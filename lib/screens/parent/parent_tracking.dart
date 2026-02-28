@@ -52,8 +52,12 @@ class _ParentTrackingState extends State<ParentTracking>
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.parentPurple.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.parentPurple.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
@@ -61,13 +65,19 @@ class _ParentTrackingState extends State<ParentTracking>
                 GestureDetector(
                   onTap: widget.onBack,
                   child: Container(
-                    width: 38, height: 38,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white.withOpacity(0.12)),
                     ),
-                    child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))),
+                    child: const Center(
+                      child: Text(
+                        '←',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -75,10 +85,21 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Live Tracking',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                      Text('Bus #42 · Route A',
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                      const Text(
+                        'Live Tracking',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Bus #42 · Route A',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -87,16 +108,28 @@ class _ParentTrackingState extends State<ParentTracking>
                   builder: (_, __) => Row(
                     children: [
                       Container(
-                        width: 8, height: 8,
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
                           color: AppTheme.success,
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: AppTheme.success.withOpacity(0.6), blurRadius: 6)],
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.success.withOpacity(0.6),
+                              blurRadius: 6,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text('LIVE',
-                          style: TextStyle(color: AppTheme.successLight, fontSize: 12, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'LIVE',
+                        style: TextStyle(
+                          color: AppTheme.successLight,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -111,29 +144,50 @@ class _ParentTrackingState extends State<ParentTracking>
                 // ── ETA Banner ───────────────────────────────────────────
                 GlassCard(
                   gradient: LinearGradient(
-                    colors: [AppTheme.parentPurple.withOpacity(0.2), AppTheme.info.withOpacity(0.1)],
+                    colors: [
+                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.info.withOpacity(0.1),
+                    ],
                   ),
                   borderColor: AppTheme.parentPurple.withOpacity(0.3),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('ESTIMATED ARRIVAL',
-                              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
+                          Text(
+                            'ESTIMATED ARRIVAL',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.55),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.baseline,
                             textBaseline: TextBaseline.alphabetic,
                             children: [
-                              Text('$etaInt',
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+                              Text(
+                                '$etaInt',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                               const SizedBox(width: 6),
-                              Text('min',
-                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16)),
+                              Text(
+                                'min',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 16,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -141,12 +195,22 @@ class _ParentTrackingState extends State<ParentTracking>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('ARRIVAL TIME',
-                              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11)),
+                          Text(
+                            'ARRIVAL TIME',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.55),
+                              fontSize: 11,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          const Text('07:45 AM',
-                              style: TextStyle(
-                                  color: AppTheme.parentAccent, fontSize: 20, fontWeight: FontWeight.w700)),
+                          const Text(
+                            '07:45 AM',
+                            style: TextStyle(
+                              color: AppTheme.parentAccent,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -166,8 +230,14 @@ class _ParentTrackingState extends State<ParentTracking>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Route Map',
-                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                            const Text(
+                              'Route Map',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -185,12 +255,21 @@ class _ParentTrackingState extends State<ParentTracking>
                       ),
                       const Divider(color: Color(0x10FFFFFF), height: 1),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         child: Row(
                           children: [
-                            _LegendDot(color: AppTheme.success, label: 'Completed'),
+                            _LegendDot(
+                              color: AppTheme.success,
+                              label: 'Completed',
+                            ),
                             const SizedBox(width: 16),
-                            _LegendDot(color: AppTheme.purple, label: 'Current'),
+                            _LegendDot(
+                              color: AppTheme.purple,
+                              label: 'Current',
+                            ),
                             const SizedBox(width: 16),
                             _LegendDot(color: AppTheme.info, label: 'Upcoming'),
                           ],
@@ -207,13 +286,21 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Route Stops',
-                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'Route Stops',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 14),
-                      ..._stops.asMap().entries.map((e) => _StopRow(
-                            stop: e.value,
-                            isLast: e.key == _stops.length - 1,
-                          )),
+                      ..._stops.asMap().entries.map(
+                        (e) => _StopRow(
+                          stop: e.value,
+                          isLast: e.key == _stops.length - 1,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -225,8 +312,14 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Bus Information',
-                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                      const Text(
+                        'Bus Information',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 14),
                       GridView.count(
                         shrinkWrap: true,
@@ -234,12 +327,28 @@ class _ParentTrackingState extends State<ParentTracking>
                         crossAxisCount: 2,
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        childAspectRatio: 1.8,
+                        childAspectRatio: 1.5,
                         children: const [
-                          _InfoCard(icon: '👨‍✈️', label: 'Driver', value: 'Mike Thompson'),
-                          _InfoCard(icon: '🚌', label: 'Bus Number', value: '#42'),
-                          _InfoCard(icon: '⚡', label: 'Speed', value: '35 km/h'),
-                          _InfoCard(icon: '👦', label: 'Students', value: '22 onboard'),
+                          _InfoCard(
+                            icon: '👨‍✈️',
+                            label: 'Driver',
+                            value: 'Mike Thompson',
+                          ),
+                          _InfoCard(
+                            icon: '🚌',
+                            label: 'Bus Number',
+                            value: '#42',
+                          ),
+                          _InfoCard(
+                            icon: '⚡',
+                            label: 'Speed',
+                            value: '35 km/h',
+                          ),
+                          _InfoCard(
+                            icon: '👦',
+                            label: 'Students',
+                            value: '22 onboard',
+                          ),
                         ],
                       ),
                     ],
@@ -255,10 +364,10 @@ class _ParentTrackingState extends State<ParentTracking>
 }
 
 const _stops = [
-  _Stop(name: 'Oak Street',         time: '07:15', status: 'done'),
-  _Stop(name: 'Maple Avenue',       time: '07:22', status: 'done'),
-  _Stop(name: 'Pine Road',          time: '07:30', status: 'current'),
-  _Stop(name: 'Cedar Blvd',         time: '07:37', status: 'upcoming'),
+  _Stop(name: 'Oak Street', time: '07:15', status: 'done'),
+  _Stop(name: 'Maple Avenue', time: '07:22', status: 'done'),
+  _Stop(name: 'Pine Road', time: '07:30', status: 'current'),
+  _Stop(name: 'Cedar Blvd', time: '07:37', status: 'upcoming'),
   _Stop(name: 'Lincoln Elementary', time: '07:45', status: 'school'),
 ];
 
@@ -274,10 +383,14 @@ class _StopRow extends StatelessWidget {
 
   Color get _color {
     switch (stop.status) {
-      case 'done': return AppTheme.success;
-      case 'current': return AppTheme.purple;
-      case 'upcoming': return AppTheme.info;
-      default: return AppTheme.warning;
+      case 'done':
+        return AppTheme.success;
+      case 'current':
+        return AppTheme.purple;
+      case 'upcoming':
+        return AppTheme.info;
+      default:
+        return AppTheme.warning;
     }
   }
 
@@ -291,24 +404,41 @@ class _StopRow extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 28, height: 28,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: _color.withOpacity(0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: _color, width: 2),
                   boxShadow: stop.status == 'current'
-                      ? [BoxShadow(color: _color.withOpacity(0.4), blurRadius: 10)]
+                      ? [
+                          BoxShadow(
+                            color: _color.withOpacity(0.4),
+                            blurRadius: 10,
+                          ),
+                        ]
                       : null,
                 ),
                 child: Center(
                   child: stop.status == 'done'
-                      ? Text('✓', style: TextStyle(color: _color, fontSize: 13, fontWeight: FontWeight.w700))
+                      ? Text(
+                          '✓',
+                          style: TextStyle(
+                            color: _color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
                       : stop.status == 'school'
-                          ? const Text('🏫', style: TextStyle(fontSize: 12))
-                          : Container(
-                              width: 8, height: 8,
-                              decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
-                            ),
+                      ? const Text('🏫', style: TextStyle(fontSize: 12))
+                      : Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                 ),
               ),
               if (!isLast)
@@ -335,22 +465,37 @@ class _StopRow extends StatelessWidget {
                     Text(
                       stop.name,
                       style: TextStyle(
-                        color: stop.status == 'current' ? Colors.white : Colors.white.withOpacity(0.75),
+                        color: stop.status == 'current'
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.75),
                         fontSize: 14,
-                        fontWeight: stop.status == 'current' ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: stop.status == 'current'
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                     if (stop.status == 'current') ...[
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.purple.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.purple.withOpacity(0.4)),
+                          border: Border.all(
+                            color: AppTheme.purple.withOpacity(0.4),
+                          ),
                         ),
-                        child: const Text('NOW',
-                            style: TextStyle(color: AppTheme.parentAccent, fontSize: 9, fontWeight: FontWeight.w700)),
+                        child: const Text(
+                          'NOW',
+                          style: TextStyle(
+                            color: AppTheme.parentAccent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -361,8 +506,8 @@ class _StopRow extends StatelessWidget {
                     color: stop.status == 'done'
                         ? AppTheme.successLight
                         : stop.status == 'current'
-                            ? AppTheme.parentAccent
-                            : Colors.white.withOpacity(0.4),
+                        ? AppTheme.parentAccent
+                        : Colors.white.withOpacity(0.4),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -385,9 +530,16 @@ class _LegendDot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+        ),
       ],
     );
   }
@@ -395,7 +547,11 @@ class _LegendDot extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   final String icon, label, value;
-  const _InfoCard({required this.icon, required this.label, required this.value});
+  const _InfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -412,10 +568,24 @@ class _InfoCard extends StatelessWidget {
         children: [
           Text(icon, style: const TextStyle(fontSize: 18)),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 10)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.45),
+              fontSize: 10,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(value,
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -451,15 +621,21 @@ class _RouteMapPainter extends CustomPainter {
       ..strokeWidth = 8 * scaleX
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(s(30, 148), s(310, 148), roadPaint);
-    canvas.drawLine(s(100, 20),  s(100, 160), roadPaint);
-    canvas.drawLine(s(30, 78),   s(310, 78),  roadPaint);
+    canvas.drawLine(s(100, 20), s(100, 160), roadPaint);
+    canvas.drawLine(s(30, 78), s(310, 78), roadPaint);
 
     // Dashed route
     final dashPaint = Paint()
       ..color = AppTheme.purple.withOpacity(0.45)
       ..strokeWidth = 3 * scaleX
       ..strokeCap = StrokeCap.round;
-    _drawDashedPolyline(canvas, [s(42, 148), s(100, 148), s(100, 78), s(210, 78), s(290, 78)], dashPaint);
+    _drawDashedPolyline(canvas, [
+      s(42, 148),
+      s(100, 148),
+      s(100, 78),
+      s(210, 78),
+      s(290, 78),
+    ], dashPaint);
 
     // Completed portion
     final donePaint = Paint()
@@ -489,9 +665,19 @@ class _RouteMapPainter extends CustomPainter {
     for (final stop in stopDefs) {
       final center = s(stop.$1, stop.$2);
       final color = stop.$3;
-      canvas.drawCircle(center, 10 * scaleX, Paint()..color = color.withOpacity(0.2));
-      canvas.drawCircle(center, 10 * scaleX,
-          Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2);
+      canvas.drawCircle(
+        center,
+        10 * scaleX,
+        Paint()..color = color.withOpacity(0.2),
+      );
+      canvas.drawCircle(
+        center,
+        10 * scaleX,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
       canvas.drawCircle(center, 4 * scaleX, Paint()..color = color);
     }
 
@@ -499,21 +685,28 @@ class _RouteMapPainter extends CustomPainter {
     double busX, busY;
     if (progress < seg1End) {
       final t = progress / seg1End;
-      busX = 100; busY = 148 - t * 70;
+      busX = 100;
+      busY = 148 - t * 70;
     } else {
       final t = (progress - seg1End) / (1.0 - seg1End);
-      busX = 100 + t * 110; busY = 78;
+      busX = 100 + t * 110;
+      busY = 78;
     }
     final busCenter = s(busX, busY);
-    final busRect = Rect.fromCenter(center: busCenter, width: 28 * scaleX, height: 28 * scaleY);
+    final busRect = Rect.fromCenter(
+      center: busCenter,
+      width: 28 * scaleX,
+      height: 28 * scaleY,
+    );
     final rrect = RRect.fromRectAndRadius(busRect, Radius.circular(8 * scaleX));
     canvas.drawRRect(rrect, Paint()..color = AppTheme.purple.withOpacity(0.9));
     canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5);
+      rrect,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
     final tp = TextPainter(
       text: const TextSpan(text: '🚌', style: TextStyle(fontSize: 14)),
       textDirection: TextDirection.ltr,
@@ -545,7 +738,8 @@ class _RouteMapPainter extends CustomPainter {
       final nx = x + stepX * len;
       final ny = y + stepY * len;
       if (drawing) canvas.drawLine(Offset(x, y), Offset(nx, ny), paint);
-      x = nx; y = ny;
+      x = nx;
+      y = ny;
       drawn += len;
       drawing = !drawing;
     }

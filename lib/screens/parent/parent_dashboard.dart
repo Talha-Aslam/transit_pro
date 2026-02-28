@@ -158,28 +158,31 @@ class ParentDashboard extends StatelessWidget {
                       Expanded(
                         child: Row(
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Noorulain Shahid',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Noorulain Shahid',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Grade 5 · Lincoln Elementary',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.55),
-                                    fontSize: 12,
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Grade 5 · Lincoln Elementary',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.55),
+                                      fontSize: 12,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                            Spacer(),
                             const SizedBox(width: 8),
                             StatusBadge(
                               label: '● On the Bus',
@@ -220,7 +223,7 @@ class ParentDashboard extends StatelessWidget {
                     ],
                   ),
                   borderColor: AppTheme.parentPurple.withOpacity(0.25),
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(13),
                   child: Row(
                     children: [
                       Container(
