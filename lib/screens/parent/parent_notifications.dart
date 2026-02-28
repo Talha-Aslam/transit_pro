@@ -23,10 +23,14 @@ class _ParentNotificationsState extends State<ParentNotifications> {
 
   List<_Notif> get _filtered {
     switch (_activeFilter) {
-      case 'Unread': return _notifs.where((n) => !n.read).toList();
-      case 'Today':  return _notifs.where((n) => n.date == 'Today').toList();
-      case 'Alerts': return _notifs.where((n) => n.type == 'alert').toList();
-      default:       return _notifs;
+      case 'Unread':
+        return _notifs.where((n) => !n.read).toList();
+      case 'Today':
+        return _notifs.where((n) => n.date == 'Today').toList();
+      case 'Alerts':
+        return _notifs.where((n) => n.type == 'alert').toList();
+      default:
+        return _notifs;
     }
   }
 
@@ -41,32 +45,48 @@ class _ParentNotificationsState extends State<ParentNotifications> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.parentPurple.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.parentPurple.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: widget.onBack,
-                  child: _backBtn(),
-                ),
+                GestureDetector(onTap: widget.onBack, child: _backBtn()),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Row(
                     children: [
-                      const Text('Notifications',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       if (_unreadCount > 0) ...[
                         const SizedBox(width: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.error,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text('$_unreadCount',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -75,17 +95,29 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                 if (_unreadCount > 0)
                   GestureDetector(
                     onTap: () => setState(() {
-                      _notifs = _notifs.map((n) => n.copyWith(read: true)).toList();
+                      _notifs = _notifs
+                          .map((n) => n.copyWith(read: true))
+                          .toList();
                     }),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.parentAccent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.parentAccent.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppTheme.parentAccent.withOpacity(0.3),
+                        ),
                       ),
-                      child: Text('Mark all read',
-                          style: TextStyle(color: AppTheme.parentAccent, fontSize: 12)),
+                      child: Text(
+                        'Mark all read',
+                        style: TextStyle(
+                          color: AppTheme.parentAccent,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -108,7 +140,10 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                         child: GestureDetector(
                           onTap: () => setState(() => _activeFilter = f),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: active
                                   ? AppTheme.parentPurple.withOpacity(0.2)
@@ -120,12 +155,18 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                     : Colors.white.withOpacity(0.1),
                               ),
                             ),
-                            child: Text(f,
-                                style: TextStyle(
-                                  color: active ? AppTheme.parentAccent : Colors.white.withOpacity(0.5),
-                                  fontSize: 13,
-                                  fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                                )),
+                            child: Text(
+                              f,
+                              style: TextStyle(
+                                color: active
+                                    ? AppTheme.parentAccent
+                                    : Colors.white.withOpacity(0.5),
+                                fontSize: 13,
+                                fontWeight: active
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
                           ),
                         ),
                       );
@@ -136,35 +177,46 @@ class _ParentNotificationsState extends State<ParentNotifications> {
 
                 // Grouped by date
                 for (final date in ['Today', 'Yesterday', 'Mon, Feb 23']) ...[
-                  Builder(builder: (context) {
-                    final group = _filtered.where((n) => n.date == date).toList();
-                    if (group.isEmpty) return const SizedBox.shrink();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(date,
+                  Builder(
+                    builder: (context) {
+                      final group = _filtered
+                          .where((n) => n.date == date)
+                          .toList();
+                      if (group.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              date,
                               style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5)),
-                        ),
-                        ...group.map((n) => Padding(
+                                color: Colors.white.withOpacity(0.4),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          ...group.map(
+                            (n) => Padding(
                               padding: const EdgeInsets.only(bottom: 8),
                               child: _NotifCard(
                                 notif: n,
                                 onTap: () => setState(() {
-                                  final i = _notifs.indexWhere((x) => x.id == n.id);
+                                  final i = _notifs.indexWhere(
+                                    (x) => x.id == n.id,
+                                  );
                                   _notifs[i] = _notifs[i].copyWith(read: true);
                                 }),
                               ),
-                            )),
-                        const SizedBox(height: 8),
-                      ],
-                    );
-                  }),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      );
+                    },
+                  ),
                 ],
 
                 if (_filtered.isEmpty)
@@ -175,8 +227,13 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                         children: [
                           const Text('🔔', style: TextStyle(fontSize: 40)),
                           const SizedBox(height: 12),
-                          Text('No notifications in this category',
-                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14)),
+                          Text(
+                            'No notifications in this category',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 14,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -202,67 +259,95 @@ class _NotifCard extends StatelessWidget {
       child: AnimatedOpacity(
         opacity: notif.read ? 0.7 : 1.0,
         duration: const Duration(milliseconds: 200),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(20),
-            border: Border(
-              left: BorderSide(
-                color: notif.read ? Colors.transparent : notif.color,
-                width: notif.read ? 1 : 3,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              border: Border(
+                left: BorderSide(
+                  color: notif.read ? Colors.transparent : notif.color,
+                  width: notif.read ? 1 : 3,
+                ),
+                top: BorderSide(color: Colors.white.withOpacity(0.10)),
+                right: BorderSide(color: Colors.white.withOpacity(0.10)),
+                bottom: BorderSide(color: Colors.white.withOpacity(0.10)),
               ),
-              top: BorderSide(color: Colors.white.withOpacity(0.10)),
-              right: BorderSide(color: Colors.white.withOpacity(0.10)),
-              bottom: BorderSide(color: Colors.white.withOpacity(0.10)),
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color: notif.color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: notif.color.withOpacity(0.25)),
-                ),
-                child: Center(child: Text(notif.icon, style: const TextStyle(fontSize: 20))),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(notif.title,
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: notif.read ? FontWeight.w500 : FontWeight.w700)),
-                        ),
-                        Text(notif.time,
-                            style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11)),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(notif.msg,
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.55), fontSize: 12, height: 1.5)),
-                  ],
-                ),
-              ),
-              if (!notif.read) ...[
-                const SizedBox(width: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Container(
-                  width: 8, height: 8, margin: const EdgeInsets.only(top: 4),
-                  decoration: BoxDecoration(color: notif.color, shape: BoxShape.circle),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: notif.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: notif.color.withOpacity(0.25)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      notif.icon,
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                  ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              notif.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: notif.read
+                                    ? FontWeight.w500
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            notif.time,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.35),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        notif.msg,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.55),
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!notif.read) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: BoxDecoration(
+                      color: notif.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -271,13 +356,16 @@ class _NotifCard extends StatelessWidget {
 }
 
 Widget _backBtn() => Container(
-  width: 38, height: 38,
+  width: 38,
+  height: 38,
   decoration: BoxDecoration(
     color: Colors.white.withOpacity(0.08),
     borderRadius: BorderRadius.circular(12),
     border: Border.all(color: Colors.white.withOpacity(0.12)),
   ),
-  child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))),
+  child: const Center(
+    child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16)),
+  ),
 );
 
 class _Notif {
@@ -287,37 +375,107 @@ class _Notif {
   final bool read;
 
   const _Notif({
-    required this.id, required this.type, required this.icon,
-    required this.title, required this.msg, required this.time,
-    required this.date, required this.color, required this.read,
+    required this.id,
+    required this.type,
+    required this.icon,
+    required this.title,
+    required this.msg,
+    required this.time,
+    required this.date,
+    required this.color,
+    required this.read,
   });
 
   _Notif copyWith({bool? read}) => _Notif(
-    id: id, type: type, icon: icon, title: title, msg: msg,
-    time: time, date: date, color: color, read: read ?? this.read,
+    id: id,
+    type: type,
+    icon: icon,
+    title: title,
+    msg: msg,
+    time: time,
+    date: date,
+    color: color,
+    read: read ?? this.read,
   );
 }
 
 const _allNotifs = [
-  _Notif(id: 1, type: 'success', icon: '✅', read: false, title: 'Emma Boarded the Bus',
-      msg: 'Your child has safely boarded Bus #42 at Oak Street stop.',
-      time: '07:18 AM', date: 'Today', color: AppTheme.success),
-  _Notif(id: 2, type: 'info', icon: '🚌', read: false, title: 'Bus Running Ahead',
-      msg: 'Bus #42 is running 3 minutes ahead of schedule today.',
-      time: '07:10 AM', date: 'Today', color: AppTheme.info),
-  _Notif(id: 3, type: 'alert', icon: '🔔', read: false, title: 'Bus Approaching Stop',
-      msg: 'Bus #42 will arrive at Pine Road stop in approximately 5 minutes.',
-      time: '06:55 AM', date: 'Today', color: AppTheme.warning),
-  _Notif(id: 4, type: 'success', icon: '🏫', read: true, title: 'Emma Arrived at School',
-      msg: 'Emma has safely arrived at Lincoln Elementary School.',
-      time: '07:45 AM', date: 'Yesterday', color: AppTheme.success),
-  _Notif(id: 5, type: 'info', icon: '📍', read: true, title: 'Route Update',
-      msg: 'Due to road works, Route A will use alternate path via Oak Avenue.',
-      time: '06:30 PM', date: 'Yesterday', color: AppTheme.purple),
-  _Notif(id: 6, type: 'success', icon: '🌇', read: true, title: 'Emma Dropped Off',
-      msg: 'Emma has been safely dropped off at Oak Street stop.',
-      time: '03:35 PM', date: 'Yesterday', color: AppTheme.success),
-  _Notif(id: 7, type: 'alert', icon: '⚠️', read: true, title: 'Schedule Change',
-      msg: "Tomorrow's pickup time has been moved to 07:30 AM due to a school event.",
-      time: '04:00 PM', date: 'Mon, Feb 23', color: AppTheme.warning),
+  _Notif(
+    id: 1,
+    type: 'success',
+    icon: '✅',
+    read: false,
+    title: 'Emma Boarded the Bus',
+    msg: 'Your child has safely boarded Bus #42 at Oak Street stop.',
+    time: '07:18 AM',
+    date: 'Today',
+    color: AppTheme.success,
+  ),
+  _Notif(
+    id: 2,
+    type: 'info',
+    icon: '🚌',
+    read: false,
+    title: 'Bus Running Ahead',
+    msg: 'Bus #42 is running 3 minutes ahead of schedule today.',
+    time: '07:10 AM',
+    date: 'Today',
+    color: AppTheme.info,
+  ),
+  _Notif(
+    id: 3,
+    type: 'alert',
+    icon: '🔔',
+    read: false,
+    title: 'Bus Approaching Stop',
+    msg: 'Bus #42 will arrive at Pine Road stop in approximately 5 minutes.',
+    time: '06:55 AM',
+    date: 'Today',
+    color: AppTheme.warning,
+  ),
+  _Notif(
+    id: 4,
+    type: 'success',
+    icon: '🏫',
+    read: true,
+    title: 'Emma Arrived at School',
+    msg: 'Emma has safely arrived at Lincoln Elementary School.',
+    time: '07:45 AM',
+    date: 'Yesterday',
+    color: AppTheme.success,
+  ),
+  _Notif(
+    id: 5,
+    type: 'info',
+    icon: '📍',
+    read: true,
+    title: 'Route Update',
+    msg: 'Due to road works, Route A will use alternate path via Oak Avenue.',
+    time: '06:30 PM',
+    date: 'Yesterday',
+    color: AppTheme.purple,
+  ),
+  _Notif(
+    id: 6,
+    type: 'success',
+    icon: '🌇',
+    read: true,
+    title: 'Emma Dropped Off',
+    msg: 'Emma has been safely dropped off at Oak Street stop.',
+    time: '03:35 PM',
+    date: 'Yesterday',
+    color: AppTheme.success,
+  ),
+  _Notif(
+    id: 7,
+    type: 'alert',
+    icon: '⚠️',
+    read: true,
+    title: 'Schedule Change',
+    msg:
+        "Tomorrow's pickup time has been moved to 07:30 AM due to a school event.",
+    time: '04:00 PM',
+    date: 'Mon, Feb 23',
+    color: AppTheme.warning,
+  ),
 ];
