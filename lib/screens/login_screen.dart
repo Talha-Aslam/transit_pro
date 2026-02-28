@@ -13,10 +13,10 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
-  bool _loading    = false;
-  bool _showPass   = false;
-  String _error    = '';
+  final _passCtrl = TextEditingController();
+  bool _loading = false;
+  bool _showPass = false;
+  String _error = '';
 
   bool get _isParent => widget.role == 'parent';
 
@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _fillDemo() {
     _emailCtrl.text = _cfg.demoEmail;
-    _passCtrl.text  = _cfg.demoPass;
+    _passCtrl.text = _cfg.demoPass;
     setState(() => _error = '');
   }
 
@@ -55,7 +55,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Please fill in all fields.');
       return;
     }
-    setState(() { _error = ''; _loading = true; });
+    setState(() {
+      _error = '';
+      _loading = true;
+    });
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
         setState(() => _loading = false);
@@ -110,46 +113,75 @@ class _LoginScreenState extends State<LoginScreen> {
                     GestureDetector(
                       onTap: () => context.go('/role-select'),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 9,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.12)),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.12),
+                          ),
                         ),
                         child: Text(
                           '← Back',
-                          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 28),
 
                     // Role icon
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        gradient: _cfg.gradient,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _cfg.glowColor.withOpacity(0.45),
-                            blurRadius: 28,
-                            offset: const Offset(0, 12),
+                    Center(
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              gradient: _cfg.gradient,
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _cfg.glowColor.withOpacity(0.45),
+                                  blurRadius: 28,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                _cfg.icon,
+                                style: const TextStyle(fontSize: 36),
+                              ),
+                            ),
                           ),
+                          const SizedBox(height: 20),
+
+                          Text(
+                            _cfg.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _cfg.subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
                         ],
                       ),
-                      child: Center(child: Text(_cfg.icon, style: const TextStyle(fontSize: 36))),
                     ),
-                    const SizedBox(height: 20),
-
-                    Text(_cfg.title,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
-                    Text(_cfg.subtitle,
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
-                    const SizedBox(height: 28),
 
                     // Form card
                     GlassCard(
@@ -161,11 +193,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           GestureDetector(
                             onTap: _fillDemo,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: _cfg.glowColor.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: _cfg.glowColor.withOpacity(0.3)),
+                                border: Border.all(
+                                  color: _cfg.glowColor.withOpacity(0.3),
+                                ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,8 +236,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _emailCtrl,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(color: Colors.white, fontSize: 15),
-                            decoration: const InputDecoration(hintText: 'Enter your email'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'Enter your email',
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -210,14 +252,20 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _passCtrl,
                             obscureText: !_showPass,
-                            style: const TextStyle(color: Colors.white, fontSize: 15),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                            ),
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
                               hintText: 'Enter your password',
                               suffixIcon: GestureDetector(
-                                onTap: () => setState(() => _showPass = !_showPass),
+                                onTap: () =>
+                                    setState(() => _showPass = !_showPass),
                                 child: Icon(
-                                  _showPass ? Icons.visibility_off : Icons.visibility,
+                                  _showPass
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
                                   color: Colors.white.withOpacity(0.4),
                                   size: 20,
                                 ),
@@ -233,7 +281,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               onTap: () {},
                               child: Text(
                                 'Forgot password?',
-                                style: TextStyle(color: _cfg.accent, fontSize: 13),
+                                style: TextStyle(
+                                  color: _cfg.accent,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ),
@@ -242,17 +293,30 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (_error.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppTheme.error.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+                                border: Border.all(
+                                  color: AppTheme.error.withOpacity(0.3),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Text('⚠️  ', style: TextStyle(fontSize: 13)),
-                                  Text(_error,
-                                      style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 13)),
+                                  const Text(
+                                    '⚠️  ',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  Text(
+                                    _error,
+                                    style: const TextStyle(
+                                      color: Color(0xFFFCA5A5),
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -261,7 +325,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Login button
                           GradientButton(
-                            label: _isParent ? 'Sign In as Parent →' : 'Sign In as Driver →',
+                            label: _isParent
+                                ? 'Sign In as Parent →'
+                                : 'Sign In as Driver →',
                             gradient: _cfg.gradient,
                             glowColor: _cfg.glowColor,
                             isLoading: _loading,
@@ -274,7 +340,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: Text(
                         '🔒  256-bit encrypted · GDPR compliant',
-                        style: TextStyle(color: Colors.white.withOpacity(0.25), fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.25),
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),

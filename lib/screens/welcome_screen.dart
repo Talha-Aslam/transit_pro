@@ -56,14 +56,20 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     // Generate floating dots
-    _dots = List.generate(12, (i) => _FloatingDot(
-      color: [
-        AppTheme.purple, AppTheme.info, AppTheme.driverCyan, AppTheme.pink
-      ][i % 4],
-      size: 3 + _random.nextDouble() * 4,
-      left: 0.05 + _random.nextDouble() * 0.90,
-      top: 0.10 + _random.nextDouble() * 0.80,
-    ));
+    _dots = List.generate(
+      12,
+      (i) => _FloatingDot(
+        color: [
+          AppTheme.purple,
+          AppTheme.info,
+          AppTheme.driverCyan,
+          AppTheme.pink,
+        ][i % 4],
+        size: 3 + _random.nextDouble() * 4,
+        left: 0.05 + _random.nextDouble() * 0.90,
+        top: 0.10 + _random.nextDouble() * 0.80,
+      ),
+    );
   }
 
   @override
@@ -100,7 +106,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(max(0.0, 0.15 - i * 0.02)),
+                            color: Colors.white.withOpacity(
+                              max(0.0, 0.15 - i * 0.02),
+                            ),
                             width: 1,
                           ),
                         ),
@@ -112,24 +120,26 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             }),
 
             // Floating dots
-            ..._dots.map((dot) => Positioned(
-              left: dot.left * size.width,
-              top: dot.top * size.height,
-              child: AnimatedBuilder(
-                animation: _bounceController,
-                builder: (_, __) => Transform.translate(
-                  offset: Offset(0, -_bounceController.value * 20),
-                  child: Container(
-                    width: dot.size,
-                    height: dot.size,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: dot.color.withOpacity(0.6),
+            ..._dots.map(
+              (dot) => Positioned(
+                left: dot.left * size.width,
+                top: dot.top * size.height,
+                child: AnimatedBuilder(
+                  animation: _bounceController,
+                  builder: (_, __) => Transform.translate(
+                    offset: Offset(0, -_bounceController.value * 20),
+                    child: Container(
+                      width: dot.size,
+                      height: dot.size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: dot.color.withOpacity(0.6),
+                      ),
                     ),
                   ),
                 ),
               ),
-            )),
+            ),
 
             // Main content
             Center(
@@ -170,10 +180,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       // App name
                       ShaderMask(
                         shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Colors.white, Color(0xFFC4B5FD), Color(0xFF93C5FD)],
+                          colors: [
+                            Colors.white,
+                            Color(0xFFC4B5FD),
+                            Color(0xFF93C5FD),
+                          ],
                         ).createShader(bounds),
                         child: const Text(
-                          'TransportKid',
+                          'Transit Pro',
                           style: TextStyle(
                             fontSize: 38,
                             fontWeight: FontWeight.w800,
@@ -199,55 +213,67 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         spacing: 10,
                         runSpacing: 10,
                         alignment: WrapAlignment.center,
-                        children: ['📍 Live Tracking', '🔔 Alerts', '🛡️ Safe & Secure']
-                            .map((f) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.07),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white.withOpacity(0.12)),
-                                  ),
-                                  child: Text(
-                                    f,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                        children:
+                            [
+                                  '📍 Live Tracking',
+                                  '🔔 Alerts',
+                                  '🛡️ Safe & Secure',
+                                ]
+                                .map(
+                                  (f) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 7,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.07),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      f,
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.8),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
-                                ))
-                            .toList(),
+                                )
+                                .toList(),
                       ),
                       const SizedBox(height: 36),
 
-                      // Get Started button
-                      GestureDetector(
-                        onTap: () => context.go('/role-select'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.mainGradient,
-                            borderRadius: BorderRadius.circular(50),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.purple.withOpacity(0.5),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            'Get Started →',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      // // Get Started button
+                      // GestureDetector(
+                      //   onTap: () => context.go('/role-select'),
+                      //   child: Container(
+                      //     padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
+                      //     decoration: BoxDecoration(
+                      //       gradient: AppTheme.mainGradient,
+                      //       borderRadius: BorderRadius.circular(50),
+                      //       boxShadow: [
+                      //         BoxShadow(
+                      //           color: AppTheme.purple.withOpacity(0.5),
+                      //           blurRadius: 28,
+                      //           offset: const Offset(0, 10),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //     child: const Text(
+                      //       'Get Started →',
+                      //       style: TextStyle(
+                      //         color: Colors.white,
+                      //         fontSize: 16,
+                      //         fontWeight: FontWeight.w700,
+                      //         letterSpacing: 0.5,
+                      //       ),
+                      //     ),
+                      //   ),
+                      // ),
+                      const SizedBox(height: 14),
 
                       // Progress bar + hint
                       Row(
@@ -256,23 +282,30 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ClipRRect(
                             borderRadius: BorderRadius.circular(2),
                             child: SizedBox(
-                              width: 40,
+                              width: 70,
                               height: 3,
                               child: AnimatedBuilder(
                                 animation: _progressController,
                                 builder: (_, __) => LinearProgressIndicator(
                                   value: _progressController.value,
-                                  backgroundColor: Colors.white.withOpacity(0.15),
-                                  valueColor: const AlwaysStoppedAnimation(AppTheme.purple),
+                                  backgroundColor: Colors.white.withOpacity(
+                                    0.15,
+                                  ),
+                                  valueColor: const AlwaysStoppedAnimation(
+                                    AppTheme.purple,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Auto-continuing…',
-                            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11),
-                          ),
+                          // const SizedBox(width: 10),
+                          // Text(
+                          //   'Starting up...',
+                          //   style: TextStyle(
+                          //     color: Colors.white.withOpacity(0.3),
+                          //     fontSize: 11,
+                          //   ),
+                          // ),
                         ],
                       ),
                     ],

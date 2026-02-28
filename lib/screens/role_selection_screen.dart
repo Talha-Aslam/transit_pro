@@ -103,14 +103,19 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   children: [
                     // Header badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.purple.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.purple.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppTheme.purple.withOpacity(0.3),
+                        ),
                       ),
                       child: Text(
-                        'WELCOME TO TRANSPORTKID',
+                        'WELCOME TO TRANSIT PRO',
                         style: TextStyle(
                           color: AppTheme.parentAccent,
                           fontSize: 11,
@@ -122,12 +127,19 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     const SizedBox(height: 18),
                     const Text(
                       'Who are you?',
-                      style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       'Select your role to get started',
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 36),
 
@@ -181,14 +193,18 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                     ],
                                   ),
                                   child: Center(
-                                    child: Text(role.icon, style: const TextStyle(fontSize: 28)),
+                                    child: Text(
+                                      role.icon,
+                                      style: const TextStyle(fontSize: 28),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 // Info
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         role.label,
@@ -208,30 +224,34 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-                                      ...role.features.map((f) => Padding(
-                                            padding: const EdgeInsets.only(bottom: 4),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  width: 5,
-                                                  height: 5,
-                                                  decoration: BoxDecoration(
-                                                    color: role.accent,
-                                                    shape: BoxShape.circle,
-                                                  ),
+                                      ...role.features.map(
+                                        (f) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 5,
+                                                height: 5,
+                                                decoration: BoxDecoration(
+                                                  color: role.accent,
+                                                  shape: BoxShape.circle,
                                                 ),
-                                                const SizedBox(width: 7),
-                                                Text(
-                                                  f,
-                                                  style: TextStyle(
-                                                    color: role.accent,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
+                                              ),
+                                              const SizedBox(width: 7),
+                                              Text(
+                                                f,
+                                                style: TextStyle(
+                                                  color: role.accent,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
                                                 ),
-                                              ],
-                                            ),
-                                          )),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -244,13 +264,21 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                     shape: BoxShape.circle,
                                     gradient: isSelected ? role.gradient : null,
                                     border: Border.all(
-                                      color: isSelected ? role.accent : Colors.white.withOpacity(0.2),
+                                      color: isSelected
+                                          ? role.accent
+                                          : Colors.white.withOpacity(0.2),
                                       width: 2,
                                     ),
                                   ),
                                   child: isSelected
                                       ? const Center(
-                                          child: Text('✓', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                          child: Text(
+                                            '✓',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                            ),
+                                          ),
                                         )
                                       : null,
                                 ),
@@ -267,7 +295,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       children: [
                         Text(
                           '🔒  Your data is encrypted & secure',
-                          style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.3),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
