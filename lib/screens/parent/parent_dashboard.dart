@@ -42,15 +42,15 @@ class ParentDashboard extends StatelessWidget {
                       Text(
                         '$greeting 👋',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: context.textSecondary,
                           fontSize: 13,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'Shahid',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                         ),
@@ -68,11 +68,9 @@ class ParentDashboard extends StatelessWidget {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: context.cardBgElevated,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                          ),
+                          border: Border.all(color: context.inputBorder),
                         ),
                         child: const Center(
                           child: Text('🔔', style: TextStyle(fontSize: 18)),
@@ -88,11 +86,11 @@ class ParentDashboard extends StatelessWidget {
                             color: AppTheme.error,
                             shape: BoxShape.circle,
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               '3',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: context.textPrimary,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -162,10 +160,10 @@ class ParentDashboard extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Noorulain Shahid',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: context.textPrimary,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -175,7 +173,7 @@ class ParentDashboard extends StatelessWidget {
                                   Text(
                                     'Grade 5 · Lincoln Elementary',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.55),
+                                      color: context.textSecondary,
                                       fontSize: 12,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -252,7 +250,7 @@ class ParentDashboard extends StatelessWidget {
                             Text(
                               'BUS #42 · ROUTE A',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.55),
+                                color: context.textSecondary,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -270,10 +268,10 @@ class ParentDashboard extends StatelessWidget {
                                       Color(0xFF60A5FA),
                                     ],
                                   ).createShader(b),
-                                  child: const Text(
+                                  child: Text(
                                     '8 min',
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: context.textPrimary,
                                       fontSize: 30,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -283,7 +281,7 @@ class ParentDashboard extends StatelessWidget {
                                 Text(
                                   'to school',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: context.textSecondary,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -292,7 +290,7 @@ class ParentDashboard extends StatelessWidget {
                             Text(
                               '📍 Currently at Pine Road Stop',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
+                                color: context.textTertiary,
                                 fontSize: 12,
                               ),
                             ),
@@ -309,10 +307,13 @@ class ParentDashboard extends StatelessWidget {
                             color: AppTheme.parentAccent.withOpacity(0.3),
                           ),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
                             '→',
-                            style: TextStyle(color: Colors.white, fontSize: 18),
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                       ),
@@ -329,10 +330,10 @@ class ParentDashboard extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             "Today's Schedule",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: context.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
@@ -439,10 +440,10 @@ class ParentDashboard extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Recent Alerts',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: context.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
@@ -552,18 +553,15 @@ class _StatCard extends StatelessWidget {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 Text(
                   label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.45),
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: context.textSecondary, fontSize: 10),
                 ),
               ],
             ),
@@ -594,7 +592,7 @@ class _ScheduleChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: context.cardBgElevated),
         ),
         child: Column(
           children: [
@@ -602,16 +600,13 @@ class _ScheduleChip extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 10,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 10),
             ),
             const SizedBox(height: 3),
             Text(
               time,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.textPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -658,7 +653,7 @@ class _AlertRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: context.cardBg),
       ),
       child: Row(
         children: [

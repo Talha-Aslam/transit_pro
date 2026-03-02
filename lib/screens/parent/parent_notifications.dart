@@ -55,15 +55,15 @@ class _ParentNotificationsState extends State<ParentNotifications> {
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn()),
+                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Notifications',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
@@ -81,8 +81,8 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                           ),
                           child: Text(
                             '$_unreadCount',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -160,7 +160,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                               style: TextStyle(
                                 color: active
                                     ? AppTheme.parentAccent
-                                    : Colors.white.withOpacity(0.5),
+                                    : context.textSecondary,
                                 fontSize: 13,
                                 fontWeight: active
                                     ? FontWeight.w700
@@ -191,7 +191,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                             child: Text(
                               date,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
+                                color: context.textTertiary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.5,
@@ -225,12 +225,12 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                       padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Column(
                         children: [
-                          const Text('🔔', style: TextStyle(fontSize: 40)),
+                          Text('🔔', style: TextStyle(fontSize: 40)),
                           const SizedBox(height: 12),
                           Text(
                             'No notifications in this category',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: context.textTertiary,
                               fontSize: 14,
                             ),
                           ),
@@ -264,15 +264,15 @@ class _NotifCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: context.cardBg,
               border: Border(
                 left: BorderSide(
                   color: notif.read ? Colors.transparent : notif.color,
                   width: notif.read ? 1 : 3,
                 ),
-                top: BorderSide(color: Colors.white.withOpacity(0.10)),
-                right: BorderSide(color: Colors.white.withOpacity(0.10)),
-                bottom: BorderSide(color: Colors.white.withOpacity(0.10)),
+                top: BorderSide(color: context.surfaceBorder),
+                right: BorderSide(color: context.surfaceBorder),
+                bottom: BorderSide(color: context.surfaceBorder),
               ),
             ),
             child: Row(
@@ -305,7 +305,7 @@ class _NotifCard extends StatelessWidget {
                             child: Text(
                               notif.title,
                               style: TextStyle(
-                                color: Colors.white,
+                                color: context.textPrimary,
                                 fontSize: 14,
                                 fontWeight: notif.read
                                     ? FontWeight.w500
@@ -326,7 +326,7 @@ class _NotifCard extends StatelessWidget {
                       Text(
                         notif.msg,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: context.textSecondary,
                           fontSize: 12,
                           height: 1.5,
                         ),
@@ -355,16 +355,19 @@ class _NotifCard extends StatelessWidget {
   }
 }
 
-Widget _backBtn() => Container(
+Widget _backBtn(BuildContext context) => Container(
   width: 38,
   height: 38,
   decoration: BoxDecoration(
-    color: Colors.white.withOpacity(0.08),
+    color: context.cardBgElevated,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    border: Border.all(color: context.inputBorder),
   ),
-  child: const Center(
-    child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16)),
+  child: Center(
+    child: Text(
+      '←',
+      style: TextStyle(color: context.textPrimary, fontSize: 16),
+    ),
   ),
 );
 

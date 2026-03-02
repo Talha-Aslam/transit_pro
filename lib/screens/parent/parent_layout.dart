@@ -32,7 +32,7 @@ class _ParentLayoutState extends State<ParentLayout> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: SafeArea(
           bottom: false,
           child: IndexedStack(
@@ -61,8 +61,10 @@ class _ParentLayoutState extends State<ParentLayout> {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.45),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+            color: context.isDark
+                ? Colors.black.withOpacity(0.45)
+                : Colors.white.withOpacity(0.85),
+            border: Border(top: BorderSide(color: context.cardBgElevated)),
           ),
           child: SafeArea(
             top: false,
@@ -86,15 +88,15 @@ class _ParentLayoutState extends State<ParentLayout> {
                               padding: const EdgeInsets.all(8),
                               decoration: isActive
                                   ? BoxDecoration(
-                                      color: AppTheme.parentPurple.withOpacity(0.2),
+                                      color: AppTheme.parentPurple.withOpacity(
+                                        0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(12),
                                     )
                                   : null,
                               child: Text(
                                 _navItems[i].icon,
-                                style: TextStyle(
-                                  fontSize: isActive ? 22 : 20,
-                                ),
+                                style: TextStyle(fontSize: isActive ? 22 : 20),
                               ),
                             ),
                             const SizedBox(height: 3),
@@ -103,9 +105,11 @@ class _ParentLayoutState extends State<ParentLayout> {
                               style: TextStyle(
                                 color: isActive
                                     ? AppTheme.parentAccent
-                                    : Colors.white.withOpacity(0.4),
+                                    : context.textTertiary,
                                 fontSize: 10,
-                                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
                               ),
                             ),
                           ],

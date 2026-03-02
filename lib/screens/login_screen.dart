@@ -18,31 +18,43 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPass = false;
   String _error = '';
 
-  bool get _isParent => widget.role == 'parent';
+  static final _configs = {
+    'parent': _LoginConfig(
+      gradient: AppTheme.parentGradient,
+      glowColor: AppTheme.parentPurple,
+      accent: AppTheme.parentAccent,
+      icon: '👨‍👩‍👧',
+      title: 'Parent Login',
+      subtitle: "Access your child's journey",
+      demoEmail: 'sarah@example.com',
+      demoPass: 'parent123',
+      path: '/parent',
+    ),
+    'driver': _LoginConfig(
+      gradient: AppTheme.driverGradient,
+      glowColor: AppTheme.driverCyan,
+      accent: AppTheme.driverAccent,
+      icon: '🚌',
+      title: 'Driver Login',
+      subtitle: 'Start your route today',
+      demoEmail: 'mike@transport.com',
+      demoPass: 'driver123',
+      path: '/driver',
+    ),
+    'student': _LoginConfig(
+      gradient: AppTheme.studentGradient,
+      glowColor: AppTheme.studentAmber,
+      accent: AppTheme.studentAccent,
+      icon: '🎓',
+      title: 'Student Login',
+      subtitle: 'Track your bus & attendance',
+      demoEmail: 'noorulain@school.com',
+      demoPass: 'student123',
+      path: '/student',
+    ),
+  };
 
-  _LoginConfig get _cfg => _isParent
-      ? _LoginConfig(
-          gradient: AppTheme.parentGradient,
-          glowColor: AppTheme.parentPurple,
-          accent: AppTheme.parentAccent,
-          icon: '👨‍👩‍👧',
-          title: 'Parent Login',
-          subtitle: "Access your child's journey",
-          demoEmail: 'sarah@example.com',
-          demoPass: 'parent123',
-          path: '/parent',
-        )
-      : _LoginConfig(
-          gradient: AppTheme.driverGradient,
-          glowColor: AppTheme.driverCyan,
-          accent: AppTheme.driverAccent,
-          icon: '🚌',
-          title: 'Driver Login',
-          subtitle: 'Start your route today',
-          demoEmail: 'mike@transport.com',
-          demoPass: 'driver123',
-          path: '/driver',
-        );
+  _LoginConfig get _cfg => _configs[widget.role] ?? _configs['parent']!;
 
   void _fillDemo() {
     _emailCtrl.text = _cfg.demoEmail;
@@ -78,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: Stack(
           children: [
             // Glow blob
@@ -118,11 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           vertical: 9,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: context.cardBgElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                          ),
+                          border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
                           '← Back',
@@ -164,8 +174,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           Text(
                             _cfg.title,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 28,
                               fontWeight: FontWeight.w800,
                             ),
@@ -174,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Text(
                             _cfg.subtitle,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
+                              color: context.textSecondary,
                               fontSize: 14,
                             ),
                           ),
@@ -220,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Text(
                                     '${_cfg.demoEmail}  ·  ${_cfg.demoPass}',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.5),
+                                      color: context.textSecondary,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -236,8 +246,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _emailCtrl,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 15,
                             ),
                             decoration: const InputDecoration(
@@ -252,8 +262,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextField(
                             controller: _passCtrl,
                             obscureText: !_showPass,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 15,
                             ),
                             onSubmitted: (_) => _login(),
@@ -266,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _showPass
                                       ? Icons.visibility_off
                                       : Icons.visibility,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: context.textTertiary,
                                   size: 20,
                                 ),
                               ),
@@ -278,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: GestureDetector(
-                              onTap: () {},
+                              onTap: () => context.push('/forgot-password'),
                               child: Text(
                                 'Forgot password?',
                                 style: TextStyle(
@@ -306,10 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Text(
-                                    '⚠️  ',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
+                                  Text('⚠️  ', style: TextStyle(fontSize: 13)),
                                   Text(
                                     _error,
                                     style: const TextStyle(
@@ -325,9 +332,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Login button
                           GradientButton(
-                            label: _isParent
-                                ? 'Sign In as Parent →'
-                                : 'Sign In as Driver →',
+                            label:
+                                'Sign In as ${_cfg.title.replaceAll(' Login', '')} →',
                             gradient: _cfg.gradient,
                             glowColor: _cfg.glowColor,
                             isLoading: _loading,
@@ -340,10 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: Text(
                         '🔒  256-bit encrypted · GDPR compliant',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.25),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: context.textHint, fontSize: 12),
                       ),
                     ),
                     const SizedBox(height: 24),

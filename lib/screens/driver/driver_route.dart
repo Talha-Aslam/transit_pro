@@ -48,22 +48,37 @@ class _DriverRouteState extends State<DriverRoute>
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.driverCyan.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.driverCyan.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn()),
+                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Route Navigator',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                      Text('Route A · Morning Run',
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                      Text(
+                        'Route Navigator',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Route A · Morning Run',
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -72,17 +87,29 @@ class _DriverRouteState extends State<DriverRoute>
                     AnimatedBuilder(
                       animation: _busController,
                       builder: (_, __) => Container(
-                        width: 8, height: 8,
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
                           color: AppTheme.success,
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: AppTheme.success.withOpacity(0.6), blurRadius: 8)],
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.success.withOpacity(0.6),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text('LIVE',
-                        style: TextStyle(color: AppTheme.successLight, fontSize: 12, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: AppTheme.successLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -104,17 +131,29 @@ class _DriverRouteState extends State<DriverRoute>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Live Route Map',
-                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                            Text(
+                              'Live Route Map',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             Row(
                               children: [
-                                const Text('⚡ ', style: TextStyle(fontSize: 13)),
+                                const Text(
+                                  '⚡ ',
+                                  style: TextStyle(fontSize: 13),
+                                ),
                                 AnimatedBuilder(
                                   animation: _busController,
                                   builder: (_, __) => Text(
                                     '$_speed km/h',
                                     style: const TextStyle(
-                                        color: AppTheme.driverAccent, fontSize: 13, fontWeight: FontWeight.w700),
+                                      color: AppTheme.driverAccent,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -129,23 +168,38 @@ class _DriverRouteState extends State<DriverRoute>
                         child: AnimatedBuilder(
                           animation: _busController,
                           builder: (_, __) => CustomPaint(
-                            painter: _DriverRouteMapPainter(_busController.value),
+                            painter: _DriverRouteMapPainter(
+                              _busController.value,
+                              roadColor: context.inputBorder,
+                            ),
                             size: const Size(double.infinity, 210),
                           ),
                         ),
                       ),
                       const Divider(color: Color(0x10FFFFFF), height: 1),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         child: Row(
                           children: [
-                            _LegendDot(color: AppTheme.success,  label: 'Completed'),
+                            _LegendDot(
+                              color: AppTheme.success,
+                              label: 'Completed',
+                            ),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.purple,   label: 'Current'),
+                            _LegendDot(
+                              color: AppTheme.purple,
+                              label: 'Current',
+                            ),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.info,     label: 'Next'),
+                            _LegendDot(color: AppTheme.info, label: 'Next'),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.warning,  label: 'School'),
+                            _LegendDot(
+                              color: AppTheme.warning,
+                              label: 'School',
+                            ),
                           ],
                         ),
                       ),
@@ -157,11 +211,23 @@ class _DriverRouteState extends State<DriverRoute>
                 // ── Live stats bar ────────────────────────────────────────
                 Row(
                   children: [
-                    _LiveStatCard(icon: '⏱️', label: 'ETA School',    value: '15 min'),
+                    _LiveStatCard(
+                      icon: '⏱️',
+                      label: 'ETA School',
+                      value: '15 min',
+                    ),
                     const SizedBox(width: 10),
-                    _LiveStatCard(icon: '📏', label: 'Distance Left', value: '4.2 km'),
+                    _LiveStatCard(
+                      icon: '📏',
+                      label: 'Distance Left',
+                      value: '4.2 km',
+                    ),
                     const SizedBox(width: 10),
-                    _LiveStatCard(icon: '⚡', label: 'Avg Speed',      value: '35 km/h'),
+                    _LiveStatCard(
+                      icon: '⚡',
+                      label: 'Avg Speed',
+                      value: '35 km/h',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -172,13 +238,21 @@ class _DriverRouteState extends State<DriverRoute>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Route Stops',
-                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text(
+                        'Route Stops',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 16),
-                      ..._routeStops.asMap().entries.map((e) => _StopRow(
-                            stop: e.value,
-                            isLast: e.key == _routeStops.length - 1,
-                          )),
+                      ..._routeStops.asMap().entries.map(
+                        (e) => _StopRow(
+                          stop: e.value,
+                          isLast: e.key == _routeStops.length - 1,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -194,9 +268,15 @@ class _DriverRouteState extends State<DriverRoute>
                           gradient: AppTheme.driverGradient,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Center(
-                          child: Text('✅  Mark Stop Done',
-                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                        child: Center(
+                          child: Text(
+                            '✅  Mark Stop Done',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -207,11 +287,19 @@ class _DriverRouteState extends State<DriverRoute>
                         decoration: BoxDecoration(
                           color: AppTheme.warning.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+                          border: Border.all(
+                            color: AppTheme.warning.withOpacity(0.3),
+                          ),
                         ),
                         child: const Center(
-                          child: Text('⚠️  Report Issue',
-                              style: TextStyle(color: AppTheme.warningLight, fontSize: 14, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            '⚠️  Report Issue',
+                            style: TextStyle(
+                              color: AppTheme.warningLight,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -228,7 +316,11 @@ class _DriverRouteState extends State<DriverRoute>
 
 class _LiveStatCard extends StatelessWidget {
   final String icon, label, value;
-  const _LiveStatCard({required this.icon, required this.label, required this.value});
+  const _LiveStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,8 +331,18 @@ class _LiveStatCard extends StatelessWidget {
           children: [
             Text(icon, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 9)),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(color: context.textTertiary, fontSize: 9),
+            ),
           ],
         ),
       ),
@@ -257,9 +359,16 @@ class _LegendDot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10)),
+        Text(
+          label,
+          style: TextStyle(color: context.textSecondary, fontSize: 10),
+        ),
       ],
     );
   }
@@ -268,17 +377,65 @@ class _LegendDot extends StatelessWidget {
 class _StopData {
   final String name, time, note, status, icon;
   final int students;
-  const _StopData({required this.name, required this.time, required this.note,
-      required this.status, required this.icon, required this.students});
+  const _StopData({
+    required this.name,
+    required this.time,
+    required this.note,
+    required this.status,
+    required this.icon,
+    required this.students,
+  });
 }
 
 const _routeStops = [
-  _StopData(name: 'Bus Depot',          time: '06:55', students: 0, status: 'done',        icon: '🚌', note: 'Departure point'),
-  _StopData(name: 'Oak Street',         time: '07:15', students: 3, status: 'done',        icon: '📍', note: '3 students picked up'),
-  _StopData(name: 'Maple Avenue',       time: '07:22', students: 3, status: 'done',        icon: '📍', note: '3 students picked up'),
-  _StopData(name: 'Pine Road',          time: '07:30', students: 2, status: 'current',     icon: '📍', note: 'Just completed'),
-  _StopData(name: 'Cedar Blvd',         time: '07:37', students: 4, status: 'upcoming',    icon: '📍', note: '4 students waiting'),
-  _StopData(name: 'Lincoln Elementary', time: '07:45', students: 0, status: 'destination', icon: '🏫', note: 'Drop-off point'),
+  _StopData(
+    name: 'Bus Depot',
+    time: '06:55',
+    students: 0,
+    status: 'done',
+    icon: '🚌',
+    note: 'Departure point',
+  ),
+  _StopData(
+    name: 'Oak Street',
+    time: '07:15',
+    students: 3,
+    status: 'done',
+    icon: '📍',
+    note: '3 students picked up',
+  ),
+  _StopData(
+    name: 'Maple Avenue',
+    time: '07:22',
+    students: 3,
+    status: 'done',
+    icon: '📍',
+    note: '3 students picked up',
+  ),
+  _StopData(
+    name: 'Pine Road',
+    time: '07:30',
+    students: 2,
+    status: 'current',
+    icon: '📍',
+    note: 'Just completed',
+  ),
+  _StopData(
+    name: 'Cedar Blvd',
+    time: '07:37',
+    students: 4,
+    status: 'upcoming',
+    icon: '📍',
+    note: '4 students waiting',
+  ),
+  _StopData(
+    name: 'Lincoln Elementary',
+    time: '07:45',
+    students: 0,
+    status: 'destination',
+    icon: '🏫',
+    note: 'Drop-off point',
+  ),
 ];
 
 class _StopRow extends StatelessWidget {
@@ -287,10 +444,10 @@ class _StopRow extends StatelessWidget {
   const _StopRow({required this.stop, required this.isLast});
 
   Color get _color => switch (stop.status) {
-    'done'        => AppTheme.success,
-    'current'     => AppTheme.purple,
+    'done' => AppTheme.success,
+    'current' => AppTheme.purple,
     'destination' => AppTheme.warning,
-    _             => AppTheme.info,
+    _ => AppTheme.info,
   };
 
   @override
@@ -303,28 +460,42 @@ class _StopRow extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 32, height: 32,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: _color.withOpacity(0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: _color, width: 2),
                   boxShadow: stop.status == 'current'
-                      ? [BoxShadow(color: _color.withOpacity(0.5), blurRadius: 12)]
+                      ? [
+                          BoxShadow(
+                            color: _color.withOpacity(0.5),
+                            blurRadius: 12,
+                          ),
+                        ]
                       : null,
                 ),
                 child: Center(
                   child: stop.status == 'done'
-                      ? Text('✓', style: TextStyle(color: _color, fontSize: 14, fontWeight: FontWeight.w700))
+                      ? Text(
+                          '✓',
+                          style: TextStyle(
+                            color: _color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
                       : Text(stop.icon, style: const TextStyle(fontSize: 13)),
                 ),
               ),
               if (!isLast)
                 Container(
-                  width: 2, height: 30,
+                  width: 2,
+                  height: 30,
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   color: stop.status == 'done'
                       ? AppTheme.success.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.08),
+                      : context.cardBgElevated,
                 ),
             ],
           ),
@@ -342,31 +513,54 @@ class _StopRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(stop.name,
-                            style: TextStyle(
-                              color: stop.status == 'current' || stop.status == 'destination'
-                                  ? Colors.white : Colors.white.withOpacity(0.75),
-                              fontSize: 14,
-                              fontWeight: stop.status == 'current' ? FontWeight.w700 : FontWeight.w500,
-                            )),
+                        Text(
+                          stop.name,
+                          style: TextStyle(
+                            color:
+                                stop.status == 'current' ||
+                                    stop.status == 'destination'
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.75),
+                            fontSize: 14,
+                            fontWeight: stop.status == 'current'
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
                         if (stop.status == 'current') ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.purple.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppTheme.purple.withOpacity(0.4)),
+                              border: Border.all(
+                                color: AppTheme.purple.withOpacity(0.4),
+                              ),
                             ),
-                            child: const Text('NEXT',
-                                style: TextStyle(color: AppTheme.parentAccent, fontSize: 9, fontWeight: FontWeight.w700)),
+                            child: Text(
+                              'NEXT',
+                              style: TextStyle(
+                                color: AppTheme.parentAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ],
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(stop.note,
-                        style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11)),
+                    Text(
+                      stop.note,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.35),
+                        fontSize: 11,
+                      ),
+                    ),
                   ],
                 ),
                 Column(
@@ -376,17 +570,23 @@ class _StopRow extends StatelessWidget {
                       '${stop.time} AM',
                       style: TextStyle(
                         color: switch (stop.status) {
-                          'done'        => AppTheme.successLight,
-                          'current'     => AppTheme.parentAccent,
+                          'done' => AppTheme.successLight,
+                          'current' => AppTheme.parentAccent,
                           'destination' => AppTheme.warning,
-                          _             => AppTheme.driverAccent,
+                          _ => AppTheme.driverAccent,
                         },
-                        fontSize: 13, fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     if (stop.students > 0)
-                      Text('👦 ${stop.students}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                      Text(
+                        '👦 ${stop.students}',
+                        style: TextStyle(
+                          color: context.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -398,20 +598,27 @@ class _StopRow extends StatelessWidget {
   }
 }
 
-Widget _backBtn() => Container(
-  width: 38, height: 38,
+Widget _backBtn(BuildContext context) => Container(
+  width: 38,
+  height: 38,
   decoration: BoxDecoration(
-    color: Colors.white.withOpacity(0.08),
+    color: context.cardBgElevated,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    border: Border.all(color: context.inputBorder),
   ),
-  child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))),
+  child: Center(
+    child: Text(
+      '←',
+      style: TextStyle(color: context.textPrimary, fontSize: 16),
+    ),
+  ),
 );
 
 // ── Custom Painter ─────────────────────────────────────────────────────────────
 class _DriverRouteMapPainter extends CustomPainter {
   final double progress;
-  _DriverRouteMapPainter(this.progress);
+  final Color roadColor;
+  _DriverRouteMapPainter(this.progress, {required this.roadColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -419,7 +626,9 @@ class _DriverRouteMapPainter extends CustomPainter {
     final sy = size.height / 210;
     Offset s(double x, double y) => Offset(x * sx, y * sy);
 
-    final gridPaint = Paint()..color = Colors.white.withOpacity(0.04)..strokeWidth = 1;
+    final gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.04)
+      ..strokeWidth = 1;
     for (final y in [42.0, 84.0, 126.0, 168.0]) {
       canvas.drawLine(s(0, y), s(340, y), gridPaint);
     }
@@ -428,54 +637,96 @@ class _DriverRouteMapPainter extends CustomPainter {
     }
 
     final roadPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
+      ..color = roadColor
       ..strokeWidth = 10 * sx
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(s(20, 155), s(320, 155), roadPaint);
-    canvas.drawLine(s(100, 20),  s(100, 165), roadPaint);
-    canvas.drawLine(s(20, 82),   s(320, 82),  roadPaint);
+    canvas.drawLine(s(100, 20), s(100, 165), roadPaint);
+    canvas.drawLine(s(20, 82), s(320, 82), roadPaint);
 
     final dashPaint = Paint()
       ..color = AppTheme.driverCyan.withOpacity(0.35)
       ..strokeWidth = 3 * sx
       ..strokeCap = StrokeCap.round;
-    _drawDashedPolyline(canvas, [s(50, 155), s(100, 155), s(100, 82), s(220, 82), s(300, 82)], dashPaint);
+    _drawDashedPolyline(canvas, [
+      s(50, 155),
+      s(100, 155),
+      s(100, 82),
+      s(220, 82),
+      s(300, 82),
+    ], dashPaint);
 
-    final donePaint = Paint()..color = AppTheme.success..strokeWidth = 3 * sx..strokeCap = StrokeCap.round;
+    final donePaint = Paint()
+      ..color = AppTheme.success
+      ..strokeWidth = 3 * sx
+      ..strokeCap = StrokeCap.round;
     final busProgress = 0.3 + progress * 0.35;
     canvas.drawLine(s(50, 155), s(100, 155), donePaint);
     canvas.drawLine(s(100, 155), s(100, 82), donePaint);
     canvas.drawLine(s(100, 82), s(100 + busProgress * 200, 82), donePaint);
 
     final stopDefs = [
-      (50.0, 155.0, 'done'), (100.0, 155.0, 'done'), (100.0, 120.0, 'done'),
-      (100.0, 82.0, 'current'), (220.0, 82.0, 'upcoming'), (300.0, 82.0, 'destination'),
+      (50.0, 155.0, 'done'),
+      (100.0, 155.0, 'done'),
+      (100.0, 120.0, 'done'),
+      (100.0, 82.0, 'current'),
+      (220.0, 82.0, 'upcoming'),
+      (300.0, 82.0, 'destination'),
     ];
     for (final st in stopDefs) {
       final center = s(st.$1, st.$2);
       final col = switch (st.$3) {
-        'done'        => AppTheme.success,
-        'current'     => AppTheme.purple,
+        'done' => AppTheme.success,
+        'current' => AppTheme.purple,
         'destination' => AppTheme.warning,
-        _             => AppTheme.info,
+        _ => AppTheme.info,
       };
       canvas.drawCircle(center, 10 * sx, Paint()..color = col.withOpacity(0.2));
-      canvas.drawCircle(center, 10 * sx, Paint()..color = col..style = PaintingStyle.stroke..strokeWidth = 2);
+      canvas.drawCircle(
+        center,
+        10 * sx,
+        Paint()
+          ..color = col
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
       canvas.drawCircle(center, 4 * sx, Paint()..color = col);
       if (st.$3 == 'destination') {
-        final tp = TextPainter(text: const TextSpan(text: '🏫', style: TextStyle(fontSize: 14)), textDirection: TextDirection.ltr)..layout();
-        tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2 + 18 * sy));
+        final tp = TextPainter(
+          text: const TextSpan(text: '🏫', style: TextStyle(fontSize: 14)),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(
+          canvas,
+          center - Offset(tp.width / 2, tp.height / 2 + 18 * sy),
+        );
       }
     }
 
     final busX = 100 + busProgress * 200;
     const busY = 82.0;
     final busCenter = s(busX, busY);
-    final busRect = Rect.fromCenter(center: busCenter, width: 28 * sx, height: 28 * sy);
+    final busRect = Rect.fromCenter(
+      center: busCenter,
+      width: 28 * sx,
+      height: 28 * sy,
+    );
     final rrect = RRect.fromRectAndRadius(busRect, Radius.circular(8 * sx));
-    canvas.drawRRect(rrect, Paint()..color = AppTheme.driverCyan.withOpacity(0.9));
-    canvas.drawRRect(rrect, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
-    final tp = TextPainter(text: const TextSpan(text: '🚌', style: TextStyle(fontSize: 14)), textDirection: TextDirection.ltr)..layout();
+    canvas.drawRRect(
+      rrect,
+      Paint()..color = AppTheme.driverCyan.withOpacity(0.9),
+    );
+    canvas.drawRRect(
+      rrect,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    final tp = TextPainter(
+      text: const TextSpan(text: '🚌', style: TextStyle(fontSize: 14)),
+      textDirection: TextDirection.ltr,
+    )..layout();
     tp.paint(canvas, busCenter - Offset(tp.width / 2, tp.height / 2));
   }
 
@@ -490,17 +741,22 @@ class _DriverRouteMapPainter extends CustomPainter {
     final dx = e.dx - s.dx, dy = e.dy - s.dy;
     final dist = sqrt(dx * dx + dy * dy);
     final sx2 = dx / dist, sy2 = dy / dist;
-    double drawn = 0; bool draw = true;
+    double drawn = 0;
+    bool draw = true;
     double x = s.dx, y = s.dy;
     while (drawn < dist) {
       final step = draw ? dl : gl;
       final len = min(step, dist - drawn);
       final nx = x + sx2 * len, ny = y + sy2 * len;
       if (draw) canvas.drawLine(Offset(x, y), Offset(nx, ny), paint);
-      x = nx; y = ny; drawn += len; draw = !draw;
+      x = nx;
+      y = ny;
+      drawn += len;
+      draw = !draw;
     }
   }
 
   @override
-  bool shouldRepaint(_DriverRouteMapPainter old) => old.progress != progress;
+  bool shouldRepaint(_DriverRouteMapPainter old) =>
+      old.progress != progress || old.roadColor != roadColor;
 }

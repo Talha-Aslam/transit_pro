@@ -121,7 +121,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
         statusLabel = '● Active';
         break;
       default:
-        statusColor = Colors.white.withOpacity(0.4);
+        statusColor = context.textTertiary;
         statusLabel = '⏰ Upcoming';
     }
 
@@ -144,15 +144,15 @@ class _ParentScheduleState extends State<ParentSchedule> {
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn()),
+                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Schedule',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
@@ -160,7 +160,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                     Text(
                       'Feb 23–27, 2026',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: context.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -204,7 +204,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                 Text(
                                   _weekDays[i],
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: context.textSecondary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -227,8 +227,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                   child: Center(
                                     child: Text(
                                       '${_dates[i]}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: context.textPrimary,
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -244,7 +244,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                         ? AppTheme.success
                                         : _schedule[i].status == 'today'
                                         ? AppTheme.purple
-                                        : Colors.white.withOpacity(0.15),
+                                        : context.surfaceBorder,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -282,8 +282,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                             children: [
                               Text(
                                 '${_weekDays[_selectedDay]}day Schedule',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: context.textPrimary,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -352,10 +352,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Route A Timetable',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -493,10 +493,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Upcoming Events',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -509,9 +509,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.03),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.06),
-                            ),
+                            border: Border.all(color: context.cardBg),
                           ),
                           child: Row(
                             children: [
@@ -529,8 +527,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                 children: [
                                   Text(
                                     h.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: context.textPrimary,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -539,7 +537,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                   Text(
                                     h.date,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.4),
+                                      color: context.textTertiary,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -578,7 +576,7 @@ class _TimeCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.04),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: context.cardBgElevated),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -588,7 +586,7 @@ class _TimeCard extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
+                color: context.textSecondary,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -596,8 +594,8 @@ class _TimeCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               time,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
@@ -605,10 +603,7 @@ class _TimeCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               sub,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
-                fontSize: 10,
-              ),
+              style: TextStyle(color: context.textTertiary, fontSize: 10),
             ),
           ],
         ),
@@ -617,16 +612,19 @@ class _TimeCard extends StatelessWidget {
   }
 }
 
-Widget _backBtn() => Container(
+Widget _backBtn(BuildContext context) => Container(
   width: 38,
   height: 38,
   decoration: BoxDecoration(
-    color: Colors.white.withOpacity(0.08),
+    color: context.cardBgElevated,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    border: Border.all(color: context.inputBorder),
   ),
-  child: const Center(
-    child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16)),
+  child: Center(
+    child: Text(
+      '←',
+      style: TextStyle(color: context.textPrimary, fontSize: 16),
+    ),
   ),
 );
 

@@ -2,29 +2,31 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
-import 'driver_dashboard.dart';
-import 'driver_attendance.dart';
-import 'driver_route.dart';
-import 'driver_notifications.dart';
-import 'driver_profile.dart';
+import 'student_dashboard.dart';
+import 'student_tracking.dart';
+import 'student_schedule.dart';
+import 'student_attendance.dart';
+import 'student_fees.dart';
+import 'student_profile.dart';
 
-class DriverLayout extends StatefulWidget {
-  const DriverLayout({super.key});
+class StudentLayout extends StatefulWidget {
+  const StudentLayout({super.key});
 
   @override
-  State<DriverLayout> createState() => _DriverLayoutState();
+  State<StudentLayout> createState() => _StudentLayoutState();
 }
 
-class _DriverLayoutState extends State<DriverLayout> {
+class _StudentLayoutState extends State<StudentLayout> {
   int _tab = 0;
 
   void _goToTab(int index) => setState(() => _tab = index);
 
   static const _navItems = [
     _NavItem(icon: '🏠', label: 'Home'),
-    _NavItem(icon: '👦', label: 'Students'),
-    _NavItem(icon: '🗺️', label: 'Route'),
-    _NavItem(icon: '💬', label: 'Messages'),
+    _NavItem(icon: '📍', label: 'Track'),
+    _NavItem(icon: '📅', label: 'Schedule'),
+    _NavItem(icon: '📱', label: 'QR Pass'),
+    _NavItem(icon: '💰', label: 'Fees'),
     _NavItem(icon: '👤', label: 'Profile'),
   ];
 
@@ -38,14 +40,12 @@ class _DriverLayoutState extends State<DriverLayout> {
           child: IndexedStack(
             index: _tab,
             children: [
-              DriverDashboard(onNavigate: _goToTab),
-              DriverAttendance(onBack: () => _goToTab(0)),
-              DriverRoute(onBack: () => _goToTab(0)),
-              DriverNotifications(onBack: () => _goToTab(0)),
-              DriverProfile(
-                onNavigate: _goToTab,
-                onLogout: () => context.go('/role-select'),
-              ),
+              StudentDashboard(onNavigate: _goToTab),
+              StudentTracking(onBack: () => _goToTab(0)),
+              const StudentSchedule(),
+              const StudentAttendance(),
+              const StudentFees(),
+              StudentProfile(onLogout: () => context.go('/role-select')),
             ],
           ),
         ),
@@ -69,7 +69,7 @@ class _DriverLayoutState extends State<DriverLayout> {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 children: List.generate(_navItems.length, (i) {
                   final isActive = _tab == i;
@@ -82,29 +82,31 @@ class _DriverLayoutState extends State<DriverLayout> {
                         children: [
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             decoration: isActive
                                 ? BoxDecoration(
-                                    color: AppTheme.driverCyan.withOpacity(0.2),
+                                    color: AppTheme.studentAmber.withOpacity(
+                                      0.2,
+                                    ),
                                     borderRadius: BorderRadius.circular(12),
                                   )
                                 : null,
                             child: Text(
                               _navItems[i].icon,
-                              style: TextStyle(fontSize: isActive ? 22 : 20),
+                              style: TextStyle(fontSize: isActive ? 20 : 18),
                             ),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             _navItems[i].label,
                             style: TextStyle(
                               color: isActive
-                                  ? AppTheme.driverAccent
+                                  ? AppTheme.studentAccent
                                   : context.textTertiary,
                               fontSize: 10,
                               fontWeight: isActive
                                   ? FontWeight.w700
-                                  : FontWeight.w400,
+                                  : FontWeight.w500,
                             ),
                           ),
                         ],

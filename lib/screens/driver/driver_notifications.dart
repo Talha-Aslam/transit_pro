@@ -33,9 +33,9 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   List<_Message> get _filtered => _msgs.where((m) {
     return switch (_activeTab) {
       'Parents' => m.type == 'parent',
-      'Admin'   => m.type == 'admin',
-      'System'  => m.type == 'system',
-      _         => true,
+      'Admin' => m.type == 'admin',
+      'System' => m.type == 'system',
+      _ => true,
     };
   }).toList();
 
@@ -54,7 +54,10 @@ class _DriverNotificationsState extends State<DriverNotifications> {
       return _DetailView(
         msg: _selectedMsg!,
         replyCtrl: _replyCtrl,
-        onBack: () => setState(() { _selectedMsg = null; _replyCtrl.clear(); }),
+        onBack: () => setState(() {
+          _selectedMsg = null;
+          _replyCtrl.clear();
+        }),
       );
     }
 
@@ -67,26 +70,48 @@ class _DriverNotificationsState extends State<DriverNotifications> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.driverCyan.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.driverCyan.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn()),
+                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Row(
                     children: [
-                      const Text('Messages',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                      Text(
+                        'Messages',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                       if (_unread > 0) ...[
                         const SizedBox(width: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppTheme.error, borderRadius: BorderRadius.circular(10)),
-                          child: Text('$_unread',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$_unread',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -98,14 +123,24 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                       _msgs = _msgs.map((m) => m.copyWith(read: true)).toList();
                     }),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.driverAccent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.driverAccent.withOpacity(0.3)),
+                        border: Border.all(
+                          color: AppTheme.driverAccent.withOpacity(0.3),
+                        ),
                       ),
-                      child: Text('Mark all read',
-                          style: TextStyle(color: AppTheme.driverAccent, fontSize: 12)),
+                      child: Text(
+                        'Mark all read',
+                        style: TextStyle(
+                          color: AppTheme.driverAccent,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -128,21 +163,29 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: active ? AppTheme.driverCyan.withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                              color: active
+                                  ? AppTheme.driverCyan.withOpacity(0.15)
+                                  : Colors.white.withOpacity(0.04),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: active
                                     ? AppTheme.driverCyan.withOpacity(0.4)
-                                    : Colors.white.withOpacity(0.08),
+                                    : context.cardBgElevated,
                               ),
                             ),
                             child: Center(
-                              child: Text(tab,
-                                  style: TextStyle(
-                                    color: active ? AppTheme.driverAccent : Colors.white.withOpacity(0.4),
-                                    fontSize: 12,
-                                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                                  )),
+                              child: Text(
+                                tab,
+                                style: TextStyle(
+                                  color: active
+                                      ? AppTheme.driverAccent
+                                      : context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: active
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -153,79 +196,116 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                 const SizedBox(height: 14),
 
                 // Message list
-                ..._filtered.map((msg) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: GestureDetector(
-                        onTap: () => _openMsg(msg),
-                        child: AnimatedOpacity(
-                          opacity: msg.read ? 0.7 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.06),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border(
-                                left: BorderSide(
-                                  color: msg.read ? Colors.transparent : msg.color,
-                                  width: msg.read ? 1 : 3,
-                                ),
-                                top: BorderSide(color: Colors.white.withOpacity(0.10)),
-                                right: BorderSide(color: Colors.white.withOpacity(0.10)),
-                                bottom: BorderSide(color: Colors.white.withOpacity(0.10)),
+                ..._filtered.map(
+                  (msg) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GestureDetector(
+                      onTap: () => _openMsg(msg),
+                      child: AnimatedOpacity(
+                        opacity: msg.read ? 0.7 : 1.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: context.cardBg,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border(
+                              left: BorderSide(
+                                color: msg.read
+                                    ? Colors.transparent
+                                    : msg.color,
+                                width: msg.read ? 1 : 3,
                               ),
+                              top: BorderSide(color: context.surfaceBorder),
+                              right: BorderSide(color: context.surfaceBorder),
+                              bottom: BorderSide(color: context.surfaceBorder),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44, height: 44,
-                                  decoration: BoxDecoration(
-                                    color: msg.color.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: msg.color.withOpacity(0.25)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: msg.color.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: msg.color.withOpacity(0.25),
                                   ),
-                                  child: Center(child: Text(msg.avatar, style: const TextStyle(fontSize: 22))),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(msg.sender,
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 13,
-                                                    fontWeight: msg.read ? FontWeight.w500 : FontWeight.w700),
-                                                overflow: TextOverflow.ellipsis),
+                                child: Center(
+                                  child: Text(
+                                    msg.avatar,
+                                    style: const TextStyle(fontSize: 22),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            msg.sender,
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 13,
+                                              fontWeight: msg.read
+                                                  ? FontWeight.w500
+                                                  : FontWeight.w700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          Text(msg.time,
-                                              style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11)),
-                                        ],
+                                        ),
+                                        Text(
+                                          msg.time,
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(
+                                              0.35,
+                                            ),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      msg.msg,
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12,
+                                        height: 1.4,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(msg.msg,
-                                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, height: 1.4),
-                                          maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    ],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!msg.read) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.only(top: 2),
+                                  decoration: BoxDecoration(
+                                    color: msg.color,
+                                    shape: BoxShape.circle,
                                   ),
                                 ),
-                                if (!msg.read) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    width: 8, height: 8, margin: const EdgeInsets.only(top: 2),
-                                    decoration: BoxDecoration(color: msg.color, shape: BoxShape.circle),
-                                  ),
-                                ],
                               ],
-                            ),
+                            ],
                           ),
                         ),
                       ),
-                    )),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -240,7 +320,11 @@ class _DetailView extends StatelessWidget {
   final TextEditingController replyCtrl;
   final VoidCallback onBack;
 
-  const _DetailView({required this.msg, required this.replyCtrl, required this.onBack});
+  const _DetailView({
+    required this.msg,
+    required this.replyCtrl,
+    required this.onBack,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -252,33 +336,54 @@ class _DetailView extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.driverCyan.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.driverCyan.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: onBack, child: _backBtn()),
+                GestureDetector(onTap: onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(msg.sender,
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                      Text('${msg.type.capitalize()} · ${msg.time}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                      Text(
+                        msg.sender,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${msg.type.capitalize()} · ${msg.time}',
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: msg.color.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: msg.color.withOpacity(0.25)),
                   ),
-                  child: Center(child: Text(msg.avatar, style: const TextStyle(fontSize: 22))),
+                  child: Center(
+                    child: Text(
+                      msg.avatar,
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -292,11 +397,22 @@ class _DetailView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(msg.msg,
-                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 15, height: 1.6)),
+                      Text(
+                        msg.msg,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 15,
+                          height: 1.6,
+                        ),
+                      ),
                       const SizedBox(height: 12),
-                      Text('Received: ${msg.time}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12)),
+                      Text(
+                        'Received: ${msg.time}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.35),
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -307,30 +423,45 @@ class _DetailView extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('REPLY',
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11,
-                                fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                        Text(
+                          'REPLY',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: replyCtrl,
                           maxLines: 3,
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Type your reply...',
-                            hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+                            hintStyle: TextStyle(color: context.textHint),
                             filled: true,
                             fillColor: Colors.white.withOpacity(0.05),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.driverAccent),
+                              borderSide: const BorderSide(
+                                color: AppTheme.driverAccent,
+                              ),
                             ),
                             contentPadding: const EdgeInsets.all(12),
                           ),
@@ -345,9 +476,15 @@ class _DetailView extends StatelessWidget {
                               gradient: AppTheme.driverGradient,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Center(
-                              child: Text('📤  Send Reply',
-                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                            child: Center(
+                              child: Text(
+                                '📤  Send Reply',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -364,18 +501,25 @@ class _DetailView extends StatelessWidget {
   }
 }
 
-Widget _backBtn() => Container(
-  width: 38, height: 38,
+Widget _backBtn(BuildContext context) => Container(
+  width: 38,
+  height: 38,
   decoration: BoxDecoration(
-    color: Colors.white.withOpacity(0.08),
+    color: context.cardBgElevated,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    border: Border.all(color: context.inputBorder),
   ),
-  child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))),
+  child: Center(
+    child: Text(
+      '←',
+      style: TextStyle(color: context.textPrimary, fontSize: 16),
+    ),
+  ),
 );
 
 extension _StrExt on String {
-  String capitalize() => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+  String capitalize() =>
+      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
 }
 
 class _Message {
@@ -384,36 +528,93 @@ class _Message {
   final Color color;
   final bool read;
 
-  const _Message({required this.id, required this.type, required this.sender, required this.avatar,
-      required this.msg, required this.time, required this.color, required this.read});
+  const _Message({
+    required this.id,
+    required this.type,
+    required this.sender,
+    required this.avatar,
+    required this.msg,
+    required this.time,
+    required this.color,
+    required this.read,
+  });
 
-  _Message copyWith({bool? read}) => _Message(id: id, type: type, sender: sender, avatar: avatar,
-      msg: msg, time: time, color: color, read: read ?? this.read);
+  _Message copyWith({bool? read}) => _Message(
+    id: id,
+    type: type,
+    sender: sender,
+    avatar: avatar,
+    msg: msg,
+    time: time,
+    color: color,
+    read: read ?? this.read,
+  );
 }
 
 const _allMessages = [
-  _Message(id: 1, type: 'parent', read: false,
-      sender: "Sarah Johnson (Emma's Mom)", avatar: '👩',
-      msg: 'Hi Mike, Emma will not be coming to school today. Please note her as absent.',
-      time: '07:05 AM', color: AppTheme.parentAccent),
-  _Message(id: 2, type: 'admin', read: false,
-      sender: 'Transport Admin', avatar: '🏢',
-      msg: 'Please be aware: road works on Pine Road today. Use alternate route via Oak Ave.',
-      time: '06:45 AM', color: AppTheme.driverAccent),
-  _Message(id: 3, type: 'parent', read: true,
-      sender: "David Martinez (Ava's Dad)", avatar: '👨',
-      msg: 'Thank you for the on-time service today! Ava was very happy.',
-      time: 'Yesterday', color: AppTheme.parentAccent),
-  _Message(id: 4, type: 'system', read: true,
-      sender: 'System Alert', avatar: '⚙️',
-      msg: 'Your morning route is complete. 22/22 students delivered safely. Great job!',
-      time: 'Yesterday', color: AppTheme.success),
-  _Message(id: 5, type: 'admin', read: true,
-      sender: 'Transport Admin', avatar: '🏢',
-      msg: 'Reminder: Monthly vehicle inspection is scheduled for Friday, Feb 28.',
-      time: 'Mon, Feb 23', color: AppTheme.driverAccent),
-  _Message(id: 6, type: 'parent', read: true,
-      sender: "Emily Wilson (William's Mom)", avatar: '👩',
-      msg: "William will need to be picked up at the alternate stop on Cedar Ave tomorrow.",
-      time: 'Mon, Feb 23', color: AppTheme.parentAccent),
+  _Message(
+    id: 1,
+    type: 'parent',
+    read: false,
+    sender: "Sarah Johnson (Emma's Mom)",
+    avatar: '👩',
+    msg:
+        'Hi Mike, Emma will not be coming to school today. Please note her as absent.',
+    time: '07:05 AM',
+    color: AppTheme.parentAccent,
+  ),
+  _Message(
+    id: 2,
+    type: 'admin',
+    read: false,
+    sender: 'Transport Admin',
+    avatar: '🏢',
+    msg:
+        'Please be aware: road works on Pine Road today. Use alternate route via Oak Ave.',
+    time: '06:45 AM',
+    color: AppTheme.driverAccent,
+  ),
+  _Message(
+    id: 3,
+    type: 'parent',
+    read: true,
+    sender: "David Martinez (Ava's Dad)",
+    avatar: '👨',
+    msg: 'Thank you for the on-time service today! Ava was very happy.',
+    time: 'Yesterday',
+    color: AppTheme.parentAccent,
+  ),
+  _Message(
+    id: 4,
+    type: 'system',
+    read: true,
+    sender: 'System Alert',
+    avatar: '⚙️',
+    msg:
+        'Your morning route is complete. 22/22 students delivered safely. Great job!',
+    time: 'Yesterday',
+    color: AppTheme.success,
+  ),
+  _Message(
+    id: 5,
+    type: 'admin',
+    read: true,
+    sender: 'Transport Admin',
+    avatar: '🏢',
+    msg:
+        'Reminder: Monthly vehicle inspection is scheduled for Friday, Feb 28.',
+    time: 'Mon, Feb 23',
+    color: AppTheme.driverAccent,
+  ),
+  _Message(
+    id: 6,
+    type: 'parent',
+    read: true,
+    sender: "Emily Wilson (William's Mom)",
+    avatar: '👩',
+    msg:
+        "William will need to be picked up at the alternate stop on Cedar Ave tomorrow.",
+    time: 'Mon, Feb 23',
+    color: AppTheme.parentAccent,
+  ),
 ];

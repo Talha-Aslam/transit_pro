@@ -68,14 +68,17 @@ class _ParentTrackingState extends State<ParentTracking>
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
+                      color: context.cardBgElevated,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                      border: Border.all(color: context.inputBorder),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
                         '←',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -85,10 +88,10 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Live Tracking',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
@@ -96,7 +99,7 @@ class _ParentTrackingState extends State<ParentTracking>
                       Text(
                         'Bus #42 · Route A',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: context.textSecondary,
                           fontSize: 13,
                         ),
                       ),
@@ -163,7 +166,7 @@ class _ParentTrackingState extends State<ParentTracking>
                           Text(
                             'ESTIMATED ARRIVAL',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
+                              color: context.textSecondary,
                               fontSize: 11,
                             ),
                           ),
@@ -174,8 +177,8 @@ class _ParentTrackingState extends State<ParentTracking>
                             children: [
                               Text(
                                 '$etaInt',
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: context.textPrimary,
                                   fontSize: 28,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -184,7 +187,7 @@ class _ParentTrackingState extends State<ParentTracking>
                               Text(
                                 'min',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: context.textSecondary,
                                   fontSize: 16,
                                 ),
                               ),
@@ -198,7 +201,7 @@ class _ParentTrackingState extends State<ParentTracking>
                           Text(
                             'ARRIVAL TIME',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
+                              color: context.textSecondary,
                               fontSize: 11,
                             ),
                           ),
@@ -230,10 +233,10 @@ class _ParentTrackingState extends State<ParentTracking>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Route Map',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: context.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -248,7 +251,10 @@ class _ParentTrackingState extends State<ParentTracking>
                         child: AnimatedBuilder(
                           animation: _busController,
                           builder: (_, __) => CustomPaint(
-                            painter: _RouteMapPainter(_busController.value),
+                            painter: _RouteMapPainter(
+                              _busController.value,
+                              roadColor: context.surfaceBorder,
+                            ),
                             size: const Size(double.infinity, 200),
                           ),
                         ),
@@ -286,10 +292,10 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Route Stops',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -312,10 +318,10 @@ class _ParentTrackingState extends State<ParentTracking>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Bus Information',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: context.textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -430,7 +436,7 @@ class _StopRow extends StatelessWidget {
                           ),
                         )
                       : stop.status == 'school'
-                      ? const Text('🏫', style: TextStyle(fontSize: 12))
+                      ? Text('🏫', style: TextStyle(fontSize: 12))
                       : Container(
                           width: 8,
                           height: 8,
@@ -448,7 +454,7 @@ class _StopRow extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   color: stop.status == 'done'
                       ? AppTheme.success.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.08),
+                      : context.cardBgElevated,
                 ),
             ],
           ),
@@ -507,7 +513,7 @@ class _StopRow extends StatelessWidget {
                         ? AppTheme.successLight
                         : stop.status == 'current'
                         ? AppTheme.parentAccent
-                        : Colors.white.withOpacity(0.4),
+                        : context.textTertiary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -538,7 +544,7 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 5),
         Text(
           label,
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          style: TextStyle(color: context.textSecondary, fontSize: 11),
         ),
       ],
     );
@@ -560,7 +566,7 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        border: Border.all(color: context.cardBg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -570,18 +576,15 @@ class _InfoCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.45),
-              fontSize: 10,
-            ),
+            style: TextStyle(color: context.textSecondary, fontSize: 10),
           ),
           const SizedBox(height: 2),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: context.textPrimary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -595,7 +598,8 @@ class _InfoCard extends StatelessWidget {
 // ── Custom Painter ─────────────────────────────────────────────────────────────
 class _RouteMapPainter extends CustomPainter {
   final double progress;
-  _RouteMapPainter(this.progress);
+  final Color roadColor;
+  _RouteMapPainter(this.progress, {required this.roadColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -617,7 +621,7 @@ class _RouteMapPainter extends CustomPainter {
 
     // Roads
     final roadPaint = Paint()
-      ..color = Colors.white.withOpacity(0.10)
+      ..color = roadColor
       ..strokeWidth = 8 * scaleX
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(s(30, 148), s(310, 148), roadPaint);
@@ -746,5 +750,6 @@ class _RouteMapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RouteMapPainter old) => old.progress != progress;
+  bool shouldRepaint(_RouteMapPainter old) =>
+      old.progress != progress || old.roadColor != roadColor;
 }

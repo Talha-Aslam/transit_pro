@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
-import '../widgets/glass_card.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -42,6 +41,20 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       accent: AppTheme.driverAccent,
       features: ['Student attendance', 'Route navigation', 'Parent messaging'],
     ),
+    _RoleConfig(
+      id: 'student',
+      icon: '🎓',
+      label: "I'm a Student",
+      desc: 'View bus schedule, track ride & manage fees',
+      gradient: const LinearGradient(
+        colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      glowColor: Color(0xFFF59E0B),
+      accent: AppTheme.studentAccent,
+      features: ['Bus tracking', 'QR attendance', 'Fee status'],
+    ),
   ];
 
   void _selectRole(String id) {
@@ -55,7 +68,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: Stack(
           children: [
             // Purple blob top-left
@@ -96,7 +109,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             ),
             // Content
             SafeArea(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -125,10 +138,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text(
+                    Text(
                       'Who are you?',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: context.textPrimary,
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                       ),
@@ -137,7 +150,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     Text(
                       'Select your role to get started',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: context.textSecondary,
                         fontSize: 14,
                       ),
                     ),
@@ -155,13 +168,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                             padding: const EdgeInsets.all(22),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? Colors.white.withOpacity(0.10)
-                                  : Colors.white.withOpacity(0.06),
+                                  ? context.surfaceBorder
+                                  : context.cardBg,
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
                                 color: isSelected
                                     ? role.accent
-                                    : Colors.white.withOpacity(0.10),
+                                    : context.surfaceBorder,
                                 width: isSelected ? 1.5 : 1,
                               ),
                               boxShadow: isSelected
@@ -208,8 +221,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                     children: [
                                       Text(
                                         role.label,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
                                           fontSize: 18,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -218,7 +231,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                       Text(
                                         role.desc,
                                         style: TextStyle(
-                                          color: Colors.white.withOpacity(0.55),
+                                          color: context.textSecondary,
                                           fontSize: 13,
                                           height: 1.4,
                                         ),
@@ -271,11 +284,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                                     ),
                                   ),
                                   child: isSelected
-                                      ? const Center(
+                                      ? Center(
                                           child: Text(
                                             '✓',
                                             style: TextStyle(
-                                              color: Colors.white,
+                                              color: context.textPrimary,
                                               fontSize: 14,
                                             ),
                                           ),
@@ -294,14 +307,39 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
+                            color: context.textTertiary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => context.go('/signup'),
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              color: AppTheme.parentAccent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
                           '🔒  Your data is encrypted & secure',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
+                            color: context.textTertiary,
                             fontSize: 12,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

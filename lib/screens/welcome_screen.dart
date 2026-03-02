@@ -87,7 +87,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: Stack(
           children: [
             // Pulsing rings
@@ -186,12 +186,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             Color(0xFF93C5FD),
                           ],
                         ).createShader(bounds),
-                        child: const Text(
+                        child: Text(
                           'Transit Pro',
                           style: TextStyle(
                             fontSize: 38,
                             fontWeight: FontWeight.w800,
-                            color: Colors.white,
+                            color: context.textPrimary,
                             letterSpacing: -1,
                           ),
                         ),
@@ -200,7 +200,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       Text(
                         'Safe Journeys · Happy Kids · Peace of Mind',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: context.textSecondary,
                           fontSize: 14,
                           letterSpacing: 0.3,
                         ),
@@ -226,10 +226,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       vertical: 7,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.07),
+                                      color: context.cardBg,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.12),
+                                        color: context.inputBorder,
                                       ),
                                     ),
                                     child: Text(
@@ -265,7 +265,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       //     child: const Text(
                       //       'Get Started →',
                       //       style: TextStyle(
-                      //         color: Colors.white,
+                      //         color: context.textPrimary,
                       //         fontSize: 16,
                       //         fontWeight: FontWeight.w700,
                       //         letterSpacing: 0.5,
@@ -302,7 +302,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           // Text(
                           //   'Starting up...',
                           //   style: TextStyle(
-                          //     color: Colors.white.withOpacity(0.3),
+                          //     color: context.textTertiary,
                           //     fontSize: 11,
                           //   ),
                           // ),

@@ -32,19 +32,35 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: gradient == null
-            ? (backgroundColor ?? Colors.white.withOpacity(0.06))
+            ? (backgroundColor ??
+                  (isDark ? Colors.white.withOpacity(0.06) : Colors.white))
             : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: borderColor ?? Colors.white.withOpacity(0.10),
+          color:
+              borderColor ??
+              (isDark
+                  ? Colors.white.withOpacity(0.10)
+                  : const Color(0xFFE2E8F0)),
           width: borderWidth,
         ),
-        boxShadow: boxShadow,
+        boxShadow:
+            boxShadow ??
+            (isDark
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]),
       ),
       child: child,
     );
@@ -87,8 +103,16 @@ class AppSwitch extends StatelessWidget {
         height: 26,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(13),
-          color: value ? activeColor : Colors.white.withOpacity(0.12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          color: value
+              ? activeColor
+              : (Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white.withOpacity(0.12)
+                    : const Color(0xFFE2E8F0)),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withOpacity(0.1)
+                : const Color(0xFFCBD5E1),
+          ),
         ),
         child: Stack(
           children: [
@@ -193,7 +217,13 @@ class GradientButton extends StatelessWidget {
           color: isLoading ? Colors.white.withOpacity(0.1) : null,
           borderRadius: BorderRadius.circular(14),
           boxShadow: (!isLoading && glowColor != null)
-              ? [BoxShadow(color: glowColor!.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 8))]
+              ? [
+                  BoxShadow(
+                    color: glowColor!.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
               : null,
         ),
         child: Center(
@@ -201,11 +231,18 @@ class GradientButton extends StatelessWidget {
               ? const SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : Text(
                   label,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
         ),
       ),
