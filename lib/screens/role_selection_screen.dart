@@ -127,13 +127,25 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                           color: AppTheme.purple.withOpacity(0.3),
                         ),
                       ),
-                      child: Text(
-                        'WELCOME TO TRANSIT PRO',
-                        style: TextStyle(
-                          color: AppTheme.parentAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [
+                            Colors.red,
+                            Colors.orange,
+                            Colors.yellow,
+                            Colors.greenAccent,
+                            Colors.teal,
+                            Colors.lightGreen,
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          'WELCOME TO TRANSIT PRO',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: context.textPrimary,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                     ),

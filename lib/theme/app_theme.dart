@@ -33,8 +33,8 @@ extension AppColors on BuildContext {
 
 class AppTheme {
   // ── Background ────────────────────────────────────────────────────────────
-  static const Color bgDarkest = Color.fromARGB(255, 99, 74, 192);
-  static const Color bgDark = Color.fromARGB(255, 45, 18, 95);
+  static const Color bgDarkest = Color.fromARGB(255, 16, 9, 44);
+  static const Color bgDark = Color.fromARGB(255, 39, 14, 83);
   static const Color bgDarkBlue = Color.fromARGB(255, 42, 41, 94);
 
   // ── Light backgrounds ─────────────────────────────────────────────────────

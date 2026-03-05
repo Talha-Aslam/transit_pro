@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          '← Back',
+                          'Back',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 14,

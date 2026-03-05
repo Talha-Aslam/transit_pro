@@ -155,48 +155,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         animation: _bounceAnim,
                         builder: (_, __) => Transform.translate(
                           offset: Offset(0, _bounceAnim.value),
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.mainGradient,
-                              borderRadius: BorderRadius.circular(32),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.purple.withOpacity(0.5),
-                                  blurRadius: 40,
-                                  offset: const Offset(0, 20),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Text('🚌', style: TextStyle(fontSize: 60)),
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/bus_icon.png',
+                              width: 285,
+                              height: 300,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 28),
 
-                      // App name
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Color(0xFFC4B5FD),
-                            Color(0xFF93C5FD),
-                          ],
-                        ).createShader(bounds),
-                        child: Text(
-                          'Transit Pro',
-                          style: TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            color: context.textPrimary,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      // const SizedBox(height: 2),
                       Text(
                         'Safe Journeys · Happy Kids · Peace of Mind',
                         style: TextStyle(
@@ -244,7 +213,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 )
                                 .toList(),
                       ),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 26),
 
                       // // Get Started button
                       // GestureDetector(
@@ -273,7 +242,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       //     ),
                       //   ),
                       // ),
-                      const SizedBox(height: 14),
+                      // const SizedBox(height: 14),
 
                       // Progress bar + hint
                       Row(
@@ -282,7 +251,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           ClipRRect(
                             borderRadius: BorderRadius.circular(2),
                             child: SizedBox(
-                              width: 70,
+                              width: 90,
                               height: 3,
                               child: AnimatedBuilder(
                                 animation: _progressController,
