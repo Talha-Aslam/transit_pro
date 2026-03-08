@@ -6,6 +6,7 @@ import 'parent_dashboard.dart';
 import 'parent_tracking.dart';
 import 'parent_schedule.dart';
 import 'parent_notifications.dart';
+import 'parent_fees.dart';
 import 'parent_profile.dart';
 
 class ParentLayout extends StatefulWidget {
@@ -17,15 +18,30 @@ class ParentLayout extends StatefulWidget {
 
 class _ParentLayoutState extends State<ParentLayout> {
   int _tab = 0;
+  int _unreadCount = 3; // matches initial unread notifs count
 
   void _goToTab(int index) => setState(() => _tab = index);
+  void _onUnreadChanged(int count) => setState(() => _unreadCount = count);
 
   final _navItems = const [
-    _NavItem(icon: '🏠', label: 'Home'),
-    _NavItem(icon: '📍', label: 'Track'),
-    _NavItem(icon: '📅', label: 'Schedule'),
-    _NavItem(icon: '🔔', label: 'Alerts'),
-    _NavItem(icon: '👤', label: 'Profile'),
+    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
+    _NavItem(
+      icon: 'assets/images/navbar/track_transparent.png',
+      label: 'Track',
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/calendar_transparent.png',
+      label: 'Schedule',
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/notification_transparent.png',
+      label: 'Alerts',
+    ),
+    _NavItem(icon: 'assets/images/navbar/fees.png', label: 'Fees'),
+    _NavItem(
+      icon: 'assets/images/navbar/user_transparent.png',
+      label: 'Profile',
+    ),
   ];
 
   @override
@@ -38,10 +54,14 @@ class _ParentLayoutState extends State<ParentLayout> {
           child: IndexedStack(
             index: _tab,
             children: [
-              ParentDashboard(onNavigate: _goToTab),
+              ParentDashboard(onNavigate: _goToTab, unreadCount: _unreadCount),
               ParentTracking(onBack: () => _goToTab(0)),
               ParentSchedule(onBack: () => _goToTab(0)),
-              ParentNotifications(onBack: () => _goToTab(0)),
+              ParentNotifications(
+                onBack: () => _goToTab(0),
+                onUnreadChanged: _onUnreadChanged,
+              ),
+              const StudentFees(),
               ParentProfile(
                 onNavigate: _goToTab,
                 onLogout: () => context.go('/role-select'),
@@ -56,20 +76,34 @@ class _ParentLayoutState extends State<ParentLayout> {
   }
 
   Widget _buildNav() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.isDark
-                ? Colors.black.withOpacity(0.45)
-                : Colors.white.withOpacity(0.85),
-            border: Border(top: BorderSide(color: context.cardBgElevated)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.isDark
+                    ? Colors.white.withOpacity(0.10)
+                    : Colors.white.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                  color: context.isDark
+                      ? Colors.white.withOpacity(0.18)
+                      : Colors.white.withOpacity(0.80),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 28,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 children: List.generate(_navItems.length, (i) {
                   final isActive = _tab == i;
@@ -78,39 +112,51 @@ class _ParentLayoutState extends State<ParentLayout> {
                       onTap: () => _goToTab(i),
                       behavior: HitTestBehavior.opaque,
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        decoration: isActive
+                            ? BoxDecoration(
+                                color: context.isDark
+                                    ? Colors.white.withOpacity(0.20)
+                                    : Colors.white.withOpacity(0.72),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.10),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              )
+                            : null,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(8),
-                              decoration: isActive
-                                  ? BoxDecoration(
-                                      color: AppTheme.parentPurple.withOpacity(
-                                        0.2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    )
-                                  : null,
-                              child: Text(
-                                _navItems[i].icon,
-                                style: TextStyle(fontSize: isActive ? 22 : 20),
-                              ),
+                            Image.asset(
+                              _navItems[i].icon,
+                              width: isActive ? 26 : 22,
+                              height: isActive ? 26 : 22,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 1),
                             Text(
                               _navItems[i].label,
                               style: TextStyle(
                                 color: isActive
                                     ? AppTheme.parentAccent
                                     : context.textTertiary,
-                                fontSize: 10,
+                                fontSize: isActive ? 10 : 9,
                                 fontWeight: isActive
                                     ? FontWeight.w700
                                     : FontWeight.w400,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ],
                         ),

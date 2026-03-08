@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   go_router: ^14.0.0
+  image_picker: ^1.1.2
     
 dev_dependencies:
   flutter_test:
@@ -20,4 +21,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/bus_icon.png
+    - assets/images/navbar/
+    - assets/images/profile/
+    - assets/images/profile_page/
+    - assets/images/role_selection/
+    - assets/images/schedule/
+    - assets/images/splash_screen/bus_splash_icon.png
+    - assets/images/stats/
+    - assets/images/
+    - assets/images/notification_bell.gif
+    - assets/images/path_transparent.gif

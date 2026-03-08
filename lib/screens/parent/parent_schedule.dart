@@ -220,8 +220,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                     color: isToday
                                         ? null
                                         : isSelected
-                                        ? Colors.white.withOpacity(0.1)
-                                        : Colors.white.withOpacity(0.05),
+                                        ? context.cardBgElevated
+                                        : context.cardBg,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Center(
@@ -327,14 +327,15 @@ class _ParentScheduleState extends State<ParentSchedule> {
                       Row(
                         children: [
                           _TimeCard(
-                            emoji: '🌅',
+                            emoji:
+                                'assets/images/waiting_for_bus_transparent.png',
                             label: 'MORNING PICKUP',
                             time: sel.pickup,
                             sub: 'Oak Street Stop',
                           ),
                           const SizedBox(width: 12),
                           _TimeCard(
-                            emoji: '🌇',
+                            emoji: 'assets/images/drop_off_transparent.png',
                             label: 'EVENING DROP',
                             time: sel.dropoff,
                             sub: 'Oak Street Stop',
@@ -363,11 +364,11 @@ class _ParentScheduleState extends State<ParentSchedule> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'STOP',
                               style: TextStyle(
-                                color: Colors.white38,
+                                color: context.textTertiary,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -379,7 +380,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               child: Text(
                                 '🌅 AM',
                                 style: TextStyle(
-                                  color: Colors.white38,
+                                  color: context.textTertiary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -392,7 +393,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               child: Text(
                                 '🌇 PM',
                                 style: TextStyle(
-                                  color: Colors.white38,
+                                  color: context.textTertiary,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -412,12 +413,12 @@ class _ParentScheduleState extends State<ParentSchedule> {
                           decoration: BoxDecoration(
                             color: stop.type == 'school'
                                 ? AppTheme.warning.withOpacity(0.08)
-                                : Colors.white.withOpacity(0.03),
+                                : context.cardBg,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: stop.type == 'school'
                                   ? AppTheme.warning.withOpacity(0.15)
-                                  : Colors.white.withOpacity(0.05),
+                                  : context.surfaceBorder,
                             ),
                           ),
                           child: Row(
@@ -441,7 +442,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                         style: TextStyle(
                                           color: stop.type == 'school'
                                               ? AppTheme.warning
-                                              : Colors.white.withOpacity(0.8),
+                                              : context.textPrimary,
                                           fontSize: 12,
                                           fontWeight: stop.type == 'school'
                                               ? FontWeight.w700
@@ -507,9 +508,9 @@ class _ParentScheduleState extends State<ParentSchedule> {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.03),
+                            color: context.cardBg,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: context.cardBg),
+                            border: Border.all(color: context.surfaceBorder),
                           ),
                           child: Row(
                             children: [
@@ -574,14 +575,20 @@ class _TimeCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: context.cardBgElevated,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.cardBgElevated),
+          border: Border.all(color: context.surfaceBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
+            Image.asset(
+              emoji,
+              width: 32,
+              height: 32,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
             const SizedBox(height: 8),
             Text(
               label,
@@ -621,10 +628,7 @@ Widget _backBtn(BuildContext context) => Container(
     border: Border.all(color: context.inputBorder),
   ),
   child: Center(
-    child: Text(
-      '←',
-      style: TextStyle(color: context.textPrimary, fontSize: 16),
-    ),
+    child: Icon(Icons.arrow_back, color: context.textPrimary, size: 16),
   ),
 );
 

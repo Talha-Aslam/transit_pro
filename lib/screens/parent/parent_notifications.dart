@@ -3,7 +3,12 @@ import '../../theme/app_theme.dart';
 
 class ParentNotifications extends StatefulWidget {
   final VoidCallback onBack;
-  const ParentNotifications({super.key, required this.onBack});
+  final void Function(int unreadCount)? onUnreadChanged;
+  const ParentNotifications({
+    super.key,
+    required this.onBack,
+    this.onUnreadChanged,
+  });
 
   @override
   State<ParentNotifications> createState() => _ParentNotificationsState();
@@ -17,6 +22,10 @@ class _ParentNotificationsState extends State<ParentNotifications> {
   void initState() {
     super.initState();
     _notifs = List.from(_allNotifs);
+    // Report initial unread count to parent
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onUnreadChanged?.call(_unreadCount);
+    });
   }
 
   int get _unreadCount => _notifs.where((n) => !n.read).length;
@@ -98,6 +107,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                       _notifs = _notifs
                           .map((n) => n.copyWith(read: true))
                           .toList();
+                      widget.onUnreadChanged?.call(0);
                     }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -208,6 +218,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                     (x) => x.id == n.id,
                                   );
                                   _notifs[i] = _notifs[i].copyWith(read: true);
+                                  widget.onUnreadChanged?.call(_unreadCount);
                                 }),
                               ),
                             ),
@@ -225,8 +236,13 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                       padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Column(
                         children: [
-                          Text('🔔', style: TextStyle(fontSize: 40)),
-                          const SizedBox(height: 12),
+                          Image.asset(
+                            'assets/images/notification_bell.gif',
+                            width: 110,
+                            height: 110,
+                            filterQuality: FilterQuality.high,
+                          ),
+                          const SizedBox(height: 16),
                           Text(
                             'No notifications in this category',
                             style: TextStyle(
@@ -364,10 +380,7 @@ Widget _backBtn(BuildContext context) => Container(
     border: Border.all(color: context.inputBorder),
   ),
   child: Center(
-    child: Text(
-      '←',
-      style: TextStyle(color: context.textPrimary, fontSize: 16),
-    ),
+    child: Icon(Icons.arrow_back, color: context.textPrimary, size: 16),
   ),
 );
 

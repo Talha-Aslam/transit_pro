@@ -21,11 +21,20 @@ class _DriverLayoutState extends State<DriverLayout> {
   void _goToTab(int index) => setState(() => _tab = index);
 
   static const _navItems = [
-    _NavItem(icon: '🏠', label: 'Home'),
-    _NavItem(icon: '👦', label: 'Students'),
-    _NavItem(icon: '🗺️', label: 'Route'),
-    _NavItem(icon: '💬', label: 'Messages'),
-    _NavItem(icon: '👤', label: 'Profile'),
+    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
+    _NavItem(icon: 'assets/images/navbar/student.png', label: 'Students'),
+    _NavItem(
+      icon: 'assets/images/navbar/track_transparent.png',
+      label: 'Route',
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/notification_transparent.png',
+      label: 'Alerts',
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/user_transparent.png',
+      label: 'Profile',
+    ),
   ];
 
   @override
@@ -56,20 +65,34 @@ class _DriverLayoutState extends State<DriverLayout> {
   }
 
   Widget _buildNav() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.isDark
-                ? Colors.black.withOpacity(0.45)
-                : Colors.white.withOpacity(0.85),
-            border: Border(top: BorderSide(color: context.cardBgElevated)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.isDark
+                    ? Colors.white.withOpacity(0.10)
+                    : Colors.white.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                  color: context.isDark
+                      ? Colors.white.withOpacity(0.18)
+                      : Colors.white.withOpacity(0.80),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 28,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 children: List.generate(_navItems.length, (i) {
                   final isActive = _tab == i;
@@ -77,37 +100,55 @@ class _DriverLayoutState extends State<DriverLayout> {
                     child: GestureDetector(
                       onTap: () => _goToTab(i),
                       behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(8),
-                            decoration: isActive
-                                ? BoxDecoration(
-                                    color: AppTheme.driverCyan.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : null,
-                            child: Text(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        decoration: isActive
+                            ? BoxDecoration(
+                                color: context.isDark
+                                    ? Colors.white.withOpacity(0.20)
+                                    : Colors.white.withOpacity(0.72),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.10),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              )
+                            : null,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
                               _navItems[i].icon,
-                              style: TextStyle(fontSize: isActive ? 22 : 20),
+                              width: isActive ? 28 : 22,
+                              height: isActive ? 28 : 22,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                             ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            _navItems[i].label,
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppTheme.driverAccent
-                                  : context.textTertiary,
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
+                            const SizedBox(height: 2),
+                            Text(
+                              _navItems[i].label,
+                              style: TextStyle(
+                                color: isActive
+                                    ? AppTheme.driverAccent
+                                    : context.textTertiary,
+                                fontSize: isActive ? 10 : 9,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

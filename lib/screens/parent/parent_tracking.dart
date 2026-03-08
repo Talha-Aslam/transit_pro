@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -43,328 +44,365 @@ class _ParentTrackingState extends State<ParentTracking>
   @override
   Widget build(BuildContext context) {
     final etaInt = _eta.round().clamp(1, 8);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Header ───────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.parentPurple.withOpacity(0.2),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: widget.onBack,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: context.cardBgElevated,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: context.inputBorder),
-                    ),
-                    child: Center(
-                      child: Text(
-                        '←',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Live Tracking',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      Text(
-                        'Bus #42 · Route A',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AnimatedBuilder(
-                  animation: _busController,
-                  builder: (_, __) => Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppTheme.success,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.success.withOpacity(0.6),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'LIVE',
-                        style: TextStyle(
-                          color: AppTheme.successLight,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+    final svc = ParentDataService.instance;
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // ── ETA Banner ───────────────────────────────────────────
-                GlassCard(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
-                      AppTheme.info.withOpacity(0.1),
-                    ],
-                  ),
-                  borderColor: AppTheme.parentPurple.withOpacity(0.3),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'ESTIMATED ARRIVAL',
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 11,
+    return ValueListenableBuilder<List<ChildInfo>>(
+      valueListenable: svc.children,
+      builder: (context, children, _) {
+        return ValueListenableBuilder<int>(
+          valueListenable: svc.selectedChildIndex,
+          builder: (context, selIdx, _) {
+            final safeIdx = children.isEmpty
+                ? 0
+                : selIdx.clamp(0, children.length - 1);
+            final child = children.isEmpty ? null : children[safeIdx];
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 100),
+              child: Column(
+                children: [
+                  // ── Header ───────────────────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppTheme.parentPurple.withOpacity(0.2),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: widget.onBack,
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: context.cardBgElevated,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: context.inputBorder),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.arrow_back,
+                                color: context.textPrimary,
+                                size: 16,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$etaInt',
+                                'Live Tracking',
                                 style: TextStyle(
                                   color: context.textPrimary,
-                                  fontSize: 28,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(width: 6),
                               Text(
-                                'min',
+                                child == null
+                                    ? ''
+                                    : '${child.busNumber} · ${child.route}',
                                 style: TextStyle(
                                   color: context.textSecondary,
-                                  fontSize: 16,
+                                  fontSize: 13,
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            'ARRIVAL TIME',
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '07:45 AM',
-                            style: TextStyle(
-                              color: AppTheme.parentAccent,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Route Map ────────────────────────────────────────────
-                GlassCard(
-                  backgroundColor: const Color(0xCC0A0F28),
-                  borderRadius: 20,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Route Map',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
-                      const Divider(color: Color(0x10FFFFFF), height: 1),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 200,
-                        child: AnimatedBuilder(
+                        AnimatedBuilder(
                           animation: _busController,
-                          builder: (_, __) => CustomPaint(
-                            painter: _RouteMapPainter(
-                              _busController.value,
-                              roadColor: context.surfaceBorder,
-                            ),
-                            size: const Size(double.infinity, 200),
+                          builder: (_, __) => Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.success.withOpacity(0.6),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: AppTheme.successLight,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const Divider(color: Color(0x10FFFFFF), height: 1),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        child: Row(
-                          children: [
-                            _LegendDot(
-                              color: AppTheme.success,
-                              label: 'Completed',
-                            ),
-                            const SizedBox(width: 16),
-                            _LegendDot(
-                              color: AppTheme.purple,
-                              label: 'Current',
-                            ),
-                            const SizedBox(width: 16),
-                            _LegendDot(color: AppTheme.info, label: 'Upcoming'),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
 
-                // ── Route Stops ──────────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Route Stops',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        // ── ETA Banner ───────────────────────────────────────────
+                        GlassCard(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.parentPurple.withOpacity(0.2),
+                              AppTheme.info.withOpacity(0.1),
+                            ],
+                          ),
+                          borderColor: AppTheme.parentPurple.withOpacity(0.3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ESTIMATED ARRIVAL',
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        '$etaInt',
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'min',
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'ARRIVAL TIME',
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '07:45 AM',
+                                    style: TextStyle(
+                                      color: AppTheme.parentAccent,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      ..._stops.asMap().entries.map(
-                        (e) => _StopRow(
-                          stop: e.value,
-                          isLast: e.key == _stops.length - 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                // ── Bus Info ─────────────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bus Information',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                        // ── Route Map ────────────────────────────────────────────
+                        GlassCard(
+                          backgroundColor: const Color(0xCC0A0F28),
+                          borderRadius: 20,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  14,
+                                  16,
+                                  10,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Route Map',
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(
+                                color: Color(0x10FFFFFF),
+                                height: 1,
+                              ),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 200,
+                                child: AnimatedBuilder(
+                                  animation: _busController,
+                                  builder: (_, __) => CustomPaint(
+                                    painter: _RouteMapPainter(
+                                      _busController.value,
+                                      roadColor: context.surfaceBorder,
+                                      gridColor: context.surfaceBorder
+                                          .withOpacity(
+                                            context.isDark ? 0.12 : 0.35,
+                                          ),
+                                    ),
+                                    size: const Size(double.infinity, 200),
+                                  ),
+                                ),
+                              ),
+                              const Divider(
+                                color: Color(0x10FFFFFF),
+                                height: 1,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    _LegendDot(
+                                      color: AppTheme.success,
+                                      label: 'Completed',
+                                    ),
+                                    const SizedBox(width: 16),
+                                    _LegendDot(
+                                      color: AppTheme.purple,
+                                      label: 'Current',
+                                    ),
+                                    const SizedBox(width: 16),
+                                    _LegendDot(
+                                      color: AppTheme.info,
+                                      label: 'Upcoming',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 1.5,
-                        children: const [
-                          _InfoCard(
-                            icon: '👨‍✈️',
-                            label: 'Driver',
-                            value: 'Mike Thompson',
+                        const SizedBox(height: 12),
+
+                        // ── Route Stops ──────────────────────────────────────────
+                        GlassCard(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Route Stops',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              ..._stops.asMap().entries.map(
+                                (e) => _StopRow(
+                                  stop: e.value,
+                                  isLast: e.key == _stops.length - 1,
+                                ),
+                              ),
+                            ],
                           ),
-                          _InfoCard(
-                            icon: '🚌',
-                            label: 'Bus Number',
-                            value: '#42',
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Bus Info ─────────────────────────────────────────────
+                        GlassCard(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bus Information',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              GridView.count(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 10,
+                                crossAxisSpacing: 10,
+                                childAspectRatio: 1.5,
+                                children: [
+                                  _InfoCard(
+                                    icon: '👨‍✈️',
+                                    label: 'Driver',
+                                    value: child?.driver ?? 'N/A',
+                                  ),
+                                  _InfoCard(
+                                    icon: '🚌',
+                                    label: 'Bus Number',
+                                    value: child?.busNumber ?? 'N/A',
+                                  ),
+                                  const _InfoCard(
+                                    icon: '⚡',
+                                    label: 'Speed',
+                                    value: '35 km/h',
+                                  ),
+                                  const _InfoCard(
+                                    icon: '👦',
+                                    label: 'Students',
+                                    value: '22 onboard',
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          _InfoCard(
-                            icon: '⚡',
-                            label: 'Speed',
-                            value: '35 km/h',
-                          ),
-                          _InfoCard(
-                            icon: '👦',
-                            label: 'Students',
-                            value: '22 onboard',
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -472,8 +510,8 @@ class _StopRow extends StatelessWidget {
                       stop.name,
                       style: TextStyle(
                         color: stop.status == 'current'
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.75),
+                            ? context.textPrimary
+                            : context.textSecondary,
                         fontSize: 14,
                         fontWeight: stop.status == 'current'
                             ? FontWeight.w700
@@ -564,7 +602,7 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.cardBg),
       ),
@@ -599,7 +637,12 @@ class _InfoCard extends StatelessWidget {
 class _RouteMapPainter extends CustomPainter {
   final double progress;
   final Color roadColor;
-  _RouteMapPainter(this.progress, {required this.roadColor});
+  final Color gridColor;
+  _RouteMapPainter(
+    this.progress, {
+    required this.roadColor,
+    required this.gridColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -610,7 +653,7 @@ class _RouteMapPainter extends CustomPainter {
 
     // Grid
     final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
+      ..color = gridColor
       ..strokeWidth = 1;
     for (final y in [40.0, 80.0, 120.0, 160.0]) {
       canvas.drawLine(s(0, y), s(340, y), gridPaint);
@@ -751,5 +794,7 @@ class _RouteMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RouteMapPainter old) =>
-      old.progress != progress || old.roadColor != roadColor;
+      old.progress != progress ||
+      old.roadColor != roadColor ||
+      old.gridColor != gridColor;
 }

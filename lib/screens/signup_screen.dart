@@ -23,25 +23,63 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passCtrl = TextEditingController();
   final _confirmPassCtrl = TextEditingController();
 
-  // Parent-specific
-  final _childNameCtrl = TextEditingController();
-  final _childGradeCtrl = TextEditingController();
-  final _schoolCtrl = TextEditingController();
+  // Parent-specific — dynamic children list
+  late List<_ChildData> _children;
 
   // Driver-specific
   final _licenseCtrl = TextEditingController();
   final _vehicleCtrl = TextEditingController();
   final _experienceCtrl = TextEditingController();
+  String? _vehicleType;
 
   // Student-specific
   final _studentIdCtrl = TextEditingController();
-  final _studentGradeCtrl = TextEditingController();
+  String? _studentGrade;
   final _studentSchoolCtrl = TextEditingController();
+  bool _studentSchoolCustom = false;
+
+  // Shared data
+  static const _gradeOptions = ['School', 'College', 'University', 'Academy'];
+  static const _vehicleTypes = [
+    'Bus',
+    'Van',
+    'Carry Daba',
+    'Auto Rickshaw',
+    'Bike',
+    'Car',
+  ];
+  static const _schoolList = [
+    'Beaconhouse School System',
+    'The City School',
+    'Lahore Grammar School',
+    'Roots School System',
+    'Allied School',
+    'Foundation Public School',
+    'Froebels International School',
+    'Army Public School',
+    'Divisional Public School',
+    'Government High School',
+    'DHA Suffa University',
+    'University of Punjab',
+    'COMSATS University',
+    'NUST',
+    'FAST National University',
+    'Aga Khan University',
+    'Forman Christian College',
+    'Government College University',
+    'University of Lahore',
+    'UET Lahore',
+    'Air University',
+    'Quaid-i-Azam University',
+    'LUMS',
+    'Bahria University',
+    'Riphah International University',
+  ];
 
   static final _roles = [
     _RoleCfg(
       'parent',
-      '👨‍👩‍👧',
+      'assets/images/welcome_parent_transparent.gif',
       'Parent',
       AppTheme.parentGradient,
       AppTheme.parentPurple,
@@ -49,7 +87,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ),
     _RoleCfg(
       'driver',
-      '🚌',
+      'assets/images/welcome_driver_transparent.gif',
       'Driver',
       AppTheme.driverGradient,
       AppTheme.driverCyan,
@@ -57,7 +95,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ),
     _RoleCfg(
       'student',
-      '🎓',
+      'assets/images/welcome_student_transparent.gif',
       'Student',
       AppTheme.studentGradient,
       AppTheme.studentAmber,
@@ -66,6 +104,12 @@ class _SignupScreenState extends State<SignupScreen> {
   ];
 
   _RoleCfg get _cfg => _roles.firstWhere((r) => r.id == _selectedRole);
+
+  @override
+  void initState() {
+    super.initState();
+    _children = [_ChildData()];
+  }
 
   void _signup() {
     if (!_agreeTerms) return;
@@ -85,14 +129,13 @@ class _SignupScreenState extends State<SignupScreen> {
     _phoneCtrl.dispose();
     _passCtrl.dispose();
     _confirmPassCtrl.dispose();
-    _childNameCtrl.dispose();
-    _childGradeCtrl.dispose();
-    _schoolCtrl.dispose();
+    for (final c in _children) {
+      c.dispose();
+    }
     _licenseCtrl.dispose();
     _vehicleCtrl.dispose();
     _experienceCtrl.dispose();
     _studentIdCtrl.dispose();
-    _studentGradeCtrl.dispose();
     _studentSchoolCtrl.dispose();
     super.dispose();
   }
@@ -103,6 +146,7 @@ class _SignupScreenState extends State<SignupScreen> {
       body: Container(
         decoration: context.scaffoldBg,
         child: Stack(
+          fit: StackFit.expand,
           children: [
             // Glow blob
             Positioned(
@@ -151,8 +195,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         child: Text(
                           'Back',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: context.textPrimary,
                             fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -181,9 +226,12 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ],
                               ),
                               child: Center(
-                                child: Text(
+                                child: Image.asset(
                                   _cfg.icon,
-                                  style: const TextStyle(fontSize: 36),
+                                  width: 62,
+                                  height: 62,
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.high,
                                 ),
                               ),
                             ),
@@ -309,10 +357,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           gradient: role.gradient,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Center(
-                          child: Text(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
                             role.icon,
-                            style: const TextStyle(fontSize: 22),
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                            filterQuality: FilterQuality.high,
                           ),
                         ),
                       ),
@@ -363,7 +415,7 @@ class _SignupScreenState extends State<SignupScreen> {
           })),
           const SizedBox(height: 16),
           GradientButton(
-            label: 'Continue →',
+            label: 'Continue',
             gradient: _cfg.gradient,
             glowColor: _cfg.glow,
             onTap: () => setState(() => _step = 1),
@@ -456,9 +508,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(6),
                     gradient: _agreeTerms ? _cfg.gradient : null,
                     border: Border.all(
-                      color: _agreeTerms
-                          ? _cfg.accent
-                          : Colors.white.withOpacity(0.2),
+                      color: _agreeTerms ? _cfg.accent : _cfg.accent,
                     ),
                   ),
                   child: _agreeTerms
@@ -489,7 +539,7 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 20),
 
           GradientButton(
-            label: 'Create Account →',
+            label: 'Create Account',
             gradient: _cfg.gradient,
             glowColor: _cfg.glow,
             isLoading: _loading,
@@ -502,63 +552,50 @@ class _SignupScreenState extends State<SignupScreen> {
 
   List<Widget> _roleSpecificFields() {
     switch (_selectedRole) {
+      // ── PARENT ──────────────────────────────────────────────────────────
       case 'parent':
         return [
-          const _FieldLabel("CHILD'S NAME"),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _childNameCtrl,
-            style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(
-              hintText: "Enter your child's name",
+          ..._children.asMap().entries.map((entry) {
+            return _buildChildCard(entry.key, entry.value);
+          }),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => setState(() => _children.add(_ChildData())),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: AppTheme.parentAccent.withOpacity(0.5),
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_circle_outline,
+                    color: AppTheme.parentAccent,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Add Another Child',
+                    style: TextStyle(
+                      color: AppTheme.parentAccent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _FieldLabel("CHILD'S GRADE"),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _childGradeCtrl,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. Grade 5',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _FieldLabel('SCHOOL NAME'),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _schoolCtrl,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'School name',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
         ];
+
+      // ── DRIVER ──────────────────────────────────────────────────────────
       case 'driver':
         return [
           const _FieldLabel('LICENSE NUMBER'),
@@ -572,6 +609,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -597,16 +635,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('EXPERIENCE (YRS)'),
+                    const _FieldLabel('VEHICLE TYPE'),
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: _experienceCtrl,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                      decoration: const InputDecoration(hintText: 'e.g. 5'),
+                    _buildDropdown(
+                      hint: 'Select type',
+                      value: _vehicleType,
+                      items: _vehicleTypes,
+                      onChanged: (v) => setState(() => _vehicleType = v),
                     ),
                   ],
                 ),
@@ -614,10 +649,22 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
+          const _FieldLabel('EXPERIENCE (YRS)'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _experienceCtrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: context.textPrimary, fontSize: 15),
+            decoration: const InputDecoration(hintText: 'e.g. 5'),
+          ),
+          const SizedBox(height: 16),
         ];
+
+      // ── STUDENT ──────────────────────────────────────────────────────────
       case 'student':
         return [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -643,17 +690,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('GRADE / CLASS'),
+                    const _FieldLabel('GRADE / LEVEL'),
                     const SizedBox(height: 8),
-                    TextField(
-                      controller: _studentGradeCtrl,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. Grade 10',
-                      ),
+                    _buildDropdown(
+                      hint: 'Select level',
+                      value: _studentGrade,
+                      items: _gradeOptions,
+                      onChanged: (v) => setState(() => _studentGrade = v),
                     ),
                   ],
                 ),
@@ -661,20 +704,220 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('SCHOOL / COLLEGE NAME'),
+          const _FieldLabel('SCHOOL / INSTITUTION'),
           const SizedBox(height: 8),
-          TextField(
-            controller: _studentSchoolCtrl,
-            style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(
-              hintText: 'Enter your school or college name',
-            ),
+          _buildSchoolSearch(
+            ctrl: _studentSchoolCtrl,
+            isCustom: _studentSchoolCustom,
+            onCustomChanged: (val) =>
+                setState(() => _studentSchoolCustom = val),
           ),
           const SizedBox(height: 16),
         ];
+
       default:
         return [];
     }
+  }
+
+  // ── Child card ──────────────────────────────────────────────────────────
+  Widget _buildChildCard(int index, _ChildData child) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.parentPurple.withOpacity(context.isDark ? 0.10 : 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.parentPurple.withOpacity(
+            context.isDark ? 0.28 : 0.20,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Child ${index + 1}',
+                style: TextStyle(
+                  color: AppTheme.parentAccent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              if (_children.length > 1)
+                GestureDetector(
+                  onTap: () => setState(() {
+                    child.dispose();
+                    _children.removeAt(index);
+                  }),
+                  child: const Icon(
+                    Icons.remove_circle_outline,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Name
+          const _FieldLabel("CHILD'S NAME"),
+          const SizedBox(height: 6),
+          TextField(
+            controller: child.nameCtrl,
+            style: TextStyle(color: context.textPrimary, fontSize: 15),
+            decoration: const InputDecoration(hintText: "Child's full name"),
+          ),
+          const SizedBox(height: 12),
+          // Grade dropdown
+          const _FieldLabel('GRADE / LEVEL'),
+          const SizedBox(height: 6),
+          _buildDropdown(
+            hint: 'Select level',
+            value: child.grade,
+            items: _gradeOptions,
+            onChanged: (v) => setState(() => child.grade = v),
+          ),
+          const SizedBox(height: 12),
+          // School search
+          const _FieldLabel('SCHOOL / INSTITUTION'),
+          const SizedBox(height: 6),
+          _buildSchoolSearch(
+            ctrl: child.schoolCtrl,
+            isCustom: child.isCustomSchool,
+            onCustomChanged: (val) =>
+                setState(() => child.isCustomSchool = val),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Themed dropdown ─────────────────────────────────────────────────────
+  Widget _buildDropdown({
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: context.cardBgElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.inputBorder),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          hint: Text(
+            hint,
+            style: TextStyle(color: context.textTertiary, fontSize: 14),
+          ),
+          isExpanded: true,
+          dropdownColor: context.cardBgElevated,
+          iconEnabledColor: context.textTertiary,
+          style: TextStyle(color: context.textPrimary, fontSize: 15),
+          items: items
+              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  // ── Searchable school field with autocomplete ────────────────────────────
+  Widget _buildSchoolSearch({
+    required TextEditingController ctrl,
+    required bool isCustom,
+    required void Function(bool) onCustomChanged,
+  }) {
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: ctrl.text),
+      optionsBuilder: (textEditingValue) {
+        final query = textEditingValue.text.trim().toLowerCase();
+        if (query.isEmpty) return const Iterable.empty();
+        final matches = _schoolList
+            .where((s) => s.toLowerCase().contains(query))
+            .toList();
+        // Add sentinel at the end to allow manual entry
+        return [...matches, '__manual__:${textEditingValue.text.trim()}'];
+      },
+      displayStringForOption: (option) =>
+          option.startsWith('__manual__:') ? '' : option,
+      onSelected: (option) {
+        if (option.startsWith('__manual__:')) {
+          ctrl.text = option.substring('__manual__:'.length);
+          onCustomChanged(true);
+        } else {
+          ctrl.text = option;
+          onCustomChanged(false);
+        }
+      },
+      fieldViewBuilder: (bCtx, fieldCtrl, focusNode, onFieldSubmitted) {
+        return TextField(
+          controller: fieldCtrl,
+          focusNode: focusNode,
+          onChanged: (value) => ctrl.text = value,
+          style: TextStyle(color: context.textPrimary, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: 'Search school / institution…',
+            suffixIcon: isCustom
+                ? Icon(Icons.edit_note, color: AppTheme.parentAccent, size: 20)
+                : Icon(Icons.search, color: context.textTertiary, size: 18),
+          ),
+        );
+      },
+      optionsViewBuilder: (bCtx, onAutoCompleteSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            color: context.cardBgElevated,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                shrinkWrap: true,
+                children: options.map((option) {
+                  final isManual = option.startsWith('__manual__:');
+                  final label = isManual
+                      ? '+ Add "${option.substring('__manual__:'.length)}" manually'
+                      : option;
+                  return InkWell(
+                    onTap: () => onAutoCompleteSelected(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: isManual
+                              ? AppTheme.parentAccent
+                              : context.textPrimary,
+                          fontSize: 14,
+                          fontWeight: isManual
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -686,7 +929,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.6),
+        color: context.textSecondary,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
@@ -729,4 +972,17 @@ class _RoleCfg {
     this.glow,
     this.accent,
   );
+}
+
+/// Holds per-child form state for the parent signup flow.
+class _ChildData {
+  final nameCtrl = TextEditingController();
+  final schoolCtrl = TextEditingController();
+  String? grade;
+  bool isCustomSchool = false;
+
+  void dispose() {
+    nameCtrl.dispose();
+    schoolCtrl.dispose();
+  }
 }

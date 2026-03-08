@@ -1,11 +1,35 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/image_source_sheet.dart';
 
-class StudentProfile extends StatelessWidget {
+class StudentProfile extends StatefulWidget {
   final VoidCallback onLogout;
   const StudentProfile({super.key, required this.onLogout});
+
+  @override
+  State<StudentProfile> createState() => _StudentProfileState();
+}
+
+class _StudentProfileState extends State<StudentProfile> {
+  Future<void> _pickImage() async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.studentAmber,
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      ProfileService.instance.studentImage.value = File(picked.path);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,23 +42,59 @@ class StudentProfile extends StatelessWidget {
           // ── Avatar & info ─────────────────────────────
           Column(
             children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  gradient: AppTheme.studentGradient,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.studentAmber.withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.studentGradient,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.studentAmber.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text('🎓', style: TextStyle(fontSize: 42)),
-                ),
+                    child: ValueListenableBuilder<File?>(
+                      valueListenable: ProfileService.instance.studentImage,
+                      builder: (_, file, __) => file != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: Image.file(
+                                file,
+                                width: 90,
+                                height: 90,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : const Center(
+                              child: Text('🎓', style: TextStyle(fontSize: 42)),
+                            ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: -4,
+                    right: -4,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.studentGradient,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text('✏️', style: TextStyle(fontSize: 12)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               Text(
@@ -270,7 +330,7 @@ class StudentProfile extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GestureDetector(
-              onTap: onLogout,
+              onTap: widget.onLogout,
               child: GlassCard(
                 gradient: LinearGradient(
                   colors: [

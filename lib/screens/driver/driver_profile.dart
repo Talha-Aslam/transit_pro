@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/image_source_sheet.dart';
 
 class DriverProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -23,6 +27,21 @@ class _DriverProfileState extends State<DriverProfile> {
   bool _parentAlerts = true;
   bool _routeReminders = true;
   bool _breakAlerts = false;
+
+  Future<void> _pickImage() async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.driverCyan,
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      ProfileService.instance.driverImage.value = File(picked.path);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,22 +85,41 @@ class _DriverProfileState extends State<DriverProfile> {
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Text('👨', style: TextStyle(fontSize: 44)),
+                      child: ValueListenableBuilder<File?>(
+                        valueListenable: ProfileService.instance.driverImage,
+                        builder: (_, file, __) => file != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(23),
+                                child: Image.file(
+                                  file,
+                                  width: 84,
+                                  height: 84,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : const Center(
+                                child: Text(
+                                  '👨',
+                                  style: TextStyle(fontSize: 44),
+                                ),
+                              ),
                       ),
                     ),
                     Positioned(
                       bottom: -4,
                       right: -4,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.driverGradient,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text('✏️', style: TextStyle(fontSize: 11)),
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.driverGradient,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(
+                            child: Text('✏️', style: TextStyle(fontSize: 11)),
+                          ),
                         ),
                       ),
                     ),

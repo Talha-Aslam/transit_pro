@@ -1,7 +1,20 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../app/parent_data_service.dart';
+import '../../app/profile_service.dart';
+import '../../app/subscription_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/image_source_sheet.dart';
+import 'trip_history_screen.dart';
+import 'subscription_screen.dart';
+import 'emergency_contacts_screen.dart';
+import 'change_password_screen.dart';
+import 'language_screen.dart';
+import 'help_support_screen.dart';
+import 'rate_app_screen.dart';
 
 class ParentProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -18,365 +31,703 @@ class ParentProfile extends StatefulWidget {
 }
 
 class _ParentProfileState extends State<ParentProfile> {
+  final _svc = ParentDataService.instance;
+
   bool _boardingAlert = true;
   bool _arrivalAlert = true;
   bool _delayAlert = true;
   bool _smsNotif = false;
   bool _emailNotif = true;
 
+  void _onSubscriptionChanged() => setState(() {});
+
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Profile header ────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.parentPurple.withOpacity(0.25),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Column(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      width: 84,
-                      height: 84,
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade200.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(
-                          color: AppTheme.parentPurple.withOpacity(0.5),
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.parentPurple.withOpacity(0.3),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Text('👩', style: TextStyle(fontSize: 44)),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -4,
-                      right: -4,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.parentGradient,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Text('✏️', style: TextStyle(fontSize: 11)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Sarah Johnson',
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'sarah@example.com',
-                  style: TextStyle(color: context.textSecondary, fontSize: 14),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.parentPurple.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppTheme.parentPurple.withOpacity(0.3),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('⭐', style: TextStyle(fontSize: 10)),
-                      SizedBox(width: 5),
-                      Text(
-                        'Premium Member',
-                        style: TextStyle(
-                          color: AppTheme.parentAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+  void initState() {
+    super.initState();
+    SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
+  }
+
+  @override
+  void dispose() {
+    SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.parentPurple,
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      ProfileService.instance.parentImage.value = File(picked.path);
+    }
+  }
+
+  void _editParentInfo() {
+    final info = _svc.parentInfo.value;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditSheet(
+        title: 'Edit My Information',
+        fields: [
+          _FieldDef('Full Name', info.name),
+          _FieldDef('Email', info.email),
+          _FieldDef('Phone', info.phone),
+        ],
+        accentColor: AppTheme.parentPurple,
+        onSave: (values) => _svc.updateParentInfo(
+          ParentInfo(name: values[0], email: values[1], phone: values[2]),
+        ),
+      ),
+    );
+  }
+
+  void _editChild(int index) {
+    final child = _svc.children.value[index];
+    final label = child.name.isEmpty ? 'Child' : child.name;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditSheet(
+        title: "Edit $label's Info",
+        fields: [
+          _FieldDef('Child Name', child.name),
+          _FieldDef('Grade', child.grade),
+          _FieldDef('School', child.school),
+          _FieldDef('Bus Number', child.busNumber),
+          _FieldDef('Route', child.route),
+          _FieldDef('Bus Stop', child.stop),
+          _FieldDef('Driver Name', child.driver),
+        ],
+        accentColor: AppTheme.parentPurple,
+        onSave: (values) => _svc.updateChild(
+          index,
+          child.copyWith(
+            name: values[0],
+            grade: values[1],
+            school: values[2],
+            busNumber: values[3],
+            route: values[4],
+            stop: values[5],
+            driver: values[6],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addChild() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditSheet(
+        title: 'Add New Child',
+        fields: [
+          _FieldDef('Child Name', ''),
+          _FieldDef('Grade', ''),
+          _FieldDef('School', ''),
+          _FieldDef('Bus Number', ''),
+          _FieldDef('Route', ''),
+          _FieldDef('Bus Stop', ''),
+          _FieldDef('Driver Name', ''),
+        ],
+        accentColor: AppTheme.parentPurple,
+        onSave: (values) => _svc.addChild(
+          ChildInfo(
+            name: values[0],
+            grade: values[1],
+            school: values[2],
+            busNumber: values[3],
+            route: values[4],
+            stop: values[5],
+            driver: values[6],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmRemoveChild(BuildContext context, int index) {
+    final name = _svc.children.value[index].name;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Remove Child',
+          style: TextStyle(
+            color: context.textPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Remove ${name.isEmpty ? 'this child' : name} from your account?',
+          style: TextStyle(color: context.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: context.textSecondary),
             ),
           ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // ── Child info ───────────────────────────────────────────
-                GlassCard(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.parentPurple.withOpacity(0.1),
-                      AppTheme.info.withOpacity(0.05),
-                    ],
-                  ),
-                  borderColor: AppTheme.parentPurple.withOpacity(0.2),
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'CHILD INFORMATION',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Center(
-                              child: Text('👧', style: TextStyle(fontSize: 24)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Emma Johnson',
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Grade 5 · Lincoln Elementary School',
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 2.4,
-                        children: const [
-                          _MiniCard(label: 'Bus Number', value: 'Bus #42'),
-                          _MiniCard(label: 'Route', value: 'Route A'),
-                          _MiniCard(label: 'Stop', value: 'Oak Street'),
-                          _MiniCard(label: 'Driver', value: 'Mike T.'),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Notification preferences ─────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'NOTIFICATION PREFERENCES',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      _PrefRow(
-                        label: 'Boarding Alerts',
-                        desc: 'When Emma boards/exits',
-                        value: _boardingAlert,
-                        onChanged: (v) => setState(() => _boardingAlert = v),
-                      ),
-                      _divider(context),
-                      _PrefRow(
-                        label: 'Arrival Notifications',
-                        desc: 'School & home arrivals',
-                        value: _arrivalAlert,
-                        onChanged: (v) => setState(() => _arrivalAlert = v),
-                      ),
-                      _divider(context),
-                      _PrefRow(
-                        label: 'Delay Alerts',
-                        desc: 'When bus is late',
-                        value: _delayAlert,
-                        onChanged: (v) => setState(() => _delayAlert = v),
-                      ),
-                      _divider(context),
-                      _PrefRow(
-                        label: 'SMS Notifications',
-                        desc: 'Text message alerts',
-                        value: _smsNotif,
-                        onChanged: (v) => setState(() => _smsNotif = v),
-                      ),
-                      _divider(context),
-                      _PrefRow(
-                        label: 'Email Notifications',
-                        desc: 'Daily summary email',
-                        value: _emailNotif,
-                        onChanged: (v) => setState(() => _emailNotif = v),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Menu items ───────────────────────────────────────────
-                GlassCard(
-                  child: Column(
-                    children: [
-                      _MenuItem(
-                        icon: '📋',
-                        label: 'Trip History',
-                        desc: '142 completed trips',
-                      ),
-                      _MenuItem(
-                        icon: '💳',
-                        label: 'Subscription',
-                        desc: 'Premium Plan · Active',
-                      ),
-                      _MenuItem(
-                        icon: '📞',
-                        label: 'Emergency Contacts',
-                        desc: '2 contacts added',
-                      ),
-                      _MenuItem(icon: '🔐', label: 'Change Password'),
-                      _MenuItem(icon: '🌐', label: 'Language', desc: 'English'),
-                      _MenuItem(icon: '❓', label: 'Help & Support'),
-                      _MenuItem(icon: '⭐', label: 'Rate the App', isLast: true),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Theme ────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        context.isDark ? '🌙' : '☀️',
-                        style: const TextStyle(fontSize: 18),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          context.isDark ? 'Dark Mode' : 'Light Mode',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      AppSwitch(
-                        value: context.isDark,
-                        activeColor: AppTheme.parentPurple,
-                        onChanged: (_) => ThemeProvider.instance.toggle(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Logout ───────────────────────────────────────────────
-                GestureDetector(
-                  onTap: widget.onLogout,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppTheme.error.withOpacity(0.25),
-                      ),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        '🚪  Log Out',
-                        style: TextStyle(
-                          color: AppTheme.errorLight,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'TransportKid v2.4.1 · © 2026',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.2),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _svc.removeChild(index);
+            },
+            child: const Text(
+              'Remove',
+              style: TextStyle(
+                color: AppTheme.errorLight,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ParentInfo>(
+      valueListenable: _svc.parentInfo,
+      builder: (context, parentInfo, _) {
+        return ValueListenableBuilder<List<ChildInfo>>(
+          valueListenable: _svc.children,
+          builder: (context, children, _) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 100),
+              child: Column(
+                children: [
+                  // ── Profile header ──────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppTheme.parentPurple.withOpacity(0.25),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 84,
+                              height: 84,
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade200.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: AppTheme.parentPurple.withOpacity(0.5),
+                                  width: 3,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.parentPurple.withOpacity(
+                                      0.3,
+                                    ),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: ValueListenableBuilder<File?>(
+                                valueListenable:
+                                    ProfileService.instance.parentImage,
+                                builder: (_, file, __) => ClipRRect(
+                                  borderRadius: BorderRadius.circular(23),
+                                  child: file != null
+                                      ? Image.file(
+                                          file,
+                                          width: 84,
+                                          height: 84,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.asset(
+                                          'assets/images/profile/boy_transparent.gif',
+                                          width: 84,
+                                          height: 84,
+                                          fit: BoxFit.contain,
+                                          filterQuality: FilterQuality.high,
+                                        ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: -4,
+                              right: -4,
+                              child: GestureDetector(
+                                onTap: _pickImage,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.parentGradient,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      '✏️',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          parentInfo.name,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          parentInfo.email,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (parentInfo.phone.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            parentInfo.phone,
+                            style: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.parentPurple.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppTheme.parentPurple.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    '⭐',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${SubscriptionProvider.instance.planDisplayName} · ${children.length} ${children.length == 1 ? 'child' : 'children'}',
+                                    style: const TextStyle(
+                                      color: AppTheme.parentAccent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _editParentInfo,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.cardBg,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: context.surfaceBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      '✏️',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Edit Info',
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        // ── Children section ──────────────────────────────
+                        GlassCard(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.parentPurple.withOpacity(0.1),
+                              AppTheme.info.withOpacity(0.05),
+                            ],
+                          ),
+                          borderColor: AppTheme.parentPurple.withOpacity(0.2),
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Section header with Add button
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'CHILDREN (${children.length})',
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: _addChild,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.parentGradient,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.add,
+                                            color: Colors.white,
+                                            size: 14,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Add Child',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+
+                              if (children.isEmpty)
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 20,
+                                    ),
+                                    child: Text(
+                                      'No children added yet.\nTap "Add Child" to get started.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ...List.generate(children.length, (i) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: i < children.length - 1 ? 12 : 0,
+                                    ),
+                                    child: _ChildCard(
+                                      child: children[i],
+                                      index: i,
+                                      onEdit: () => _editChild(i),
+                                      onRemove: () =>
+                                          _confirmRemoveChild(context, i),
+                                    ),
+                                  );
+                                }),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Notification preferences ──────────────────────
+                        GlassCard(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'NOTIFICATION PREFERENCES',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _PrefRow(
+                                label: 'Boarding Alerts',
+                                desc: 'When your child boards/exits',
+                                value: _boardingAlert,
+                                onChanged: (v) =>
+                                    setState(() => _boardingAlert = v),
+                              ),
+                              _divider(context),
+                              _PrefRow(
+                                label: 'Arrival Notifications',
+                                desc: 'School & home arrivals',
+                                value: _arrivalAlert,
+                                onChanged: (v) =>
+                                    setState(() => _arrivalAlert = v),
+                              ),
+                              _divider(context),
+                              _PrefRow(
+                                label: 'Delay Alerts',
+                                desc: 'When bus is late',
+                                value: _delayAlert,
+                                onChanged: (v) =>
+                                    setState(() => _delayAlert = v),
+                              ),
+                              _divider(context),
+                              _PrefRow(
+                                label: 'SMS Notifications',
+                                desc: 'Text message alerts',
+                                value: _smsNotif,
+                                onChanged: (v) => setState(() => _smsNotif = v),
+                              ),
+                              _divider(context),
+                              _PrefRow(
+                                label: 'Email Notifications',
+                                desc: 'Daily summary email',
+                                value: _emailNotif,
+                                onChanged: (v) =>
+                                    setState(() => _emailNotif = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Menu items ────────────────────────────────────
+                        GlassCard(
+                          child: Column(
+                            children: [
+                              _MenuItem(
+                                icon: '📋',
+                                label: 'Trip History',
+                                desc: '142 completed trips',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const TripHistoryScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '💳',
+                                label: 'Subscription',
+                                desc:
+                                    '${SubscriptionProvider.instance.planDisplayName} Plan · Active',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const SubscriptionScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '📞',
+                                label: 'Emergency Contacts',
+                                desc: '2 contacts added',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const EmergencyContactsScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '🔐',
+                                label: 'Change Password',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ChangePasswordScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '🌐',
+                                label: 'Language',
+                                desc: 'English',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const LanguageScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '❓',
+                                label: 'Help & Support',
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const HelpSupportScreen(),
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '⭐',
+                                label: 'Rate the App',
+                                isLast: true,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RateAppScreen(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Theme ─────────────────────────────────────────
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                context.isDark ? '🌙' : '☀️',
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  context.isDark ? 'Dark Mode' : 'Light Mode',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              AppSwitch(
+                                value: context.isDark,
+                                activeColor: AppTheme.parentPurple,
+                                onChanged: (_) =>
+                                    ThemeProvider.instance.toggle(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Logout ────────────────────────────────────────
+                        GestureDetector(
+                          onTap: widget.onLogout,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppTheme.error.withOpacity(0.25),
+                              ),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '🚪  Log Out',
+                                style: TextStyle(
+                                  color: AppTheme.errorLight,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'TransportKid v2.4.1 · © 2026',
+                          style: TextStyle(
+                            color: context.textTertiary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
+
+// ─────────────────────────────────────────────────────────── helper widgets ──
 
 Widget _divider(BuildContext context) => Container(
   height: 1,
@@ -408,10 +759,7 @@ class _PrefRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: context.textPrimary, fontSize: 14),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -436,67 +784,323 @@ class _MenuItem extends StatelessWidget {
   final String icon, label;
   final String? desc;
   final bool isLast;
+  final VoidCallback? onTap;
 
   const _MenuItem({
     required this.icon,
     required this.label,
     this.desc,
     this.isLast = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          border: isLast
+              ? null
+              : Border(bottom: BorderSide(color: context.surfaceBorder)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: context.cardBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(icon, style: const TextStyle(fontSize: 18)),
+              ),
             ),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 18)),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
-                    fontSize: 14,
-                  ),
-                ),
-                if (desc != null) ...[
-                  const SizedBox(height: 2),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    desc!,
-                    style: TextStyle(color: context.textTertiary, fontSize: 12),
+                    label,
+                    style: TextStyle(color: context.textPrimary, fontSize: 14),
+                  ),
+                  if (desc != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      desc!,
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Text(
+              '›',
+              style: TextStyle(color: context.textTertiary, fontSize: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Child card with expand/collapse ──────────────────────────────────────────
+
+class _ChildCard extends StatefulWidget {
+  final ChildInfo child;
+  final int index;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  const _ChildCard({
+    required this.child,
+    required this.index,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  @override
+  State<_ChildCard> createState() => _ChildCardState();
+}
+
+class _ChildCardState extends State<_ChildCard> {
+  bool _expanded = false;
+
+  final _svc = ParentDataService.instance;
+
+  Future<void> _pickChildImage() async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.parentPurple,
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      _svc.updateChildImage(widget.index, File(picked.path));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.child;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.cardBgElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.parentPurple.withOpacity(0.15)),
+      ),
+      child: Column(
+        children: [
+          // Row: avatar + name/grade + edit + remove + chevron
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // ── Child avatar with camera overlay ──────────────────
+                  GestureDetector(
+                    onTap: _pickChildImage,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ValueListenableBuilder<List<File?>>(
+                          valueListenable: _svc.childImages,
+                          builder: (_, imgs, __) {
+                            final file = widget.index < imgs.length
+                                ? imgs[widget.index]
+                                : null;
+                            return Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: file == null
+                                    ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFFF59E0B),
+                                          Color(0xFFD97706),
+                                        ],
+                                      )
+                                    : null,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: file != null
+                                    ? Image.file(
+                                        file,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.asset(
+                                        'assets/images/profile/boy_transparent.gif',
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.contain,
+                                        filterQuality: FilterQuality.high,
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                        Positioned(
+                          bottom: -3,
+                          right: -3,
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.parentGradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.camera_alt,
+                                size: 10,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.name.isEmpty ? 'Unnamed Child' : c.name,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (c.grade.isNotEmpty || c.school.isNotEmpty)
+                          Text(
+                            [
+                              c.grade,
+                              c.school,
+                            ].where((s) => s.isNotEmpty).join(' · '),
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 11,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Edit button
+                  GestureDetector(
+                    onTap: widget.onEdit,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.parentPurple.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Text('✏️', style: TextStyle(fontSize: 13)),
+                    ),
+                  ),
+                  // Remove button
+                  GestureDetector(
+                    onTap: widget.onRemove,
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.error.withOpacity(0.10),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 13,
+                        color: AppTheme.errorLight,
+                      ),
+                    ),
+                  ),
+                  // Chevron
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      color: context.textTertiary,
+                      size: 20,
+                    ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
-          Text(
-            '›',
-            style: TextStyle(color: context.textTertiary, fontSize: 20),
+          // Expanded transport details
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: _buildDetails(context, c),
+            crossFadeState: _expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 220),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetails(BuildContext context, ChildInfo c) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      child: Column(
+        children: [
+          Container(
+            height: 1,
+            color: context.surfaceBorder,
+            margin: const EdgeInsets.only(bottom: 12),
+          ),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.2,
+            children: [
+              _MiniCard(
+                label: 'Bus Number',
+                value: c.busNumber.isEmpty ? '—' : c.busNumber,
+              ),
+              _MiniCard(label: 'Route', value: c.route.isEmpty ? '—' : c.route),
+              _MiniCard(label: 'Stop', value: c.stop.isEmpty ? '—' : c.stop),
+              _MiniCard(
+                label: 'Driver',
+                value: c.driver.isEmpty ? '—' : c.driver,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
+// ── Mini detail card ──────────────────────────────────────────────────────────
 
 class _MiniCard extends StatelessWidget {
   final String label, value;
@@ -505,9 +1109,9 @@ class _MiniCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: context.cardBg,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -520,6 +1124,7 @@ class _MiniCard extends StatelessWidget {
               color: context.textTertiary,
               fontSize: 9,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
           ),
           const SizedBox(height: 3),
@@ -530,8 +1135,200 @@ class _MiniCard extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Edit bottom sheet ─────────────────────────────────────────────────────────
+
+/// Describes a single editable field inside [_EditSheet].
+class _FieldDef {
+  final String label;
+  final String initialValue;
+  _FieldDef(this.label, this.initialValue);
+}
+
+class _EditSheet extends StatefulWidget {
+  final String title;
+  final List<_FieldDef> fields;
+  final Color accentColor;
+  final void Function(List<String> values) onSave;
+
+  const _EditSheet({
+    required this.title,
+    required this.fields,
+    required this.accentColor,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditSheet> createState() => _EditSheetState();
+}
+
+class _EditSheetState extends State<_EditSheet> {
+  late final List<TextEditingController> _controllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = widget.fields
+        .map((f) => TextEditingController(text: f.initialValue))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _save() {
+    widget.onSave(_controllers.map((c) => c.text.trim()).toList());
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final sheetBg = context.isDark ? AppTheme.bgDark : Colors.white;
+    final inputFill = context.isDark
+        ? AppTheme.bgDarkBlue
+        : const Color(0xFFF1F5F9);
+
+    // Fixed height: 85% of the screen. When the keyboard appears, only the
+    // bottom padding grows, pushing the Save button up above the keyboard.
+    // The Expanded ScrollView absorbs any leftover space changes.
+    final sheetHeight = MediaQuery.of(context).size.height * 0.85;
+
+    return SizedBox(
+      height: sheetHeight,
+      child: Container(
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: context.surfaceBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Title
+            Text(
+              widget.title,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Scrollable fields – Expanded so Save button is always visible
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: List.generate(widget.fields.length, (i) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.fields[i].label,
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _controllers[i],
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 14,
+                            ),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: inputFill,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: context.inputBorder,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: context.inputBorder,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: widget.accentColor,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Save button
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _save,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        widget.accentColor,
+                        widget.accentColor.withOpacity(0.75),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Save Changes',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

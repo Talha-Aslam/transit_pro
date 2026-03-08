@@ -157,7 +157,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           offset: Offset(0, _bounceAnim.value),
                           child: Center(
                             child: Image.asset(
-                              'assets/images/bus_icon.png',
+                              'assets/images/splash_screen/bus_splash_icon.png',
                               width: 285,
                               height: 300,
                             ),

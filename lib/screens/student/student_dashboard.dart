@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -80,8 +82,21 @@ class StudentDashboard extends StatelessWidget {
                       width: 2,
                     ),
                   ),
-                  child: const Center(
-                    child: Text('🎓', style: TextStyle(fontSize: 22)),
+                  child: ValueListenableBuilder<File?>(
+                    valueListenable: ProfileService.instance.studentImage,
+                    builder: (_, file, __) => file != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              file,
+                              width: 42,
+                              height: 42,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : const Center(
+                            child: Text('🎓', style: TextStyle(fontSize: 22)),
+                          ),
                   ),
                 ),
               ],

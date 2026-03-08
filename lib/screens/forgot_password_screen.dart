@@ -40,6 +40,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       body: Container(
         decoration: context.scaffoldBg,
         child: Stack(
+          fit: StackFit.expand,
           children: [
             Positioned(
               top: -100,
@@ -78,14 +79,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         decoration: BoxDecoration(
                           color: context.cardBgElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: context.inputBorder,
-                          ),
+                          border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          '← Back',
+                          'Back',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withOpacity(0.9),
                             fontSize: 14,
                           ),
                         ),
@@ -172,7 +171,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                             const SizedBox(height: 20),
                             GradientButton(
-                              label: 'Send Reset Link →',
+                              label: 'Send Reset Link',
                               gradient: AppTheme.parentGradient,
                               glowColor: AppTheme.parentPurple,
                               isLoading: _loading,
@@ -224,7 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                             const SizedBox(height: 16),
                             GradientButton(
-                              label: 'Back to Login →',
+                              label: 'Back to Login',
                               gradient: AppTheme.parentGradient,
                               glowColor: AppTheme.parentPurple,
                               onTap: () => context.pop(),

@@ -22,12 +22,21 @@ class _StudentLayoutState extends State<StudentLayout> {
   void _goToTab(int index) => setState(() => _tab = index);
 
   static const _navItems = [
-    _NavItem(icon: '🏠', label: 'Home'),
-    _NavItem(icon: '📍', label: 'Track'),
-    _NavItem(icon: '📅', label: 'Schedule'),
-    _NavItem(icon: '📱', label: 'QR Pass'),
-    _NavItem(icon: '💰', label: 'Fees'),
-    _NavItem(icon: '👤', label: 'Profile'),
+    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
+    _NavItem(
+      icon: 'assets/images/navbar/track_transparent.png',
+      label: 'Track',
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/calendar_transparent.png',
+      label: 'Schedule',
+    ),
+    _NavItem(icon: 'assets/images/navbar/qr_pass.png', label: 'QR Pass'),
+    _NavItem(icon: 'assets/images/navbar/fees.png', label: 'Fees'),
+    _NavItem(
+      icon: 'assets/images/navbar/user_transparent.png',
+      label: 'Profile',
+    ),
   ];
 
   @override
@@ -56,20 +65,34 @@ class _StudentLayoutState extends State<StudentLayout> {
   }
 
   Widget _buildNav() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.isDark
-                ? Colors.black.withOpacity(0.45)
-                : Colors.white.withOpacity(0.85),
-            border: Border(top: BorderSide(color: context.cardBgElevated)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(40),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: context.isDark
+                    ? Colors.white.withOpacity(0.10)
+                    : Colors.white.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                  color: context.isDark
+                      ? Colors.white.withOpacity(0.18)
+                      : Colors.white.withOpacity(0.80),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 28,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 children: List.generate(_navItems.length, (i) {
                   final isActive = _tab == i;
@@ -77,39 +100,55 @@ class _StudentLayoutState extends State<StudentLayout> {
                     child: GestureDetector(
                       onTap: () => _goToTab(i),
                       behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.all(6),
-                            decoration: isActive
-                                ? BoxDecoration(
-                                    color: AppTheme.studentAmber.withOpacity(
-                                      0.2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  )
-                                : null,
-                            child: Text(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 7,
+                          horizontal: 2,
+                        ),
+                        decoration: isActive
+                            ? BoxDecoration(
+                                color: context.isDark
+                                    ? Colors.white.withOpacity(0.20)
+                                    : Colors.white.withOpacity(0.72),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.10),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              )
+                            : null,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
                               _navItems[i].icon,
-                              style: TextStyle(fontSize: isActive ? 20 : 18),
+                              width: isActive ? 26 : 22,
+                              height: isActive ? 26 : 22,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _navItems[i].label,
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppTheme.studentAccent
-                                  : context.textTertiary,
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                            const SizedBox(height: 2),
+                            Text(
+                              _navItems[i].label,
+                              style: TextStyle(
+                                color: isActive
+                                    ? AppTheme.studentAccent
+                                    : context.textTertiary,
+                                fontSize: isActive ? 10 : 9,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

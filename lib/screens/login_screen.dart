@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
       gradient: AppTheme.parentGradient,
       glowColor: AppTheme.parentPurple,
       accent: AppTheme.parentAccent,
-      icon: '👨‍👩‍👧',
+      icon: 'assets/images/welcome_parent_transparent.gif',
       title: 'Parent Login',
       subtitle: "Access your child's journey",
       demoEmail: 'sarah@example.com',
@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
       gradient: AppTheme.driverGradient,
       glowColor: AppTheme.driverCyan,
       accent: AppTheme.driverAccent,
-      icon: '🚌',
+      icon: 'assets/images/welcome_driver_transparent.gif',
       title: 'Driver Login',
       subtitle: 'Start your route today',
       demoEmail: 'mike@transport.com',
@@ -45,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       gradient: AppTheme.studentGradient,
       glowColor: AppTheme.studentAmber,
       accent: AppTheme.studentAccent,
-      icon: '🎓',
+      icon: 'assets/images/welcome_student_transparent.gif',
       title: 'Student Login',
       subtitle: 'Track your bus & attendance',
       demoEmail: 'noorulain@school.com',
@@ -92,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: context.scaffoldBg,
         child: Stack(
+          fit: StackFit.expand,
           children: [
             // Glow blob
             Positioned(
@@ -137,8 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Text(
                           'Back',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: context.textPrimary,
                             fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -164,9 +166,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             child: Center(
-                              child: Text(
+                              child: Image.asset(
                                 _cfg.icon,
-                                style: const TextStyle(fontSize: 36),
+                                width: 62,
+                                height: 62,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.high,
                               ),
                             ),
                           ),
@@ -370,7 +375,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.6),
+        color: context.textSecondary,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,
