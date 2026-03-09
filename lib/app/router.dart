@@ -15,6 +15,7 @@ import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
 import '../screens/driver/driver_layout.dart';
 import '../screens/student/student_layout.dart';
+import '../screens/parent/payment_screens.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -68,6 +69,51 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/parent/rate-app',
       builder: (context, state) => const RateAppScreen(),
+    ),
+    GoRoute(
+      path: '/parent/payment',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        return PaymentMethodScreen(
+          amount: extra['amount'] as String? ?? 'Rs.0',
+          month: extra['month'] as String? ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/parent/payment/cash',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        return CashPaymentScreen(
+          amount: extra['amount'] as String? ?? 'Rs.0',
+          month: extra['month'] as String? ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/parent/payment/online',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        final rawChildren = extra['children'] as List<dynamic>? ?? [];
+        final children = rawChildren
+            .map((e) => Map<String, String>.from(e as Map))
+            .toList();
+        return OnlinePaymentScreen(
+          amount: extra['amount'] as String? ?? 'Rs.0',
+          month: extra['month'] as String? ?? '',
+          children: children,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/parent/payment/card',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        return CardPaymentScreen(
+          amount: extra['amount'] as String? ?? 'Rs.0',
+          month: extra['month'] as String? ?? '',
+        );
+      },
     ),
     GoRoute(path: '/driver', builder: (context, state) => const DriverLayout()),
     GoRoute(

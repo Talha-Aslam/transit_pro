@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../app/language_provider.dart';
@@ -82,8 +83,12 @@ class _StudentFeesState extends State<StudentFees> {
                           gradient: AppTheme.studentGradient,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Center(
-                          child: Text('💰', style: TextStyle(fontSize: 24)),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/utilities/dollar.png',
+                            width: 44,
+                            height: 44,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -122,27 +127,33 @@ class _StudentFeesState extends State<StudentFees> {
                   ),
                   const SizedBox(height: 18),
                   // Pay now button
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.studentGradient,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.studentAmber.withOpacity(0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                  GestureDetector(
+                    onTap: () => context.push(
+                      '/parent/payment',
+                      extra: {'amount': 'Rs.2,500', 'month': 'December 2024'},
                     ),
-                    child: Center(
-                      child: Text(
-                        AppStrings.t('pay_now'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.studentGradient,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.studentAmber.withOpacity(0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          AppStrings.t('pay_now'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -159,21 +170,21 @@ class _StudentFeesState extends State<StudentFees> {
             child: Row(
               children: [
                 _StatPill(
-                  icon: '✅',
+                  icon: 'assets/images/utilities/check.png',
                   label: AppStrings.t('paid'),
                   value: 'Rs.22,500',
                   color: AppTheme.success,
                 ),
                 const SizedBox(width: 10),
                 _StatPill(
-                  icon: '⏳',
+                  icon: 'assets/images/utilities/pending.png',
                   label: AppStrings.t('pending'),
                   value: 'Rs.2,500',
                   color: AppTheme.warning,
                 ),
                 const SizedBox(width: 10),
                 _StatPill(
-                  icon: '📅',
+                  icon: 'assets/images/utilities/total.png',
                   label: AppStrings.t('total'),
                   value: 'Rs.25,000',
                   color: AppTheme.info,
@@ -456,7 +467,7 @@ class _StatPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
+            Image.asset(icon, width: 28, height: 28),
             const SizedBox(height: 4),
             Text(
               value,
