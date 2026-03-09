@@ -460,9 +460,12 @@ class _ParentProfileState extends State<ParentProfile> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Text(
-                                      '✏️',
-                                      style: TextStyle(fontSize: 11),
+                                    Image.asset(
+                                      'assets/images/utilities/edit_pencil.png',
+                                      width: 15,
+                                      height: 15,
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
@@ -1070,7 +1073,13 @@ class _ChildCardState extends State<_ChildCard> {
                         color: AppTheme.parentPurple.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(9),
                       ),
-                      child: const Text('✏️', style: TextStyle(fontSize: 13)),
+                      child: Image.asset(
+                        'assets/images/utilities/edit_pencil.png',
+                        width: 15,
+                        height: 15,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
                     ),
                   ),
                   // Remove button

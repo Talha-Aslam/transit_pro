@@ -41,7 +41,7 @@ class AppStrings {
     'good_afternoon': 'Good Afternoon',
     'good_evening': 'Good Evening',
     'no_children_yet': 'No children added yet',
-    'on_the_bus': '? On the Bus',
+    'on_the_bus': 'On the Bus',
     'to_school': 'to school',
     'todays_schedule': 'Today\'s Schedule',
     'view_all': 'View All',
@@ -89,7 +89,7 @@ class AppStrings {
     'rate_app': 'Rate the App',
     'dark_mode': 'Dark Mode',
     'light_mode': 'Light Mode',
-    'log_out': '??  Log Out',
+    'log_out': 'Log Out',
     'remove_child': 'Remove Child',
     'cancel': 'Cancel',
     'remove': 'Remove',
@@ -136,8 +136,8 @@ class AppStrings {
     'upcoming_holidays': 'Upcoming Holidays',
     'oak_street_stop': 'Oak Street Stop',
     'active': '? Active',
-    'completed_check': '? Completed',
-    'upcoming_clock': '? Upcoming',
+    'completed_check': 'Completed',
+    'upcoming_clock': 'Upcoming',
 
     // Notifications
     'notifications': 'Notifications',
@@ -152,7 +152,7 @@ class AppStrings {
     'my_fees': 'My Fees',
     'fee_details': 'Transport fee details & payments',
     'outstanding_balance': 'Outstanding Balance',
-    'pay_now': '?? Pay Now',
+    'pay_now': 'Pay Now',
     'paid': 'Paid',
     'total': 'Total',
     'payment_history': 'Payment History',
@@ -275,17 +275,17 @@ class AppStrings {
     'student_desc': 'View bus schedule, track ride & manage fees',
     'no_account': "Don't have an account? ",
     'sign_up': 'Sign Up',
-    'data_secure': '??  Your data is encrypted & secure',
+    'data_secure': 'Your data is encrypted & secure',
 
     // Login
     'back': 'Back',
-    'use_demo': '??  USE DEMO ACCOUNT',
+    'use_demo': 'USE DEMO ACCOUNT',
     'email_address': 'EMAIL ADDRESS',
     'email_hint': 'Enter your email',
     'password_lbl': 'PASSWORD',
     'password_hint': 'Enter your password',
     'forgot_password': 'Forgot password?',
-    'login_encrypted': '??  256-bit encrypted � GDPR compliant',
+    'login_encrypted': '256-bit encrypted � GDPR compliant',
     'fill_fields_login': 'Please fill in all fields.',
     'parent_login_title': 'Parent Login',
     'parent_login_sub': "Access your child's journey",
@@ -293,9 +293,9 @@ class AppStrings {
     'driver_login_sub': 'Start your route today',
     'student_login_title': 'Student Login',
     'student_login_sub': 'Track your bus & attendance',
-    'signin_as_parent': 'Sign In as Parent ?',
-    'signin_as_driver': 'Sign In as Driver ?',
-    'signin_as_student': 'Sign In as Student ?',
+    'signin_as_parent': 'Sign In as Parent',
+    'signin_as_driver': 'Sign In as Driver',
+    'signin_as_student': 'Sign In as Student',
     'parent_role_name': 'Parent',
     'driver_role_name': 'Driver',
     'student_role_name': 'Student',
@@ -355,9 +355,9 @@ class AppStrings {
 
     // Welcome screen
     'safe_journeys': 'Safe Journeys � Happy Kids � Peace of Mind',
-    'pill_tracking': '?? Live Tracking',
-    'pill_alerts': '?? Alerts',
-    'pill_safe': '??? Safe & Secure',
+    'pill_tracking': 'Live Tracking',
+    'pill_alerts': 'Alerts',
+    'pill_safe': 'Safe & Secure',
 
     // Driver navbar
     'dnav_home': 'Home',
@@ -503,6 +503,49 @@ class AppStrings {
     'privacy_lbl': 'Privacy',
     'terms_lbl': 'Terms of Service',
     'log_out_text': 'Log Out',
+
+    // FAQ
+    'faq_q1': 'How do I track my child\'s bus in real time?',
+    'faq_a1':
+        'Go to the "Live Tracking" tab from the bottom navigation bar. The map will show the bus\'s current position and estimated arrival time at each stop.',
+    'faq_q2': 'How do I add another child to my account?',
+    'faq_a2':
+        'Open the Profile tab, scroll to the Children section, and tap the "+" button. Fill in your child\'s name, grade, school and bus details.',
+    'faq_q3': 'Why am I not receiving notifications?',
+    'faq_a3':
+        'Make sure notifications are enabled for TransitPro in your device Settings. You can also check alert preferences inside App Settings on the Profile tab.',
+    'faq_q4': 'How do I update my child\'s bus route?',
+    'faq_a4':
+        'Tap the child card on the Profile tab, then select "Edit Info". Update the Bus Number, Route, or Stop fields and tap Save.',
+    'faq_q5': 'How do I change my emergency contacts?',
+    'faq_a5':
+        'Go to Profile → Emergency Contacts. You can add, edit or remove contacts from there.',
+    'faq_q6': 'What does the Premium plan include?',
+    'faq_a6':
+        'Premium includes live GPS tracking, up to 3 child profiles, push & SMS alerts, full trip history and emergency contact management.',
+
+    // Subscription plan features
+    'plan_premium_name': 'Premium',
+    'plan_family_name': 'Family',
+    'plan_basic_name': 'Basic',
+    'feat_live_gps': 'Live GPS tracking',
+    'feat_3_profiles': 'Up to 3 child profiles',
+    'feat_push_sms': 'Push + SMS alerts',
+    'feat_trip_history': 'Full trip history',
+    'feat_emergency': 'Emergency contacts',
+    'feat_everything_premium': 'Everything in Premium',
+    'feat_unlimited_profiles': 'Unlimited child profiles',
+    'feat_priority_support': 'Priority support',
+    'feat_route_custom': 'Route customisation',
+    'feat_driver_chat': 'Driver direct chat',
+
+    // Trip history
+    'trip_type_morning_pickup': 'Morning Pickup',
+    'trip_type_afternoon_dropoff': 'Afternoon Drop-off',
+    'trip_status_on_time': 'On Time',
+    'trip_status_5_late': '5 min late',
+    'trip_status_1_early': '1 min early',
+    'trip_to_arrow': '→',
   };
 
   static final Map<String, String> _ur = {
@@ -969,5 +1012,48 @@ class AppStrings {
     'privacy_lbl': 'رازداری',
     'terms_lbl': 'شرائط و ضوابط',
     'log_out_text': 'لاگ آؤٹ',
+
+    // FAQ
+    'faq_q1': 'میں اپنے بچے کی بس کو ریئل ٹائم میں کیسے ٹریک کروں؟',
+    'faq_a1':
+        '"لائیو ٹریکنگ" ٹیب پر جائیں جو نچلے نیوی گیشن بار میں ہے۔ نقشہ بس کی موجودہ پوزیشن اور ہر اسٹاپ پر متوقع آمد کا وقت دکھائے گا۔',
+    'faq_q2': 'میں اپنے اکاؤنٹ میں ایک اور بچہ کیسے شامل کروں؟',
+    'faq_a2':
+        'پروفائل ٹیب کھولیں، بچوں کے سیکشن تک اسکرول کریں، اور "+" بٹن پر کلک کریں۔ بچے کا نام، کلاس، اسکول اور بس کی تفصیلات درج کریں۔',
+    'faq_q3': 'مجھے اطلاعات کیوں نہیں مل رہیں؟',
+    'faq_a3':
+        'یقینی بنائیں کہ آپ کے ڈیوائس کی سیٹنگز میں ٹرانزٹ پرو کی اطلاعات فعال ہیں۔ آپ پروفائل ٹیب پر ایپ سیٹنگز میں الرٹ ترجیحات بھی چیک کر سکتے ہیں۔',
+    'faq_q4': 'میں اپنے بچے کا بس روٹ کیسے اپ ڈیٹ کروں؟',
+    'faq_a4':
+        'پروفائل ٹیب پر بچے کے کارڈ پر کلک کریں، پھر "معلومات تبدیل کریں" منتخب کریں۔ بس نمبر، روٹ یا اسٹاپ کے خانے اپ ڈیٹ کریں اور محفوظ کریں۔',
+    'faq_q5': 'میں اپنے ہنگامی رابطے کیسے تبدیل کروں؟',
+    'faq_a5':
+        'پروفائل → ہنگامی رابطے پر جائیں۔ وہاں سے آپ رابطے شامل، تبدیل یا حذف کر سکتے ہیں۔',
+    'faq_q6': 'پریمیم پلان میں کیا شامل ہے؟',
+    'faq_a6':
+        'پریمیم میں لائیو GPS ٹریکنگ، 3 بچوں کے پروفائل، پش اور SMS الرٹس، مکمل سفر کی تاریخ اور ہنگامی رابطوں کا انتظام شامل ہے۔',
+
+    // Subscription plan features
+    'plan_premium_name': 'پریمیم',
+    'plan_family_name': 'فیملی',
+    'plan_basic_name': 'بیسک',
+    'feat_live_gps': 'لائیو GPS ٹریکنگ',
+    'feat_3_profiles': '3 بچوں کے پروفائل',
+    'feat_push_sms': 'پش + SMS الرٹس',
+    'feat_trip_history': 'مکمل سفر کی تاریخ',
+    'feat_emergency': 'ہنگامی رابطے',
+    'feat_everything_premium': 'پریمیم کی تمام سہولیات',
+    'feat_unlimited_profiles': 'لامحدود بچوں کے پروفائل',
+    'feat_priority_support': 'ترجیحی سپورٹ',
+    'feat_route_custom': 'روٹ کی حسب ضرورت تبدیلی',
+    'feat_driver_chat': 'ڈرائیور سے براہ راست چیٹ',
+
+    // Trip history
+    'trip_type_morning_pickup': 'صبح کی سواری',
+    'trip_type_afternoon_dropoff': 'دوپہر کی واپسی',
+    'trip_status_on_time': 'وقت پر',
+    'trip_status_5_late': '5 منٹ دیر',
+    'trip_status_1_early': '1 منٹ جلدی',
+    'trip_to_arrow': '←',
   };
 }

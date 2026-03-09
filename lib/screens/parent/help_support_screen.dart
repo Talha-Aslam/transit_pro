@@ -51,31 +51,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     context.push('/parent/live-chat');
   }
 
-  final _faqs = const [
-    _Faq(
-      q: 'How do I track my child\'s bus in real time?',
-      a: 'Go to the "Live Tracking" tab from the bottom navigation bar. The map will show the bus\'s current position and estimated arrival time at each stop.',
-    ),
-    _Faq(
-      q: 'How do I add another child to my account?',
-      a: 'Open the Profile tab, scroll to the Children section, and tap the "+" button. Fill in your child\'s name, grade, school and bus details.',
-    ),
-    _Faq(
-      q: 'Why am I not receiving notifications?',
-      a: 'Make sure notifications are enabled for TransitPro in your device Settings. You can also check alert preferences inside App Settings on the Profile tab.',
-    ),
-    _Faq(
-      q: 'How do I update my child\'s bus route?',
-      a: 'Tap the child card on the Profile tab, then select "Edit Info". Update the Bus Number, Route, or Stop fields and tap Save.',
-    ),
-    _Faq(
-      q: 'How do I change my emergency contacts?',
-      a: 'Go to Profile → Emergency Contacts. You can add, edit or remove contacts from there.',
-    ),
-    _Faq(
-      q: 'What does the Premium plan include?',
-      a: 'Premium includes live GPS tracking, up to 3 child profiles, push & SMS alerts, full trip history and emergency contact management.',
-    ),
+  List<_Faq> get _faqs => [
+    _Faq(q: AppStrings.t('faq_q1'), a: AppStrings.t('faq_a1')),
+    _Faq(q: AppStrings.t('faq_q2'), a: AppStrings.t('faq_a2')),
+    _Faq(q: AppStrings.t('faq_q3'), a: AppStrings.t('faq_a3')),
+    _Faq(q: AppStrings.t('faq_q4'), a: AppStrings.t('faq_a4')),
+    _Faq(q: AppStrings.t('faq_q5'), a: AppStrings.t('faq_a5')),
+    _Faq(q: AppStrings.t('faq_q6'), a: AppStrings.t('faq_a6')),
   ];
 
   @override

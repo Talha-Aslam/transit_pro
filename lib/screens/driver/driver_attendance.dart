@@ -23,7 +23,15 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     _students = List.from(_initialStudents);
   }
 
-  void _onLangChanged() => setState(() {});
+  void _onLangChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
 
   void _toggleStatus(int id) {
     setState(() {

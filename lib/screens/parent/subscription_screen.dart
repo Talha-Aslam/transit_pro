@@ -192,17 +192,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       _PlanCard(
                         id: 'premium',
                         selected: _selected == 'premium',
-                        name: 'Premium',
+                        name: AppStrings.t('plan_premium_name'),
                         price: 'Rs. 299/mo',
                         badge: SubscriptionProvider.instance.plan == 'premium'
                             ? AppStrings.t('current_badge')
                             : null,
-                        features: const [
-                          'Live GPS tracking',
-                          'Up to 3 child profiles',
-                          'Push + SMS alerts',
-                          'Full trip history',
-                          'Emergency contacts',
+                        features: [
+                          AppStrings.t('feat_live_gps'),
+                          AppStrings.t('feat_3_profiles'),
+                          AppStrings.t('feat_push_sms'),
+                          AppStrings.t('feat_trip_history'),
+                          AppStrings.t('feat_emergency'),
                         ],
                         color: AppTheme.parentPurple,
                         onTap: () => setState(() => _selected = 'premium'),
@@ -211,17 +211,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       _PlanCard(
                         id: 'family',
                         selected: _selected == 'family',
-                        name: 'Family',
+                        name: AppStrings.t('plan_family_name'),
                         price: 'Rs. 499/mo',
                         badge: SubscriptionProvider.instance.plan == 'family'
                             ? AppStrings.t('current_badge')
                             : AppStrings.t('best_value'),
-                        features: const [
-                          'Everything in Premium',
-                          'Unlimited child profiles',
-                          'Priority support',
-                          'Route customisation',
-                          'Driver direct chat',
+                        features: [
+                          AppStrings.t('feat_everything_premium'),
+                          AppStrings.t('feat_unlimited_profiles'),
+                          AppStrings.t('feat_priority_support'),
+                          AppStrings.t('feat_route_custom'),
+                          AppStrings.t('feat_driver_chat'),
                         ],
                         color: AppTheme.warning,
                         onTap: () => setState(() => _selected = 'family'),

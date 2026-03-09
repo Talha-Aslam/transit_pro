@@ -419,6 +419,68 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               );
                             }),
 
+                            // ── Language toggle ──────────────────────────
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                14,
+                                12,
+                                14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: context.cardBg,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: context.surfaceBorder,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.language_rounded,
+                                        size: 13,
+                                        color: context.textTertiary,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Language · زبان',
+                                        style: TextStyle(
+                                          color: context.textTertiary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      _LangChip(
+                                        label: '🇬🇧  English',
+                                        selected:
+                                            !LanguageProvider.instance.isUrdu,
+                                        onTap: () => LanguageProvider.instance
+                                            .setLanguage('English'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _LangChip(
+                                        label: 'اردو  🇵🇰',
+                                        selected:
+                                            LanguageProvider.instance.isUrdu,
+                                        onTap: () => LanguageProvider.instance
+                                            .setLanguage('Urdu'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
                             // Push footer to bottom
                             const Spacer(),
 
@@ -485,4 +547,56 @@ class _RoleConfig {
     required this.accent,
     // required this.features,
   });
+}
+
+class _LangChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            gradient: selected ? AppTheme.parentGradient : null,
+            color: selected ? null : context.cardBgElevated,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? Colors.transparent : context.inputBorder,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppTheme.parentPurple.withOpacity(0.28),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : context.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

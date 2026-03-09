@@ -242,12 +242,29 @@ class _LanguageScreenState extends State<LanguageScreen> {
                       GestureDetector(
                         onTap: () {
                           LanguageProvider.instance.setLanguage(_selected);
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          // Read strings AFTER language has been applied
+                          final msg =
+                              '${AppStrings.t('language_set')} $_selected';
+                          final messenger = ScaffoldMessenger.of(context);
+                          messenger.clearSnackBars();
+                          messenger.showSnackBar(
                             SnackBar(
                               content: Text(
-                                '${AppStrings.t('language_set')} $_selected',
+                                msg,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
                               ),
                               backgroundColor: AppTheme.parentPurple,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              elevation: 6,
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                           context.pop();

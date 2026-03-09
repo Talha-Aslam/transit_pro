@@ -35,76 +35,83 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 
   void _onLangChanged() => setState(() {});
 
-  final _trips = const [
+  List<_Trip> get _trips => [
     _Trip(
       date: 'Mon, Mar 3 2026',
-      type: 'Morning Pickup',
+      type: AppStrings.t('trip_type_morning_pickup'),
       from: 'Oak Street Stop',
       to: 'Lincoln Elementary',
       time: '07:15 AM',
       duration: '28 min',
-      status: 'On Time',
+      status: AppStrings.t('trip_status_on_time'),
       statusOk: true,
+      isMorning: true,
     ),
     _Trip(
       date: 'Mon, Mar 3 2026',
-      type: 'Afternoon Drop-off',
+      type: AppStrings.t('trip_type_afternoon_dropoff'),
       from: 'Lincoln Elementary',
       to: 'Oak Street Stop',
       time: '03:30 PM',
       duration: '31 min',
-      status: 'On Time',
+      status: AppStrings.t('trip_status_on_time'),
       statusOk: true,
+      isMorning: false,
     ),
     _Trip(
       date: 'Tue, Mar 4 2026',
-      type: 'Morning Pickup',
+      type: AppStrings.t('trip_type_morning_pickup'),
       from: 'Oak Street Stop',
       to: 'Lincoln Elementary',
       time: '07:20 AM',
       duration: '30 min',
-      status: '5 min late',
+      status: AppStrings.t('trip_status_5_late'),
       statusOk: false,
+      isMorning: true,
     ),
     _Trip(
       date: 'Tue, Mar 4 2026',
-      type: 'Afternoon Drop-off',
+      type: AppStrings.t('trip_type_afternoon_dropoff'),
       from: 'Lincoln Elementary',
       to: 'Oak Street Stop',
       time: '03:30 PM',
       duration: '29 min',
-      status: 'On Time',
+      status: AppStrings.t('trip_status_on_time'),
       statusOk: true,
+      isMorning: false,
     ),
     _Trip(
       date: 'Wed, Mar 5 2026',
-      type: 'Morning Pickup',
+      type: AppStrings.t('trip_type_morning_pickup'),
       from: 'Oak Street Stop',
       to: 'Lincoln Elementary',
       time: '07:14 AM',
       duration: '27 min',
-      status: '1 min early',
+      status: AppStrings.t('trip_status_1_early'),
       statusOk: true,
+      isMorning: true,
     ),
     _Trip(
       date: 'Wed, Mar 5 2026',
-      type: 'Afternoon Drop-off',
+      type: AppStrings.t('trip_type_afternoon_dropoff'),
       from: 'Lincoln Elementary',
       to: 'Oak Street Stop',
       time: '03:30 PM',
       duration: '32 min',
-      status: 'On Time',
+      status: AppStrings.t('trip_status_on_time'),
       statusOk: true,
+      isMorning: false,
     ),
     _Trip(
       date: 'Thu, Mar 6 2026',
-      type: 'Morning Pickup',
+      type: AppStrings.t('trip_type_morning_pickup'),
       from: 'Oak Street Stop',
       to: 'Lincoln Elementary',
       time: '07:18 AM',
       duration: '29 min',
-      status: 'On Time',
+      status: AppStrings.t('trip_status_on_time'),
       statusOk: true,
+      isMorning: true,
     ),
   ];
 
@@ -376,9 +383,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                       ),
                                       child: Center(
                                         child: Text(
-                                          t.type.contains('Pickup')
-                                              ? '🚌'
-                                              : '🏫',
+                                          t.isMorning ? '🚌' : '🏫',
                                           style: const TextStyle(fontSize: 18),
                                         ),
                                       ),
@@ -432,7 +437,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
-                                            '${t.from}  →  ${t.to}',
+                                            '${t.from}  ${AppStrings.t('trip_to_arrow')}  ${t.to}',
                                             style: TextStyle(
                                               color: context.textSecondary,
                                               fontSize: 11,
@@ -484,6 +489,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 class _Trip {
   final String date, type, from, to, time, duration, status;
   final bool statusOk;
+  final bool isMorning;
 
   const _Trip({
     required this.date,
@@ -494,5 +500,6 @@ class _Trip {
     required this.duration,
     required this.status,
     required this.statusOk,
+    required this.isMorning,
   });
 }

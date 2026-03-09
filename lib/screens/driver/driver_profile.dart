@@ -265,7 +265,7 @@ class _DriverProfileState extends State<DriverProfile> {
                         crossAxisCount: 2,
                         mainAxisSpacing: 8,
                         crossAxisSpacing: 8,
-                        childAspectRatio: 1.9,
+                        childAspectRatio: 1.7,
                         children: [
                           _InfoCard(
                             icon: '🪪',
@@ -622,6 +622,8 @@ class _InfoCard extends StatelessWidget {
               fontSize: 9,
               fontWeight: FontWeight.w600,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(

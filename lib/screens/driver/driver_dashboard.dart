@@ -435,7 +435,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         crossAxisCount: 2,
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        childAspectRatio: 2.2,
+                        childAspectRatio: 2.0,
                         children: [
                           _QuickActionBtn(
                             icon: '🚨',
@@ -620,12 +620,16 @@ class _QuickActionBtn extends StatelessWidget {
         children: [
           Text(icon, style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: context.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
