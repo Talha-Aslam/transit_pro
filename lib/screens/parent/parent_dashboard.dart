@@ -1,10 +1,11 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../app/parent_data_service.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
-class ParentDashboard extends StatelessWidget {
+class ParentDashboard extends StatefulWidget {
   final void Function(int) onNavigate;
   final int unreadCount;
 
@@ -15,13 +16,32 @@ class ParentDashboard extends StatelessWidget {
   });
 
   @override
+  State<ParentDashboard> createState() => _ParentDashboardState();
+}
+
+class _ParentDashboardState extends State<ParentDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? 'Good Morning'
+        ? AppStrings.t('good_morning')
         : hour < 17
-        ? 'Good Afternoon'
-        : 'Good Evening';
+        ? AppStrings.t('good_afternoon')
+        : AppStrings.t('good_evening');
 
     final svc = ParentDataService.instance;
 
@@ -83,7 +103,7 @@ class ParentDashboard extends StatelessWidget {
                         ),
                         // Notification button
                         GestureDetector(
-                          onTap: () => onNavigate(3),
+                          onTap: () => widget.onNavigate(3),
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
@@ -97,7 +117,7 @@ class ParentDashboard extends StatelessWidget {
                                     color: context.inputBorder,
                                   ),
                                 ),
-                                child: unreadCount > 0
+                                child: widget.unreadCount > 0
                                     ? Image.asset(
                                         'assets/images/notification_bell.gif',
                                         width: 36,
@@ -114,7 +134,7 @@ class ParentDashboard extends StatelessWidget {
                                         ),
                                       ),
                               ),
-                              if (unreadCount > 0)
+                              if (widget.unreadCount > 0)
                                 Positioned(
                                   top: -4,
                                   right: -4,
@@ -127,7 +147,7 @@ class ParentDashboard extends StatelessWidget {
                                     ),
                                     child: Center(
                                       child: Text(
-                                        '$unreadCount',
+                                        '${widget.unreadCount}',
                                         style: TextStyle(
                                           color: context.textPrimary,
                                           fontSize: 9,
@@ -219,7 +239,7 @@ class ParentDashboard extends StatelessWidget {
                                       vertical: 8,
                                     ),
                                     child: Text(
-                                      'No children added yet',
+                                      AppStrings.t('no_children_yet'),
                                       style: TextStyle(
                                         color: context.textSecondary,
                                       ),
@@ -314,7 +334,7 @@ class ParentDashboard extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 8),
                                           StatusBadge(
-                                            label: 'â— On the Bus',
+                                            label: AppStrings.t('on_the_bus'),
                                             color: AppTheme.success,
                                           ),
                                         ],
@@ -327,7 +347,7 @@ class ParentDashboard extends StatelessWidget {
 
                         // â”€â”€ Live ETA card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         GlassCard(
-                          onTap: () => onNavigate(1),
+                          onTap: () => widget.onNavigate(1),
                           gradient: LinearGradient(
                             colors: [
                               AppTheme.parentPurple.withOpacity(0.2),
@@ -405,7 +425,7 @@ class ParentDashboard extends StatelessWidget {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          'to school',
+                                          AppStrings.t('to_school'),
                                           style: TextStyle(
                                             color: context.textSecondary,
                                             fontSize: 13,
@@ -416,7 +436,7 @@ class ParentDashboard extends StatelessWidget {
                                     Text(
                                       child == null
                                           ? ''
-                                          : 'ðŸ“ Currently at ${child.stop}',
+                                          : '\ud83d\udccd ${AppStrings.t('currently_at')} ${child.stop}',
                                       style: TextStyle(
                                         color: context.textTertiary,
                                         fontSize: 12,
@@ -459,7 +479,7 @@ class ParentDashboard extends StatelessWidget {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    "Today's Schedule",
+                                    AppStrings.t('todays_schedule'),
                                     style: TextStyle(
                                       color: context.textPrimary,
                                       fontSize: 15,
@@ -467,7 +487,7 @@ class ParentDashboard extends StatelessWidget {
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: () => onNavigate(2),
+                                    onTap: () => widget.onNavigate(2),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
@@ -483,7 +503,7 @@ class ParentDashboard extends StatelessWidget {
                                         ),
                                       ),
                                       child: Text(
-                                        'View All',
+                                        AppStrings.t('view_all'),
                                         style: TextStyle(
                                           color: AppTheme.parentAccent,
                                           fontSize: 12,
@@ -499,26 +519,26 @@ class ParentDashboard extends StatelessWidget {
                                   _ScheduleChip(
                                     icon:
                                         'assets/images/waiting_for_bus_transparent.png',
-                                    label: 'Pickup',
+                                    label: AppStrings.t('pickup'),
                                     time: '07:15 AM',
-                                    status: 'Done',
+                                    status: AppStrings.t('done'),
                                     color: AppTheme.success,
                                   ),
                                   const SizedBox(width: 8),
                                   _ScheduleChip(
                                     icon: 'assets/images/at_school.png',
-                                    label: 'At School',
+                                    label: AppStrings.t('at_school'),
                                     time: '07:45 AM',
-                                    status: 'Done',
+                                    status: AppStrings.t('done'),
                                     color: AppTheme.success,
                                   ),
                                   const SizedBox(width: 8),
                                   _ScheduleChip(
                                     icon:
                                         'assets/images/drop_off_transparent.png',
-                                    label: 'Drop Off',
+                                    label: AppStrings.t('drop_off'),
                                     time: '03:30 PM',
-                                    status: 'Pending',
+                                    status: AppStrings.t('pending'),
                                     color: AppTheme.warning,
                                   ),
                                 ],
@@ -540,25 +560,25 @@ class ParentDashboard extends StatelessWidget {
                           children: [
                             _StatCard(
                               icon: 'assets/images/total_trips.png',
-                              label: 'Total Trips',
+                              label: AppStrings.t('total_trips'),
                               value: '142',
                               color: AppTheme.purple,
                             ),
                             _StatCard(
                               icon: 'assets/images/on_time.png',
-                              label: 'On-Time',
+                              label: AppStrings.t('on_time'),
                               value: '96%',
                               color: AppTheme.success,
                             ),
                             _StatCard(
                               icon: 'assets/images/calendar.png',
-                              label: 'This Week',
+                              label: AppStrings.t('this_week'),
                               value: '5',
                               color: AppTheme.info,
                             ),
                             _StatCard(
                               icon: 'assets/images/safety.png',
-                              label: 'Safe Rides',
+                              label: AppStrings.t('safe_rides'),
                               value: '142',
                               color: AppTheme.warning,
                             ),
@@ -576,7 +596,7 @@ class ParentDashboard extends StatelessWidget {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    'Recent Alerts',
+                                    AppStrings.t('recent_alerts'),
                                     style: TextStyle(
                                       color: context.textPrimary,
                                       fontSize: 15,
@@ -584,7 +604,7 @@ class ParentDashboard extends StatelessWidget {
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: () => onNavigate(3),
+                                    onTap: () => widget.onNavigate(3),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
@@ -600,7 +620,7 @@ class ParentDashboard extends StatelessWidget {
                                         ),
                                       ),
                                       child: Text(
-                                        'View All',
+                                        AppStrings.t('view_all'),
                                         style: TextStyle(
                                           color: AppTheme.parentAccent,
                                           fontSize: 12,
@@ -613,7 +633,7 @@ class ParentDashboard extends StatelessWidget {
                               const SizedBox(height: 12),
                               ...[
                                 (
-                                  'assets/images/check.png',
+                                  'assets/images/utilities/check.png',
                                   child == null
                                       ? 'No child selected'
                                       : '${child.name.split(' ').first} boarded ${child.busNumber} at ${child.stop}',
@@ -630,7 +650,7 @@ class ParentDashboard extends StatelessWidget {
                                 ),
                                 (
                                   'assets/images/alert.png',
-                                  'Bus approaching your stop in 8 min',
+                                  AppStrings.t('bus_approaching'),
                                   '06:55 AM',
                                   AppTheme.warning,
                                 ),

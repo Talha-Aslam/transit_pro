@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   go_router: ^14.0.0
   image_picker: ^1.1.2
+  url_launcher: ^6.3.0
     
 dev_dependencies:
   flutter_test:
@@ -28,6 +29,7 @@ flutter:
     - assets/images/schedule/
     - assets/images/splash_screen/bus_splash_icon.png
     - assets/images/stats/
+    - assets/images/utilities/
     - assets/images/
     - assets/images/notification_bell.gif
     - assets/images/path_transparent.gif

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -14,10 +16,26 @@ class _RateAppScreenState extends State<RateAppScreen> {
   final _ctrl = TextEditingController();
   bool _submitted = false;
 
-  final _starLabels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+  List<String> get _starLabels => [
+    '',
+    AppStrings.t('star_poor'),
+    AppStrings.t('star_fair'),
+    AppStrings.t('star_good'),
+    AppStrings.t('star_very_good'),
+    AppStrings.t('star_excellent'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _ctrl.dispose();
     super.dispose();
   }
@@ -45,7 +63,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -65,7 +83,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Rate the App',
+                      AppStrings.t('rate_app_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -96,7 +114,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Enjoying TransitPro?',
+                                    AppStrings.t('enjoying_transitpro'),
                                     style: TextStyle(
                                       color: context.textPrimary,
                                       fontSize: 20,
@@ -105,7 +123,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Your feedback helps us improve\nthe experience for everyone.',
+                                    AppStrings.t('feedback_helps'),
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: context.textSecondary,
@@ -165,7 +183,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Leave a comment (optional)',
+                                    AppStrings.t('leave_comment'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 12,
@@ -189,7 +207,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                         fontSize: 13,
                                       ),
                                       decoration: InputDecoration(
-                                        hintText: 'Tell us what you think...',
+                                        hintText: AppStrings.t('tell_us_what'),
                                         hintStyle: TextStyle(
                                           color: context.textTertiary,
                                         ),
@@ -221,10 +239,10 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                     gradient: AppTheme.parentGradient,
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Text(
-                                      'Submit Rating',
-                                      style: TextStyle(
+                                      AppStrings.t('submit_rating'),
+                                      style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
@@ -270,7 +288,7 @@ class _ThankYouView extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'Thank You! 🎉',
+            '${AppStrings.t('thank_you')} 🎉',
             style: TextStyle(
               color: context.textPrimary,
               fontSize: 24,
@@ -284,7 +302,7 @@ class _ThankYouView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Your feedback helps us build a\nbetter app for all parents.',
+            AppStrings.t('better_app'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: context.textSecondary,
@@ -294,16 +312,16 @@ class _ThankYouView extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () => context.pop(),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
               decoration: BoxDecoration(
                 gradient: AppTheme.parentGradient,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Text(
-                'Back to Profile',
-                style: TextStyle(
+              child: Text(
+                AppStrings.t('back_to_profile'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                 ),

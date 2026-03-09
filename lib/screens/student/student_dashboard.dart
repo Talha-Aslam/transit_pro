@@ -1,21 +1,41 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
-class StudentDashboard extends StatelessWidget {
+class StudentDashboard extends StatefulWidget {
   final void Function(int) onNavigate;
   const StudentDashboard({super.key, required this.onNavigate});
+
+  @override
+  State<StudentDashboard> createState() => _StudentDashboardState();
+}
+
+class _StudentDashboardState extends State<StudentDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? 'Good Morning'
+        ? AppStrings.t('good_morning')
         : hour < 17
-        ? 'Good Afternoon'
-        : 'Good Evening';
+        ? AppStrings.t('good_afternoon')
+        : AppStrings.t('good_evening');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -177,7 +197,7 @@ class StudentDashboard extends StatelessWidget {
 
                 // ── ETA Card ──────────────────────────────────
                 GestureDetector(
-                  onTap: () => onNavigate(1),
+                  onTap: () => widget.onNavigate(1),
                   child: GlassCard(
                     gradient: LinearGradient(
                       colors: [
@@ -225,7 +245,7 @@ class StudentDashboard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'to school',
+                                    AppStrings.t('to_school'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 13,
@@ -268,7 +288,7 @@ class StudentDashboard extends StatelessWidget {
 
                 // ── QR Pass quick action ──────────────────────
                 GestureDetector(
-                  onTap: () => onNavigate(3),
+                  onTap: () => widget.onNavigate(3),
                   child: GlassCard(
                     gradient: LinearGradient(
                       colors: [
@@ -297,7 +317,7 @@ class StudentDashboard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'My QR Pass',
+                                AppStrings.t('my_qr_pass'),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 15,
@@ -345,7 +365,7 @@ class StudentDashboard extends StatelessWidget {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => onNavigate(2),
+                            onTap: () => widget.onNavigate(2),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -361,7 +381,7 @@ class StudentDashboard extends StatelessWidget {
                                 ),
                               ),
                               child: Text(
-                                'View All',
+                                AppStrings.t('view_all'),
                                 style: TextStyle(
                                   color: AppTheme.studentAccent,
                                   fontSize: 12,
@@ -409,7 +429,7 @@ class StudentDashboard extends StatelessWidget {
                   children: [
                     _StatCard(
                       icon: '🚌',
-                      label: 'Total Rides',
+                      label: AppStrings.t('total_rides'),
                       value: '142',
                       color: AppTheme.studentAmber,
                     ),

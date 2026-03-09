@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 
@@ -14,6 +15,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
   bool _loading = false;
   bool _sent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
 
   void _sendReset() {
     if (_emailCtrl.text.isEmpty) return;
@@ -30,6 +39,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _emailCtrl.dispose();
     super.dispose();
   }
@@ -82,7 +92,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          'Back',
+                          AppStrings.t('back'),
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 14,
@@ -119,7 +129,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            _sent ? 'Check Your Email' : 'Forgot Password?',
+                            _sent
+                                ? AppStrings.t('check_email_title')
+                                : AppStrings.t('forgot_password_title'),
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 26,
@@ -130,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           Text(
                             _sent
                                 ? 'We sent a reset link to\n${_emailCtrl.text}'
-                                : "Enter your email and we'll send you\na link to reset your password",
+                                : AppStrings.t('forgot_pass_sub'),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: context.textSecondary,
@@ -149,7 +161,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'EMAIL ADDRESS',
+                              AppStrings.t('email_address'),
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.6),
                                 fontSize: 11,
@@ -165,13 +177,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 color: context.textPrimary,
                                 fontSize: 15,
                               ),
-                              decoration: const InputDecoration(
-                                hintText: 'Enter your email',
+                              decoration: InputDecoration(
+                                hintText: AppStrings.t('email_hint'),
                               ),
                             ),
                             const SizedBox(height: 20),
                             GradientButton(
-                              label: 'Send Reset Link',
+                              label: AppStrings.t('send_reset'),
                               gradient: AppTheme.parentGradient,
                               glowColor: AppTheme.parentPurple,
                               isLoading: _loading,
@@ -211,7 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Reset link sent successfully!\nPlease check your inbox.',
+                                    AppStrings.t('reset_sent'),
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.7),
                                       fontSize: 13,
@@ -223,7 +235,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                             const SizedBox(height: 16),
                             GradientButton(
-                              label: 'Back to Login',
+                              label: AppStrings.t('back_to_login'),
                               gradient: AppTheme.parentGradient,
                               glowColor: AppTheme.parentPurple,
                               onTap: () => context.pop(),

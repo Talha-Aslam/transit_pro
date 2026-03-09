@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 
 class ParentNotifications extends StatefulWidget {
@@ -16,17 +17,26 @@ class ParentNotifications extends StatefulWidget {
 
 class _ParentNotificationsState extends State<ParentNotifications> {
   String _activeFilter = 'All';
-  late List<_Notif> _notifs;
 
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _notifs = List.from(_allNotifs);
-    // Report initial unread count to parent
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onUnreadChanged?.call(_unreadCount);
     });
   }
+
+  void _onLangChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  late List<_Notif> _notifs;
 
   int get _unreadCount => _notifs.where((n) => !n.read).length;
 
@@ -70,7 +80,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                   child: Row(
                     children: [
                       Text(
-                        'Notifications',
+                        AppStrings.t('notifications'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -122,7 +132,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                         ),
                       ),
                       child: Text(
-                        'Mark all read',
+                        AppStrings.t('mark_all_read'),
                         style: TextStyle(
                           color: AppTheme.parentAccent,
                           fontSize: 12,
@@ -143,44 +153,52 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: ['All', 'Unread', 'Today', 'Alerts'].map((f) {
-                      final active = _activeFilter == f;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _activeFilter = f),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? AppTheme.parentPurple.withOpacity(0.2)
-                                  : Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: active
-                                    ? AppTheme.parentPurple.withOpacity(0.5)
-                                    : Colors.white.withOpacity(0.1),
+                    children:
+                        {
+                          'All': AppStrings.t('all'),
+                          'Unread': AppStrings.t('unread'),
+                          'Today': AppStrings.t('today'),
+                          'Alerts': AppStrings.t('alerts'),
+                        }.entries.map((e) {
+                          final f = e.key;
+                          final label = e.value;
+                          final active = _activeFilter == f;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _activeFilter = f),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? AppTheme.parentPurple.withOpacity(0.2)
+                                      : Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: active
+                                        ? AppTheme.parentPurple.withOpacity(0.5)
+                                        : Colors.white.withOpacity(0.1),
+                                  ),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: active
+                                        ? AppTheme.parentAccent
+                                        : context.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: active
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text(
-                              f,
-                              style: TextStyle(
-                                color: active
-                                    ? AppTheme.parentAccent
-                                    : context.textSecondary,
-                                fontSize: 13,
-                                fontWeight: active
-                                    ? FontWeight.w700
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        }).toList(),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -244,7 +262,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No notifications in this category',
+                            AppStrings.t('no_notifs'),
                             style: TextStyle(
                               color: context.textTertiary,
                               fontSize: 14,

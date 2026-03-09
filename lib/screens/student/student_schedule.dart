@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -11,7 +12,28 @@ class StudentSchedule extends StatefulWidget {
 class _StudentScheduleState extends State<StudentSchedule> {
   int _selectedDay = DateTime.now().weekday - 1; // 0=Mon
 
-  final _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  List<String> get _days => [
+    AppStrings.t('day_mon'),
+    AppStrings.t('day_tue'),
+    AppStrings.t('day_wed'),
+    AppStrings.t('day_thu'),
+    AppStrings.t('day_fri'),
+    AppStrings.t('day_sat'),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +49,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'My Schedule',
+                  AppStrings.t('my_schedule'),
                   style: TextStyle(
                     color: context.textPrimary,
                     fontSize: 24,
@@ -36,11 +58,8 @@ class _StudentScheduleState extends State<StudentSchedule> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Pickup & drop-off timings',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 13,
-                  ),
+                  AppStrings.t('pickup_dropoff_timings'),
+                  style: TextStyle(color: context.textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -73,9 +92,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
                       child: Text(
                         _days[i],
                         style: TextStyle(
-                          color: sel
-                              ? Colors.white
-                              : context.textSecondary,
+                          color: sel ? Colors.white : context.textSecondary,
                           fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                           fontSize: 13,
                         ),
@@ -128,7 +145,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Your Stop: Pine Road',
+                          '${AppStrings.t('your_stop')}: Pine Road',
                           style: TextStyle(
                             color: AppTheme.studentAccent,
                             fontSize: 12,
@@ -137,7 +154,10 @@ class _StudentScheduleState extends State<StudentSchedule> {
                       ],
                     ),
                   ),
-                  StatusBadge(label: 'Active', color: AppTheme.success),
+                  StatusBadge(
+                    label: AppStrings.t('active_status'),
+                    color: AppTheme.success,
+                  ),
                 ],
               ),
             ),
@@ -145,7 +165,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
           const SizedBox(height: 16),
 
           // ── Morning schedule ──────────────────────────
-          _SectionLabel(label: 'Morning Pickup'),
+          _SectionLabel(label: AppStrings.t('morning_pickup_s')),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
@@ -154,7 +174,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
                 children: [
                   _TimelineItem(
                     icon: '🏠',
-                    title: 'Be at Stop',
+                    title: AppStrings.t('be_at_stop'),
                     subtitle: 'Pine Road bus stop',
                     time: '07:15 AM',
                     color: AppTheme.studentAmber,
@@ -162,21 +182,21 @@ class _StudentScheduleState extends State<StudentSchedule> {
                   ),
                   _TimelineItem(
                     icon: '🚌',
-                    title: 'Bus Arrives',
+                    title: AppStrings.t('bus_arrives'),
                     subtitle: 'Estimated pickup',
                     time: '07:22 AM',
                     color: AppTheme.info,
                   ),
                   _TimelineItem(
                     icon: '✅',
-                    title: 'QR Check-in',
+                    title: AppStrings.t('qr_checkin'),
                     subtitle: 'Scan your QR pass',
                     time: '07:22 AM',
                     color: AppTheme.success,
                   ),
                   _TimelineItem(
                     icon: '🏫',
-                    title: 'Reach School',
+                    title: AppStrings.t('reach_school'),
                     subtitle: 'Lincoln Elementary',
                     time: '07:35 AM',
                     color: AppTheme.purple,
@@ -189,7 +209,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
           const SizedBox(height: 16),
 
           // ── Afternoon schedule ────────────────────────
-          _SectionLabel(label: 'Afternoon Drop-off'),
+          _SectionLabel(label: AppStrings.t('afternoon_dropoff_s')),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
@@ -198,7 +218,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
                 children: [
                   _TimelineItem(
                     icon: '🏫',
-                    title: 'School Dismissal',
+                    title: AppStrings.t('school_dismissal'),
                     subtitle: 'Board at Gate B',
                     time: '02:30 PM',
                     color: AppTheme.purple,
@@ -206,21 +226,21 @@ class _StudentScheduleState extends State<StudentSchedule> {
                   ),
                   _TimelineItem(
                     icon: '✅',
-                    title: 'QR Check-out',
+                    title: AppStrings.t('qr_checkout'),
                     subtitle: 'Scan when boarding',
                     time: '02:35 PM',
                     color: AppTheme.success,
                   ),
                   _TimelineItem(
                     icon: '🚌',
-                    title: 'Bus Departs',
+                    title: AppStrings.t('bus_departs'),
                     subtitle: 'Route A return journey',
                     time: '02:40 PM',
                     color: AppTheme.info,
                   ),
                   _TimelineItem(
                     icon: '🏠',
-                    title: 'Reach Stop',
+                    title: AppStrings.t('reach_stop'),
                     subtitle: 'Pine Road bus stop',
                     time: '03:05 PM',
                     color: AppTheme.studentAmber,
@@ -233,7 +253,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
           const SizedBox(height: 16),
 
           // ── Weekly summary ────────────────────────────
-          _SectionLabel(label: 'This Week Summary'),
+          _SectionLabel(label: AppStrings.t('this_week_summary')),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
@@ -244,19 +264,19 @@ class _StudentScheduleState extends State<StudentSchedule> {
                   _WeekStat(
                     icon: '🚌',
                     value: '8',
-                    label: 'Rides',
+                    label: AppStrings.t('rides_lbl'),
                     color: AppTheme.studentAmber,
                   ),
                   _WeekStat(
                     icon: '⏱️',
                     value: '100%',
-                    label: 'On Time',
+                    label: AppStrings.t('on_time'),
                     color: AppTheme.success,
                   ),
                   _WeekStat(
                     icon: '📲',
                     value: '8',
-                    label: 'Check-ins',
+                    label: AppStrings.t('checkins_lbl'),
                     color: AppTheme.info,
                   ),
                 ],
@@ -363,10 +383,7 @@ class _TimelineItem extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    color: context.textTertiary,
-                    fontSize: 11,
-                  ),
+                  style: TextStyle(color: context.textTertiary, fontSize: 11),
                 ),
                 if (!isLast) const SizedBox(height: 8),
               ],

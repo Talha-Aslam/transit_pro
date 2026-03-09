@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -21,6 +23,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _currentCtrl.dispose();
     _newCtrl.dispose();
     _confirmCtrl.dispose();
@@ -30,6 +33,56 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _hasLength(String v) => v.length >= 8;
   bool _hasUpper(String v) => v.contains(RegExp(r'[A-Z]'));
   bool _hasDigit(String v) => v.contains(RegExp(r'[0-9]'));
+  bool _hasSpecial(String v) =>
+      v.contains(RegExp(r'[!@#\$%\^&\*\(\),.?":{}|<>_\-]'));
+
+  int get _strength {
+    final v = _newCtrl.text;
+    return [
+      _hasLength(v),
+      _hasUpper(v),
+      _hasDigit(v),
+      _hasSpecial(v),
+    ].where((b) => b).length;
+  }
+
+  Color get _strengthColor {
+    switch (_strength) {
+      case 1:
+        return AppTheme.errorLight;
+      case 2:
+        return AppTheme.warningLight;
+      case 3:
+        return const Color(0xFF84CC16);
+      case 4:
+        return AppTheme.successLight;
+      default:
+        return Colors.transparent;
+    }
+  }
+
+  String get _strengthLabel {
+    switch (_strength) {
+      case 1:
+        return AppStrings.t('pwd_weak');
+      case 2:
+        return AppStrings.t('pwd_fair');
+      case 3:
+        return AppStrings.t('pwd_good');
+      case 4:
+        return AppStrings.t('pwd_strong');
+      default:
+        return '';
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
 
   Future<void> _submit() async {
     setState(() => _error = null);
@@ -38,15 +91,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final confirm = _confirmCtrl.text;
 
     if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
-      setState(() => _error = 'Please fill in all fields');
+      setState(() => _error = AppStrings.t('fill_all_fields'));
       return;
     }
-    if (!_hasLength(next) || !_hasUpper(next) || !_hasDigit(next)) {
-      setState(() => _error = 'New password does not meet requirements');
+    if (!_hasLength(next) ||
+        !_hasUpper(next) ||
+        !_hasDigit(next) ||
+        !_hasSpecial(next)) {
+      setState(() => _error = AppStrings.t('pwd_not_meet'));
       return;
     }
     if (next != confirm) {
-      setState(() => _error = 'Passwords do not match');
+      setState(() => _error = AppStrings.t('pwd_no_match'));
       return;
     }
 
@@ -56,17 +112,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _loading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password changed successfully'),
+      SnackBar(
+        content: Text(AppStrings.t('pwd_changed')),
         backgroundColor: AppTheme.success,
       ),
     );
-    Navigator.pop(context);
+    context.pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final newVal = _newCtrl.text;
     return Scaffold(
       body: Container(
         decoration: context.scaffoldBg,
@@ -89,7 +144,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -109,7 +164,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Change Password',
+                      AppStrings.t('change_password_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -133,7 +188,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             const Text('🔐', style: TextStyle(fontSize: 36)),
                             const SizedBox(height: 8),
                             Text(
-                              'Update your password',
+                              AppStrings.t('update_password'),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 16,
@@ -141,7 +196,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ),
                             ),
                             Text(
-                              'Use a strong password with at least 8 characters.',
+                              AppStrings.t('strong_password'),
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -158,7 +213,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           children: [
                             _PasswordField(
                               ctrl: _currentCtrl,
-                              hint: 'Current Password',
+                              hint: AppStrings.t('current_password'),
                               show: _showCurrent,
                               onToggle: () =>
                                   setState(() => _showCurrent = !_showCurrent),
@@ -167,7 +222,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             const SizedBox(height: 12),
                             _PasswordField(
                               ctrl: _newCtrl,
-                              hint: 'New Password',
+                              hint: AppStrings.t('new_password'),
                               show: _showNew,
                               onToggle: () =>
                                   setState(() => _showNew = !_showNew),
@@ -176,12 +231,50 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             const SizedBox(height: 12),
                             _PasswordField(
                               ctrl: _confirmCtrl,
-                              hint: 'Confirm New Password',
+                              hint: AppStrings.t('confirm_new_password'),
                               show: _showConfirm,
                               onToggle: () =>
                                   setState(() => _showConfirm = !_showConfirm),
                               onChanged: (_) => setState(() {}),
                             ),
+                            if (_confirmCtrl.text.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const SizedBox(width: 2),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 250),
+                                    child: Icon(
+                                      _confirmCtrl.text == _newCtrl.text
+                                          ? Icons.check_circle
+                                          : Icons.cancel_outlined,
+                                      key: ValueKey(
+                                        _confirmCtrl.text == _newCtrl.text,
+                                      ),
+                                      size: 14,
+                                      color: _confirmCtrl.text == _newCtrl.text
+                                          ? AppTheme.success
+                                          : AppTheme.errorLight,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 250),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _confirmCtrl.text == _newCtrl.text
+                                          ? AppTheme.success
+                                          : AppTheme.errorLight,
+                                    ),
+                                    child: Text(
+                                      _confirmCtrl.text == _newCtrl.text
+                                          ? AppStrings.t('passwords_match')
+                                          : AppStrings.t('pwd_no_match'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -193,26 +286,71 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Password Requirements',
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    AppStrings.t('password_requirements'),
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                if (_strength > 0)
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 300),
+                                    style: TextStyle(
+                                      color: _strengthColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    child: Text(_strengthLabel),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Animated strength bar
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 5,
+                                    color: Colors.white.withOpacity(0.08),
+                                  ),
+                                  LayoutBuilder(
+                                    builder: (ctx, box) => AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 350,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      height: 5,
+                                      width: box.maxWidth * (_strength / 4),
+                                      color: _strengthColor,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             _Requirement(
-                              label: 'At least 8 characters',
-                              met: _hasLength(newVal),
+                              label: AppStrings.t('min_8_chars'),
+                              met: _hasLength(_newCtrl.text),
                             ),
                             _Requirement(
-                              label: 'At least one uppercase letter',
-                              met: _hasUpper(newVal),
+                              label: AppStrings.t('uppercase'),
+                              met: _hasUpper(_newCtrl.text),
                             ),
                             _Requirement(
-                              label: 'At least one number',
-                              met: _hasDigit(newVal),
+                              label: AppStrings.t('one_digit'),
+                              met: _hasDigit(_newCtrl.text),
+                            ),
+                            _Requirement(
+                              label: AppStrings.t('special_char'),
+                              met: _hasSpecial(_newCtrl.text),
+                              isLast: true,
                             ),
                           ],
                         ),
@@ -274,9 +412,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
-                                    'Change Password',
-                                    style: TextStyle(
+                                : Text(
+                                    AppStrings.t('update_password_btn'),
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
@@ -356,26 +494,38 @@ class _PasswordField extends StatelessWidget {
 class _Requirement extends StatelessWidget {
   final String label;
   final bool met;
-  const _Requirement({required this.label, required this.met});
+  final bool isLast;
+  const _Requirement({
+    required this.label,
+    required this.met,
+    this.isLast = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
       child: Row(
         children: [
-          Icon(
-            met ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 15,
-            color: met ? AppTheme.success : context.textTertiary,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, anim) =>
+                ScaleTransition(scale: anim, child: child),
+            child: Icon(
+              met ? Icons.check_circle : Icons.radio_button_unchecked,
+              key: ValueKey(met),
+              size: 15,
+              color: met ? AppTheme.success : context.textTertiary,
+            ),
           ),
           const SizedBox(width: 8),
-          Text(
-            label,
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 300),
             style: TextStyle(
               color: met ? AppTheme.success : context.textSecondary,
               fontSize: 12,
             ),
+            child: Text(label),
           ),
         ],
       ),

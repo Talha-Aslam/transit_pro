@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -23,6 +25,20 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       phone: '+92 321 7654321',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
 
   void _showAddSheet({_Contact? existing, int? index}) {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
@@ -57,7 +73,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                existing == null ? 'Add Contact' : 'Edit Contact',
+                existing == null
+                    ? AppStrings.t('add_contact')
+                    : AppStrings.t('edit_contact'),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -65,17 +83,21 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildField(nameCtrl, 'Full Name', Icons.person_outline),
+              _buildField(
+                nameCtrl,
+                AppStrings.t('full_name'),
+                Icons.person_outline,
+              ),
               const SizedBox(height: 10),
               _buildField(
                 relCtrl,
-                'Relation (e.g. Mother)',
+                AppStrings.t('relation'),
                 Icons.family_restroom,
               ),
               const SizedBox(height: 10),
               _buildField(
                 phoneCtrl,
-                'Phone Number',
+                AppStrings.t('phone_number'),
                 Icons.phone_outlined,
                 type: TextInputType.phone,
               ),
@@ -91,10 +113,10 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                           color: Colors.white10,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'Cancel',
-                            style: TextStyle(color: Colors.white70),
+                            AppStrings.t('cancel'),
+                            style: const TextStyle(color: Colors.white70),
                           ),
                         ),
                       ),
@@ -130,7 +152,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            existing == null ? 'Add' : 'Save',
+                            existing == null
+                                ? AppStrings.t('add_contact')
+                                : AppStrings.t('save'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -185,20 +209,20 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.bgDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Remove Contact',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          AppStrings.t('remove_contact'),
+          style: const TextStyle(color: Colors.white),
         ),
         content: Text(
-          'Remove ${_contacts[index].name} from emergency contacts?',
+          '${AppStrings.t('remove_contact')}: ${_contacts[index].name}?',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
+            child: Text(
+              AppStrings.t('cancel'),
+              style: const TextStyle(color: Colors.white54),
             ),
           ),
           TextButton(
@@ -206,9 +230,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
               setState(() => _contacts.removeAt(index));
               Navigator.pop(context);
             },
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: AppTheme.error),
+            child: Text(
+              AppStrings.t('remove'),
+              style: const TextStyle(color: AppTheme.error),
             ),
           ),
         ],
@@ -240,7 +264,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -261,7 +285,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Emergency Contacts',
+                        AppStrings.t('emergency_contacts_title'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -296,14 +320,14 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                             const Text('📞', style: TextStyle(fontSize: 48)),
                             const SizedBox(height: 12),
                             Text(
-                              'No emergency contacts added',
+                              AppStrings.t('no_emergency_contacts'),
                               style: TextStyle(color: context.textSecondary),
                             ),
                             const SizedBox(height: 8),
                             GestureDetector(
                               onTap: () => _showAddSheet(),
                               child: Text(
-                                'Add one now',
+                                AppStrings.t('add_one_now'),
                                 style: TextStyle(
                                   color: AppTheme.parentPurple,
                                   fontWeight: FontWeight.w600,
@@ -362,7 +386,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                         Text(
                                           c.relation.isNotEmpty
                                               ? c.relation
-                                              : 'Emergency Contact',
+                                              : AppStrings.t(
+                                                  'emergency_contact_fallback',
+                                                ),
                                           style: TextStyle(
                                             color: context.textSecondary,
                                             fontSize: 12,

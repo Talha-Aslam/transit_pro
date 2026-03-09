@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'driver_dashboard.dart';
 import 'driver_attendance.dart';
@@ -20,20 +21,40 @@ class _DriverLayoutState extends State<DriverLayout> {
 
   void _goToTab(int index) => setState(() => _tab = index);
 
-  static const _navItems = [
-    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
-    _NavItem(icon: 'assets/images/navbar/student.png', label: 'Students'),
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  List<_NavItem> get _navItems => [
+    _NavItem(
+      icon: 'assets/images/navbar/home_transparent.png',
+      label: AppStrings.t('dnav_home'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/student.png',
+      label: AppStrings.t('dnav_students'),
+    ),
     _NavItem(
       icon: 'assets/images/navbar/track_transparent.png',
-      label: 'Route',
+      label: AppStrings.t('dnav_route'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/notification_transparent.png',
-      label: 'Alerts',
+      label: AppStrings.t('dnav_alerts'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/user_transparent.png',
-      label: 'Profile',
+      label: AppStrings.t('dnav_profile'),
     ),
   ];
 

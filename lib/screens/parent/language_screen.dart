@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -12,13 +14,24 @@ class LanguageScreen extends StatefulWidget {
 class _LanguageScreenState extends State<LanguageScreen> {
   String _selected = 'English';
 
+  @override
+  void initState() {
+    super.initState();
+    _selected = LanguageProvider.instance.lang;
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
   final _languages = const [
     _Lang(name: 'English', native: 'English', flag: '🇬🇧'),
     _Lang(name: 'Urdu', native: 'اردو', flag: '🇵🇰'),
-    _Lang(name: 'Arabic', native: 'العربية', flag: '🇸🇦'),
-    _Lang(name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳'),
-    _Lang(name: 'French', native: 'Français', flag: '🇫🇷'),
-    _Lang(name: 'Spanish', native: 'Español', flag: '🇪🇸'),
   ];
 
   @override
@@ -45,7 +58,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -65,7 +78,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Language',
+                      AppStrings.t('language_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -92,7 +105,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'App Language',
+                                    AppStrings.t('app_language'),
                                     style: TextStyle(
                                       color: context.textPrimary,
                                       fontSize: 14,
@@ -100,7 +113,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                     ),
                                   ),
                                   Text(
-                                    'Choose your preferred language',
+                                    AppStrings.t('choose_language'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 11,
@@ -228,13 +241,16 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
                       GestureDetector(
                         onTap: () {
+                          LanguageProvider.instance.setLanguage(_selected);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Language set to $_selected'),
+                              content: Text(
+                                '${AppStrings.t('language_set')} $_selected',
+                              ),
                               backgroundColor: AppTheme.parentPurple,
                             ),
                           );
-                          Navigator.pop(context);
+                          context.pop();
                         },
                         child: Container(
                           width: double.infinity,
@@ -243,10 +259,10 @@ class _LanguageScreenState extends State<LanguageScreen> {
                             gradient: AppTheme.parentGradient,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
-                              'Apply',
-                              style: TextStyle(
+                              AppStrings.t('apply'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,

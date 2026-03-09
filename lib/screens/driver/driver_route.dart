@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -20,6 +21,7 @@ class _DriverRouteState extends State<DriverRoute>
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _busController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
@@ -31,8 +33,11 @@ class _DriverRouteState extends State<DriverRoute>
     });
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _busController.dispose();
     super.dispose();
   }
@@ -65,7 +70,7 @@ class _DriverRouteState extends State<DriverRoute>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Route Navigator',
+                        AppStrings.t('route_navigator'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -132,7 +137,7 @@ class _DriverRouteState extends State<DriverRoute>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Live Route Map',
+                              AppStrings.t('live_route_map'),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 14,
@@ -213,19 +218,19 @@ class _DriverRouteState extends State<DriverRoute>
                   children: [
                     _LiveStatCard(
                       icon: '⏱️',
-                      label: 'ETA School',
+                      label: AppStrings.t('eta_school'),
                       value: '15 min',
                     ),
                     const SizedBox(width: 10),
                     _LiveStatCard(
                       icon: '📏',
-                      label: 'Distance Left',
+                      label: AppStrings.t('distance_left'),
                       value: '4.2 km',
                     ),
                     const SizedBox(width: 10),
                     _LiveStatCard(
                       icon: '⚡',
-                      label: 'Avg Speed',
+                      label: AppStrings.t('avg_speed'),
                       value: '35 km/h',
                     ),
                   ],

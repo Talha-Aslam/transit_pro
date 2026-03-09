@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../app/profile_service.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -14,6 +15,20 @@ class DriverDashboard extends StatefulWidget {
 
 class _DriverDashboardState extends State<DriverDashboard> {
   bool _routeStarted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +193,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "TODAY'S ROUTE",
+                                AppStrings.t('todays_route'),
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 11,
@@ -231,7 +246,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  _routeStarted ? 'IN PROGRESS' : 'NOT STARTED',
+                                  _routeStarted
+                                      ? AppStrings.t('in_progress_badge')
+                                      : AppStrings.t('not_started_badge'),
                                   style: TextStyle(
                                     color: _routeStarted
                                         ? AppTheme.successLight
@@ -253,7 +270,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Route Progress',
+                                AppStrings.t('route_progress'),
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -288,19 +305,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         children: [
                           _RouteStatChip(
                             icon: '📍',
-                            label: 'Stops Done',
+                            label: AppStrings.t('stops_done'),
                             value: '3/5',
                           ),
                           const SizedBox(width: 8),
                           _RouteStatChip(
                             icon: '👦',
-                            label: 'Students',
+                            label: AppStrings.t('students'),
                             value: '18/22',
                           ),
                           const SizedBox(width: 8),
                           _RouteStatChip(
                             icon: '⏱️',
-                            label: 'Time Left',
+                            label: AppStrings.t('time_left'),
                             value: '15 min',
                           ),
                         ],
@@ -347,7 +364,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'NEXT STOP',
+                              AppStrings.t('next_stop'),
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 10,
@@ -404,7 +421,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Quick Actions",
+                        AppStrings.t('quick_actions'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,
@@ -419,25 +436,25 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
                         childAspectRatio: 2.2,
-                        children: const [
+                        children: [
                           _QuickActionBtn(
                             icon: '🚨',
-                            label: 'Emergency',
+                            label: AppStrings.t('emergency'),
                             color: AppTheme.error,
                           ),
                           _QuickActionBtn(
                             icon: '📢',
-                            label: 'Alert All',
+                            label: AppStrings.t('alert_all'),
                             color: AppTheme.warning,
                           ),
                           _QuickActionBtn(
                             icon: '📍',
-                            label: 'Share Location',
+                            label: AppStrings.t('share_location'),
                             color: AppTheme.success,
                           ),
                           _QuickActionBtn(
                             icon: '🔄',
-                            label: 'Update Route',
+                            label: AppStrings.t('update_route'),
                             color: AppTheme.info,
                           ),
                         ],
@@ -454,7 +471,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Today's Stats",
+                        AppStrings.t('todays_stats'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,
@@ -463,7 +480,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ),
                       const SizedBox(height: 14),
                       _StatBar(
-                        label: 'Students Picked Up',
+                        label: AppStrings.t('students_picked'),
                         value: 18,
                         total: 22,
                         color: AppTheme.success,
@@ -471,7 +488,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ),
                       const SizedBox(height: 12),
                       _StatBar(
-                        label: 'Route Completion',
+                        label: AppStrings.t('route_completion'),
                         value: 55,
                         total: 100,
                         color: AppTheme.driverAccent,
@@ -479,7 +496,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ),
                       const SizedBox(height: 12),
                       _StatBar(
-                        label: 'On-Time Performance',
+                        label: AppStrings.t('on_time_perf'),
                         value: 96,
                         total: 100,
                         color: AppTheme.parentAccent,
@@ -521,8 +538,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     child: Center(
                       child: Text(
                         _routeStarted
-                            ? "🛑  End Today's Route"
-                            : "▶️  Start Today's Route",
+                            ? "🛑  ${AppStrings.t('end_route')}"
+                            : "▶️  ${AppStrings.t('start_route')}",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 16,

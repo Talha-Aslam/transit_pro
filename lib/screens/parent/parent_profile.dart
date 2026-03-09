@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/subscription_provider.dart';
@@ -8,13 +10,6 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
-import 'trip_history_screen.dart';
-import 'subscription_screen.dart';
-import 'emergency_contacts_screen.dart';
-import 'change_password_screen.dart';
-import 'language_screen.dart';
-import 'help_support_screen.dart';
-import 'rate_app_screen.dart';
 
 class ParentProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -45,13 +40,17 @@ class _ParentProfileState extends State<ParentProfile> {
   void initState() {
     super.initState();
     SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
+    LanguageProvider.instance.addListener(_onLangChanged);
   }
 
   @override
   void dispose() {
     SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
+    LanguageProvider.instance.removeListener(_onLangChanged);
     super.dispose();
   }
+
+  void _onLangChanged() => setState(() {});
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -75,11 +74,11 @@ class _ParentProfileState extends State<ParentProfile> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _EditSheet(
-        title: 'Edit My Information',
+        title: AppStrings.t('edit_info'),
         fields: [
-          _FieldDef('Full Name', info.name),
-          _FieldDef('Email', info.email),
-          _FieldDef('Phone', info.phone),
+          _FieldDef(AppStrings.t('full_name'), info.name),
+          _FieldDef(AppStrings.t('email'), info.email),
+          _FieldDef(AppStrings.t('phone'), info.phone),
         ],
         accentColor: AppTheme.parentPurple,
         onSave: (values) => _svc.updateParentInfo(
@@ -97,15 +96,15 @@ class _ParentProfileState extends State<ParentProfile> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _EditSheet(
-        title: "Edit $label's Info",
+        title: "${AppStrings.t('edit_info')} - $label",
         fields: [
-          _FieldDef('Child Name', child.name),
-          _FieldDef('Grade', child.grade),
-          _FieldDef('School', child.school),
-          _FieldDef('Bus Number', child.busNumber),
-          _FieldDef('Route', child.route),
-          _FieldDef('Bus Stop', child.stop),
-          _FieldDef('Driver Name', child.driver),
+          _FieldDef(AppStrings.t('child_name'), child.name),
+          _FieldDef(AppStrings.t('grade'), child.grade),
+          _FieldDef(AppStrings.t('school'), child.school),
+          _FieldDef(AppStrings.t('bus_number_lbl'), child.busNumber),
+          _FieldDef(AppStrings.t('route_lbl'), child.route),
+          _FieldDef(AppStrings.t('bus_stop'), child.stop),
+          _FieldDef(AppStrings.t('driver_name'), child.driver),
         ],
         accentColor: AppTheme.parentPurple,
         onSave: (values) => _svc.updateChild(
@@ -130,15 +129,15 @@ class _ParentProfileState extends State<ParentProfile> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _EditSheet(
-        title: 'Add New Child',
+        title: AppStrings.t('add_child'),
         fields: [
-          _FieldDef('Child Name', ''),
-          _FieldDef('Grade', ''),
-          _FieldDef('School', ''),
-          _FieldDef('Bus Number', ''),
-          _FieldDef('Route', ''),
-          _FieldDef('Bus Stop', ''),
-          _FieldDef('Driver Name', ''),
+          _FieldDef(AppStrings.t('child_name'), ''),
+          _FieldDef(AppStrings.t('grade'), ''),
+          _FieldDef(AppStrings.t('school'), ''),
+          _FieldDef(AppStrings.t('bus_number_lbl'), ''),
+          _FieldDef(AppStrings.t('route_lbl'), ''),
+          _FieldDef(AppStrings.t('bus_stop'), ''),
+          _FieldDef(AppStrings.t('driver_name'), ''),
         ],
         accentColor: AppTheme.parentPurple,
         onSave: (values) => _svc.addChild(
@@ -158,44 +157,124 @@ class _ParentProfileState extends State<ParentProfile> {
 
   void _confirmRemoveChild(BuildContext context, int index) {
     final name = _svc.children.value[index].name;
+    final isDark = context.isDark;
+    final dialogBg = isDark ? const Color(0xFF1E1040) : const Color(0xFFF8FAFF);
+    final cancelBg = isDark ? const Color(0xFF2A1860) : const Color(0xFFEDF0F7);
+    final cancelBorder = isDark
+        ? const Color(0xFF4A2FA0)
+        : const Color(0xFFCDD5E0);
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    final bodyColor = isDark ? Colors.white70 : const Color(0xFF5A5A7A);
+    final cancelColor = isDark ? Colors.white70 : const Color(0xFF5A5A7A);
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Remove Child',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        content: Text(
-          'Remove ${name.isEmpty ? 'this child' : name} from your account?',
-          style: TextStyle(color: context.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: context.textSecondary),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _svc.removeChild(index);
-            },
-            child: const Text(
-              'Remove',
-              style: TextStyle(
-                color: AppTheme.errorLight,
-                fontWeight: FontWeight.w700,
+      barrierColor: Colors.black.withOpacity(0.75),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: dialogBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.35),
+                blurRadius: 32,
+                offset: const Offset(0, 8),
               ),
-            ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppTheme.errorLight,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppStrings.t('remove_child'),
+                style: TextStyle(
+                  color: titleColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                AppStrings.t('remove_child_confirm').replaceFirst(
+                  '{name}',
+                  name.isEmpty ? AppStrings.t('this_child') : name,
+                ),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: bodyColor, fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        decoration: BoxDecoration(
+                          color: cancelBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cancelBorder),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          AppStrings.t('cancel'),
+                          style: TextStyle(
+                            color: cancelColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _svc.removeChild(index);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        decoration: BoxDecoration(
+                          color: AppTheme.error.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.error.withOpacity(0.55),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          AppStrings.t('remove'),
+                          style: const TextStyle(
+                            color: AppTheme.errorLight,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -234,7 +313,12 @@ class _ParentProfileState extends State<ParentProfile> {
                               width: 84,
                               height: 84,
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade200.withOpacity(0.3),
+                                color: const Color.fromARGB(
+                                  255,
+                                  223,
+                                  156,
+                                  55,
+                                ).withOpacity(0.8),
                                 borderRadius: BorderRadius.circular(26),
                                 border: Border.all(
                                   color: AppTheme.parentPurple.withOpacity(0.5),
@@ -285,9 +369,10 @@ class _ParentProfileState extends State<ParentProfile> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Center(
-                                    child: Text(
-                                      '✏️',
-                                      style: TextStyle(fontSize: 11),
+                                    child: Icon(
+                                      Icons.camera_alt_rounded,
+                                      size: 12,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
@@ -381,7 +466,7 @@ class _ParentProfileState extends State<ParentProfile> {
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
-                                      'Edit Info',
+                                      AppStrings.t('edit_info'),
                                       style: TextStyle(
                                         color: context.textSecondary,
                                         fontSize: 12,
@@ -420,7 +505,7 @@ class _ParentProfileState extends State<ParentProfile> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      'CHILDREN (${children.length})',
+                                      '${AppStrings.t('children_section')} (${children.length})',
                                       style: TextStyle(
                                         color: context.textSecondary,
                                         fontSize: 11,
@@ -440,18 +525,18 @@ class _ParentProfileState extends State<ParentProfile> {
                                         gradient: AppTheme.parentGradient,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: const Row(
+                                      child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.add,
                                             color: Colors.white,
                                             size: 14,
                                           ),
-                                          SizedBox(width: 4),
+                                          const SizedBox(width: 4),
                                           Text(
-                                            'Add Child',
-                                            style: TextStyle(
+                                            AppStrings.t('add_child'),
+                                            style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
@@ -472,7 +557,7 @@ class _ParentProfileState extends State<ParentProfile> {
                                       vertical: 20,
                                     ),
                                     child: Text(
-                                      'No children added yet.\nTap "Add Child" to get started.',
+                                      AppStrings.t('no_children_added'),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         color: context.textTertiary,
@@ -508,7 +593,7 @@ class _ParentProfileState extends State<ParentProfile> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'NOTIFICATION PREFERENCES',
+                                AppStrings.t('notification_prefs'),
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 11,
@@ -518,39 +603,39 @@ class _ParentProfileState extends State<ParentProfile> {
                               ),
                               const SizedBox(height: 4),
                               _PrefRow(
-                                label: 'Boarding Alerts',
-                                desc: 'When your child boards/exits',
+                                label: AppStrings.t('boarding_alerts'),
+                                desc: AppStrings.t('boarding_alerts_desc'),
                                 value: _boardingAlert,
                                 onChanged: (v) =>
                                     setState(() => _boardingAlert = v),
                               ),
                               _divider(context),
                               _PrefRow(
-                                label: 'Arrival Notifications',
-                                desc: 'School & home arrivals',
+                                label: AppStrings.t('arrival_notifs'),
+                                desc: AppStrings.t('arrival_notifs_desc'),
                                 value: _arrivalAlert,
                                 onChanged: (v) =>
                                     setState(() => _arrivalAlert = v),
                               ),
                               _divider(context),
                               _PrefRow(
-                                label: 'Delay Alerts',
-                                desc: 'When bus is late',
+                                label: AppStrings.t('delay_alerts'),
+                                desc: AppStrings.t('delay_alerts_desc'),
                                 value: _delayAlert,
                                 onChanged: (v) =>
                                     setState(() => _delayAlert = v),
                               ),
                               _divider(context),
                               _PrefRow(
-                                label: 'SMS Notifications',
-                                desc: 'Text message alerts',
+                                label: AppStrings.t('sms_notifs'),
+                                desc: AppStrings.t('sms_notifs_desc'),
                                 value: _smsNotif,
                                 onChanged: (v) => setState(() => _smsNotif = v),
                               ),
                               _divider(context),
                               _PrefRow(
-                                label: 'Email Notifications',
-                                desc: 'Daily summary email',
+                                label: AppStrings.t('email_notifs'),
+                                desc: AppStrings.t('email_notifs_desc'),
                                 value: _emailNotif,
                                 onChanged: (v) =>
                                     setState(() => _emailNotif = v),
@@ -566,81 +651,48 @@ class _ParentProfileState extends State<ParentProfile> {
                             children: [
                               _MenuItem(
                                 icon: '📋',
-                                label: 'Trip History',
-                                desc: '142 completed trips',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const TripHistoryScreen(),
-                                  ),
-                                ),
+                                label: AppStrings.t('trip_history'),
+                                desc: AppStrings.t('trip_history_desc'),
+                                onTap: () => context.push('/parent/trips'),
                               ),
                               _MenuItem(
                                 icon: '💳',
-                                label: 'Subscription',
+                                label: AppStrings.t('subscription'),
                                 desc:
                                     '${SubscriptionProvider.instance.planDisplayName} Plan · Active',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const SubscriptionScreen(),
-                                  ),
-                                ),
+                                onTap: () =>
+                                    context.push('/parent/subscription'),
                               ),
                               _MenuItem(
                                 icon: '📞',
-                                label: 'Emergency Contacts',
-                                desc: '2 contacts added',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const EmergencyContactsScreen(),
-                                  ),
-                                ),
+                                label: AppStrings.t('emergency_contacts'),
+                                desc: AppStrings.t('emergency_contacts_desc'),
+                                onTap: () =>
+                                    context.push('/parent/emergency-contacts'),
                               ),
                               _MenuItem(
                                 icon: '🔐',
-                                label: 'Change Password',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const ChangePasswordScreen(),
-                                  ),
-                                ),
+                                label: AppStrings.t('change_password'),
+                                onTap: () =>
+                                    context.push('/parent/change-password'),
                               ),
                               _MenuItem(
                                 icon: '🌐',
-                                label: 'Language',
-                                desc: 'English',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LanguageScreen(),
-                                  ),
-                                ),
+                                label: AppStrings.t('language'),
+                                desc: LanguageProvider.instance.lang,
+                                onTap: () => context.push('/parent/language'),
                               ),
                               _MenuItem(
                                 icon: '❓',
-                                label: 'Help & Support',
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const HelpSupportScreen(),
-                                  ),
-                                ),
+                                label: AppStrings.t('help_support'),
+                                onTap: () =>
+                                    context.push('/parent/help-support'),
                               ),
                               _MenuItem(
                                 icon: '⭐',
-                                label: 'Rate the App',
+                                label: AppStrings.t('rate_app'),
                                 isLast: true,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const RateAppScreen(),
-                                  ),
-                                ),
+                                onTap: () => context.push('/parent/rate-app'),
                               ),
                             ],
                           ),
@@ -662,7 +714,9 @@ class _ParentProfileState extends State<ParentProfile> {
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
-                                  context.isDark ? 'Dark Mode' : 'Light Mode',
+                                  context.isDark
+                                      ? AppStrings.t('dark_mode')
+                                      : AppStrings.t('light_mode'),
                                   style: TextStyle(
                                     color: context.textPrimary,
                                     fontSize: 14,
@@ -694,10 +748,10 @@ class _ParentProfileState extends State<ParentProfile> {
                                 color: AppTheme.error.withOpacity(0.25),
                               ),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Text(
-                                '🚪  Log Out',
-                                style: TextStyle(
+                                AppStrings.t('log_out'),
+                                style: const TextStyle(
                                   color: AppTheme.errorLight,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,

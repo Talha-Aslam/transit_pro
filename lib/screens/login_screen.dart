@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 
@@ -62,9 +63,17 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _error = '');
   }
 
+  void _onLangChanged() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
   void _login() {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      setState(() => _error = 'Please fill in all fields.');
+      setState(() => _error = AppStrings.t('fill_fields_login'));
       return;
     }
     setState(() {
@@ -81,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -136,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          'Back',
+                          AppStrings.t('back'),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 14,
@@ -178,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
 
                           Text(
-                            _cfg.title,
+                            AppStrings.t('${widget.role}_login_title'),
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 28,
@@ -187,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _cfg.subtitle,
+                            AppStrings.t('${widget.role}_login_sub'),
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 14,
@@ -223,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '📋  USE DEMO ACCOUNT',
+                                    AppStrings.t('use_demo'),
                                     style: TextStyle(
                                       color: _cfg.accent,
                                       fontSize: 11,
@@ -246,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 22),
 
                           // Email
-                          _FieldLabel('EMAIL ADDRESS'),
+                          _FieldLabel(AppStrings.t('email_address')),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _emailCtrl,
@@ -255,14 +265,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: context.textPrimary,
                               fontSize: 15,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'Enter your email',
+                            decoration: InputDecoration(
+                              hintText: AppStrings.t('email_hint'),
                             ),
                           ),
                           const SizedBox(height: 16),
 
                           // Password
-                          _FieldLabel('PASSWORD'),
+                          _FieldLabel(AppStrings.t('password_lbl')),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _passCtrl,
@@ -273,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
-                              hintText: 'Enter your password',
+                              hintText: AppStrings.t('password_hint'),
                               suffixIcon: GestureDetector(
                                 onTap: () =>
                                     setState(() => _showPass = !_showPass),
@@ -295,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: GestureDetector(
                               onTap: () => context.push('/forgot-password'),
                               child: Text(
-                                'Forgot password?',
+                                AppStrings.t('forgot_password'),
                                 style: TextStyle(
                                   color: _cfg.accent,
                                   fontSize: 13,
@@ -337,8 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Login button
                           GradientButton(
-                            label:
-                                'Sign In as ${_cfg.title.replaceAll(' Login', '')} →',
+                            label: AppStrings.t('signin_as_${widget.role}'),
                             gradient: _cfg.gradient,
                             glowColor: _cfg.glowColor,
                             isLoading: _loading,

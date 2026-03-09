@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -17,14 +18,18 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _rainbowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _rainbowCtrl.dispose();
     super.dispose();
   }
@@ -239,9 +244,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                     child: child,
                                   );
                                 },
-                                child: const Text(
-                                  'WELCOME TO TRANSIT PRO',
-                                  style: TextStyle(
+                                child: Text(
+                                  AppStrings.t('welcome_banner'),
+                                  style: const TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w900,
                                     color: Colors.white,
@@ -252,7 +257,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                             ),
                             const SizedBox(height: 65),
                             Text(
-                              'Select your role',
+                              AppStrings.t('select_role'),
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontWeight: FontWeight.w800,
@@ -343,7 +348,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                                 MainAxisAlignment.center,
                                             children: [
                                               Text(
-                                                role.label,
+                                                AppStrings.t(
+                                                  '${role.id}_label',
+                                                ),
                                                 style: TextStyle(
                                                   color: context.textPrimary,
                                                   fontSize: 17,
@@ -352,7 +359,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                role.desc,
+                                                AppStrings.t('${role.id}_desc'),
                                                 style: TextStyle(
                                                   color: context.textSecondary,
                                                   fontSize: 12.5,
@@ -420,7 +427,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  "Don't have an account? ",
+                                  AppStrings.t('no_account'),
                                   style: TextStyle(
                                     color: context.textTertiary,
                                     fontSize: 13,
@@ -429,7 +436,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                 GestureDetector(
                                   onTap: () => context.go('/signup'),
                                   child: Text(
-                                    'Sign Up',
+                                    AppStrings.t('sign_up'),
                                     style: TextStyle(
                                       color: AppTheme.parentAccent,
                                       fontSize: 13,
@@ -441,7 +448,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              '🔒  Your data is encrypted & secure',
+                              AppStrings.t('data_secure'),
                               style: TextStyle(
                                 color: context.textTertiary,
                                 fontSize: 12,

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -11,6 +14,42 @@ class HelpSupportScreen extends StatefulWidget {
 
 class _HelpSupportScreenState extends State<HelpSupportScreen> {
   int? _openFaq;
+  final _subjectController = TextEditingController();
+  final _messageController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    _subjectController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  Future<void> _launchEmail() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@transitpro.pk',
+      queryParameters: {'subject': 'Support Request'},
+    );
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  Future<void> _launchPhone() async {
+    final uri = Uri(scheme: 'tel', path: '+923000000000');
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
+  void _openLiveChat() {
+    context.push('/parent/live-chat');
+  }
 
   final _faqs = const [
     _Faq(
@@ -62,7 +101,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -82,7 +121,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Help & Support',
+                      AppStrings.t('help_and_support'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -104,30 +143,30 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                           Expanded(
                             child: _ContactCard(
                               icon: '📧',
-                              label: 'Email Us',
+                              label: AppStrings.t('email_us'),
                               value: 'support@\ntransitpro.pk',
                               color: AppTheme.info,
-                              onTap: () {},
+                              onTap: _launchEmail,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: _ContactCard(
                               icon: '📞',
-                              label: 'Call Us',
+                              label: AppStrings.t('call_us'),
                               value: '+92 300\n0000000',
                               color: AppTheme.success,
-                              onTap: () {},
+                              onTap: _launchPhone,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: _ContactCard(
                               icon: '💬',
-                              label: 'Live Chat',
-                              value: 'Mon–Fri\n9am–6pm',
+                              label: AppStrings.t('live_chat'),
+                              value: AppStrings.t('live_chat_hours'),
                               color: AppTheme.parentPurple,
-                              onTap: () {},
+                              onTap: _openLiveChat,
                             ),
                           ),
                         ],
@@ -137,7 +176,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       Row(
                         children: [
                           Text(
-                            'Frequently Asked Questions',
+                            AppStrings.t('faq'),
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 15,
@@ -230,7 +269,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Send a Message',
+                              AppStrings.t('send_message'),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 14,
@@ -238,20 +277,25 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            _SupportTextField(hint: 'Subject', maxLines: 1),
+                            _SupportTextField(
+                              hint: AppStrings.t('subject'),
+                              maxLines: 1,
+                              controller: _subjectController,
+                            ),
                             const SizedBox(height: 10),
                             _SupportTextField(
-                              hint: 'Describe your issue...',
+                              hint: AppStrings.t('describe_issue'),
                               maxLines: 4,
+                              controller: _messageController,
                             ),
                             const SizedBox(height: 14),
                             GestureDetector(
                               onTap: () {
+                                _subjectController.clear();
+                                _messageController.clear();
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Message sent! We\'ll reply within 24h.',
-                                    ),
+                                  SnackBar(
+                                    content: Text(AppStrings.t('message_sent')),
                                     backgroundColor: AppTheme.success,
                                   ),
                                 );
@@ -265,10 +309,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                                   gradient: AppTheme.parentGradient,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
-                                    'Send Message',
-                                    style: TextStyle(
+                                    AppStrings.t('send'),
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -355,7 +399,12 @@ class _ContactCard extends StatelessWidget {
 class _SupportTextField extends StatelessWidget {
   final String hint;
   final int maxLines;
-  const _SupportTextField({required this.hint, required this.maxLines});
+  final TextEditingController controller;
+  const _SupportTextField({
+    required this.hint,
+    required this.maxLines,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -366,6 +415,7 @@ class _SupportTextField extends StatelessWidget {
         border: Border.all(color: context.inputBorder),
       ),
       child: TextField(
+        controller: controller,
         maxLines: maxLines,
         style: TextStyle(color: context.textPrimary, fontSize: 13),
         decoration: InputDecoration(

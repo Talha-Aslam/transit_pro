@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
@@ -16,6 +17,20 @@ class StudentProfile extends StatefulWidget {
 }
 
 class _StudentProfileState extends State<StudentProfile> {
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
       context,
@@ -152,7 +167,7 @@ class _StudentProfileState extends State<StudentProfile> {
                   _QuickStat(
                     icon: '🚌',
                     value: '42',
-                    label: 'Route A',
+                    label: AppStrings.t('route_lbl'),
                     color: AppTheme.studentAmber,
                   ),
                   Container(
@@ -163,7 +178,7 @@ class _StudentProfileState extends State<StudentProfile> {
                   _QuickStat(
                     icon: '📅',
                     value: '180',
-                    label: 'Rides',
+                    label: AppStrings.t('rides_lbl'),
                     color: AppTheme.info,
                   ),
                   Container(
@@ -174,7 +189,7 @@ class _StudentProfileState extends State<StudentProfile> {
                   _QuickStat(
                     icon: '⏱️',
                     value: '98%',
-                    label: 'On Time',
+                    label: AppStrings.t('on_time'),
                     color: AppTheme.success,
                   ),
                 ],
@@ -189,7 +204,7 @@ class _StudentProfileState extends State<StudentProfile> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Transport Details',
+                AppStrings.t('transport_details'),
                 style: TextStyle(
                   color: context.textPrimary,
                   fontSize: 15,
@@ -204,17 +219,29 @@ class _StudentProfileState extends State<StudentProfile> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _DetailRow(icon: '🚌', label: 'Bus', value: '#42'),
-                  _DetailRow(icon: '📍', label: 'Route', value: 'Route A'),
-                  _DetailRow(icon: '🚏', label: 'Stop', value: 'Pine Road'),
+                  _DetailRow(
+                    icon: '🚌',
+                    label: AppStrings.t('bus_lbl'),
+                    value: '#42',
+                  ),
+                  _DetailRow(
+                    icon: '📍',
+                    label: AppStrings.t('route_lbl'),
+                    value: 'Route A',
+                  ),
+                  _DetailRow(
+                    icon: '🚏',
+                    label: AppStrings.t('stop_lbl'),
+                    value: 'Pine Road',
+                  ),
                   _DetailRow(
                     icon: '👨‍✈️',
-                    label: 'Driver',
+                    label: AppStrings.t('driver_lbl'),
                     value: 'Mike Johnson',
                   ),
                   _DetailRow(
                     icon: '📞',
-                    label: 'Driver Phone',
+                    label: AppStrings.t('driver_phone_lbl'),
                     value: '+91 98765 43210',
                   ),
                 ],
@@ -229,7 +256,7 @@ class _StudentProfileState extends State<StudentProfile> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Parent / Guardian',
+                AppStrings.t('parent_guardian_lbl'),
                 style: TextStyle(
                   color: context.textPrimary,
                   fontSize: 15,
@@ -244,15 +271,19 @@ class _StudentProfileState extends State<StudentProfile> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _DetailRow(icon: '👤', label: 'Name', value: 'Ahmed Khan'),
+                  _DetailRow(
+                    icon: '👤',
+                    label: AppStrings.t('name_lbl'),
+                    value: 'Ahmed Khan',
+                  ),
                   _DetailRow(
                     icon: '📞',
-                    label: 'Phone',
+                    label: AppStrings.t('phone'),
                     value: '+91 99887 76655',
                   ),
                   _DetailRow(
                     icon: '✉️',
-                    label: 'Email',
+                    label: AppStrings.t('email'),
                     value: 'ahmed@email.com',
                   ),
                 ],
@@ -267,7 +298,7 @@ class _StudentProfileState extends State<StudentProfile> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Settings',
+                AppStrings.t('settings_lbl'),
                 style: TextStyle(
                   color: context.textPrimary,
                   fontSize: 15,
@@ -282,11 +313,17 @@ class _StudentProfileState extends State<StudentProfile> {
               padding: const EdgeInsets.all(4),
               child: Column(
                 children: [
-                  _SettingTile(icon: '🔔', label: 'Notifications'),
-                  _SettingTile(icon: '🌙', label: 'Appearance'),
-                  _SettingTile(icon: '🔒', label: 'Privacy'),
-                  _SettingTile(icon: '❓', label: 'Help & Support'),
-                  _SettingTile(icon: '📋', label: 'Terms of Service'),
+                  _SettingTile(
+                    icon: '🔔',
+                    label: AppStrings.t('notifications_lbl'),
+                  ),
+                  _SettingTile(
+                    icon: '🌙',
+                    label: AppStrings.t('appearance_lbl'),
+                  ),
+                  _SettingTile(icon: '🔒', label: AppStrings.t('privacy_lbl')),
+                  _SettingTile(icon: '❓', label: AppStrings.t('help_support')),
+                  _SettingTile(icon: '📋', label: AppStrings.t('terms_lbl')),
                 ],
               ),
             ),
@@ -307,7 +344,9 @@ class _StudentProfileState extends State<StudentProfile> {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      context.isDark ? 'Dark Mode' : 'Light Mode',
+                      context.isDark
+                          ? AppStrings.t('dark_mode')
+                          : AppStrings.t('light_mode'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 14,
@@ -346,10 +385,10 @@ class _StudentProfileState extends State<StudentProfile> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('🚪', style: TextStyle(fontSize: 18)),
+                    Text('🚪', style: const TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
                     Text(
-                      'Log Out',
+                      AppStrings.t('log_out_text'),
                       style: TextStyle(
                         color: AppTheme.error,
                         fontSize: 15,

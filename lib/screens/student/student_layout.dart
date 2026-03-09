@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'student_dashboard.dart';
 import 'student_tracking.dart';
@@ -21,21 +22,44 @@ class _StudentLayoutState extends State<StudentLayout> {
 
   void _goToTab(int index) => setState(() => _tab = index);
 
-  static const _navItems = [
-    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  List<_NavItem> get _navItems => [
+    _NavItem(
+      icon: 'assets/images/navbar/home_transparent.png',
+      label: AppStrings.t('snav_home'),
+    ),
     _NavItem(
       icon: 'assets/images/navbar/track_transparent.png',
-      label: 'Track',
+      label: AppStrings.t('snav_track'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/calendar_transparent.png',
-      label: 'Schedule',
+      label: AppStrings.t('snav_schedule'),
     ),
-    _NavItem(icon: 'assets/images/navbar/qr_pass.png', label: 'QR Pass'),
-    _NavItem(icon: 'assets/images/navbar/fees.png', label: 'Fees'),
+    _NavItem(
+      icon: 'assets/images/navbar/qr_pass.png',
+      label: AppStrings.t('snav_qr'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/fees.png',
+      label: AppStrings.t('snav_fees'),
+    ),
     _NavItem(
       icon: 'assets/images/navbar/user_transparent.png',
-      label: 'Profile',
+      label: AppStrings.t('snav_profile'),
     ),
   ];
 

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../app/profile_service.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
@@ -27,6 +28,20 @@ class _DriverProfileState extends State<DriverProfile> {
   bool _parentAlerts = true;
   bool _routeReminders = true;
   bool _breakAlerts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -202,9 +217,9 @@ class _DriverProfileState extends State<DriverProfile> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Active · On Route',
-                        style: TextStyle(
+                      Text(
+                        AppStrings.t('active_on_route'),
+                        style: const TextStyle(
                           color: AppTheme.successLight,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -235,7 +250,7 @@ class _DriverProfileState extends State<DriverProfile> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'DRIVER INFORMATION',
+                        AppStrings.t('driver_info_section'),
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 11,
@@ -251,35 +266,35 @@ class _DriverProfileState extends State<DriverProfile> {
                         mainAxisSpacing: 8,
                         crossAxisSpacing: 8,
                         childAspectRatio: 1.9,
-                        children: const [
+                        children: [
                           _InfoCard(
                             icon: '🪪',
-                            label: 'License No.',
+                            label: AppStrings.t('license_no_lbl'),
                             value: 'DL-2024-8847',
                           ),
                           _InfoCard(
                             icon: '📅',
-                            label: 'Experience',
+                            label: AppStrings.t('experience_lbl'),
                             value: '8 Years',
                           ),
                           _InfoCard(
                             icon: '🚌',
-                            label: 'Bus Number',
+                            label: AppStrings.t('bus_number_lbl'),
                             value: 'Bus #42',
                           ),
                           _InfoCard(
                             icon: '🗺️',
-                            label: 'Route',
+                            label: AppStrings.t('route_lbl'),
                             value: 'Route A – East',
                           ),
                           _InfoCard(
                             icon: '📞',
-                            label: 'Mobile',
+                            label: AppStrings.t('mobile_lbl'),
                             value: '+1 555-0200',
                           ),
                           _InfoCard(
                             icon: '👥',
-                            label: 'Total Students',
+                            label: AppStrings.t('total_students_lbl'),
                             value: '22',
                           ),
                         ],
@@ -296,7 +311,7 @@ class _DriverProfileState extends State<DriverProfile> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'BUS INFORMATION',
+                        AppStrings.t('bus_info_section'),
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 11,
@@ -345,11 +360,20 @@ class _DriverProfileState extends State<DriverProfile> {
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          _BusChip(label: 'Capacity', value: '28 seats'),
+                          _BusChip(
+                            label: AppStrings.t('capacity_lbl'),
+                            value: '28 seats',
+                          ),
                           const SizedBox(width: 8),
-                          _BusChip(label: 'Fuel', value: 'CNG'),
+                          _BusChip(
+                            label: AppStrings.t('fuel_lbl'),
+                            value: 'CNG',
+                          ),
                           const SizedBox(width: 8),
-                          _BusChip(label: 'Last Service', value: 'Feb 10'),
+                          _BusChip(
+                            label: AppStrings.t('last_service_lbl'),
+                            value: 'Feb 10',
+                          ),
                         ],
                       ),
                     ],
@@ -364,7 +388,7 @@ class _DriverProfileState extends State<DriverProfile> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'APP SETTINGS',
+                        AppStrings.t('app_settings'),
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 11,
@@ -374,29 +398,29 @@ class _DriverProfileState extends State<DriverProfile> {
                       ),
                       const SizedBox(height: 4),
                       _PrefRow(
-                        label: 'Share Location',
-                        desc: 'Parents can see bus location',
+                        label: AppStrings.t('share_location'),
+                        desc: AppStrings.t('share_loc_desc'),
                         value: _locationSharing,
                         onChanged: (v) => setState(() => _locationSharing = v),
                       ),
                       _divider(context),
                       _PrefRow(
-                        label: 'Parent Auto-Alerts',
-                        desc: 'Send boarding notifications',
+                        label: AppStrings.t('parent_alerts_lbl'),
+                        desc: AppStrings.t('parent_alerts_desc'),
                         value: _parentAlerts,
                         onChanged: (v) => setState(() => _parentAlerts = v),
                       ),
                       _divider(context),
                       _PrefRow(
-                        label: 'Route Reminders',
-                        desc: '10 min before each stop',
+                        label: AppStrings.t('route_reminders_lbl'),
+                        desc: AppStrings.t('route_reminders_desc'),
                         value: _routeReminders,
                         onChanged: (v) => setState(() => _routeReminders = v),
                       ),
                       _divider(context),
                       _PrefRow(
-                        label: 'Break Notifications',
-                        desc: 'Alert for scheduled breaks',
+                        label: AppStrings.t('break_alerts_lbl'),
+                        desc: AppStrings.t('break_alerts_desc'),
                         value: _breakAlerts,
                         onChanged: (v) => setState(() => _breakAlerts = v),
                       ),
@@ -408,27 +432,33 @@ class _DriverProfileState extends State<DriverProfile> {
                 // ── Menu items ────────────────────────────────────────────
                 GlassCard(
                   child: Column(
-                    children: const [
+                    children: [
                       _MenuItem(
                         icon: '📋',
-                        label: 'Trip History',
+                        label: AppStrings.t('trip_history'),
                         desc: '248 trips completed',
                       ),
                       _MenuItem(
                         icon: '🏆',
-                        label: 'Performance Report',
-                        desc: '96% on-time rate',
+                        label: AppStrings.t('performance_report'),
+                        desc: AppStrings.t('performance_report_desc'),
                       ),
                       _MenuItem(
                         icon: '📜',
-                        label: 'Documents & License',
-                        desc: 'All verified ✓',
+                        label: AppStrings.t('documents_license'),
+                        desc: AppStrings.t('documents_license_desc'),
                       ),
-                      _MenuItem(icon: '🔐', label: 'Change Password'),
-                      _MenuItem(icon: '📞', label: 'Emergency Contacts'),
+                      _MenuItem(
+                        icon: '🔐',
+                        label: AppStrings.t('change_password'),
+                      ),
+                      _MenuItem(
+                        icon: '📞',
+                        label: AppStrings.t('emergency_contacts'),
+                      ),
                       _MenuItem(
                         icon: '❓',
-                        label: 'Help & Support',
+                        label: AppStrings.t('help_support'),
                         isLast: true,
                       ),
                     ],
@@ -451,7 +481,9 @@ class _DriverProfileState extends State<DriverProfile> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(
-                          context.isDark ? 'Dark Mode' : 'Light Mode',
+                          context.isDark
+                              ? AppStrings.t('dark_mode')
+                              : AppStrings.t('light_mode'),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 14,
@@ -482,10 +514,10 @@ class _DriverProfileState extends State<DriverProfile> {
                         color: AppTheme.error.withOpacity(0.25),
                       ),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        '🚪  Log Out',
-                        style: TextStyle(
+                        AppStrings.t('log_out'),
+                        style: const TextStyle(
                           color: AppTheme.errorLight,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,

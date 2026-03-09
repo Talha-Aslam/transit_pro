@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'parent_dashboard.dart';
 import 'parent_tracking.dart';
@@ -23,24 +24,44 @@ class _ParentLayoutState extends State<ParentLayout> {
   void _goToTab(int index) => setState(() => _tab = index);
   void _onUnreadChanged(int count) => setState(() => _unreadCount = count);
 
-  final _navItems = const [
-    _NavItem(icon: 'assets/images/navbar/home_transparent.png', label: 'Home'),
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  List<_NavItem> get _navItems => [
+    _NavItem(
+      icon: 'assets/images/navbar/home_transparent.png',
+      label: AppStrings.t('nav_home'),
+    ),
     _NavItem(
       icon: 'assets/images/navbar/track_transparent.png',
-      label: 'Track',
+      label: AppStrings.t('nav_track'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/calendar_transparent.png',
-      label: 'Schedule',
+      label: AppStrings.t('nav_schedule'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/notification_transparent.png',
-      label: 'Alerts',
+      label: AppStrings.t('nav_alerts'),
     ),
-    _NavItem(icon: 'assets/images/navbar/fees.png', label: 'Fees'),
+    _NavItem(
+      icon: 'assets/images/navbar/fees.png',
+      label: AppStrings.t('nav_fees'),
+    ),
     _NavItem(
       icon: 'assets/images/navbar/user_transparent.png',
-      label: 'Profile',
+      label: AppStrings.t('nav_profile'),
     ),
   ];
 

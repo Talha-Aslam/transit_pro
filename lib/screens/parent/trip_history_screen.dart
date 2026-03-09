@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -10,8 +12,28 @@ class TripHistoryScreen extends StatefulWidget {
 }
 
 class _TripHistoryScreenState extends State<TripHistoryScreen> {
-  String _filter = 'All';
-  final _filters = ['All', 'Morning', 'Afternoon', 'This Week'];
+  int _filterIndex = 0;
+
+  List<String> get _filters => [
+    AppStrings.t('all_filter'),
+    AppStrings.t('morning_filter'),
+    AppStrings.t('afternoon'),
+    AppStrings.t('this_week'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
 
   final _trips = const [
     _Trip(
@@ -113,7 +135,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -133,7 +155,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Trip History',
+                      AppStrings.t('trip_history_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -154,7 +176,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         ),
                       ),
                       child: Text(
-                        '${_trips.length} trips',
+                        '${_trips.length} ${AppStrings.t('trips_lbl')}',
                         style: TextStyle(
                           color: AppTheme.parentPurple,
                           fontSize: 12,
@@ -192,7 +214,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Total Trips',
+                                    AppStrings.t('total_trips'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 11,
@@ -221,7 +243,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'On Time',
+                                    AppStrings.t('on_time'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 11,
@@ -250,7 +272,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Delayed',
+                                    AppStrings.t('delayed'),
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 11,
@@ -272,10 +294,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                           itemCount: _filters.length,
                           separatorBuilder: (_, __) => const SizedBox(width: 8),
                           itemBuilder: (_, i) {
-                            final selected = _filters[i] == _filter;
+                            final selected = i == _filterIndex;
                             return GestureDetector(
-                              onTap: () =>
-                                  setState(() => _filter = _filters[i]),
+                              onTap: () => setState(() => _filterIndex = i),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(

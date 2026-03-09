@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../app/language_provider.dart';
 
 class StudentAttendance extends StatefulWidget {
   const StudentAttendance({super.key});
@@ -17,6 +18,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -25,9 +27,12 @@ class _StudentAttendanceState extends State<StudentAttendance>
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _pulseCtrl.dispose();
     super.dispose();
   }
+
+  void _onLangChanged() => setState(() {});
 
   void _toggleScan() {
     setState(() => _isScanning = !_isScanning);
@@ -51,7 +56,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'QR Pass',
+                  AppStrings.t('qr_pass'),
                   style: TextStyle(
                     color: context.textPrimary,
                     fontSize: 24,
@@ -60,7 +65,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Show your pass for check-in & check-out',
+                  AppStrings.t('show_pass_checkin'),
                   style: TextStyle(color: context.textSecondary, fontSize: 13),
                 ),
               ],
@@ -312,7 +317,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Monthly Report',
+                    AppStrings.t('monthly_report'),
                     style: TextStyle(
                       color: context.textPrimary,
                       fontSize: 15,
@@ -325,7 +330,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                     children: [
                       _Stat(
                         val: '42',
-                        label: 'Total\nCheck-ins',
+                        label: AppStrings.t('total_checkins'),
                         color: AppTheme.studentAmber,
                       ),
                       _Stat(

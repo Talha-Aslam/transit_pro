@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -55,6 +56,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       if (mounted) context.go('/role-select');
     });
 
+    LanguageProvider.instance.addListener(_onLangChanged);
+
     // Generate floating dots
     _dots = List.generate(
       12,
@@ -72,8 +75,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _navTimer?.cancel();
     _fadeController.dispose();
     _bounceController.dispose();
@@ -167,7 +173,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                       // const SizedBox(height: 2),
                       Text(
-                        'Safe Journeys · Happy Kids · Peace of Mind',
+                        AppStrings.t('safe_journeys'),
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 14,
@@ -184,9 +190,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         alignment: WrapAlignment.center,
                         children:
                             [
-                                  '📍 Live Tracking',
-                                  '🔔 Alerts',
-                                  '🛡️ Safe & Secure',
+                                  AppStrings.t('pill_tracking'),
+                                  AppStrings.t('pill_alerts'),
+                                  AppStrings.t('pill_safe'),
                                 ]
                                 .map(
                                   (f) => Container(

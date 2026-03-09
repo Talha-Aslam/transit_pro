@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../app/language_provider.dart';
 
-class StudentTracking extends StatelessWidget {
+class StudentTracking extends StatefulWidget {
   final VoidCallback onBack;
   const StudentTracking({super.key, required this.onBack});
+  @override
+  State<StudentTracking> createState() => _StudentTrackingState();
+}
+
+class _StudentTrackingState extends State<StudentTracking> {
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
+
+  void _onLangChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +31,7 @@ class StudentTracking extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
         children: [
-          _Header(title: 'Track My Bus', onBack: onBack),
+          _Header(title: AppStrings.t('track_my_bus'), onBack: widget.onBack),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -42,14 +61,14 @@ class StudentTracking extends StatelessWidget {
                               Text('🗺️', style: TextStyle(fontSize: 48)),
                               const SizedBox(height: 8),
                               Text(
-                                'Live Map View',
+                                AppStrings.t('live_map_view'),
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 14,
                                 ),
                               ),
                               Text(
-                                'GPS tracking will appear here',
+                                AppStrings.t('gps_tracking_here'),
                                 style: TextStyle(
                                   color: context.textTertiary,
                                   fontSize: 12,
@@ -168,7 +187,7 @@ class StudentTracking extends StatelessWidget {
                           ),
                           _ETAInfo(
                             icon: '📏',
-                            label: 'Distance',
+                            label: AppStrings.t('distance'),
                             value: '2.4 km',
                             color: AppTheme.info,
                           ),
@@ -179,7 +198,7 @@ class StudentTracking extends StatelessWidget {
                           ),
                           _ETAInfo(
                             icon: '🚏',
-                            label: 'Stops Left',
+                            label: AppStrings.t('stops_left'),
                             value: '3',
                             color: AppTheme.purple,
                           ),
@@ -197,7 +216,7 @@ class StudentTracking extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Route Progress',
+                        AppStrings.t('route_progress'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,

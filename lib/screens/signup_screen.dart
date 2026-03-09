@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 
@@ -109,6 +110,20 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     _children = [_ChildData()];
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  String _localizedRoleName(String id) {
+    switch (id) {
+      case 'parent':
+        return AppStrings.t('parent_role_name');
+      case 'driver':
+        return AppStrings.t('driver_role_name');
+      default:
+        return AppStrings.t('student_role_name');
+    }
   }
 
   void _signup() {
@@ -137,6 +152,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _experienceCtrl.dispose();
     _studentIdCtrl.dispose();
     _studentSchoolCtrl.dispose();
+    LanguageProvider.instance.removeListener(_onLangChanged);
     super.dispose();
   }
 
@@ -193,7 +209,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          'Back',
+                          AppStrings.t('back'),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 14,
@@ -239,8 +255,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 20),
                           Text(
                             _step == 0
-                                ? 'Create Account'
-                                : '${_cfg.label} Details',
+                                ? AppStrings.t('create_account')
+                                : '${_localizedRoleName(_selectedRole)} ${AppStrings.t('details_lbl')}',
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 26,
@@ -250,8 +266,8 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 6),
                           Text(
                             _step == 0
-                                ? 'Select your role to get started'
-                                : 'Fill in your information below',
+                                ? AppStrings.t('select_role_to_start')
+                                : AppStrings.t('fill_info'),
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 14,
@@ -288,7 +304,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Already have an account? ',
+                            AppStrings.t('already_account'),
                             style: TextStyle(
                               color: context.textTertiary,
                               fontSize: 13,
@@ -325,7 +341,7 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _FieldLabel('SELECT YOUR ROLE'),
+          _FieldLabel(AppStrings.t('select_your_role_lbl')),
           const SizedBox(height: 14),
           ...(_roles.map((role) {
             final isSelected = _selectedRole == role.id;
@@ -371,7 +387,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(
-                          role.label,
+                          _localizedRoleName(role.id),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 16,
@@ -415,7 +431,7 @@ class _SignupScreenState extends State<SignupScreen> {
           })),
           const SizedBox(height: 16),
           GradientButton(
-            label: 'Continue',
+            label: AppStrings.t('continue_btn'),
             gradient: _cfg.gradient,
             glowColor: _cfg.glow,
             onTap: () => setState(() => _step = 1),
@@ -432,46 +448,46 @@ class _SignupScreenState extends State<SignupScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Common fields
-          const _FieldLabel('FULL NAME'),
+          _FieldLabel(AppStrings.t('full_name_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(hintText: 'Enter your full name'),
+            decoration: InputDecoration(
+              hintText: AppStrings.t('enter_full_name'),
+            ),
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('EMAIL ADDRESS'),
+          _FieldLabel(AppStrings.t('email_address_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(hintText: 'Enter your email'),
+            decoration: InputDecoration(hintText: AppStrings.t('enter_email')),
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('PHONE NUMBER'),
+          _FieldLabel(AppStrings.t('phone_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(
-              hintText: 'Enter your phone number',
-            ),
+            decoration: InputDecoration(hintText: AppStrings.t('enter_phone')),
           ),
           const SizedBox(height: 16),
 
           // Role-specific fields
           ..._roleSpecificFields(),
 
-          const _FieldLabel('PASSWORD'),
+          _FieldLabel(AppStrings.t('password_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _passCtrl,
             obscureText: !_showPass,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
             decoration: InputDecoration(
-              hintText: 'Create a password',
+              hintText: AppStrings.t('create_password_hint'),
               suffixIcon: GestureDetector(
                 onTap: () => setState(() => _showPass = !_showPass),
                 child: Icon(
@@ -483,14 +499,14 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('CONFIRM PASSWORD'),
+          _FieldLabel(AppStrings.t('confirm_password_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _confirmPassCtrl,
             obscureText: true,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(
-              hintText: 'Re-enter your password',
+            decoration: InputDecoration(
+              hintText: AppStrings.t('reenter_password_hint'),
             ),
           ),
           const SizedBox(height: 18),
@@ -539,7 +555,7 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 20),
 
           GradientButton(
-            label: 'Create Account',
+            label: AppStrings.t('create_account_btn'),
             gradient: _cfg.gradient,
             glowColor: _cfg.glow,
             isLoading: _loading,
@@ -581,7 +597,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Add Another Child',
+                    AppStrings.t('add_another_child'),
                     style: TextStyle(
                       color: AppTheme.parentAccent,
                       fontWeight: FontWeight.w600,
@@ -598,13 +614,13 @@ class _SignupScreenState extends State<SignupScreen> {
       // ── DRIVER ──────────────────────────────────────────────────────────
       case 'driver':
         return [
-          const _FieldLabel('LICENSE NUMBER'),
+          _FieldLabel(AppStrings.t('license_number_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _licenseCtrl,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(
-              hintText: 'Enter your driving license number',
+            decoration: InputDecoration(
+              hintText: AppStrings.t('enter_license_hint'),
             ),
           ),
           const SizedBox(height: 16),
@@ -615,7 +631,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('VEHICLE NUMBER'),
+                    _FieldLabel(AppStrings.t('vehicle_number_lbl')),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _vehicleCtrl,
@@ -623,8 +639,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: context.textPrimary,
                         fontSize: 15,
                       ),
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. BUS-42',
+                      decoration: InputDecoration(
+                        hintText: AppStrings.t('vehicle_number_hint'),
                       ),
                     ),
                   ],
@@ -635,10 +651,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('VEHICLE TYPE'),
+                    _FieldLabel(AppStrings.t('vehicle_type_lbl')),
                     const SizedBox(height: 8),
                     _buildDropdown(
-                      hint: 'Select type',
+                      hint: AppStrings.t('select_type_hint'),
                       value: _vehicleType,
                       items: _vehicleTypes,
                       onChanged: (v) => setState(() => _vehicleType = v),
@@ -649,13 +665,15 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('EXPERIENCE (YRS)'),
+          _FieldLabel(AppStrings.t('experience_yrs_lbl')),
           const SizedBox(height: 8),
           TextField(
             controller: _experienceCtrl,
             keyboardType: TextInputType.number,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(hintText: 'e.g. 5'),
+            decoration: InputDecoration(
+              hintText: AppStrings.t('experience_hint'),
+            ),
           ),
           const SizedBox(height: 16),
         ];
@@ -670,7 +688,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('STUDENT ID'),
+                    _FieldLabel(AppStrings.t('student_id_lbl')),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _studentIdCtrl,
@@ -678,8 +696,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: context.textPrimary,
                         fontSize: 15,
                       ),
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. STU-1234',
+                      decoration: InputDecoration(
+                        hintText: AppStrings.t('student_id_hint'),
                       ),
                     ),
                   ],
@@ -690,10 +708,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _FieldLabel('GRADE / LEVEL'),
+                    _FieldLabel(AppStrings.t('grade_level_lbl')),
                     const SizedBox(height: 8),
                     _buildDropdown(
-                      hint: 'Select level',
+                      hint: AppStrings.t('select_level_hint'),
                       value: _studentGrade,
                       items: _gradeOptions,
                       onChanged: (v) => setState(() => _studentGrade = v),
@@ -704,7 +722,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          const _FieldLabel('SCHOOL / INSTITUTION'),
+          _FieldLabel(AppStrings.t('school_institution_lbl')),
           const SizedBox(height: 8),
           _buildSchoolSearch(
             ctrl: _studentSchoolCtrl,
@@ -742,7 +760,7 @@ class _SignupScreenState extends State<SignupScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Child ${index + 1}',
+                '${AppStrings.t('child_lbl')} ${index + 1}',
                 style: TextStyle(
                   color: AppTheme.parentAccent,
                   fontWeight: FontWeight.w700,
@@ -765,26 +783,28 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 10),
           // Name
-          const _FieldLabel("CHILD'S NAME"),
+          _FieldLabel(AppStrings.t('childs_name_lbl')),
           const SizedBox(height: 6),
           TextField(
             controller: child.nameCtrl,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: const InputDecoration(hintText: "Child's full name"),
+            decoration: InputDecoration(
+              hintText: AppStrings.t('childs_name_hint'),
+            ),
           ),
           const SizedBox(height: 12),
           // Grade dropdown
-          const _FieldLabel('GRADE / LEVEL'),
+          _FieldLabel(AppStrings.t('grade_level_lbl')),
           const SizedBox(height: 6),
           _buildDropdown(
-            hint: 'Select level',
+            hint: AppStrings.t('select_level_hint'),
             value: child.grade,
             items: _gradeOptions,
             onChanged: (v) => setState(() => child.grade = v),
           ),
           const SizedBox(height: 12),
           // School search
-          const _FieldLabel('SCHOOL / INSTITUTION'),
+          _FieldLabel(AppStrings.t('school_institution_lbl')),
           const SizedBox(height: 6),
           _buildSchoolSearch(
             ctrl: child.schoolCtrl,
@@ -866,7 +886,7 @@ class _SignupScreenState extends State<SignupScreen> {
           onChanged: (value) => ctrl.text = value,
           style: TextStyle(color: context.textPrimary, fontSize: 15),
           decoration: InputDecoration(
-            hintText: 'Search school / institution…',
+            hintText: AppStrings.t('search_school_hint'),
             suffixIcon: isCustom
                 ? Icon(Icons.edit_note, color: AppTheme.parentAccent, size: 20)
                 : Icon(Icons.search, color: context.textTertiary, size: 18),

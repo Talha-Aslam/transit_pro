@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/language_provider.dart';
 import '../../app/subscription_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -20,11 +22,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     super.initState();
     _selected = SubscriptionProvider.instance.plan;
     SubscriptionProvider.instance.addListener(_onProviderChanged);
+    LanguageProvider.instance.addListener(_onLangChanged);
   }
+
+  void _onLangChanged() => setState(() {});
 
   @override
   void dispose() {
     SubscriptionProvider.instance.removeListener(_onProviderChanged);
+    LanguageProvider.instance.removeListener(_onLangChanged);
     super.dispose();
   }
 
@@ -52,7 +58,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: Row(
                   children: [
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: Container(
                         width: 38,
                         height: 38,
@@ -72,7 +78,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Subscription',
+                      AppStrings.t('subscription_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -135,7 +141,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Active · Renews Apr 8, 2026',
+                                        AppStrings.t('active_renews'),
                                         style: TextStyle(
                                           color: context.textSecondary,
                                           fontSize: 12,
@@ -156,9 +162,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       color: AppTheme.success.withOpacity(0.4),
                                     ),
                                   ),
-                                  child: const Text(
-                                    '● Active',
-                                    style: TextStyle(
+                                  child: Text(
+                                    AppStrings.t('active'),
+                                    style: const TextStyle(
                                       color: AppTheme.success,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -173,7 +179,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       const SizedBox(height: 12),
 
                       Text(
-                        'Change Plan',
+                        AppStrings.t('change_plan'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 16,
@@ -189,7 +195,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         name: 'Premium',
                         price: 'Rs. 299/mo',
                         badge: SubscriptionProvider.instance.plan == 'premium'
-                            ? 'Current'
+                            ? AppStrings.t('current_badge')
                             : null,
                         features: const [
                           'Live GPS tracking',
@@ -208,8 +214,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         name: 'Family',
                         price: 'Rs. 499/mo',
                         badge: SubscriptionProvider.instance.plan == 'family'
-                            ? 'Current'
-                            : 'Best Value',
+                            ? AppStrings.t('current_badge')
+                            : AppStrings.t('best_value'),
                         features: const [
                           'Everything in Premium',
                           'Unlimited child profiles',
@@ -230,7 +236,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             messenger.showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Switched to ${SubscriptionProvider.instance.planDisplayName} plan',
+                                  '${AppStrings.t('switch_plan')}: ${SubscriptionProvider.instance.planDisplayName}',
                                 ),
                                 backgroundColor: AppTheme.parentPurple,
                                 duration: const Duration(seconds: 2),
@@ -245,10 +251,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               gradient: AppTheme.parentGradient,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Text(
-                                'Switch Plan',
-                                style: TextStyle(
+                                AppStrings.t('switch_plan'),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,

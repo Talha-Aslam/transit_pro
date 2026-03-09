@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -21,6 +22,7 @@ class _ParentTrackingState extends State<ParentTracking>
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _busController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 12),
@@ -35,8 +37,11 @@ class _ParentTrackingState extends State<ParentTracking>
     });
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _busController.dispose();
     super.dispose();
   }
@@ -101,7 +106,7 @@ class _ParentTrackingState extends State<ParentTracking>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Live Tracking',
+                                AppStrings.t('live_tracking'),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 20,
@@ -139,9 +144,9 @@ class _ParentTrackingState extends State<ParentTracking>
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
-                                'LIVE',
-                                style: TextStyle(
+                              Text(
+                                AppStrings.t('live'),
+                                style: const TextStyle(
                                   color: AppTheme.successLight,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -255,7 +260,7 @@ class _ParentTrackingState extends State<ParentTracking>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'Route Map',
+                                      AppStrings.t('route_map'),
                                       style: TextStyle(
                                         color: context.textPrimary,
                                         fontSize: 14,
@@ -300,17 +305,17 @@ class _ParentTrackingState extends State<ParentTracking>
                                   children: [
                                     _LegendDot(
                                       color: AppTheme.success,
-                                      label: 'Completed',
+                                      label: AppStrings.t('completed'),
                                     ),
                                     const SizedBox(width: 16),
                                     _LegendDot(
                                       color: AppTheme.purple,
-                                      label: 'Current',
+                                      label: AppStrings.t('current'),
                                     ),
                                     const SizedBox(width: 16),
                                     _LegendDot(
                                       color: AppTheme.info,
-                                      label: 'Upcoming',
+                                      label: AppStrings.t('upcoming'),
                                     ),
                                   ],
                                 ),
@@ -327,7 +332,7 @@ class _ParentTrackingState extends State<ParentTracking>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Route Stops',
+                                AppStrings.t('route_stops'),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 15,
@@ -353,7 +358,7 @@ class _ParentTrackingState extends State<ParentTracking>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Bus Information',
+                                AppStrings.t('bus_information'),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 15,
@@ -371,22 +376,22 @@ class _ParentTrackingState extends State<ParentTracking>
                                 children: [
                                   _InfoCard(
                                     icon: '👨‍✈️',
-                                    label: 'Driver',
+                                    label: AppStrings.t('driver'),
                                     value: child?.driver ?? 'N/A',
                                   ),
                                   _InfoCard(
                                     icon: '🚌',
-                                    label: 'Bus Number',
+                                    label: AppStrings.t('bus_number'),
                                     value: child?.busNumber ?? 'N/A',
                                   ),
-                                  const _InfoCard(
+                                  _InfoCard(
                                     icon: '⚡',
-                                    label: 'Speed',
+                                    label: AppStrings.t('speed'),
                                     value: '35 km/h',
                                   ),
-                                  const _InfoCard(
+                                  _InfoCard(
                                     icon: '👦',
-                                    label: 'Students',
+                                    label: AppStrings.t('students'),
                                     value: '22 onboard',
                                   ),
                                 ],

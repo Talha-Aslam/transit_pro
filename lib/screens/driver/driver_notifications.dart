@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -19,11 +20,15 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _msgs = List.from(_allMessages);
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _replyCtrl.dispose();
     super.dispose();
   }
@@ -86,7 +91,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                   child: Row(
                     children: [
                       Text(
-                        'Messages',
+                        AppStrings.t('messages'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 20,
@@ -153,45 +158,55 @@ class _DriverNotificationsState extends State<DriverNotifications> {
               children: [
                 // Tabs
                 Row(
-                  children: ['All', 'Parents', 'Admin', 'System'].map((tab) {
-                    final active = _activeTab == tab;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _activeTab = tab),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? AppTheme.driverCyan.withOpacity(0.15)
-                                  : Colors.white.withOpacity(0.04),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: active
-                                    ? AppTheme.driverCyan.withOpacity(0.4)
-                                    : context.cardBgElevated,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                tab,
-                                style: TextStyle(
+                  children:
+                      {
+                        'All': AppStrings.t('all'),
+                        'Parents': AppStrings.t('parents_tab'),
+                        'Admin': AppStrings.t('admin_tab'),
+                        'System': AppStrings.t('system_tab'),
+                      }.entries.map((e) {
+                        final tab = e.key;
+                        final label = e.value;
+                        final active = _activeTab == tab;
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _activeTab = tab),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
                                   color: active
-                                      ? AppTheme.driverAccent
-                                      : context.textTertiary,
-                                  fontSize: 12,
-                                  fontWeight: active
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
+                                      ? AppTheme.driverCyan.withOpacity(0.15)
+                                      : Colors.white.withOpacity(0.04),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: active
+                                        ? AppTheme.driverCyan.withOpacity(0.4)
+                                        : context.cardBgElevated,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: active
+                                          ? AppTheme.driverAccent
+                                          : context.textTertiary,
+                                      fontSize: 12,
+                                      fontWeight: active
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
                 const SizedBox(height: 14),
 
@@ -424,7 +439,7 @@ class _DetailView extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'REPLY',
+                          AppStrings.t('reply'),
                           style: TextStyle(
                             color: context.textSecondary,
                             fontSize: 11,
@@ -441,7 +456,7 @@ class _DetailView extends StatelessWidget {
                             fontSize: 14,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Type your reply...',
+                            hintText: AppStrings.t('type_reply'),
                             hintStyle: TextStyle(color: context.textHint),
                             filled: true,
                             fillColor: Colors.white.withOpacity(0.05),

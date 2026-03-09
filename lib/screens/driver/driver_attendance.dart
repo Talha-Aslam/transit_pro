@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -18,8 +19,11 @@ class _DriverAttendanceState extends State<DriverAttendance> {
   @override
   void initState() {
     super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
     _students = List.from(_initialStudents);
   }
+
+  void _onLangChanged() => setState(() {});
 
   void _toggleStatus(int id) {
     setState(() {
@@ -74,7 +78,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Student Attendance',
+                      AppStrings.t('student_attendance'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -104,21 +108,21 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                   children: [
                     _SummaryCard(
                       icon: '✅',
-                      label: 'Boarded',
+                      label: AppStrings.t('boarded'),
                       value: _boarded,
                       color: AppTheme.success,
                     ),
                     const SizedBox(width: 10),
                     _SummaryCard(
-                      icon: '⏳',
-                      label: 'Waiting',
+                      icon: '\u23f3',
+                      label: AppStrings.t('pending'),
                       value: _waiting,
                       color: AppTheme.warning,
                     ),
                     const SizedBox(width: 10),
                     _SummaryCard(
-                      icon: '❌',
-                      label: 'Absent',
+                      icon: '\u274c',
+                      label: AppStrings.t('absent'),
                       value: _absent,
                       color: AppTheme.error,
                     ),
@@ -138,7 +142,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Boarding Progress',
+                            AppStrings.t('boarding_progress'),
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
                               fontSize: 13,
@@ -192,7 +196,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                             fontSize: 14,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Search student or stop...',
+                            hintText: AppStrings.t('search_student'),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,

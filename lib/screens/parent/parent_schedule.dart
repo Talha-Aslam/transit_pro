@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -12,6 +13,20 @@ class ParentSchedule extends StatefulWidget {
 
 class _ParentScheduleState extends State<ParentSchedule> {
   int _selectedDay = 2; // Wednesday (today)
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    super.dispose();
+  }
 
   static const _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   static const _dates = [23, 24, 25, 26, 27];
@@ -114,15 +129,15 @@ class _ParentScheduleState extends State<ParentSchedule> {
     switch (sel.status) {
       case 'done':
         statusColor = AppTheme.success;
-        statusLabel = '✓ Completed';
+        statusLabel = AppStrings.t('completed_check');
         break;
       case 'today':
         statusColor = AppTheme.purple;
-        statusLabel = '● Active';
+        statusLabel = AppStrings.t('active');
         break;
       default:
         statusColor = context.textTertiary;
-        statusLabel = '⏰ Upcoming';
+        statusLabel = AppStrings.t('upcoming_clock');
     }
 
     return SingleChildScrollView(
@@ -150,7 +165,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Schedule',
+                      AppStrings.t('schedule'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -329,16 +344,16 @@ class _ParentScheduleState extends State<ParentSchedule> {
                           _TimeCard(
                             emoji:
                                 'assets/images/waiting_for_bus_transparent.png',
-                            label: 'MORNING PICKUP',
+                            label: AppStrings.t('morning_pickup'),
                             time: sel.pickup,
-                            sub: 'Oak Street Stop',
+                            sub: AppStrings.t('oak_street_stop'),
                           ),
                           const SizedBox(width: 12),
                           _TimeCard(
                             emoji: 'assets/images/drop_off_transparent.png',
-                            label: 'EVENING DROP',
+                            label: AppStrings.t('evening_drop'),
                             time: sel.dropoff,
-                            sub: 'Oak Street Stop',
+                            sub: AppStrings.t('oak_street_stop'),
                           ),
                         ],
                       ),
@@ -354,7 +369,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Route A Timetable',
+                        AppStrings.t('route_a_timetable'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,
@@ -366,7 +381,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                         children: [
                           Expanded(
                             child: Text(
-                              'STOP',
+                              AppStrings.t('stop'),
                               style: TextStyle(
                                 color: context.textTertiary,
                                 fontSize: 10,
@@ -495,7 +510,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Upcoming Events',
+                        AppStrings.t('upcoming_holidays'),
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,
