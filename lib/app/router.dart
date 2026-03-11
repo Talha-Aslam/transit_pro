@@ -18,6 +18,9 @@ import '../screens/driver/driver_trip_history_screen.dart';
 import '../screens/driver/driver_performance_screen.dart';
 import '../screens/driver/driver_documents_screen.dart';
 import '../screens/student/student_layout.dart';
+import '../screens/student/missed_bus_screen.dart';
+import '../screens/driver/driver_pickup_requests_screen.dart';
+import '../screens/parent/parent_missed_bus_screen.dart';
 import '../screens/parent/payment_screens.dart';
 import '../theme/app_theme.dart';
 
@@ -175,6 +178,18 @@ final appRouter = GoRouter(
       path: '/student/help-support',
       builder: (context, state) =>
           const HelpSupportScreen(accentColor: AppTheme.studentAmber),
+    ),
+    GoRoute(
+      path: '/student/missed-bus',
+      builder: (context, state) => const MissedBusScreen(),
+    ),
+    GoRoute(
+      path: '/driver/pickup-requests',
+      builder: (context, state) => const DriverPickupRequestsScreen(),
+    ),
+    GoRoute(
+      path: '/parent/missed-bus',
+      builder: (context, state) => const ParentMissedBusScreen(),
     ),
   ],
 );

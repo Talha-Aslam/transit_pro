@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +19,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeAnim;
   late Animation<double> _bounceAnim;
 
-  Timer? _navTimer;
   final _random = Random();
   late List<_FloatingDot> _dots;
 

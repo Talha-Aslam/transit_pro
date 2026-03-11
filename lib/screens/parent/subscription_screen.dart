@@ -276,27 +276,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
-class _FeaturePill extends StatelessWidget {
-  final String label;
-  const _FeaturePill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.parentPurple.withOpacity(0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: context.textSecondary, fontSize: 11),
-      ),
-    );
-  }
-}
-
 class _PlanCard extends StatelessWidget {
   final String id, name, price;
   final String? badge;

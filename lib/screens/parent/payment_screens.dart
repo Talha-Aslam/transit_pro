@@ -921,14 +921,6 @@ class _CardPaymentScreenState extends State<CardPaymentScreen> {
     return chunks.join(' ');
   }
 
-  String _formatExpiry(String raw) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.length >= 3) {
-      return '${digits.substring(0, 2)}/${digits.substring(2, digits.length.clamp(2, 4))}';
-    }
-    return digits;
-  }
-
   String? _validateCard(String? v) {
     if (v == null || v.replaceAll(' ', '').length < 16) {
       return AppStrings.t('invalid_card_number');

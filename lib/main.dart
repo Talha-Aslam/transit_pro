@@ -79,8 +79,8 @@ void main() async {
 }
 
 void _startBackgroundService() {
-  const _channel = MethodChannel('com.example.transit_pro/background_service');
-  _channel.invokeMethod<void>('startService').catchError((_) {});
+  const channel = MethodChannel('com.example.transit_pro/background_service');
+  channel.invokeMethod<void>('startService').catchError((_) {});
 }
 
 class TransportKidApp extends StatefulWidget {

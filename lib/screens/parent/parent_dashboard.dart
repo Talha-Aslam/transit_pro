@@ -1,7 +1,10 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/missed_bus_service.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/language_provider.dart';
+import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -460,9 +463,120 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 12),
+
+                        // ── Missed Bus quick action ────────────────────────
+                        ValueListenableBuilder<MissedBusRequest?>(
+                          valueListenable:
+                              MissedBusService.instance.studentActiveRequest,
+                          builder: (_, req, __) {
+                            final isActive =
+                                req != null &&
+                                req.status == RequestStatus.searching;
+                            return GestureDetector(
+                              onTap: () => context.push('/parent/missed-bus'),
+                              child: GlassCard(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppTheme.error.withOpacity(0.15),
+                                    AppTheme.warning.withOpacity(0.08),
+                                  ],
+                                ),
+                                borderColor: isActive
+                                    ? AppTheme.error.withOpacity(0.5)
+                                    : AppTheme.error.withOpacity(0.2),
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            AppTheme.error,
+                                            Color(0xFFFF6B35),
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(13),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          '🚌',
+                                          style: TextStyle(fontSize: 22),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isActive
+                                                ? 'Pickup in Progress…'
+                                                : 'Child Missed the Bus?',
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            isActive
+                                                ? 'Searching for a nearby bus'
+                                                : 'Request a pickup from a nearby bus',
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isActive)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.warning.withOpacity(
+                                            0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'ACTIVE',
+                                          style: TextStyle(
+                                            color: AppTheme.warningLight,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      Text(
+                                        '→',
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 30),
 
-                        // â”€â”€ Today's schedule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                        // ── Today's schedule ──────────────────────────────────────────
                         GlassCard(
                           padding: const EdgeInsets.all(18),
                           child: Column(

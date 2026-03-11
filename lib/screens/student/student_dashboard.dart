@@ -1,5 +1,6 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../theme/app_theme.dart';
@@ -327,6 +328,70 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               const SizedBox(height: 3),
                               Text(
                                 'Show QR for check-in/check-out',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '→',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Missed Bus quick action ────────────────────
+                GestureDetector(
+                  onTap: () => context.push('/student/missed-bus'),
+                  child: GlassCard(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.error.withOpacity(0.15),
+                        AppTheme.warning.withOpacity(0.08),
+                      ],
+                    ),
+                    borderColor: AppTheme.error.withOpacity(0.25),
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppTheme.error, Color(0xFFFF6B35)],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Center(
+                            child: Text('🚌', style: TextStyle(fontSize: 24)),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Missed Your Bus?',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Request a pickup from a nearby bus',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,

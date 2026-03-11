@@ -347,43 +347,66 @@ class _DriverProfileState extends State<DriverProfile> {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 1.7,
+                          Column(
                             children: [
-                              _InfoCard(
-                                icon: '🪪',
-                                label: AppStrings.t('license_no_lbl'),
-                                value: info.license,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '🪪',
+                                      label: AppStrings.t('license_no_lbl'),
+                                      value: info.license,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '📅',
+                                      label: AppStrings.t('experience_lbl'),
+                                      value: info.experience,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              _InfoCard(
-                                icon: '📅',
-                                label: AppStrings.t('experience_lbl'),
-                                value: info.experience,
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '🚌',
+                                      label: AppStrings.t('bus_number_lbl'),
+                                      value: info.busNumber,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '🗺️',
+                                      label: AppStrings.t('route_lbl'),
+                                      value: info.route,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              _InfoCard(
-                                icon: '🚌',
-                                label: AppStrings.t('bus_number_lbl'),
-                                value: info.busNumber,
-                              ),
-                              _InfoCard(
-                                icon: '🗺️',
-                                label: AppStrings.t('route_lbl'),
-                                value: info.route,
-                              ),
-                              _InfoCard(
-                                icon: '📞',
-                                label: AppStrings.t('mobile_lbl'),
-                                value: info.phone,
-                              ),
-                              _InfoCard(
-                                icon: '👥',
-                                label: AppStrings.t('total_students_lbl'),
-                                value: info.totalStudents,
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '📞',
+                                      label: AppStrings.t('mobile_lbl'),
+                                      value: info.phone,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _InfoCard(
+                                      icon: '👥',
+                                      label: AppStrings.t('total_students_lbl'),
+                                      value: info.totalStudents,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -712,7 +735,7 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(12),
@@ -723,7 +746,7 @@ class _InfoCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
