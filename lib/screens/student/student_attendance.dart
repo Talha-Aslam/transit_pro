@@ -181,7 +181,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                         Text(
                           '🚌 Bus #42',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: context.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -195,7 +195,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                         Text(
                           '📍 Route A',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: context.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),

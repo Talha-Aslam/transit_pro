@@ -1,5 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../app/notification_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -29,6 +32,44 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   void _onLangChanged() => setState(() {});
+
+  // ── Quick action handlers ──────────────────────────────────────────────
+
+  void _onEmergency() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _EmergencySheet(),
+    );
+  }
+
+  void _onAlertAll() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _AlertAllSheet(),
+    );
+  }
+
+  void _onShareLocation() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ShareLocationSheet(),
+    );
+  }
+
+  void _onUpdateRoute() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _UpdateRouteSheet(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +104,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$greeting 🚌',
+                        '$greeting',
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -102,8 +143,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: context.inputBorder),
                         ),
-                        child: const Center(
-                          child: Text('💬', style: TextStyle(fontSize: 18)),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/notification_bell.gif',
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -129,34 +175,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppTheme.driverCyan.withOpacity(0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: ValueListenableBuilder<File?>(
-                    valueListenable: ProfileService.instance.driverImage,
-                    builder: (_, file, __) => file != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              file,
-                              width: 42,
-                              height: 42,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : const Center(
-                            child: Text('👨', style: TextStyle(fontSize: 24)),
-                          ),
                   ),
                 ),
               ],
@@ -189,29 +207,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.t('todays_route'),
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.t('todays_route'),
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'Route A – Morning Run',
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
+                                const SizedBox(height: 5),
+                                Text(
+                                  'Route A – Morning Run',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -291,7 +313,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: 0.55,
-                              backgroundColor: Colors.white.withOpacity(0.1),
+                              backgroundColor: context.cardBgElevated,
                               valueColor: const AlwaysStoppedAnimation(
                                 AppTheme.success,
                               ),
@@ -304,19 +326,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       Row(
                         children: [
                           _RouteStatChip(
-                            icon: '📍',
+                            icon: 'assets/images/utilities/check.png',
                             label: AppStrings.t('stops_done'),
                             value: '3/5',
                           ),
                           const SizedBox(width: 8),
                           _RouteStatChip(
-                            icon: '👦',
+                            icon: 'assets/images/navbar/student.png',
                             label: AppStrings.t('students'),
                             value: '18/22',
                           ),
                           const SizedBox(width: 8),
                           _RouteStatChip(
-                            icon: '⏱️',
+                            icon: 'assets/images/stats/on_time.png',
                             label: AppStrings.t('time_left'),
                             value: '15 min',
                           ),
@@ -354,8 +376,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             ),
                           ],
                         ),
-                        child: const Center(
-                          child: Text('📍', style: TextStyle(fontSize: 24)),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/utilities/next_stop.png',
+                            width: 28,
+                            height: 28,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -383,7 +410,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             ),
                             const SizedBox(height: 2),
                             const Text(
-                              '⏱️ ~3 minutes away · 07:37 AM scheduled',
+                              '~3 minutes away · 07:37 AM scheduled',
                               style: TextStyle(
                                 color: AppTheme.driverAccent,
                                 fontSize: 12,
@@ -438,24 +465,28 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         childAspectRatio: 2.0,
                         children: [
                           _QuickActionBtn(
-                            icon: '🚨',
+                            icon: 'assets/images/utilities/emergency.png',
                             label: AppStrings.t('emergency'),
                             color: AppTheme.error,
+                            onTap: _onEmergency,
                           ),
                           _QuickActionBtn(
-                            icon: '📢',
+                            icon: 'assets/images/alert.png',
                             label: AppStrings.t('alert_all'),
                             color: AppTheme.warning,
+                            onTap: _onAlertAll,
                           ),
                           _QuickActionBtn(
-                            icon: '📍',
+                            icon: 'assets/images/navbar/track_transparent.png',
                             label: AppStrings.t('share_location'),
                             color: AppTheme.success,
+                            onTap: _onShareLocation,
                           ),
                           _QuickActionBtn(
-                            icon: '🔄',
+                            icon: 'assets/images/utilities/edit_pencil.png',
                             label: AppStrings.t('update_route'),
                             color: AppTheme.info,
+                            onTap: _onUpdateRoute,
                           ),
                         ],
                       ),
@@ -536,15 +567,27 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ],
                     ),
                     child: Center(
-                      child: Text(
-                        _routeStarted
-                            ? "🛑  ${AppStrings.t('end_route')}"
-                            : "▶️  ${AppStrings.t('start_route')}",
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Image.asset(
+                            'assets/images/route_in_progress.png',
+                            width: 22,
+                            height: 22,
+                            fit: BoxFit.contain,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            _routeStarted
+                                ? AppStrings.t('end_route')
+                                : AppStrings.t('start_route'),
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -577,7 +620,7 @@ class _RouteStatChip extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 16)),
+            Image.asset(icon, width: 20, height: 20, fit: BoxFit.contain),
             const SizedBox(height: 4),
             Text(
               value,
@@ -601,38 +644,43 @@ class _RouteStatChip extends StatelessWidget {
 class _QuickActionBtn extends StatelessWidget {
   final String icon, label;
   final Color color;
+  final VoidCallback? onTap;
   const _QuickActionBtn({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.25)),
-      ),
-      child: Row(
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 22)),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.13),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            Image.asset(icon, width: 26, height: 26, fit: BoxFit.contain),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -661,10 +709,7 @@ class _StatBar extends StatelessWidget {
           children: [
             Text(
               label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
-                fontSize: 13,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 13),
             ),
             Text(
               suffix != null ? '$value$suffix' : '$value/$total',
@@ -687,6 +732,545 @@ class _StatBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Bottom-sheet helper ──────────────────────────────────────────────────────
+
+class _SheetBase extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _SheetBase({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Emergency sheet ─────────────────────────────────────────────────────────
+
+class _EmergencySheet extends StatefulWidget {
+  @override
+  State<_EmergencySheet> createState() => _EmergencySheetState();
+}
+
+class _EmergencySheetState extends State<_EmergencySheet> {
+  bool _sent = false;
+
+  Future<void> _callEmergency() async {
+    final uri = Uri(scheme: 'tel', path: '1122');
+    if (await canLaunchUrl(uri)) launchUrl(uri);
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _sendSOS() async {
+    await NotificationService.instance.show(
+      title: '🚨 SOS – Bus #42',
+      body:
+          'Driver has triggered an emergency alert on Route A. Authorities notified.',
+      type: 'alert',
+      icon: '🚨',
+      color: AppTheme.error,
+    );
+    if (!mounted) return;
+    setState(() => _sent = true);
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetBase(
+      title: '🚨 Emergency',
+      child: Column(
+        children: [
+          if (_sent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'SOS sent to all parents & dispatchers.',
+                style: TextStyle(color: AppTheme.successLight, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          _ActionRow(
+            icon: '📞',
+            label: 'Call Emergency Services (1122)',
+            color: AppTheme.error,
+            onTap: _callEmergency,
+          ),
+          const SizedBox(height: 10),
+          _ActionRow(
+            icon: '📢',
+            label: 'Send SOS to All Parents',
+            color: AppTheme.warning,
+            onTap: _sent ? null : _sendSOS,
+          ),
+          const SizedBox(height: 10),
+          _ActionRow(
+            icon: '✖',
+            label: 'Cancel',
+            color: Colors.white24,
+            onTap: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Alert All sheet ─────────────────────────────────────────────────────────
+
+class _AlertAllSheet extends StatefulWidget {
+  @override
+  State<_AlertAllSheet> createState() => _AlertAllSheetState();
+}
+
+class _AlertAllSheetState extends State<_AlertAllSheet> {
+  int? _selected;
+
+  static const _messages = [
+    (
+      icon: '⏱️',
+      label: 'Running 10 min late',
+      body:
+          'Bus #42 is running approximately 10 minutes behind schedule today.',
+    ),
+    (
+      icon: '⚠️',
+      label: 'Minor breakdown – wait 15 min',
+      body:
+          'Bus #42 has a minor issue. Expect a 15-minute delay. Stay at your stop.',
+    ),
+    (
+      icon: '✅',
+      label: 'Running ahead of schedule',
+      body:
+          'Bus #42 is running 5 minutes ahead of schedule. Please be at your stop now.',
+    ),
+    (
+      icon: '🌧️',
+      label: 'Delayed due to weather',
+      body:
+          'Bus #42 is delayed due to weather conditions. We will update you shortly.',
+    ),
+  ];
+
+  Future<void> _send() async {
+    if (_selected == null) return;
+    final m = _messages[_selected!];
+    await NotificationService.instance.show(
+      title: '${m.icon} Alert – Bus #42',
+      body: m.body,
+      type: 'alert',
+      icon: m.icon,
+      color: AppTheme.warning,
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetBase(
+      title: '📢 Alert All Parents',
+      child: Column(
+        children: [
+          ..._messages.asMap().entries.map((e) {
+            final selected = _selected == e.key;
+            return GestureDetector(
+              onTap: () => setState(() => _selected = e.key),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppTheme.warning.withOpacity(0.15)
+                      : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selected
+                        ? AppTheme.warning.withOpacity(0.5)
+                        : Colors.white.withOpacity(0.08),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(e.value.icon, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.value.label,
+                        style: TextStyle(
+                          color: selected
+                              ? AppTheme.warningLight
+                              : Colors.white70,
+                          fontSize: 13,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.warning,
+                        size: 18,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selected != null ? _send : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.warning,
+                disabledBackgroundColor: Colors.white12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Send to All Parents',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Share Location sheet ────────────────────────────────────────────────────
+
+class _ShareLocationSheet extends StatefulWidget {
+  @override
+  State<_ShareLocationSheet> createState() => _ShareLocationSheetState();
+}
+
+class _ShareLocationSheetState extends State<_ShareLocationSheet> {
+  // Mock current position
+  static const _lat = 33.6844;
+  static const _lng = 73.0479;
+  bool _copied = false;
+
+  Future<void> _openInMaps() async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$_lat,$_lng',
+    );
+    if (await canLaunchUrl(uri))
+      launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _copyCoords() {
+    Clipboard.setData(const ClipboardData(text: '$_lat, $_lng'));
+    setState(() => _copied = true);
+  }
+
+  Future<void> _notifyParents() async {
+    await NotificationService.instance.show(
+      title: '📍 Bus Location Shared',
+      body:
+          'Driver is sharing live location. Bus #42 is currently near Cedar Blvd.',
+      type: 'info',
+      icon: '📍',
+      color: AppTheme.success,
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetBase(
+      title: '📍 Share Location',
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.success.withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.location_on,
+                  color: AppTheme.success,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$_lat, $_lng  •  Cedar Blvd',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _copyCoords,
+                  child: Text(
+                    _copied ? '✔ Copied' : 'Copy',
+                    style: TextStyle(
+                      color: _copied
+                          ? AppTheme.successLight
+                          : AppTheme.driverCyan,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _ActionRow(
+            icon: '🗺️',
+            label: 'Open in Google Maps',
+            color: AppTheme.info,
+            onTap: _openInMaps,
+          ),
+          const SizedBox(height: 10),
+          _ActionRow(
+            icon: '📬',
+            label: 'Notify All Parents of Current Position',
+            color: AppTheme.success,
+            onTap: _notifyParents,
+          ),
+          const SizedBox(height: 10),
+          _ActionRow(
+            icon: '✖',
+            label: 'Cancel',
+            color: Colors.white24,
+            onTap: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Update Route sheet ──────────────────────────────────────────────────────
+
+class _UpdateRouteSheet extends StatefulWidget {
+  @override
+  State<_UpdateRouteSheet> createState() => _UpdateRouteSheetState();
+}
+
+class _UpdateRouteSheetState extends State<_UpdateRouteSheet> {
+  int? _selected;
+
+  static const _options = [
+    (icon: '✅', label: 'On Time', body: 'Bus #42 is back on schedule.'),
+    (
+      icon: '⏱️',
+      label: 'Delayed – 5 min',
+      body: 'Bus #42 is running 5 minutes behind schedule.',
+    ),
+    (
+      icon: '⏱️',
+      label: 'Delayed – 10 min',
+      body: 'Bus #42 is running 10 minutes behind schedule.',
+    ),
+    (
+      icon: '🔀',
+      label: 'Route Deviation',
+      body:
+          'Bus #42 has taken an alternate route due to road conditions. ETA updated.',
+    ),
+    (
+      icon: '🛑',
+      label: 'Route Suspended',
+      body:
+          'Bus #42 route is temporarily suspended. Please arrange alternative transport.',
+    ),
+  ];
+
+  Future<void> _apply() async {
+    if (_selected == null) return;
+    final o = _options[_selected!];
+    await NotificationService.instance.show(
+      title: '${o.icon} Route Update – Bus #42',
+      body: o.body,
+      type: _selected == 0 ? 'success' : 'alert',
+      icon: o.icon,
+      color: _selected == 0 ? AppTheme.success : AppTheme.warning,
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SheetBase(
+      title: '🔄 Update Route Status',
+      child: Column(
+        children: [
+          ..._options.asMap().entries.map((e) {
+            final sel = _selected == e.key;
+            return GestureDetector(
+              onTap: () => setState(() => _selected = e.key),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: sel
+                      ? AppTheme.info.withOpacity(0.15)
+                      : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: sel
+                        ? AppTheme.info.withOpacity(0.5)
+                        : Colors.white.withOpacity(0.08),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(e.value.icon, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.value.label,
+                        style: TextStyle(
+                          color: sel ? Colors.white : Colors.white70,
+                          fontSize: 13,
+                          fontWeight: sel ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    if (sel)
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.info,
+                        size: 18,
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _selected != null ? _apply : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.info,
+                disabledBackgroundColor: Colors.white12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Notify Parents',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Reusable action row ─────────────────────────────────────────────────────
+
+class _ActionRow extends StatelessWidget {
+  final String icon, label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: onTap != null ? Colors.white : Colors.white38,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

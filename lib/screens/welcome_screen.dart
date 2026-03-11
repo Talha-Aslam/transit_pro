@@ -45,16 +45,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
 
-    // Progress bar
+    // Progress bar — navigate when the bar finishes so they are perfectly synced
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    )..forward();
-
-    // Auto navigate after 4 seconds
-    _navTimer = Timer(const Duration(milliseconds: 4000), () {
-      if (mounted) context.go('/role-select');
+      duration: const Duration(milliseconds: 40000),
+    );
+    _progressController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        context.go('/role-select');
+      }
     });
+    _progressController.forward();
 
     LanguageProvider.instance.addListener(_onLangChanged);
 
@@ -80,7 +81,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
-    _navTimer?.cancel();
     _fadeController.dispose();
     _bounceController.dispose();
     _progressController.dispose();
@@ -112,9 +112,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(
-                              max(0.0, 0.15 - i * 0.02),
-                            ),
+                            color: context.isDark
+                                ? Colors.white.withOpacity(
+                                    max(0.0, 0.15 - i * 0.02),
+                                  )
+                                : Colors.black.withOpacity(
+                                    max(0.0, 0.08 - i * 0.01),
+                                  ),
                             width: 1,
                           ),
                         ),
@@ -210,7 +214,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     child: Text(
                                       f,
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.8),
+                                        color: context.textPrimary,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -250,38 +254,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       // ),
                       // const SizedBox(height: 14),
 
-                      // Progress bar + hint
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: SizedBox(
-                              width: 90,
-                              height: 3,
-                              child: AnimatedBuilder(
-                                animation: _progressController,
-                                builder: (_, __) => LinearProgressIndicator(
-                                  value: _progressController.value,
-                                  backgroundColor: Colors.white.withOpacity(
-                                    0.15,
-                                  ),
-                                  valueColor: const AlwaysStoppedAnimation(
-                                    AppTheme.purple,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // const SizedBox(width: 10),
-                          // Text(
-                          //   'Starting up...',
-                          //   style: TextStyle(
-                          //     color: context.textTertiary,
-                          //     fontSize: 11,
-                          //   ),
-                          // ),
-                        ],
+                      // Segmented capsule progress bar
+                      AnimatedBuilder(
+                        animation: _progressController,
+                        builder: (_, __) => _SegmentedProgressBar(
+                          progress: _progressController.value,
+                          segments: 6,
+                          width: 200,
+                          height: 18,
+                        ),
                       ),
                     ],
                   ),
@@ -306,4 +287,105 @@ class _FloatingDot {
     required this.left,
     required this.top,
   });
+}
+
+// ── Segmented capsule loading bar ─────────────────────────────────────────────
+
+class _SegmentedProgressBar extends StatelessWidget {
+  final double progress; // 0.0 – 1.0
+  final int segments;
+  final double width;
+  final double height;
+
+  const _SegmentedProgressBar({
+    required this.progress,
+    required this.segments,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filledCount = (progress * segments).floor();
+    final partialFill = (progress * segments) - filledCount;
+
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(height / 2),
+        border: Border.all(color: AppTheme.purple.withOpacity(0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.purple.withOpacity(0.35),
+            blurRadius: 18,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: AppTheme.info.withOpacity(0.15),
+            blurRadius: 30,
+            spreadRadius: 6,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(height / 2),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            children: List.generate(segments, (i) {
+              // Determine fill level for this segment
+              double fill;
+              if (i < filledCount) {
+                fill = 1.0;
+              } else if (i == filledCount) {
+                fill = partialFill;
+              } else {
+                fill = 0.0;
+              }
+
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < segments - 1 ? 3 : 0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Stack(
+                      children: [
+                        // Track
+                        Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.purple.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        // Fill
+                        if (fill > 0)
+                          FractionallySizedBox(
+                            widthFactor: fill,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [AppTheme.purple, AppTheme.info],
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.purple.withOpacity(0.6),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
 }

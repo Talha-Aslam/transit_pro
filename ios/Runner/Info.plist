@@ -49,5 +49,9 @@
 	<string>Needed to set your profile picture</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Needed to take a profile picture</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Transit Pro needs your location to show the bus on the map and calculate arrival times.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Transit Pro uses background location to keep tracking the bus when the app is minimised.</string>
 </dict>
 </plist>

@@ -5,7 +5,7 @@ class ThemeProvider extends ChangeNotifier {
   static final ThemeProvider instance = ThemeProvider._();
   ThemeProvider._();
 
-  ThemeMode _mode = ThemeMode.dark;
+  ThemeMode _mode = ThemeMode.light;
 
   ThemeMode get mode => _mode;
   bool get isDark => _mode != ThemeMode.light;

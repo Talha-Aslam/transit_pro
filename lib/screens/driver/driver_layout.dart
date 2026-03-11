@@ -19,6 +19,8 @@ class DriverLayout extends StatefulWidget {
 class _DriverLayoutState extends State<DriverLayout> {
   int _tab = 0;
 
+  static const int _routeTab = 2;
+
   void _goToTab(int index) => setState(() => _tab = index);
 
   @override
@@ -70,7 +72,17 @@ class _DriverLayoutState extends State<DriverLayout> {
             children: [
               DriverDashboard(onNavigate: _goToTab),
               DriverAttendance(onBack: () => _goToTab(0)),
-              DriverRoute(onBack: () => _goToTab(0)),
+              // DriverRoute hosts a GoogleMap platform view.
+              // Render it ONLY while the Route tab is active — this fully
+              // tears down the native MapView (and its TextureView render loop)
+              // whenever the user is on any other tab.
+              // DriverRoute.initState() calls TrackingService.start() and
+              // DriverRoute.dispose() calls TrackingService.stop(), so the
+              // tracking lifecycle is self-contained.
+              if (_tab == _routeTab)
+                DriverRoute(onBack: () => _goToTab(0))
+              else
+                const SizedBox.shrink(),
               DriverNotifications(onBack: () => _goToTab(0)),
               DriverProfile(
                 onNavigate: _goToTab,

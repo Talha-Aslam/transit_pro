@@ -6,7 +6,11 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class HelpSupportScreen extends StatefulWidget {
-  const HelpSupportScreen({super.key});
+  final Color accentColor;
+  const HelpSupportScreen({
+    super.key,
+    this.accentColor = AppTheme.parentPurple,
+  });
 
   @override
   State<HelpSupportScreen> createState() => _HelpSupportScreenState();
@@ -75,7 +79,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      widget.accentColor.withOpacity(0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -147,7 +151,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                               icon: '💬',
                               label: AppStrings.t('live_chat'),
                               value: AppStrings.t('live_chat_hours'),
-                              color: AppTheme.parentPurple,
+                              color: widget.accentColor,
                               onTap: _openLiveChat,
                             ),
                           ),

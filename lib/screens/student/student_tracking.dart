@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../app/language_provider.dart';
+import '../../app/tracking_service.dart';
+import '../../models/route_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
-import '../../app/language_provider.dart';
 
 class StudentTracking extends StatefulWidget {
   final VoidCallback onBack;
@@ -11,19 +15,117 @@ class StudentTracking extends StatefulWidget {
 }
 
 class _StudentTrackingState extends State<StudentTracking> {
+  final _tracking = TrackingService.instance;
+
+  GoogleMapController? _mapController;
+  String? _mapStyle;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+
+    rootBundle.loadString('assets/map_style.json').then((style) {
+      _mapStyle = style;
+      _mapController?.setMapStyle(style);
+    });
+
+    final route = MockRouteBuilder.buildMorningRoute();
+    _tracking.start(route);
+    _tracking.busPosition.addListener(_onBusPositionChanged);
+    _buildMapOverlays();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  void _onBusPositionChanged() {
+    _buildMapOverlays();
+    setState(() {});
+  }
+
+  void _buildMapOverlays() {
+    final route = _tracking.route;
+    final busPos = _tracking.busPosition.value;
+
+    final markers = <Marker>{};
+
+    // Student's stop highlighted
+    const studentStopName = 'Pine Road';
+
+    for (final stop in route.stops) {
+      final isStudentStop = stop.name == studentStopName;
+      markers.add(
+        Marker(
+          markerId: MarkerId(stop.name),
+          position: stop.location,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            isStudentStop
+                ? BitmapDescriptor.hueYellow
+                : switch (stop.status) {
+                    StopStatus.completed => BitmapDescriptor.hueGreen,
+                    StopStatus.current => BitmapDescriptor.hueViolet,
+                    StopStatus.upcoming => BitmapDescriptor.hueAzure,
+                    StopStatus.destination => BitmapDescriptor.hueOrange,
+                  },
+          ),
+          infoWindow: InfoWindow(
+            title: isStudentStop ? '📍 ${stop.name} (Your Stop)' : stop.name,
+            snippet: stop.scheduledTime,
+          ),
+        ),
+      );
+    }
+
+    markers.add(
+      Marker(
+        markerId: const MarkerId('bus'),
+        position: busPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+        rotation: _tracking.busHeading.value,
+        anchor: const Offset(0.5, 0.5),
+        infoWindow: const InfoWindow(title: '🚌 Bus #42'),
+        zIndex: 10,
+      ),
+    );
+
+    final polylines = <Polyline>{
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: route.polylinePoints,
+        color: const Color(0xFFF59E0B),
+        width: 4,
+        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+      ),
+    };
+
+    final completedIdx = route.polylinePoints.indexWhere(
+      (p) => p.latitude == busPos.latitude && p.longitude == busPos.longitude,
+    );
+    if (completedIdx > 0) {
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('completed'),
+          points: route.polylinePoints.sublist(0, completedIdx + 1),
+          color: const Color(0xFF10B981),
+          width: 5,
+        ),
+      );
+    }
+
+    _markers = markers;
+    _polylines = polylines;
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _tracking.busPosition.removeListener(_onBusPositionChanged);
+    _tracking.stop();
+    _mapController?.dispose();
     super.dispose();
   }
-
-  void _onLangChanged() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
@@ -36,84 +138,72 @@ class _StudentTrackingState extends State<StudentTracking> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // ── Map placeholder ─────────────────────────
+                // ── Google Map ─────────────────────────────────
                 GlassCard(
                   padding: EdgeInsets.zero,
-                  child: Container(
-                    height: 220,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppTheme.studentAmber.withOpacity(0.08),
-                          AppTheme.bgDark.withOpacity(0.4),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      height: 220,
+                      child: Stack(
+                        children: [
+                          GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: _tracking.busPosition.value,
+                              zoom: 13.5,
+                            ),
+                            markers: _markers,
+                            polylines: _polylines,
+                            myLocationEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                            compassEnabled: false,
+                            trafficEnabled: true,
+                            onMapCreated: (controller) {
+                              _mapController = controller;
+                              if (_mapStyle != null) {
+                                controller.setMapStyle(_mapStyle!);
+                              }
+                            },
+                          ),
+                          // Status overlay
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: StatusBadge(
+                              label: '● LIVE',
+                              color: AppTheme.success,
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 12,
+                            left: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '📍 Pine Road → School',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('🗺️', style: TextStyle(fontSize: 48)),
-                              const SizedBox(height: 8),
-                              Text(
-                                AppStrings.t('live_map_view'),
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                AppStrings.t('gps_tracking_here'),
-                                style: TextStyle(
-                                  color: context.textTertiary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Status indicators overlay
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: StatusBadge(
-                            label: '● LIVE',
-                            color: AppTheme.success,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 12,
-                          left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '📍 Pine Road → School',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // ── Bus status ──────────────────────────────
+                // ── Bus status ──────────────────────────────────
                 GlassCard(
                   gradient: LinearGradient(
                     colors: [
@@ -142,7 +232,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Bus #42 · Route A',
+                              '${_tracking.route.busNumber} · Route A',
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 15,
@@ -151,7 +241,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'Driver: Mike Johnson',
+                              'Driver: ${_tracking.route.driverName}',
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -166,50 +256,50 @@ class _StudentTrackingState extends State<StudentTracking> {
                 ),
                 const SizedBox(height: 12),
 
-                // ── ETA info ────────────────────────────────
+                // ── ETA info ────────────────────────────────────
                 GlassCard(
                   padding: const EdgeInsets.all(18),
-                  child: Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _ETAInfo(
-                            icon: '⏱️',
-                            label: 'ETA',
-                            value: '8 min',
-                            color: AppTheme.studentAmber,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 40,
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                          _ETAInfo(
-                            icon: '📏',
-                            label: AppStrings.t('distance'),
-                            value: '2.4 km',
-                            color: AppTheme.info,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 40,
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                          _ETAInfo(
-                            icon: '🚏',
-                            label: AppStrings.t('stops_left'),
-                            value: '3',
-                            color: AppTheme.purple,
-                          ),
-                        ],
+                      ValueListenableBuilder<int>(
+                        valueListenable: _tracking.etaMinutes,
+                        builder: (_, eta, __) => _ETAInfo(
+                          icon: '⏱️',
+                          label: 'ETA',
+                          value: '$eta min',
+                          color: AppTheme.studentAmber,
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      _ETAInfo(
+                        icon: '📏',
+                        label: AppStrings.t('distance'),
+                        value: '2.4 km',
+                        color: AppTheme.info,
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      _ETAInfo(
+                        icon: '🚏',
+                        label: AppStrings.t('stops_left'),
+                        value:
+                            '${_tracking.route.stops.where((s) => s.status == StopStatus.upcoming || s.status == StopStatus.destination).length}',
+                        color: AppTheme.purple,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // ── Route progress ──────────────────────────
+                // ── Route progress ──────────────────────────────
                 GlassCard(
                   padding: const EdgeInsets.all(18),
                   child: Column(
@@ -224,35 +314,23 @@ class _StudentTrackingState extends State<StudentTracking> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _StopItem(
-                        name: 'Oak Street',
-                        time: '07:10 AM',
-                        status: 'passed',
-                        color: AppTheme.success,
-                      ),
-                      _StopItem(
-                        name: 'Maple Avenue',
-                        time: '07:15 AM',
-                        status: 'passed',
-                        color: AppTheme.success,
-                      ),
-                      _StopItem(
-                        name: 'Pine Road (Your Stop)',
-                        time: '07:22 AM',
-                        status: 'current',
-                        color: AppTheme.studentAmber,
-                      ),
-                      _StopItem(
-                        name: 'Cedar Lane',
-                        time: '07:28 AM',
-                        status: 'upcoming',
-                        color: Colors.white24,
-                      ),
-                      _StopItem(
-                        name: 'Lincoln Elementary',
-                        time: '07:35 AM',
-                        status: 'upcoming',
-                        color: Colors.white24,
+                      ..._tracking.route.stops.map(
+                        (stop) => _StopItem(
+                          name: stop.name == 'Pine Road'
+                              ? '${stop.name} (Your Stop)'
+                              : stop.name,
+                          time: stop.scheduledTime,
+                          status: switch (stop.status) {
+                            StopStatus.completed => 'passed',
+                            StopStatus.current => 'current',
+                            _ => 'upcoming',
+                          },
+                          color: switch (stop.status) {
+                            StopStatus.completed => AppTheme.success,
+                            StopStatus.current => AppTheme.studentAmber,
+                            _ => Colors.white24,
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -266,7 +344,7 @@ class _StudentTrackingState extends State<StudentTracking> {
   }
 }
 
-// ── Widgets ───────────────────────────────────────────────────────────────
+// ── Widgets ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
   final String title;

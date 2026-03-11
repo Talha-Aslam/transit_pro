@@ -152,7 +152,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                           Text(
                             AppStrings.t('boarding_progress'),
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
+                              color: context.textSecondary,
                               fontSize: 13,
                             ),
                           ),
@@ -188,13 +188,19 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                   decoration: BoxDecoration(
                     color: context.cardBg,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: context.inputBorder),
                   ),
                   child: Row(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(left: 14),
-                        child: Text('🔍', style: TextStyle(fontSize: 16)),
+                      Padding(
+                        padding: EdgeInsets.only(left: 14, right: 10),
+                        child: Image.asset(
+                          'assets/images/utilities/search.png',
+                          width: 18,
+                          height: 18,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
                       ),
                       Expanded(
                         child: TextField(
@@ -317,12 +323,12 @@ class _DriverAttendanceState extends State<DriverAttendance> {
           decoration: BoxDecoration(
             color: active
                 ? AppTheme.driverCyan.withOpacity(0.15)
-                : Colors.white.withOpacity(0.05),
+                : context.cardBgElevated,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: active
                   ? AppTheme.driverCyan.withOpacity(0.5)
-                  : Colors.white.withOpacity(0.1),
+                  : context.surfaceBorder,
             ),
           ),
           child: Text(

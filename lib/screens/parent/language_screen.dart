@@ -5,7 +5,8 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class LanguageScreen extends StatefulWidget {
-  const LanguageScreen({super.key});
+  final Color accentColor;
+  const LanguageScreen({super.key, this.accentColor = AppTheme.parentPurple});
 
   @override
   State<LanguageScreen> createState() => _LanguageScreenState();
@@ -50,7 +51,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      widget.accentColor.withOpacity(0.2),
                       Colors.transparent,
                     ],
                   ),

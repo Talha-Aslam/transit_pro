@@ -111,8 +111,8 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                           ),
                           child: Text(
                             '$_unread',
-                            style: TextStyle(
-                              color: context.textPrimary,
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -180,12 +180,12 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                 decoration: BoxDecoration(
                                   color: active
                                       ? AppTheme.driverCyan.withOpacity(0.15)
-                                      : Colors.white.withOpacity(0.04),
+                                      : context.cardBgElevated,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: active
                                         ? AppTheme.driverCyan.withOpacity(0.4)
-                                        : context.cardBgElevated,
+                                        : context.surfaceBorder,
                                   ),
                                 ),
                                 child: Center(
@@ -280,9 +280,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                         Text(
                                           msg.time,
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(
-                                              0.35,
-                                            ),
+                                            color: context.textTertiary,
                                             fontSize: 11,
                                           ),
                                         ),
@@ -415,7 +413,7 @@ class _DetailView extends StatelessWidget {
                       Text(
                         msg.msg,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: context.textPrimary,
                           fontSize: 15,
                           height: 1.6,
                         ),
@@ -424,7 +422,7 @@ class _DetailView extends StatelessWidget {
                       Text(
                         'Received: ${msg.time}',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
+                          color: context.textTertiary,
                           fontSize: 12,
                         ),
                       ),
@@ -459,17 +457,17 @@ class _DetailView extends StatelessWidget {
                             hintText: AppStrings.t('type_reply'),
                             hintStyle: TextStyle(color: context.textHint),
                             filled: true,
-                            fillColor: Colors.white.withOpacity(0.05),
+                            fillColor: context.inputFill,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.1),
+                                color: context.inputBorder,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.1),
+                                color: context.inputBorder,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(

@@ -20,6 +20,8 @@ class StudentLayout extends StatefulWidget {
 class _StudentLayoutState extends State<StudentLayout> {
   int _tab = 0;
 
+  static const int _trackTab = 1;
+
   void _goToTab(int index) => setState(() => _tab = index);
 
   @override
@@ -74,7 +76,13 @@ class _StudentLayoutState extends State<StudentLayout> {
             index: _tab,
             children: [
               StudentDashboard(onNavigate: _goToTab),
-              StudentTracking(onBack: () => _goToTab(0)),
+              // StudentTracking hosts a GoogleMap platform view.
+              // Render it ONLY while the Track tab is active so the native
+              // MapView/TextureView render loop is fully stopped on other tabs.
+              if (_tab == _trackTab)
+                StudentTracking(onBack: () => _goToTab(0))
+              else
+                const SizedBox.shrink(),
               const StudentSchedule(),
               const StudentAttendance(),
               const StudentFees(),

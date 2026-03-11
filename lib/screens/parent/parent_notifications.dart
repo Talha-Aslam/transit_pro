@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/language_provider.dart';
+import '../../app/notification_service.dart';
 import '../../theme/app_theme.dart';
 
 class ParentNotifications extends StatefulWidget {
@@ -16,45 +17,52 @@ class ParentNotifications extends StatefulWidget {
 }
 
 class _ParentNotificationsState extends State<ParentNotifications> {
+  final _svc = NotificationService.instance;
   String _activeFilter = 'All';
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _notifs = List.from(_allNotifs);
+    _svc.init();
+    _svc.history.addListener(_onHistoryChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.onUnreadChanged?.call(_unreadCount);
+      widget.onUnreadChanged?.call(_svc.unreadCount);
     });
   }
 
   void _onLangChanged() => setState(() {});
 
+  void _onHistoryChanged() {
+    widget.onUnreadChanged?.call(_svc.unreadCount);
+    setState(() {});
+  }
+
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.history.removeListener(_onHistoryChanged);
     super.dispose();
   }
 
-  late List<_Notif> _notifs;
-
-  int get _unreadCount => _notifs.where((n) => !n.read).length;
-
-  List<_Notif> get _filtered {
+  List<AppNotification> get _filtered {
+    final all = _svc.history.value;
     switch (_activeFilter) {
       case 'Unread':
-        return _notifs.where((n) => !n.read).toList();
+        return all.where((n) => !n.read).toList();
       case 'Today':
-        return _notifs.where((n) => n.date == 'Today').toList();
+        return all.where((n) => n.date == 'Today').toList();
       case 'Alerts':
-        return _notifs.where((n) => n.type == 'alert').toList();
+        return all.where((n) => n.type == 'alert').toList();
       default:
-        return _notifs;
+        return all;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final unread = _svc.unreadCount;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -87,7 +95,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      if (_unreadCount > 0) ...[
+                      if (unread > 0) ...[
                         const SizedBox(width: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -99,7 +107,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            '$_unreadCount',
+                            '$unread',
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 12,
@@ -111,14 +119,12 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                     ],
                   ),
                 ),
-                if (_unreadCount > 0)
+                if (unread > 0)
                   GestureDetector(
-                    onTap: () => setState(() {
-                      _notifs = _notifs
-                          .map((n) => n.copyWith(read: true))
-                          .toList();
+                    onTap: () {
+                      _svc.markAllRead();
                       widget.onUnreadChanged?.call(0);
-                    }),
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -231,13 +237,15 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                               padding: const EdgeInsets.only(bottom: 8),
                               child: _NotifCard(
                                 notif: n,
-                                onTap: () => setState(() {
-                                  final i = _notifs.indexWhere(
-                                    (x) => x.id == n.id,
+                                onTap: () {
+                                  n.read = true;
+                                  _svc.history.value = List.from(
+                                    _svc.history.value,
                                   );
-                                  _notifs[i] = _notifs[i].copyWith(read: true);
-                                  widget.onUnreadChanged?.call(_unreadCount);
-                                }),
+                                  widget.onUnreadChanged?.call(
+                                    _svc.unreadCount,
+                                  );
+                                },
                               ),
                             ),
                           ),
@@ -255,9 +263,10 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                       child: Column(
                         children: [
                           Image.asset(
-                            'assets/images/notification_bell.gif',
-                            width: 110,
-                            height: 110,
+                            'assets/images/notification_bell_off.png',
+                            width: 90,
+                            height: 90,
+                            fit: BoxFit.contain,
                             filterQuality: FilterQuality.high,
                           ),
                           const SizedBox(height: 16),
@@ -282,7 +291,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
 }
 
 class _NotifCard extends StatelessWidget {
-  final _Notif notif;
+  final AppNotification notif;
   final VoidCallback onTap;
   const _NotifCard({required this.notif, required this.onTap});
 
@@ -358,7 +367,7 @@ class _NotifCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        notif.msg,
+                        notif.message,
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 12,
@@ -401,115 +410,3 @@ Widget _backBtn(BuildContext context) => Container(
     child: Icon(Icons.arrow_back, color: context.textPrimary, size: 16),
   ),
 );
-
-class _Notif {
-  final int id;
-  final String type, icon, title, msg, time, date;
-  final Color color;
-  final bool read;
-
-  const _Notif({
-    required this.id,
-    required this.type,
-    required this.icon,
-    required this.title,
-    required this.msg,
-    required this.time,
-    required this.date,
-    required this.color,
-    required this.read,
-  });
-
-  _Notif copyWith({bool? read}) => _Notif(
-    id: id,
-    type: type,
-    icon: icon,
-    title: title,
-    msg: msg,
-    time: time,
-    date: date,
-    color: color,
-    read: read ?? this.read,
-  );
-}
-
-const _allNotifs = [
-  _Notif(
-    id: 1,
-    type: 'success',
-    icon: '✅',
-    read: false,
-    title: 'Emma Boarded the Bus',
-    msg: 'Your child has safely boarded Bus #42 at Oak Street stop.',
-    time: '07:18 AM',
-    date: 'Today',
-    color: AppTheme.success,
-  ),
-  _Notif(
-    id: 2,
-    type: 'info',
-    icon: '🚌',
-    read: false,
-    title: 'Bus Running Ahead',
-    msg: 'Bus #42 is running 3 minutes ahead of schedule today.',
-    time: '07:10 AM',
-    date: 'Today',
-    color: AppTheme.info,
-  ),
-  _Notif(
-    id: 3,
-    type: 'alert',
-    icon: '🔔',
-    read: false,
-    title: 'Bus Approaching Stop',
-    msg: 'Bus #42 will arrive at Pine Road stop in approximately 5 minutes.',
-    time: '06:55 AM',
-    date: 'Today',
-    color: AppTheme.warning,
-  ),
-  _Notif(
-    id: 4,
-    type: 'success',
-    icon: '🏫',
-    read: true,
-    title: 'Emma Arrived at School',
-    msg: 'Emma has safely arrived at Lincoln Elementary School.',
-    time: '07:45 AM',
-    date: 'Yesterday',
-    color: AppTheme.success,
-  ),
-  _Notif(
-    id: 5,
-    type: 'info',
-    icon: '📍',
-    read: true,
-    title: 'Route Update',
-    msg: 'Due to road works, Route A will use alternate path via Oak Avenue.',
-    time: '06:30 PM',
-    date: 'Yesterday',
-    color: AppTheme.purple,
-  ),
-  _Notif(
-    id: 6,
-    type: 'success',
-    icon: '🌇',
-    read: true,
-    title: 'Emma Dropped Off',
-    msg: 'Emma has been safely dropped off at Oak Street stop.',
-    time: '03:35 PM',
-    date: 'Yesterday',
-    color: AppTheme.success,
-  ),
-  _Notif(
-    id: 7,
-    type: 'alert',
-    icon: '⚠️',
-    read: true,
-    title: 'Schedule Change',
-    msg:
-        "Tomorrow's pickup time has been moved to 07:30 AM due to a school event.",
-    time: '04:00 PM',
-    date: 'Mon, Feb 23',
-    color: AppTheme.warning,
-  ),
-];

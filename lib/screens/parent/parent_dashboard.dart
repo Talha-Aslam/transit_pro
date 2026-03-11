@@ -117,22 +117,15 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     color: context.inputBorder,
                                   ),
                                 ),
-                                child: widget.unreadCount > 0
-                                    ? Image.asset(
-                                        'assets/images/notification_bell.gif',
-                                        width: 36,
-                                        height: 36,
-                                        filterQuality: FilterQuality.high,
-                                      )
-                                    : Center(
-                                        child: Image.asset(
-                                          'assets/images/notification_bell_off.png',
-                                          width: 28,
-                                          height: 28,
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.high,
-                                        ),
-                                      ),
+                                child: Center(
+                                  child: Image.asset(
+                                    'assets/images/notification_bell_off.png',
+                                    width: 28,
+                                    height: 28,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                ),
                               ),
                               if (widget.unreadCount > 0)
                                 Positioned(

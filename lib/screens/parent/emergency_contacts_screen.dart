@@ -5,7 +5,11 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
-  const EmergencyContactsScreen({super.key});
+  final Color accentColor;
+  const EmergencyContactsScreen({
+    super.key,
+    this.accentColor = AppTheme.parentPurple,
+  });
 
   @override
   State<EmergencyContactsScreen> createState() =>
@@ -256,7 +260,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      widget.accentColor.withOpacity(0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -329,7 +333,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                               child: Text(
                                 AppStrings.t('add_one_now'),
                                 style: TextStyle(
-                                  color: AppTheme.parentPurple,
+                                  color: widget.accentColor,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -398,7 +402,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                         Text(
                                           c.phone,
                                           style: TextStyle(
-                                            color: AppTheme.parentPurple,
+                                            color: widget.accentColor,
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                           ),

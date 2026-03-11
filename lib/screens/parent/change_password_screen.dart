@@ -5,7 +5,11 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+  final Color accentColor;
+  const ChangePasswordScreen({
+    super.key,
+    this.accentColor = AppTheme.parentPurple,
+  });
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -136,7 +140,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      widget.accentColor.withOpacity(0.2),
                       Colors.transparent,
                     ],
                   ),

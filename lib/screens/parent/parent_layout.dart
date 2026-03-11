@@ -21,6 +21,8 @@ class _ParentLayoutState extends State<ParentLayout> {
   int _tab = 0;
   int _unreadCount = 3; // matches initial unread notifs count
 
+  static const int _trackTab = 1;
+
   void _goToTab(int index) => setState(() => _tab = index);
   void _onUnreadChanged(int count) => setState(() => _unreadCount = count);
 
@@ -76,7 +78,13 @@ class _ParentLayoutState extends State<ParentLayout> {
             index: _tab,
             children: [
               ParentDashboard(onNavigate: _goToTab, unreadCount: _unreadCount),
-              ParentTracking(onBack: () => _goToTab(0)),
+              // ParentTracking hosts a GoogleMap platform view.
+              // Render it ONLY while the Track tab is active so the native
+              // MapView/TextureView render loop is fully stopped on other tabs.
+              if (_tab == _trackTab)
+                ParentTracking(onBack: () => _goToTab(0))
+              else
+                const SizedBox.shrink(),
               ParentSchedule(onBack: () => _goToTab(0)),
               ParentNotifications(
                 onBack: () => _goToTab(0),

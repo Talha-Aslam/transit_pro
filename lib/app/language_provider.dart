@@ -354,7 +354,7 @@ class AppStrings {
     'back_to_login': 'Back to Login',
 
     // Welcome screen
-    'safe_journeys': 'Safe Journeys � Happy Kids � Peace of Mind',
+    'safe_journeys': 'Safe Journeys - Happy Kids - Peace of Mind',
     'pill_tracking': 'Live Tracking',
     'pill_alerts': 'Alerts',
     'pill_safe': 'Safe & Secure',
@@ -429,7 +429,7 @@ class AppStrings {
     'fuel_lbl': 'Fuel',
     'last_service_lbl': 'Last Service',
     'app_settings': 'APP SETTINGS',
-    'active_on_route': 'Active � On Route',
+    'active_on_route': 'Active - On Route',
     'settings': 'Settings', 'share_loc_desc': 'Parents can see bus location',
     'parent_alerts_lbl': 'Parent Auto-Alerts',
     'parent_alerts_desc': 'Send boarding notifications',
@@ -593,7 +593,6 @@ class AppStrings {
     'driver_name_lbl': 'Driver',
     'account_name_lbl': 'Account Name',
     'account_number_lbl': 'Account Number',
-    'bus_lbl': 'Bus',
     'send_exactly': 'Send exactly:',
     'copied': 'Copied!',
     'card_number_lbl': 'Card Number',
@@ -1169,7 +1168,6 @@ class AppStrings {
     'driver_name_lbl': 'ڈرائیور',
     'account_name_lbl': 'اکاؤنٹ کا نام',
     'account_number_lbl': 'اکاؤنٹ نمبر',
-    'bus_lbl': 'بس',
     'send_exactly': 'بالکل یہ رقم بھیجیں:',
     'copied': 'کاپی ہو گیا!',
     'card_number_lbl': 'کارڈ نمبر',

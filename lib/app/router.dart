@@ -14,8 +14,12 @@ import '../screens/parent/emergency_contacts_screen.dart';
 import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
 import '../screens/driver/driver_layout.dart';
+import '../screens/driver/driver_trip_history_screen.dart';
+import '../screens/driver/driver_performance_screen.dart';
+import '../screens/driver/driver_documents_screen.dart';
 import '../screens/student/student_layout.dart';
 import '../screens/parent/payment_screens.dart';
+import '../theme/app_theme.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -117,8 +121,60 @@ final appRouter = GoRouter(
     ),
     GoRoute(path: '/driver', builder: (context, state) => const DriverLayout()),
     GoRoute(
+      path: '/driver/trips',
+      builder: (context, state) => const DriverTripHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/driver/performance',
+      builder: (context, state) => const DriverPerformanceScreen(),
+    ),
+    GoRoute(
+      path: '/driver/documents',
+      builder: (context, state) => const DriverDocumentsScreen(),
+    ),
+    GoRoute(
+      path: '/driver/language',
+      builder: (context, state) =>
+          const LanguageScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
+      path: '/driver/change-password',
+      builder: (context, state) =>
+          const ChangePasswordScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
+      path: '/driver/emergency-contacts',
+      builder: (context, state) =>
+          const EmergencyContactsScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
+      path: '/driver/help-support',
+      builder: (context, state) =>
+          const HelpSupportScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
       path: '/student',
       builder: (context, state) => const StudentLayout(),
+    ),
+    GoRoute(
+      path: '/student/language',
+      builder: (context, state) =>
+          const LanguageScreen(accentColor: AppTheme.studentAmber),
+    ),
+    GoRoute(
+      path: '/student/change-password',
+      builder: (context, state) =>
+          const ChangePasswordScreen(accentColor: AppTheme.studentAmber),
+    ),
+    GoRoute(
+      path: '/student/emergency-contacts',
+      builder: (context, state) =>
+          const EmergencyContactsScreen(accentColor: AppTheme.studentAmber),
+    ),
+    GoRoute(
+      path: '/student/help-support',
+      builder: (context, state) =>
+          const HelpSupportScreen(accentColor: AppTheme.studentAmber),
     ),
   ],
 );

@@ -516,7 +516,7 @@ class _ScheduleItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: context.cardBgElevated,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -621,7 +621,7 @@ class _ActivityRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: context.cardBgElevated,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -640,10 +640,7 @@ class _ActivityRow extends StatelessWidget {
             ),
             Text(
               time,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.35),
-                fontSize: 11,
-              ),
+              style: TextStyle(color: context.textTertiary, fontSize: 11),
             ),
           ],
         ),
