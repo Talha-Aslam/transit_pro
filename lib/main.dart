@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'app/auth_service.dart';
 import 'app/geofence_service.dart';
 import 'app/notification_service.dart';
 import 'app/router.dart';
@@ -75,6 +76,7 @@ void main() async {
   }
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await AuthService.instance.preload();
   runApp(const TransportKidApp());
 }
 

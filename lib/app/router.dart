@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'auth_service.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/role_selection_screen.dart';
 import '../screens/login_screen.dart';
@@ -25,7 +26,10 @@ import '../screens/parent/payment_screens.dart';
 import '../theme/app_theme.dart';
 
 final appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: () {
+    final role = AuthService.instance.cachedRole;
+    return role != null ? AuthService.routeForRole(role) : '/';
+  }(),
   routes: [
     GoRoute(path: '/', builder: (context, state) => const WelcomeScreen()),
     GoRoute(

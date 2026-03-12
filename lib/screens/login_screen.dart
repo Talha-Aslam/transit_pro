@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
@@ -82,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
+        AuthService.instance.saveRole(widget.role);
         setState(() => _loading = false);
         context.go(_cfg.path);
       }

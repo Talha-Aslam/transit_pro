@@ -62,7 +62,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '$greeting 👋',
+                        '$greeting',
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -90,34 +90,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   ),
                   child: const Center(
                     child: Text('🔔', style: TextStyle(fontSize: 18)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppTheme.studentAmber.withOpacity(0.5),
-                      width: 2,
-                    ),
-                  ),
-                  child: ValueListenableBuilder<File?>(
-                    valueListenable: ProfileService.instance.studentImage,
-                    builder: (_, file, __) => file != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              file,
-                              width: 42,
-                              height: 42,
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : const Center(
-                            child: Text('🎓', style: TextStyle(fontSize: 22)),
-                          ),
                   ),
                 ),
               ],
@@ -487,6 +459,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 GridView.count(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
                   crossAxisCount: 2,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
@@ -518,7 +491,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // ── Recent activity ───────────────────────────
                 GlassCard(

@@ -144,10 +144,9 @@ class _StudentProfileState extends State<StudentProfile> {
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
-                  const SizedBox(height: 16),
                   // ── Avatar & info header ───────────────────────────────
                   Container(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,

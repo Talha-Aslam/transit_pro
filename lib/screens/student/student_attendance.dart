@@ -291,7 +291,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                   time: '--:--',
                   location: 'Lincoln Elementary',
                   icon: '🌤️',
-                  color: Colors.white24,
+                  color: Colors.grey,
                   status: 'Pending',
                 ),
                 const SizedBox(height: 10),
@@ -300,7 +300,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                   time: '--:--',
                   location: 'Pine Road Stop',
                   icon: '🏠',
-                  color: Colors.white24,
+                  color: Colors.grey,
                   status: 'Pending',
                 ),
               ],
@@ -468,7 +468,7 @@ class _CheckinCard extends StatelessWidget {
                 Text(
                   type,
                   style: TextStyle(
-                    color: done ? Colors.white : context.textTertiary,
+                    color: done ? context.textPrimary : context.textTertiary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -476,7 +476,7 @@ class _CheckinCard extends StatelessWidget {
                 Text(
                   location,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(done ? 0.4 : 0.25),
+                    color: done ? context.textSecondary : context.textTertiary,
                     fontSize: 11,
                   ),
                 ),
@@ -489,14 +489,14 @@ class _CheckinCard extends StatelessWidget {
               Text(
                 time,
                 style: TextStyle(
-                  color: done ? Colors.white : context.textTertiary,
+                  color: done ? context.textPrimary : context.textTertiary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               StatusBadge(
                 label: status,
-                color: done ? AppTheme.success : Colors.white24,
+                color: done ? AppTheme.success : context.textHint,
               ),
             ],
           ),

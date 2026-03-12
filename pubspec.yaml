@@ -18,6 +18,7 @@ dependencies:
   flutter_local_notifications: ^18.0.0
   flutter_polyline_points: ^2.1.0
   http: ^1.2.0
+  shared_preferences: ^2.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -33,6 +34,7 @@ flutter:
     - assets/images/profile_page/
     - assets/images/role_selection/
     - assets/images/schedule/
+    - assets/images/splash_screen/
     - assets/images/splash_screen/bus_splash_icon.png
     - assets/images/stats/
     - assets/images/utilities/

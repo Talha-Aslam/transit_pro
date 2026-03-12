@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -48,9 +49,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 40000),
     );
-    _progressController.addStatusListener((status) {
+    _progressController.addStatusListener((status) async {
       if (status == AnimationStatus.completed && mounted) {
-        context.go('/role-select');
+        final savedRole = await AuthService.instance.getSavedRole();
+        if (!mounted) return;
+        if (savedRole != null) {
+          if (!mounted) return;
+          context.go(AuthService.routeForRole(savedRole));
+        } else {
+          context.go('/role-select');
+        }
       }
     });
     _progressController.forward();
@@ -223,44 +231,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                       const SizedBox(height: 26),
 
-                      // // Get Started button
-                      // GestureDetector(
-                      //   onTap: () => context.go('/role-select'),
-                      //   child: Container(
-                      //     padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
-                      //     decoration: BoxDecoration(
-                      //       gradient: AppTheme.mainGradient,
-                      //       borderRadius: BorderRadius.circular(50),
-                      //       boxShadow: [
-                      //         BoxShadow(
-                      //           color: AppTheme.purple.withOpacity(0.5),
-                      //           blurRadius: 28,
-                      //           offset: const Offset(0, 10),
-                      //         ),
-                      //       ],
-                      //     ),
-                      //     child: const Text(
-                      //       'Get Started →',
-                      //       style: TextStyle(
-                      //         color: context.textPrimary,
-                      //         fontSize: 16,
-                      //         fontWeight: FontWeight.w700,
-                      //         letterSpacing: 0.5,
-                      //       ),
-                      //     ),
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 14),
-
-                      // Segmented capsule progress bar
+                      // Loading bar
                       AnimatedBuilder(
                         animation: _progressController,
-                        builder: (_, __) => _SegmentedProgressBar(
-                          progress: _progressController.value,
-                          segments: 6,
-                          width: 200,
-                          height: 18,
-                        ),
+                        builder: (_, __) =>
+                            _LoadingBar(progress: _progressController.value),
                       ),
                     ],
                   ),
@@ -287,103 +262,38 @@ class _FloatingDot {
   });
 }
 
-// ── Segmented capsule loading bar ─────────────────────────────────────────────
-
-class _SegmentedProgressBar extends StatelessWidget {
-  final double progress; // 0.0 – 1.0
-  final int segments;
-  final double width;
-  final double height;
-
-  const _SegmentedProgressBar({
-    required this.progress,
-    required this.segments,
-    required this.width,
-    required this.height,
-  });
+class _LoadingBar extends StatelessWidget {
+  final double progress;
+  const _LoadingBar({required this.progress});
 
   @override
   Widget build(BuildContext context) {
-    final filledCount = (progress * segments).floor();
-    final partialFill = (progress * segments) - filledCount;
-
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(height / 2),
-        border: Border.all(color: AppTheme.purple.withOpacity(0.5), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.purple.withOpacity(0.35),
-            blurRadius: 18,
-            spreadRadius: 2,
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final filled = constraints.maxWidth * progress.clamp(0.0, 1.0);
+        return Container(
+          height: 5,
+          decoration: BoxDecoration(
+            color: context.isDark
+                ? Colors.white.withOpacity(0.10)
+                : Colors.black.withOpacity(0.07),
+            borderRadius: BorderRadius.circular(6),
           ),
-          BoxShadow(
-            color: AppTheme.info.withOpacity(0.15),
-            blurRadius: 30,
-            spreadRadius: 6,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(height / 2),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Row(
-            children: List.generate(segments, (i) {
-              // Determine fill level for this segment
-              double fill;
-              if (i < filledCount) {
-                fill = 1.0;
-              } else if (i == filledCount) {
-                fill = partialFill;
-              } else {
-                fill = 0.0;
-              }
-
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: i < segments - 1 ? 3 : 0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Stack(
-                      children: [
-                        // Track
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppTheme.purple.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        // Fill
-                        if (fill > 0)
-                          FractionallySizedBox(
-                            widthFactor: fill,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [AppTheme.purple, AppTheme.info],
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.purple.withOpacity(0.6),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+          child: Stack(
+            children: [
+              Container(
+                width: filled,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.purple, AppTheme.driverCyan],
                   ),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              );
-            }),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
