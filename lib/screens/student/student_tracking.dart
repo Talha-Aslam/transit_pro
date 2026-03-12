@@ -274,7 +274,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.white.withOpacity(0.1),
+                        color: context.surfaceBorder,
                       ),
                       _ETAInfo(
                         icon: '📏',
@@ -285,7 +285,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.white.withOpacity(0.1),
+                        color: context.surfaceBorder,
                       ),
                       _ETAInfo(
                         icon: '🚏',
@@ -465,7 +465,7 @@ class _StopItem extends StatelessWidget {
                   height: 24,
                   color: isPassed
                       ? AppTheme.success.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.1),
+                      : context.surfaceBorder,
                 ),
             ],
           ),
@@ -480,8 +480,10 @@ class _StopItem extends StatelessWidget {
                       name,
                       style: TextStyle(
                         color: isCurrent
-                            ? Colors.white
-                            : Colors.white.withOpacity(isPassed ? 0.5 : 0.35),
+                            ? context.textPrimary
+                            : isPassed
+                            ? context.textTertiary
+                            : context.textSecondary,
                         fontSize: 13,
                         fontWeight: isCurrent
                             ? FontWeight.w700
@@ -492,7 +494,7 @@ class _StopItem extends StatelessWidget {
                   Text(
                     time,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(isPassed ? 0.35 : 0.25),
+                      color: isPassed ? context.textTertiary : context.textHint,
                       fontSize: 11,
                     ),
                   ),

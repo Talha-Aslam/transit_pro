@@ -719,21 +719,21 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                             Row(
                               children: [
                                 _PlatformChip(
-                                  label: 'JazzCash',
                                   imagePath:
                                       'assets/images/utilities/jazzcash.png',
                                   selected: _platform == 'jazzcash',
                                   accentColor: const Color(0xFFD3290F),
+                                  semanticLabel: 'JazzCash',
                                   onTap: () =>
                                       setState(() => _platform = 'jazzcash'),
                                 ),
                                 const SizedBox(width: 10),
                                 _PlatformChip(
-                                  label: 'EasyPaisa',
                                   imagePath:
-                                      'assets/images/utilities/easypaisa.png',
+                                      'assets/images/utilities/Easypaisa.png',
                                   selected: _platform == 'easypaisa',
                                   accentColor: const Color(0xFF4CAF50),
+                                  semanticLabel: 'EasyPaisa',
                                   onTap: () =>
                                       setState(() => _platform = 'easypaisa'),
                                 ),
@@ -1419,6 +1419,9 @@ class _DriverInfoCard extends StatelessWidget {
     final accentColor = isJazz
         ? const Color(0xFFD3290F)
         : const Color(0xFF4CAF50);
+    final logoPath = isJazz
+        ? 'assets/images/utilities/jazzcash.png'
+        : 'assets/images/utilities/Easypaisa.png';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1433,16 +1436,23 @@ class _DriverInfoCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
+                width: 64,
                 height: 40,
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: Text(
-                    isJazz ? '🎵' : '🟢',
-                    style: const TextStyle(fontSize: 18),
+                  child: Image.asset(
+                    logoPath,
+                    width: 50,
+                    height: 22,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: accentColor,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -1575,14 +1585,15 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _PlatformChip extends StatelessWidget {
-  final String label, imagePath;
+  final String imagePath;
+  final String semanticLabel;
   final bool selected;
   final Color accentColor;
   final VoidCallback onTap;
 
   const _PlatformChip({
-    required this.label,
     required this.imagePath,
+    required this.semanticLabel,
     required this.selected,
     required this.accentColor,
     required this.onTap,
@@ -1609,20 +1620,18 @@ class _PlatformChip extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                imagePath,
-                width: 24,
-                height: 24,
-                errorBuilder: (_, __, ___) =>
-                    Text(label[0], style: TextStyle(color: accentColor)),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? accentColor : context.textSecondary,
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              Semantics(
+                label: semanticLabel,
+                child: Image.asset(
+                  imagePath,
+                  width: 82,
+                  height: 28,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: accentColor,
+                    size: 22,
+                  ),
                 ),
               ),
             ],
