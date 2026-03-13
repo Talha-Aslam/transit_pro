@@ -198,8 +198,10 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                           'assets/images/utilities/search.png',
                           width: 18,
                           height: 18,
+                          cacheWidth: 36,
+                          cacheHeight: 36,
                           fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
+                          filterQuality: FilterQuality.medium,
                         ),
                       ),
                       Expanded(
@@ -402,6 +404,7 @@ class _StudentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cfg = _statusConfig[student.status]!;
     return GlassCard(
+      enableBlur: false,
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [

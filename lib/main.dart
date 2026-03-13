@@ -105,7 +105,7 @@ class _TransportKidAppState extends State<TransportKidApp> {
     super.dispose();
   }
 
-  void _onThemeChanged() => setState(() {
+  void _onThemeChanged() {
     final isDark = ThemeProvider.instance.isDark;
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -116,17 +116,20 @@ class _TransportKidAppState extends State<TransportKidApp> {
             : const Color(0xFFF8FAFC),
       ),
     );
-  });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'TransportKid',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeProvider.instance.mode,
-      routerConfig: appRouter,
+    return ListenableBuilder(
+      listenable: ThemeProvider.instance,
+      builder: (context, _) => MaterialApp.router(
+        title: 'TransportKid',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeProvider.instance.mode,
+        routerConfig: appRouter,
+      ),
     );
   }
 }

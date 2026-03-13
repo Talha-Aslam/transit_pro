@@ -22,15 +22,11 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   @override
   void initState() {
     super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
     _msgs = List.from(_allMessages);
   }
 
-  void _onLangChanged() => setState(() {});
-
   @override
   void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
     _replyCtrl.dispose();
     super.dispose();
   }
@@ -56,367 +52,400 @@ class _DriverNotificationsState extends State<DriverNotifications> {
 
   @override
   Widget build(BuildContext context) {
-    // Detail view
-    if (_selectedMsg != null) {
-      return _DetailView(
-        msg: _selectedMsg!,
-        replyCtrl: _replyCtrl,
-        onBack: () => setState(() {
-          _selectedMsg = null;
-          _replyCtrl.clear();
-        }),
-      );
-    }
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) {
+        // Detail view
+        if (_selectedMsg != null) {
+          return _DetailView(
+            msg: _selectedMsg!,
+            replyCtrl: _replyCtrl,
+            onBack: () => setState(() {
+              _selectedMsg = null;
+              _replyCtrl.clear();
+            }),
+          );
+        }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Header ───────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Row(
-              children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        AppStrings.t('messages'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (_unread > 0) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.error,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$_unread',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            children: [
+              // ── Header ───────────────────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppTheme.driverCyan.withOpacity(0.2),
+                      Colors.transparent,
                     ],
                   ),
                 ),
-                // Mark all read — compact icon button, only shown when there are unreads
-                if (_unread > 0) ...[
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      _msgs = _msgs.map((m) => m.copyWith(read: true)).toList();
-                    }),
-                    child: Tooltip(
-                      message: 'Mark all read',
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppTheme.driverAccent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppTheme.driverAccent.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.done_all_rounded,
-                          color: AppTheme.driverAccent,
-                          size: 16,
-                        ),
-                      ),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: widget.onBack,
+                      child: _backBtn(context),
                     ),
-                  ),
-                ],
-                const SizedBox(width: 6),
-                ValueListenableBuilder(
-                  valueListenable:
-                      MissedBusService.instance.driverIncomingRequests,
-                  builder: (_, list, __) {
-                    final count = list.length;
-                    return GestureDetector(
-                      onTap: () => context.push('/driver/pickup-requests'),
-                      child: Stack(
-                        clipBehavior: Clip.none,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: count > 0
-                                  ? AppTheme.error.withOpacity(0.15)
-                                  : context.cardBgElevated,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: count > 0
-                                    ? AppTheme.error.withOpacity(0.4)
-                                    : context.surfaceBorder,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.directions_bus_rounded,
-                                  color: count > 0
-                                      ? AppTheme.error
-                                      : context.textTertiary,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Pickups',
-                                  style: TextStyle(
-                                    color: count > 0
-                                        ? AppTheme.error
-                                        : context.textTertiary,
-                                    fontSize: 12,
-                                    fontWeight: count > 0
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            AppStrings.t('messages'),
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                          if (count > 0)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '$count',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
+                          if (_unread > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.error,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$_unread',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
+                          ],
                         ],
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // Tabs
-                Row(
-                  children:
-                      {
-                        'All': AppStrings.t('all'),
-                        'Parents': AppStrings.t('parents_tab'),
-                        'Admin': AppStrings.t('admin_tab'),
-                        'System': AppStrings.t('system_tab'),
-                      }.entries.map((e) {
-                        final tab = e.key;
-                        final label = e.value;
-                        final active = _activeTab == tab;
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () => setState(() => _activeTab = tab),
-                              child: Container(
+                    ),
+                    // Mark all read — compact icon button, only shown when there are unreads
+                    if (_unread > 0) ...[
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _msgs = _msgs
+                              .map((m) => m.copyWith(read: true))
+                              .toList();
+                        }),
+                        child: Tooltip(
+                          message: 'Mark all read',
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: AppTheme.driverAccent.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppTheme.driverAccent.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.done_all_rounded,
+                              color: AppTheme.driverAccent,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 6),
+                    ValueListenableBuilder(
+                      valueListenable:
+                          MissedBusService.instance.driverIncomingRequests,
+                      builder: (_, list, __) {
+                        final count = list.length;
+                        return GestureDetector(
+                          onTap: () => context.push('/driver/pickup-requests'),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: active
-                                      ? AppTheme.driverCyan.withOpacity(0.15)
+                                  color: count > 0
+                                      ? AppTheme.error.withOpacity(0.15)
                                       : context.cardBgElevated,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: active
-                                        ? AppTheme.driverCyan.withOpacity(0.4)
+                                    color: count > 0
+                                        ? AppTheme.error.withOpacity(0.4)
                                         : context.surfaceBorder,
                                   ),
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      color: active
-                                          ? AppTheme.driverAccent
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.directions_bus_rounded,
+                                      color: count > 0
+                                          ? AppTheme.error
                                           : context.textTertiary,
-                                      fontSize: 12,
-                                      fontWeight: active
-                                          ? FontWeight.w700
-                                          : FontWeight.w400,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Pickups',
+                                      style: TextStyle(
+                                        color: count > 0
+                                            ? AppTheme.error
+                                            : context.textTertiary,
+                                        fontSize: 12,
+                                        fontWeight: count > 0
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (count > 0)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      color: AppTheme.error,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '$count',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
                                     ),
                                   ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    // Tabs
+                    Row(
+                      children:
+                          {
+                            'All': AppStrings.t('all'),
+                            'Parents': AppStrings.t('parents_tab'),
+                            'Admin': AppStrings.t('admin_tab'),
+                            'System': AppStrings.t('system_tab'),
+                          }.entries.map((e) {
+                            final tab = e.key;
+                            final label = e.value;
+                            final active = _activeTab == tab;
+                            return Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _activeTab = tab),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: active
+                                          ? AppTheme.driverCyan.withOpacity(
+                                              0.15,
+                                            )
+                                          : context.cardBgElevated,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: active
+                                            ? AppTheme.driverCyan.withOpacity(
+                                                0.4,
+                                              )
+                                            : context.surfaceBorder,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        label,
+                                        style: TextStyle(
+                                          color: active
+                                              ? AppTheme.driverAccent
+                                              : context.textTertiary,
+                                          fontSize: 12,
+                                          fontWeight: active
+                                              ? FontWeight.w700
+                                              : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Message list
+                    ..._filtered.map(
+                      (msg) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: RepaintBoundary(
+                          child: GestureDetector(
+                            onTap: () => _openMsg(msg),
+                            child: AnimatedOpacity(
+                              opacity: msg.read ? 0.7 : 1.0,
+                              duration: const Duration(milliseconds: 200),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: context.cardBg,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: context.surfaceBorder,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: msg.color.withOpacity(
+                                                0.12,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: msg.color.withOpacity(
+                                                  0.25,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                msg.avatar,
+                                                style: const TextStyle(
+                                                  fontSize: 22,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        msg.sender,
+                                                        style: TextStyle(
+                                                          color: context
+                                                              .textPrimary,
+                                                          fontSize: 13,
+                                                          fontWeight: msg.read
+                                                              ? FontWeight.w500
+                                                              : FontWeight.w700,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      msg.time,
+                                                      style: TextStyle(
+                                                        color: context
+                                                            .textTertiary,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  msg.msg,
+                                                  style: TextStyle(
+                                                    color:
+                                                        context.textSecondary,
+                                                    fontSize: 12,
+                                                    height: 1.4,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (!msg.read) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              margin: const EdgeInsets.only(
+                                                top: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: msg.color,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    if (!msg.read)
+                                      Positioned(
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 3,
+                                          color: msg.color,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                        );
-                      }).toList(),
-                ),
-                const SizedBox(height: 14),
-
-                // Message list
-                ..._filtered.map(
-                  (msg) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: GestureDetector(
-                      onTap: () => _openMsg(msg),
-                      child: AnimatedOpacity(
-                        opacity: msg.read ? 0.7 : 1.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Stack(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: context.cardBg,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: context.surfaceBorder,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: msg.color.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: msg.color.withOpacity(0.25),
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          msg.avatar,
-                                          style: const TextStyle(fontSize: 22),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  msg.sender,
-                                                  style: TextStyle(
-                                                    color: context.textPrimary,
-                                                    fontSize: 13,
-                                                    fontWeight: msg.read
-                                                        ? FontWeight.w500
-                                                        : FontWeight.w700,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              Text(
-                                                msg.time,
-                                                style: TextStyle(
-                                                  color: context.textTertiary,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            msg.msg,
-                                            style: TextStyle(
-                                              color: context.textSecondary,
-                                              fontSize: 12,
-                                              height: 1.4,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (!msg.read) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        margin: const EdgeInsets.only(top: 2),
-                                        decoration: BoxDecoration(
-                                          color: msg.color,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              if (!msg.read)
-                                Positioned(
-                                  left: 0,
-                                  top: 0,
-                                  bottom: 0,
-                                  child: Container(width: 3, color: msg.color),
-                                ),
-                            ],
-                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

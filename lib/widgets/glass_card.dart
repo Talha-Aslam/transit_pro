@@ -11,6 +11,7 @@ class GlassCard extends StatelessWidget {
   final Color? borderColor;
   final double borderWidth;
   final double blurSigma;
+  final bool enableBlur;
   final List<BoxShadow>? boxShadow;
   final VoidCallback? onTap;
   final bool clipContent;
@@ -25,6 +26,7 @@ class GlassCard extends StatelessWidget {
     this.borderColor,
     this.borderWidth = 1,
     this.blurSigma = 20,
+    this.enableBlur = true,
     this.boxShadow,
     this.onTap,
     this.clipContent = false,
@@ -65,18 +67,20 @@ class GlassCard extends StatelessWidget {
       child: child,
     );
 
-    Widget blurred = ClipRRect(
+    Widget card = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: content,
-      ),
+      child: enableBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: content,
+            )
+          : content,
     );
 
     if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: blurred);
+      return GestureDetector(onTap: onTap, child: card);
     }
-    return blurred;
+    return card;
   }
 }
 

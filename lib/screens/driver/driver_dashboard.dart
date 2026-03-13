@@ -17,20 +17,6 @@ class DriverDashboard extends StatefulWidget {
 class _DriverDashboardState extends State<DriverDashboard> {
   bool _routeStarted = true;
 
-  @override
-  void initState() {
-    super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
-  }
-
-  @override
-  void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
-    super.dispose();
-  }
-
-  void _onLangChanged() => setState(() {});
-
   // ── Quick action handlers ──────────────────────────────────────────────
 
   void _onEmergency() {
@@ -78,522 +64,538 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ? 'Good Afternoon'
         : 'Good Evening';
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Header ───────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$greeting',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Mike Thompson',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Bus #42 · Route A – East District',
-                        style: TextStyle(
-                          color: AppTheme.driverAccent,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Column(
+          children: [
+            // ── Header ───────────────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppTheme.driverCyan.withOpacity(0.2),
+                    Colors.transparent,
+                  ],
                 ),
-                GestureDetector(
-                  onTap: () => widget.onNavigate(3),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: context.cardBgElevated,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: context.inputBorder),
-                        ),
-                        child: Center(
-                          child: Image.asset(
-                            'assets/images/notification_bell.gif',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$greeting',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
                           ),
                         ),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.error,
-                            shape: BoxShape.circle,
+                        const SizedBox(height: 4),
+                        Text(
+                          'Mike Thompson',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Bus #42 · Route A – East District',
+                          style: TextStyle(
+                            color: AppTheme.driverAccent,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => widget.onNavigate(3),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: context.cardBgElevated,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: context.inputBorder),
                           ),
                           child: Center(
-                            child: Text(
-                              '2',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
+                            child: Image.asset(
+                              'assets/images/notification_bell.gif',
+                              width: 22,
+                              height: 22,
+                              cacheWidth: 44,
+                              cacheHeight: 44,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '2',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // ── Route status ─────────────────────────────────────────
-                GlassCard(
-                  gradient: LinearGradient(
-                    colors: _routeStarted
-                        ? [
-                            AppTheme.success.withOpacity(0.15),
-                            AppTheme.success.withOpacity(0.05),
-                          ]
-                        : [
-                            AppTheme.driverCyan.withOpacity(0.15),
-                            AppTheme.driverCyan.withOpacity(0.05),
-                          ],
-                  ),
-                  borderColor:
-                      (_routeStarted ? AppTheme.success : AppTheme.driverCyan)
-                          .withOpacity(0.25),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  AppStrings.t('todays_route'),
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  // ── Route status ─────────────────────────────────────────
+                  GlassCard(
+                    gradient: LinearGradient(
+                      colors: _routeStarted
+                          ? [
+                              AppTheme.success.withOpacity(0.15),
+                              AppTheme.success.withOpacity(0.05),
+                            ]
+                          : [
+                              AppTheme.driverCyan.withOpacity(0.15),
+                              AppTheme.driverCyan.withOpacity(0.05),
+                            ],
+                    ),
+                    borderColor:
+                        (_routeStarted ? AppTheme.success : AppTheme.driverCyan)
+                            .withOpacity(0.25),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    AppStrings.t('todays_route'),
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  'Route A – Morning Run',
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
+                                  const SizedBox(height: 5),
+                                  Text(
+                                    'Route A – Morning Run',
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  (_routeStarted
-                                          ? AppTheme.success
-                                          : AppTheme.warning)
-                                      .withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
                                 color:
                                     (_routeStarted
                                             ? AppTheme.success
                                             : AppTheme.warning)
-                                        .withOpacity(0.4),
+                                        .withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color:
+                                      (_routeStarted
+                                              ? AppTheme.success
+                                              : AppTheme.warning)
+                                          .withOpacity(0.4),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: _routeStarted
+                                          ? AppTheme.success
+                                          : AppTheme.warning,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _routeStarted
+                                        ? AppStrings.t('in_progress_badge')
+                                        : AppStrings.t('not_started_badge'),
+                                    style: TextStyle(
+                                      color: _routeStarted
+                                          ? AppTheme.successLight
+                                          : AppTheme.warningLight,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            child: Row(
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Progress bar
+                        Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: _routeStarted
-                                        ? AppTheme.success
-                                        : AppTheme.warning,
-                                    shape: BoxShape.circle,
+                                Text(
+                                  AppStrings.t('route_progress'),
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 12,
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _routeStarted
-                                      ? AppStrings.t('in_progress_badge')
-                                      : AppStrings.t('not_started_badge'),
+                                const Text(
+                                  '55%',
                                   style: TextStyle(
-                                    color: _routeStarted
-                                        ? AppTheme.successLight
-                                        : AppTheme.warningLight,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.successLight,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: 0.55,
+                                backgroundColor: context.cardBgElevated,
+                                valueColor: const AlwaysStoppedAnimation(
+                                  AppTheme.success,
+                                ),
+                                minHeight: 8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            _RouteStatChip(
+                              icon: 'assets/images/utilities/check.png',
+                              label: AppStrings.t('stops_done'),
+                              value: '3/5',
+                            ),
+                            const SizedBox(width: 8),
+                            _RouteStatChip(
+                              icon: 'assets/images/navbar/student.png',
+                              label: AppStrings.t('students'),
+                              value: '18/22',
+                            ),
+                            const SizedBox(width: 8),
+                            _RouteStatChip(
+                              icon: 'assets/images/stats/on_time.png',
+                              label: AppStrings.t('time_left'),
+                              value: '15 min',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Next stop card ────────────────────────────────────────
+                  GlassCard(
+                    onTap: () => widget.onNavigate(2),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.driverCyan.withOpacity(0.15),
+                        AppTheme.driverTeal.withOpacity(0.08),
+                      ],
+                    ),
+                    borderColor: AppTheme.driverCyan.withOpacity(0.25),
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.driverGradient,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.driverCyan.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Progress bar
-                      Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/utilities/next_stop.png',
+                              width: 28,
+                              height: 28,
+                              cacheWidth: 56,
+                              cacheHeight: 56,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                AppStrings.t('route_progress'),
+                                AppStrings.t('next_stop'),
                                 style: TextStyle(
                                   color: context.textSecondary,
-                                  fontSize: 12,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              const Text(
-                                '55%',
+                              const SizedBox(height: 4),
+                              Text(
+                                'Cedar Blvd',
                                 style: TextStyle(
-                                  color: AppTheme.successLight,
-                                  fontSize: 12,
+                                  color: context.textPrimary,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                '~3 minutes away · 07:37 AM scheduled',
+                                style: TextStyle(
+                                  color: AppTheme.driverAccent,
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: 0.55,
-                              backgroundColor: context.cardBgElevated,
-                              valueColor: const AlwaysStoppedAnimation(
-                                AppTheme.success,
+                        ),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppTheme.driverCyan.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '→',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 16,
                               ),
-                              minHeight: 8,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _RouteStatChip(
-                            icon: 'assets/images/utilities/check.png',
-                            label: AppStrings.t('stops_done'),
-                            value: '3/5',
-                          ),
-                          const SizedBox(width: 8),
-                          _RouteStatChip(
-                            icon: 'assets/images/navbar/student.png',
-                            label: AppStrings.t('students'),
-                            value: '18/22',
-                          ),
-                          const SizedBox(width: 8),
-                          _RouteStatChip(
-                            icon: 'assets/images/stats/on_time.png',
-                            label: AppStrings.t('time_left'),
-                            value: '15 min',
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // ── Next stop card ────────────────────────────────────────
-                GlassCard(
-                  onTap: () => widget.onNavigate(2),
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.driverCyan.withOpacity(0.15),
-                      AppTheme.driverTeal.withOpacity(0.08),
-                    ],
-                  ),
-                  borderColor: AppTheme.driverCyan.withOpacity(0.25),
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.driverGradient,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.driverCyan.withOpacity(0.3),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
+                  // ── Quick actions ─────────────────────────────────────────
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.t('quick_actions'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 2.0,
+                          children: [
+                            _QuickActionBtn(
+                              icon: 'assets/images/utilities/emergency.png',
+                              label: AppStrings.t('emergency'),
+                              color: AppTheme.error,
+                              onTap: _onEmergency,
+                            ),
+                            _QuickActionBtn(
+                              icon: 'assets/images/alert.png',
+                              label: AppStrings.t('alert_all'),
+                              color: AppTheme.warning,
+                              onTap: _onAlertAll,
+                            ),
+                            _QuickActionBtn(
+                              icon:
+                                  'assets/images/navbar/track_transparent.png',
+                              label: AppStrings.t('share_location'),
+                              color: AppTheme.success,
+                              onTap: _onShareLocation,
+                            ),
+                            _QuickActionBtn(
+                              icon: 'assets/images/utilities/edit_pencil.png',
+                              label: AppStrings.t('update_route'),
+                              color: AppTheme.info,
+                              onTap: _onUpdateRoute,
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Image.asset(
-                            'assets/images/utilities/next_stop.png',
-                            width: 28,
-                            height: 28,
-                            fit: BoxFit.contain,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Today's stats ─────────────────────────────────────────
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.t('todays_stats'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                        const SizedBox(height: 14),
+                        _StatBar(
+                          label: AppStrings.t('students_picked'),
+                          value: 18,
+                          total: 22,
+                          color: AppTheme.success,
+                          suffix: null,
+                        ),
+                        const SizedBox(height: 12),
+                        _StatBar(
+                          label: AppStrings.t('route_completion'),
+                          value: 55,
+                          total: 100,
+                          color: AppTheme.driverAccent,
+                          suffix: '%',
+                        ),
+                        const SizedBox(height: 12),
+                        _StatBar(
+                          label: AppStrings.t('on_time_perf'),
+                          value: 96,
+                          total: 100,
+                          color: AppTheme.parentAccent,
+                          suffix: '%',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Start/End route button ─────────────────────────────────
+                  GestureDetector(
+                    onTap: () => setState(() => _routeStarted = !_routeStarted),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: _routeStarted
+                              ? [
+                                  const Color(0xFFEF4444),
+                                  const Color(0xFFB91C1C),
+                                ]
+                              : [
+                                  const Color(0xFF10B981),
+                                  const Color(0xFF059669),
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color:
+                                (_routeStarted
+                                        ? AppTheme.error
+                                        : AppTheme.success)
+                                    .withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              AppStrings.t('next_stop'),
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
+                            Image.asset(
+                              'assets/images/route_in_progress.png',
+                              width: 22,
+                              height: 22,
+                              cacheWidth: 44,
+                              cacheHeight: 44,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(width: 10),
                             Text(
-                              'Cedar Blvd',
+                              _routeStarted
+                                  ? AppStrings.t('end_route')
+                                  : AppStrings.t('start_route'),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              '~3 minutes away · 07:37 AM scheduled',
-                              style: TextStyle(
-                                color: AppTheme.driverAccent,
-                                fontSize: 12,
-                              ),
-                            ),
                           ],
                         ),
                       ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppTheme.driverCyan.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '→',
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Quick actions ─────────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.t('quick_actions'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 2.0,
-                        children: [
-                          _QuickActionBtn(
-                            icon: 'assets/images/utilities/emergency.png',
-                            label: AppStrings.t('emergency'),
-                            color: AppTheme.error,
-                            onTap: _onEmergency,
-                          ),
-                          _QuickActionBtn(
-                            icon: 'assets/images/alert.png',
-                            label: AppStrings.t('alert_all'),
-                            color: AppTheme.warning,
-                            onTap: _onAlertAll,
-                          ),
-                          _QuickActionBtn(
-                            icon: 'assets/images/navbar/track_transparent.png',
-                            label: AppStrings.t('share_location'),
-                            color: AppTheme.success,
-                            onTap: _onShareLocation,
-                          ),
-                          _QuickActionBtn(
-                            icon: 'assets/images/utilities/edit_pencil.png',
-                            label: AppStrings.t('update_route'),
-                            color: AppTheme.info,
-                            onTap: _onUpdateRoute,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Today's stats ─────────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.t('todays_stats'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _StatBar(
-                        label: AppStrings.t('students_picked'),
-                        value: 18,
-                        total: 22,
-                        color: AppTheme.success,
-                        suffix: null,
-                      ),
-                      const SizedBox(height: 12),
-                      _StatBar(
-                        label: AppStrings.t('route_completion'),
-                        value: 55,
-                        total: 100,
-                        color: AppTheme.driverAccent,
-                        suffix: '%',
-                      ),
-                      const SizedBox(height: 12),
-                      _StatBar(
-                        label: AppStrings.t('on_time_perf'),
-                        value: 96,
-                        total: 100,
-                        color: AppTheme.parentAccent,
-                        suffix: '%',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Start/End route button ─────────────────────────────────
-                GestureDetector(
-                  onTap: () => setState(() => _routeStarted = !_routeStarted),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _routeStarted
-                            ? [const Color(0xFFEF4444), const Color(0xFFB91C1C)]
-                            : [
-                                const Color(0xFF10B981),
-                                const Color(0xFF059669),
-                              ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                              (_routeStarted
-                                      ? AppTheme.error
-                                      : AppTheme.success)
-                                  .withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Image.asset(
-                            'assets/images/route_in_progress.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            _routeStarted
-                                ? AppStrings.t('end_route')
-                                : AppStrings.t('start_route'),
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -618,7 +620,15 @@ class _RouteStatChip extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Image.asset(icon, width: 20, height: 20, fit: BoxFit.contain),
+            Image.asset(
+              icon,
+              width: 20,
+              height: 20,
+              cacheWidth: 40,
+              cacheHeight: 40,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+            ),
             const SizedBox(height: 4),
             Text(
               value,
@@ -663,7 +673,15 @@ class _QuickActionBtn extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Image.asset(icon, width: 26, height: 26, fit: BoxFit.contain),
+            Image.asset(
+              icon,
+              width: 26,
+              height: 26,
+              cacheWidth: 52,
+              cacheHeight: 52,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+            ),
             const SizedBox(width: 10),
             Flexible(
               child: Text(

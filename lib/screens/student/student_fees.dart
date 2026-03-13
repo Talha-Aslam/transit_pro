@@ -61,6 +61,7 @@ class _StudentFeesState extends State<StudentFees> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
+              enableBlur: false,
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -453,6 +454,7 @@ class _StatPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: GlassCard(
+        enableBlur: false,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         child: Column(
           children: [

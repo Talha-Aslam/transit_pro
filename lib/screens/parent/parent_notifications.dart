@@ -23,15 +23,12 @@ class _ParentNotificationsState extends State<ParentNotifications> {
   @override
   void initState() {
     super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
     _svc.init();
     _svc.history.addListener(_onHistoryChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onUnreadChanged?.call(_svc.unreadCount);
     });
   }
-
-  void _onLangChanged() => setState(() {});
 
   void _onHistoryChanged() {
     widget.onUnreadChanged?.call(_svc.unreadCount);
@@ -40,7 +37,6 @@ class _ParentNotificationsState extends State<ParentNotifications> {
 
   @override
   void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
     _svc.history.removeListener(_onHistoryChanged);
     super.dispose();
   }
@@ -63,228 +59,240 @@ class _ParentNotificationsState extends State<ParentNotifications> {
   Widget build(BuildContext context) {
     final unread = _svc.unreadCount;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Header ───────────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.parentPurple.withOpacity(0.2),
-                  Colors.transparent,
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Column(
+          children: [
+            // ── Header ───────────────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppTheme.parentPurple.withOpacity(0.2),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: widget.onBack,
+                    child: _backBtn(context),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          AppStrings.t('notifications'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        if (unread > 0) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$unread',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (unread > 0)
+                    GestureDetector(
+                      onTap: () {
+                        _svc.markAllRead();
+                        widget.onUnreadChanged?.call(0);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.parentAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.parentAccent.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          AppStrings.t('mark_all_read'),
+                          style: TextStyle(
+                            color: AppTheme.parentAccent,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
-            child: Row(
-              children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Text(
-                        AppStrings.t('notifications'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (unread > 0) ...[
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.error,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$unread',
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (unread > 0)
-                  GestureDetector(
-                    onTap: () {
-                      _svc.markAllRead();
-                      widget.onUnreadChanged?.call(0);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.parentAccent.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppTheme.parentAccent.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Text(
-                        AppStrings.t('mark_all_read'),
-                        style: TextStyle(
-                          color: AppTheme.parentAccent,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Filters
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children:
-                        {
-                          'All': AppStrings.t('all'),
-                          'Unread': AppStrings.t('unread'),
-                          'Today': AppStrings.t('today'),
-                          'Alerts': AppStrings.t('alerts'),
-                        }.entries.map((e) {
-                          final f = e.key;
-                          final label = e.value;
-                          final active = _activeFilter == f;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: GestureDetector(
-                              onTap: () => setState(() => _activeFilter = f),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: active
-                                      ? AppTheme.parentPurple.withOpacity(0.2)
-                                      : Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Filters
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children:
+                          {
+                            'All': AppStrings.t('all'),
+                            'Unread': AppStrings.t('unread'),
+                            'Today': AppStrings.t('today'),
+                            'Alerts': AppStrings.t('alerts'),
+                          }.entries.map((e) {
+                            final f = e.key;
+                            final label = e.value;
+                            final active = _activeFilter == f;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: GestureDetector(
+                                onTap: () => setState(() => _activeFilter = f),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
                                     color: active
-                                        ? AppTheme.parentPurple.withOpacity(0.5)
-                                        : Colors.white.withOpacity(0.1),
+                                        ? AppTheme.parentPurple.withOpacity(0.2)
+                                        : Colors.white.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: active
+                                          ? AppTheme.parentPurple.withOpacity(
+                                              0.5,
+                                            )
+                                          : Colors.white.withOpacity(0.1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: active
+                                          ? AppTheme.parentAccent
+                                          : context.textSecondary,
+                                      fontSize: 13,
+                                      fontWeight: active
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
                                   ),
                                 ),
-                                child: Text(
-                                  label,
-                                  style: TextStyle(
-                                    color: active
-                                        ? AppTheme.parentAccent
-                                        : context.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: active
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Grouped by date
+                  for (final date in ['Today', 'Yesterday', 'Mon, Feb 23']) ...[
+                    Builder(
+                      builder: (context) {
+                        final group = _filtered
+                            .where((n) => n.date == date)
+                            .toList();
+                        if (group.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                date,
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            ...group.map(
+                              (n) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: RepaintBoundary(
+                                  child: _NotifCard(
+                                    notif: n,
+                                    onTap: () {
+                                      n.read = true;
+                                      _svc.history.value = List.from(
+                                        _svc.history.value,
+                                      );
+                                      widget.onUnreadChanged?.call(
+                                        _svc.unreadCount,
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
                             ),
-                          );
-                        }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 14),
+                            const SizedBox(height: 8),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
 
-                // Grouped by date
-                for (final date in ['Today', 'Yesterday', 'Mon, Feb 23']) ...[
-                  Builder(
-                    builder: (context) {
-                      final group = _filtered
-                          .where((n) => n.date == date)
-                          .toList();
-                      if (group.isEmpty) return const SizedBox.shrink();
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              date,
+                  if (_filtered.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Column(
+                          children: [
+                            Image.asset(
+                              'assets/images/notification_bell_off.png',
+                              width: 90,
+                              height: 90,
+                              cacheWidth: 180,
+                              cacheHeight: 180,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              AppStrings.t('no_notifs'),
                               style: TextStyle(
                                 color: context.textTertiary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                                fontSize: 14,
                               ),
                             ),
-                          ),
-                          ...group.map(
-                            (n) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _NotifCard(
-                                notif: n,
-                                onTap: () {
-                                  n.read = true;
-                                  _svc.history.value = List.from(
-                                    _svc.history.value,
-                                  );
-                                  widget.onUnreadChanged?.call(
-                                    _svc.unreadCount,
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-
-                if (_filtered.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40),
-                      child: Column(
-                        children: [
-                          Image.asset(
-                            'assets/images/notification_bell_off.png',
-                            width: 90,
-                            height: 90,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            AppStrings.t('no_notifs'),
-                            style: TextStyle(
-                              color: context.textTertiary,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

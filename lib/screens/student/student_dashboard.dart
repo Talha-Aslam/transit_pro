@@ -16,20 +16,6 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   @override
-  void initState() {
-    super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
-  }
-
-  void _onLangChanged() => setState(() {});
-
-  @override
-  void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -38,268 +24,125 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ? AppStrings.t('good_afternoon')
         : AppStrings.t('good_evening');
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        children: [
-          // ── Header ──────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppTheme.studentAmber.withOpacity(0.2),
-                  Colors.transparent,
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Column(
+          children: [
+            // ── Header ──────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppTheme.studentAmber.withOpacity(0.2),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$greeting',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Noorulain',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: context.cardBgElevated,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: context.inputBorder),
+                    ),
+                    child: const Center(
+                      child: Text('🔔', style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
                 ],
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$greeting',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Noorulain',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: context.cardBgElevated,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: context.inputBorder),
-                  ),
-                  child: const Center(
-                    child: Text('🔔', style: TextStyle(fontSize: 18)),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                // ── Bus status card ───────────────────────────
-                GlassCard(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.success.withOpacity(0.15),
-                      AppTheme.success.withOpacity(0.05),
-                    ],
-                  ),
-                  borderColor: AppTheme.success.withOpacity(0.25),
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.studentGradient,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.studentAmber.withOpacity(0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Text('🚌', style: TextStyle(fontSize: 26)),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Bus #42 · Route A',
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const Spacer(),
-                                StatusBadge(
-                                  label: '● On Route',
-                                  color: AppTheme.success,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Arriving in 8 min · Pine Road Stop',
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── ETA Card ──────────────────────────────────
-                GestureDetector(
-                  onTap: () => widget.onNavigate(1),
-                  child: GlassCard(
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  // ── Bus status card ───────────────────────────
+                  GlassCard(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.studentAmber.withOpacity(0.15),
-                        AppTheme.studentOrange.withOpacity(0.08),
+                        AppTheme.success.withOpacity(0.15),
+                        AppTheme.success.withOpacity(0.05),
                       ],
                     ),
-                    borderColor: AppTheme.studentAmber.withOpacity(0.25),
+                    borderColor: AppTheme.success.withOpacity(0.25),
                     padding: const EdgeInsets.all(18),
                     child: Row(
                       children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.studentGradient,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.studentAmber.withOpacity(0.3),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Text('🚌', style: TextStyle(fontSize: 26)),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'NEXT STOP',
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 11,
-                                  letterSpacing: 0.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
                                 children: [
-                                  ShaderMask(
-                                    shaderCallback: (b) => const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFBBF24),
-                                        Color(0xFFF59E0B),
-                                      ],
-                                    ).createShader(b),
-                                    child: Text(
-                                      '8 min',
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                                  Text(
+                                    'Bus #42 · Route A',
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    AppStrings.t('to_school'),
-                                    style: TextStyle(
-                                      color: context.textSecondary,
-                                      fontSize: 13,
-                                    ),
+                                  const Spacer(),
+                                  StatusBadge(
+                                    label: '● On Route',
+                                    color: AppTheme.success,
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 4),
                               Text(
-                                '📍 Currently at Pine Road Stop',
-                                style: TextStyle(
-                                  color: context.textTertiary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppTheme.studentAccent.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '→',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── QR Pass quick action ──────────────────────
-                GestureDetector(
-                  onTap: () => widget.onNavigate(3),
-                  child: GlassCard(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.purple.withOpacity(0.15),
-                        AppTheme.info.withOpacity(0.08),
-                      ],
-                    ),
-                    borderColor: AppTheme.purple.withOpacity(0.25),
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.mainGradient,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Center(
-                            child: Text('📱', style: TextStyle(fontSize: 24)),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.t('my_qr_pass'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Show QR for check-in/check-out',
+                                'Arriving in 8 min · Pine Road Stop',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -308,228 +151,378 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             ],
                           ),
                         ),
-                        Text(
-                          '→',
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 18,
-                          ),
-                        ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // ── Missed Bus quick action ────────────────────
-                GestureDetector(
-                  onTap: () => context.push('/student/missed-bus'),
-                  child: GlassCard(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.error.withOpacity(0.15),
-                        AppTheme.warning.withOpacity(0.08),
-                      ],
-                    ),
-                    borderColor: AppTheme.error.withOpacity(0.25),
-                    padding: const EdgeInsets.all(18),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.error, Color(0xFFFF6B35)],
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Center(
-                            child: Text('🚌', style: TextStyle(fontSize: 24)),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Missed Your Bus?',
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Request a pickup from a nearby bus',
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          '→',
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── Today's schedule ──────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // ── ETA Card ──────────────────────────────────
+                  GestureDetector(
+                    onTap: () => widget.onNavigate(1),
+                    child: GlassCard(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.studentAmber.withOpacity(0.15),
+                          AppTheme.studentOrange.withOpacity(0.08),
+                        ],
+                      ),
+                      borderColor: AppTheme.studentAmber.withOpacity(0.25),
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
                         children: [
-                          Text(
-                            "Today's Schedule",
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => widget.onNavigate(2),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.studentAccent.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: AppTheme.studentAccent.withOpacity(
-                                    0.3,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'NEXT STOP',
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 11,
+                                    letterSpacing: 0.5,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    ShaderMask(
+                                      shaderCallback: (b) =>
+                                          const LinearGradient(
+                                            colors: [
+                                              Color(0xFFFBBF24),
+                                              Color(0xFFF59E0B),
+                                            ],
+                                          ).createShader(b),
+                                      child: Text(
+                                        '8 min',
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      AppStrings.t('to_school'),
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  '📍 Currently at Pine Road Stop',
+                                  style: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.studentAccent.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
                               child: Text(
-                                AppStrings.t('view_all'),
+                                '→',
                                 style: TextStyle(
-                                  color: AppTheme.studentAccent,
-                                  fontSize: 12,
+                                  color: context.textPrimary,
+                                  fontSize: 20,
                                 ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      _ScheduleItem(
-                        icon: '🌅',
-                        label: 'Pickup',
-                        time: '07:15 AM',
-                        status: 'Done',
-                        color: AppTheme.success,
-                      ),
-                      _ScheduleItem(
-                        icon: '🏫',
-                        label: 'At School',
-                        time: '07:45 AM',
-                        status: 'Done',
-                        color: AppTheme.success,
-                      ),
-                      _ScheduleItem(
-                        icon: '🌇',
-                        label: 'Drop Off',
-                        time: '03:30 PM',
-                        status: 'Upcoming',
-                        color: AppTheme.warning,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // ── Stats grid ────────────────────────────────
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 2.2,
-                  children: [
-                    _StatCard(
-                      icon: '🚌',
-                      label: AppStrings.t('total_rides'),
-                      value: '142',
-                      color: AppTheme.studentAmber,
+                  // ── QR Pass quick action ──────────────────────
+                  GestureDetector(
+                    onTap: () => widget.onNavigate(3),
+                    child: GlassCard(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.purple.withOpacity(0.15),
+                          AppTheme.info.withOpacity(0.08),
+                        ],
+                      ),
+                      borderColor: AppTheme.purple.withOpacity(0.25),
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.mainGradient,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Center(
+                              child: Text('📱', style: TextStyle(fontSize: 24)),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.t('my_qr_pass'),
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Show QR for check-in/check-out',
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '→',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    _StatCard(
-                      icon: '⏱️',
-                      label: 'On-Time',
-                      value: '96%',
-                      color: AppTheme.success,
-                    ),
-                    _StatCard(
-                      icon: '📱',
-                      label: 'Check-ins',
-                      value: '140',
-                      color: AppTheme.info,
-                    ),
-                    _StatCard(
-                      icon: '💰',
-                      label: 'Fees Paid',
-                      value: '₹3.5K',
-                      color: AppTheme.purple,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 12),
 
-                // ── Recent activity ───────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Recent Activity',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                  // ── Missed Bus quick action ────────────────────
+                  GestureDetector(
+                    onTap: () => context.push('/student/missed-bus'),
+                    child: GlassCard(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.error.withOpacity(0.15),
+                          AppTheme.warning.withOpacity(0.08),
+                        ],
+                      ),
+                      borderColor: AppTheme.error.withOpacity(0.25),
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [AppTheme.error, Color(0xFFFF6B35)],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Center(
+                              child: Text('🚌', style: TextStyle(fontSize: 24)),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Missed Your Bus?',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Request a pickup from a nearby bus',
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '→',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Today's schedule ──────────────────────────
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Today's Schedule",
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => widget.onNavigate(2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.studentAccent.withOpacity(
+                                    0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppTheme.studentAccent.withOpacity(
+                                      0.3,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  AppStrings.t('view_all'),
+                                  style: TextStyle(
+                                    color: AppTheme.studentAccent,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 14),
+                        _ScheduleItem(
+                          icon: '🌅',
+                          label: 'Pickup',
+                          time: '07:15 AM',
+                          status: 'Done',
+                          color: AppTheme.success,
+                        ),
+                        _ScheduleItem(
+                          icon: '🏫',
+                          label: 'At School',
+                          time: '07:45 AM',
+                          status: 'Done',
+                          color: AppTheme.success,
+                        ),
+                        _ScheduleItem(
+                          icon: '🌇',
+                          label: 'Drop Off',
+                          time: '03:30 PM',
+                          status: 'Upcoming',
+                          color: AppTheme.warning,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Stats grid ────────────────────────────────
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 2.2,
+                    children: [
+                      _StatCard(
+                        icon: '🚌',
+                        label: AppStrings.t('total_rides'),
+                        value: '142',
+                        color: AppTheme.studentAmber,
                       ),
-                      const SizedBox(height: 12),
-                      _ActivityRow(
-                        icon: '✅',
-                        msg: 'Checked in at Oak Street stop',
-                        time: '07:18 AM',
+                      _StatCard(
+                        icon: '⏱️',
+                        label: 'On-Time',
+                        value: '96%',
+                        color: AppTheme.success,
                       ),
-                      _ActivityRow(
-                        icon: '🏫',
-                        msg: 'Arrived at school',
-                        time: '07:42 AM',
+                      _StatCard(
+                        icon: '📱',
+                        label: 'Check-ins',
+                        value: '140',
+                        color: AppTheme.info,
                       ),
-                      _ActivityRow(
+                      _StatCard(
                         icon: '💰',
-                        msg: 'Feb fee paid successfully',
-                        time: 'Yesterday',
+                        label: 'Fees Paid',
+                        value: '₹3.5K',
+                        color: AppTheme.purple,
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+
+                  // ── Recent activity ───────────────────────────
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Recent Activity',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _ActivityRow(
+                          icon: '✅',
+                          msg: 'Checked in at Oak Street stop',
+                          time: '07:18 AM',
+                        ),
+                        _ActivityRow(
+                          icon: '🏫',
+                          msg: 'Arrived at school',
+                          time: '07:42 AM',
+                        ),
+                        _ActivityRow(
+                          icon: '💰',
+                          msg: 'Feb fee paid successfully',
+                          time: 'Yesterday',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -600,6 +593,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      enableBlur: false,
       padding: const EdgeInsets.all(12),
       gradient: LinearGradient(
         colors: [color.withOpacity(0.12), color.withOpacity(0.04)],

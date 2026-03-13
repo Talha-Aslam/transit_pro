@@ -24,20 +24,6 @@ class _DriverLayoutState extends State<DriverLayout> {
 
   void _goToTab(int index) => setState(() => _tab = index);
 
-  @override
-  void initState() {
-    super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
-  }
-
-  @override
-  void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
-    super.dispose();
-  }
-
-  void _onLangChanged() => setState(() {});
-
   List<_NavItem> get _navItems => [
     _NavItem(
       icon: 'assets/images/navbar/home_transparent.png',
@@ -74,7 +60,7 @@ class _DriverLayoutState extends State<DriverLayout> {
               DriverDashboard(onNavigate: _goToTab),
               DriverAttendance(onBack: () => _goToTab(0)),
               // DriverRoute hosts a GoogleMap platform view.
-              // Render it ONLY while the Route tab is active — this fully
+              // Render it ONLY while the Route tab is active - this fully
               // tears down the native MapView (and its TextureView render loop)
               // whenever the user is on any other tab.
               // DriverRoute.initState() calls TrackingService.start() and
@@ -102,94 +88,99 @@ class _DriverLayoutState extends State<DriverLayout> {
   }
 
   Widget _buildNav() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(40),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.isDark
-                    ? Colors.white.withOpacity(0.10)
-                    : Colors.white.withOpacity(0.55),
-                borderRadius: BorderRadius.circular(40),
-                border: Border.all(
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                decoration: BoxDecoration(
                   color: context.isDark
-                      ? Colors.white.withOpacity(0.18)
-                      : Colors.white.withOpacity(0.80),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
-                    blurRadius: 28,
-                    offset: const Offset(0, 8),
+                      ? Colors.white.withOpacity(0.10)
+                      : Colors.white.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(
+                    color: context.isDark
+                        ? Colors.white.withOpacity(0.18)
+                        : Colors.white.withOpacity(0.80),
+                    width: 1.5,
                   ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Row(
-                children: List.generate(_navItems.length, (i) {
-                  final isActive = _tab == i;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _goToTab(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeInOut,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 6,
-                          horizontal: 4,
-                        ),
-                        decoration: isActive
-                            ? BoxDecoration(
-                                color: context.isDark
-                                    ? Colors.white.withOpacity(0.20)
-                                    : Colors.white.withOpacity(0.72),
-                                borderRadius: BorderRadius.circular(30),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.10),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              )
-                            : null,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              _navItems[i].icon,
-                              width: isActive ? 28 : 22,
-                              height: isActive ? 28 : 22,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _navItems[i].label,
-                              style: TextStyle(
-                                color: isActive
-                                    ? AppTheme.driverAccent
-                                    : context.textTertiary,
-                                fontSize: isActive ? 10 : 9,
-                                fontWeight: isActive
-                                    ? FontWeight.w700
-                                    : FontWeight.w400,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 28,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(
+                  children: List.generate(_navItems.length, (i) {
+                    final isActive = _tab == i;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => _goToTab(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 4,
+                          ),
+                          decoration: isActive
+                              ? BoxDecoration(
+                                  color: context.isDark
+                                      ? Colors.white.withOpacity(0.20)
+                                      : Colors.white.withOpacity(0.72),
+                                  borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.10),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                )
+                              : null,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                _navItems[i].icon,
+                                width: isActive ? 28 : 22,
+                                height: isActive ? 28 : 22,
+                                cacheWidth: 60,
+                                cacheHeight: 60,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.medium,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ],
+                              const SizedBox(height: 2),
+                              Text(
+                                _navItems[i].label,
+                                style: TextStyle(
+                                  color: isActive
+                                      ? AppTheme.driverAccent
+                                      : context.textTertiary,
+                                  fontSize: isActive ? 10 : 9,
+                                  fontWeight: isActive
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
