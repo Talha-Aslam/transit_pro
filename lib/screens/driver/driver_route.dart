@@ -217,7 +217,7 @@ class _DriverRouteState extends State<DriverRoute> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
+      padding: const EdgeInsets.only(bottom: 150),
       child: Column(
         children: [
           // ── Header ────────────────────────────────────────────────────
