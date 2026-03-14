@@ -1,7 +1,8 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -19,7 +20,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeAnim;
   late Animation<double> _bounceAnim;
 
-  Timer? _navTimer;
   final _random = Random();
   late List<_FloatingDot> _dots;
 
@@ -44,16 +44,26 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
 
-    // Progress bar
+    // Progress bar — navigate when the bar finishes so they are perfectly synced
     _progressController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4000),
-    )..forward();
-
-    // Auto navigate after 4 seconds
-    _navTimer = Timer(const Duration(milliseconds: 4000), () {
-      if (mounted) context.go('/role-select');
+    );
+    _progressController.addStatusListener((status) async {
+      if (status == AnimationStatus.completed && mounted) {
+        final savedRole = await AuthService.instance.getSavedRole();
+        if (!mounted) return;
+        if (savedRole != null) {
+          if (!mounted) return;
+          context.go(AuthService.routeForRole(savedRole));
+        } else {
+          context.go('/role-select');
+        }
+      }
     });
+    _progressController.forward();
+
+    LanguageProvider.instance.addListener(_onLangChanged);
 
     // Generate floating dots
     _dots = List.generate(
@@ -72,9 +82,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     );
   }
 
+  void _onLangChanged() => setState(() {});
+
   @override
   void dispose() {
-    _navTimer?.cancel();
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _fadeController.dispose();
     _bounceController.dispose();
     _progressController.dispose();
@@ -87,7 +99,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: Stack(
           children: [
             // Pulsing rings
@@ -106,9 +118,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withOpacity(
-                              max(0.0, 0.15 - i * 0.02),
-                            ),
+                            color: context.isDark
+                                ? Colors.white.withOpacity(
+                                    max(0.0, 0.15 - i * 0.02),
+                                  )
+                                : Colors.black.withOpacity(
+                                    max(0.0, 0.08 - i * 0.01),
+                                  ),
                             width: 1,
                           ),
                         ),
@@ -155,52 +171,21 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         animation: _bounceAnim,
                         builder: (_, __) => Transform.translate(
                           offset: Offset(0, _bounceAnim.value),
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.mainGradient,
-                              borderRadius: BorderRadius.circular(32),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.purple.withOpacity(0.5),
-                                  blurRadius: 40,
-                                  offset: const Offset(0, 20),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Text('🚌', style: TextStyle(fontSize: 60)),
+                          child: Center(
+                            child: Image.asset(
+                              'assets/images/splash_screen/bus_splash_icon.png',
+                              width: 285,
+                              height: 300,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 28),
 
-                      // App name
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Color(0xFFC4B5FD),
-                            Color(0xFF93C5FD),
-                          ],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Transit Pro',
-                          style: TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: -1,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
+                      // const SizedBox(height: 2),
                       Text(
-                        'Safe Journeys · Happy Kids · Peace of Mind',
+                        AppStrings.t('safe_journeys'),
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.55),
+                          color: context.textSecondary,
                           fontSize: 14,
                           letterSpacing: 0.3,
                         ),
@@ -215,9 +200,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         alignment: WrapAlignment.center,
                         children:
                             [
-                                  '📍 Live Tracking',
-                                  '🔔 Alerts',
-                                  '🛡️ Safe & Secure',
+                                  AppStrings.t('pill_tracking'),
+                                  AppStrings.t('pill_alerts'),
+                                  AppStrings.t('pill_safe'),
                                 ]
                                 .map(
                                   (f) => Container(
@@ -226,16 +211,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       vertical: 7,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.07),
+                                      color: context.cardBg,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        color: Colors.white.withOpacity(0.12),
+                                        color: context.inputBorder,
                                       ),
                                     ),
                                     child: Text(
                                       f,
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.8),
+                                        color: context.textPrimary,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -244,69 +229,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 )
                                 .toList(),
                       ),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 26),
 
-                      // // Get Started button
-                      // GestureDetector(
-                      //   onTap: () => context.go('/role-select'),
-                      //   child: Container(
-                      //     padding: const EdgeInsets.symmetric(horizontal: 52, vertical: 18),
-                      //     decoration: BoxDecoration(
-                      //       gradient: AppTheme.mainGradient,
-                      //       borderRadius: BorderRadius.circular(50),
-                      //       boxShadow: [
-                      //         BoxShadow(
-                      //           color: AppTheme.purple.withOpacity(0.5),
-                      //           blurRadius: 28,
-                      //           offset: const Offset(0, 10),
-                      //         ),
-                      //       ],
-                      //     ),
-                      //     child: const Text(
-                      //       'Get Started →',
-                      //       style: TextStyle(
-                      //         color: Colors.white,
-                      //         fontSize: 16,
-                      //         fontWeight: FontWeight.w700,
-                      //         letterSpacing: 0.5,
-                      //       ),
-                      //     ),
-                      //   ),
-                      // ),
-                      const SizedBox(height: 14),
-
-                      // Progress bar + hint
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: SizedBox(
-                              width: 70,
-                              height: 3,
-                              child: AnimatedBuilder(
-                                animation: _progressController,
-                                builder: (_, __) => LinearProgressIndicator(
-                                  value: _progressController.value,
-                                  backgroundColor: Colors.white.withOpacity(
-                                    0.15,
-                                  ),
-                                  valueColor: const AlwaysStoppedAnimation(
-                                    AppTheme.purple,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // const SizedBox(width: 10),
-                          // Text(
-                          //   'Starting up...',
-                          //   style: TextStyle(
-                          //     color: Colors.white.withOpacity(0.3),
-                          //     fontSize: 11,
-                          //   ),
-                          // ),
-                        ],
+                      // Loading bar
+                      AnimatedBuilder(
+                        animation: _progressController,
+                        builder: (_, __) =>
+                            _LoadingBar(progress: _progressController.value),
                       ),
                     ],
                   ),
@@ -331,4 +260,40 @@ class _FloatingDot {
     required this.left,
     required this.top,
   });
+}
+
+class _LoadingBar extends StatelessWidget {
+  final double progress;
+  const _LoadingBar({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        final filled = constraints.maxWidth * progress.clamp(0.0, 1.0);
+        return Container(
+          height: 5,
+          decoration: BoxDecoration(
+            color: context.isDark
+                ? Colors.white.withOpacity(0.10)
+                : Colors.black.withOpacity(0.07),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Stack(
+            children: [
+              Container(
+                width: filled,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.purple, AppTheme.driverCyan],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

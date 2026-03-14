@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
+import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 
@@ -18,31 +20,43 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _showPass = false;
   String _error = '';
 
-  bool get _isParent => widget.role == 'parent';
+  static final _configs = {
+    'parent': _LoginConfig(
+      gradient: AppTheme.parentGradient,
+      glowColor: AppTheme.parentPurple,
+      accent: AppTheme.parentAccent,
+      icon: 'assets/images/role_selection/welcome_parent_transparent.gif',
+      title: 'Parent Login',
+      subtitle: "Access your child's journey",
+      demoEmail: 'sarah@example.com',
+      demoPass: 'parent123',
+      path: '/parent',
+    ),
+    'driver': _LoginConfig(
+      gradient: AppTheme.driverGradient,
+      glowColor: AppTheme.driverCyan,
+      accent: AppTheme.driverAccent,
+      icon: 'assets/images/role_selection/welcome_driver_transparent.gif',
+      title: 'Driver Login',
+      subtitle: 'Start your route today',
+      demoEmail: 'mike@transport.com',
+      demoPass: 'driver123',
+      path: '/driver',
+    ),
+    'student': _LoginConfig(
+      gradient: AppTheme.studentGradient,
+      glowColor: AppTheme.studentAmber,
+      accent: AppTheme.studentAccent,
+      icon: 'assets/images/role_selection/welcome_student_transparent.gif',
+      title: 'Student Login',
+      subtitle: 'Track your bus & attendance',
+      demoEmail: 'noorulain@school.com',
+      demoPass: 'student123',
+      path: '/student',
+    ),
+  };
 
-  _LoginConfig get _cfg => _isParent
-      ? _LoginConfig(
-          gradient: AppTheme.parentGradient,
-          glowColor: AppTheme.parentPurple,
-          accent: AppTheme.parentAccent,
-          icon: '👨‍👩‍👧',
-          title: 'Parent Login',
-          subtitle: "Access your child's journey",
-          demoEmail: 'sarah@example.com',
-          demoPass: 'parent123',
-          path: '/parent',
-        )
-      : _LoginConfig(
-          gradient: AppTheme.driverGradient,
-          glowColor: AppTheme.driverCyan,
-          accent: AppTheme.driverAccent,
-          icon: '🚌',
-          title: 'Driver Login',
-          subtitle: 'Start your route today',
-          demoEmail: 'mike@transport.com',
-          demoPass: 'driver123',
-          path: '/driver',
-        );
+  _LoginConfig get _cfg => _configs[widget.role] ?? _configs['parent']!;
 
   void _fillDemo() {
     _emailCtrl.text = _cfg.demoEmail;
@@ -50,9 +64,17 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _error = '');
   }
 
+  void _onLangChanged() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+  }
+
   void _login() {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      setState(() => _error = 'Please fill in all fields.');
+      setState(() => _error = AppStrings.t('fill_fields_login'));
       return;
     }
     setState(() {
@@ -61,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
+        AuthService.instance.saveRole(widget.role);
         setState(() => _loading = false);
         context.go(_cfg.path);
       }
@@ -69,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -78,8 +102,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: Stack(
+          fit: StackFit.expand,
           children: [
             // Glow blob
             Positioned(
@@ -118,17 +143,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           vertical: 9,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: context.cardBgElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                          ),
+                          border: Border.all(color: context.inputBorder),
                         ),
                         child: Text(
-                          '← Back',
+                          AppStrings.t('back'),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
+                            color: context.textPrimary,
                             fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -154,27 +178,30 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                             child: Center(
-                              child: Text(
+                              child: Image.asset(
                                 _cfg.icon,
-                                style: const TextStyle(fontSize: 36),
+                                width: 62,
+                                height: 62,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.high,
                               ),
                             ),
                           ),
                           const SizedBox(height: 20),
 
                           Text(
-                            _cfg.title,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            AppStrings.t('${widget.role}_login_title'),
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 28,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            _cfg.subtitle,
+                            AppStrings.t('${widget.role}_login_sub'),
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
+                              color: context.textSecondary,
                               fontSize: 14,
                             ),
                           ),
@@ -208,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '📋  USE DEMO ACCOUNT',
+                                    AppStrings.t('use_demo'),
                                     style: TextStyle(
                                       color: _cfg.accent,
                                       fontSize: 11,
@@ -220,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Text(
                                     '${_cfg.demoEmail}  ·  ${_cfg.demoPass}',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.5),
+                                      color: context.textSecondary,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -231,34 +258,34 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 22),
 
                           // Email
-                          _FieldLabel('EMAIL ADDRESS'),
+                          _FieldLabel(AppStrings.t('email_address')),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _emailCtrl,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 15,
                             ),
-                            decoration: const InputDecoration(
-                              hintText: 'Enter your email',
+                            decoration: InputDecoration(
+                              hintText: AppStrings.t('email_hint'),
                             ),
                           ),
                           const SizedBox(height: 16),
 
                           // Password
-                          _FieldLabel('PASSWORD'),
+                          _FieldLabel(AppStrings.t('password_lbl')),
                           const SizedBox(height: 8),
                           TextField(
                             controller: _passCtrl,
                             obscureText: !_showPass,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: context.textPrimary,
                               fontSize: 15,
                             ),
                             onSubmitted: (_) => _login(),
                             decoration: InputDecoration(
-                              hintText: 'Enter your password',
+                              hintText: AppStrings.t('password_hint'),
                               suffixIcon: GestureDetector(
                                 onTap: () =>
                                     setState(() => _showPass = !_showPass),
@@ -266,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _showPass
                                       ? Icons.visibility_off
                                       : Icons.visibility,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: context.textTertiary,
                                   size: 20,
                                 ),
                               ),
@@ -278,9 +305,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: GestureDetector(
-                              onTap: () {},
+                              onTap: () => context.push('/forgot-password'),
                               child: Text(
-                                'Forgot password?',
+                                AppStrings.t('forgot_password'),
                                 style: TextStyle(
                                   color: _cfg.accent,
                                   fontSize: 13,
@@ -306,10 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Text(
-                                    '⚠️  ',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
+                                  Text('⚠️  ', style: TextStyle(fontSize: 13)),
                                   Text(
                                     _error,
                                     style: const TextStyle(
@@ -325,13 +349,83 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Login button
                           GradientButton(
-                            label: _isParent
-                                ? 'Sign In as Parent →'
-                                : 'Sign In as Driver →',
+                            label: AppStrings.t('signin_as_${widget.role}'),
                             gradient: _cfg.gradient,
                             glowColor: _cfg.glowColor,
                             isLoading: _loading,
                             onTap: _login,
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Google Login Option
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: context.surfaceBorder,
+                                  thickness: 1,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: Text(
+                                  'Or continue with',
+                                  style: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: context.surfaceBorder,
+                                  thickness: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          GestureDetector(
+                            onTap: () {
+                              // Perform Google Sign-In logic and map to correct role
+                              _login();
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: context.cardBgElevated,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.inputBorder),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    'assets/images/utilities/google.png',
+                                    height: 20,
+                                    width: 20,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.g_mobiledata,
+                                              size: 24,
+                                            ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Google',
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -340,10 +434,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Center(
                       child: Text(
                         '🔒  256-bit encrypted · GDPR compliant',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.25),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: context.textHint, fontSize: 12),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -367,7 +458,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-        color: Colors.white.withOpacity(0.6),
+        color: context.textSecondary,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.8,

@@ -1,11 +1,14 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/auth_service.dart';
+import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'parent_dashboard.dart';
 import 'parent_tracking.dart';
 import 'parent_schedule.dart';
 import 'parent_notifications.dart';
+import 'parent_fees.dart';
 import 'parent_profile.dart';
 
 class ParentLayout extends StatefulWidget {
@@ -17,34 +20,70 @@ class ParentLayout extends StatefulWidget {
 
 class _ParentLayoutState extends State<ParentLayout> {
   int _tab = 0;
+  int _unreadCount = 3; // matches initial unread notifs count
+
+  static const int _trackTab = 1;
 
   void _goToTab(int index) => setState(() => _tab = index);
+  void _onUnreadChanged(int count) => setState(() => _unreadCount = count);
 
-  final _navItems = const [
-    _NavItem(icon: '🏠', label: 'Home'),
-    _NavItem(icon: '📍', label: 'Track'),
-    _NavItem(icon: '📅', label: 'Schedule'),
-    _NavItem(icon: '🔔', label: 'Alerts'),
-    _NavItem(icon: '👤', label: 'Profile'),
+  List<_NavItem> get _navItems => [
+    _NavItem(
+      icon: 'assets/images/navbar/home_transparent.png',
+      label: AppStrings.t('nav_home'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/track_transparent.png',
+      label: AppStrings.t('nav_track'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/calendar_transparent.png',
+      label: AppStrings.t('nav_schedule'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/notification_transparent.png',
+      label: AppStrings.t('nav_alerts'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/fees.png',
+      label: AppStrings.t('nav_fees'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/user_transparent.png',
+      label: AppStrings.t('nav_profile'),
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: AppTheme.bgDecoration,
+        decoration: context.scaffoldBg,
         child: SafeArea(
           bottom: false,
           child: IndexedStack(
             index: _tab,
             children: [
-              ParentDashboard(onNavigate: _goToTab),
-              ParentTracking(onBack: () => _goToTab(0)),
+              ParentDashboard(onNavigate: _goToTab, unreadCount: _unreadCount),
+              // ParentTracking hosts a GoogleMap platform view.
+              // Render it ONLY while the Track tab is active so the native
+              // MapView/TextureView render loop is fully stopped on other tabs.
+              if (_tab == _trackTab)
+                ParentTracking(onBack: () => _goToTab(0))
+              else
+                const SizedBox.shrink(),
               ParentSchedule(onBack: () => _goToTab(0)),
-              ParentNotifications(onBack: () => _goToTab(0)),
+              ParentNotifications(
+                onBack: () => _goToTab(0),
+                onUnreadChanged: _onUnreadChanged,
+              ),
+              const StudentFees(),
               ParentProfile(
                 onNavigate: _goToTab,
-                onLogout: () => context.go('/role-select'),
+                onLogout: () {
+                  AuthService.instance.clearRole();
+                  context.go('/role-select');
+                },
               ),
             ],
           ),
@@ -56,64 +95,99 @@ class _ParentLayoutState extends State<ParentLayout> {
   }
 
   Widget _buildNav() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.45),
-            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: List.generate(_navItems.length, (i) {
-                  final isActive = _tab == i;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _goToTab(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.all(8),
-                              decoration: isActive
-                                  ? BoxDecoration(
-                                      color: AppTheme.parentPurple.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    )
-                                  : null,
-                              child: Text(
+    return ListenableBuilder(
+      listenable: LanguageProvider.instance,
+      builder: (context, _) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(40),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? Colors.white.withOpacity(0.10)
+                      : Colors.white.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(
+                    color: context.isDark
+                        ? Colors.white.withOpacity(0.18)
+                        : Colors.white.withOpacity(0.80),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 28,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(
+                  children: List.generate(_navItems.length, (i) {
+                    final isActive = _tab == i;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => _goToTab(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                            horizontal: 4,
+                          ),
+                          decoration: isActive
+                              ? BoxDecoration(
+                                  color: context.isDark
+                                      ? Colors.white.withOpacity(0.20)
+                                      : Colors.white.withOpacity(0.72),
+                                  borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.10),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                )
+                              : null,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
                                 _navItems[i].icon,
+                                width: isActive ? 26 : 22,
+                                height: isActive ? 26 : 22,
+                                cacheWidth: 56,
+                                cacheHeight: 56,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.medium,
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                _navItems[i].label,
                                 style: TextStyle(
-                                  fontSize: isActive ? 22 : 20,
+                                  color: isActive
+                                      ? AppTheme.parentAccent
+                                      : context.textTertiary,
+                                  fontSize: isActive ? 10 : 9,
+                                  fontWeight: isActive
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              _navItems[i].label,
-                              style: TextStyle(
-                                color: isActive
-                                    ? AppTheme.parentAccent
-                                    : Colors.white.withOpacity(0.4),
-                                fontSize: 10,
-                                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ),
               ),
             ),
           ),

@@ -1,5 +1,13 @@
-import 'dart:math';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../app/language_provider.dart';
+import '../../app/tracking_service.dart';
+import '../../app/geofence_service.dart';
+import '../../app/notification_service.dart';
+import '../../models/route_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -11,29 +19,198 @@ class DriverRoute extends StatefulWidget {
   State<DriverRoute> createState() => _DriverRouteState();
 }
 
-class _DriverRouteState extends State<DriverRoute>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _busController;
-  int _speed = 35;
-  final _random = Random();
+class _DriverRouteState extends State<DriverRoute> {
+  final _tracking = TrackingService.instance;
+  final _geofence = GeofenceService.instance;
+  final _notifSvc = NotificationService.instance;
+
+  GoogleMapController? _mapController;
+  String? _mapStyle;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  bool _sharingLocation = true;
+  bool _followCamera = true;
+  BitmapDescriptor? _busIcon;
 
   @override
   void initState() {
     super.initState();
-    _busController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    )..repeat();
-    _busController.addListener(() {
-      if (mounted && (_busController.value * 100).round() % 5 == 0) {
-        setState(() => _speed = 30 + _random.nextInt(15));
-      }
+    LanguageProvider.instance.addListener(_onLangChanged);
+    _notifSvc.init();
+
+    rootBundle.loadString('assets/map_style.json').then((style) {
+      _mapStyle = style;
+      _mapController?.setMapStyle(style);
     });
+
+    final route = MockRouteBuilder.buildMorningRoute();
+    _tracking.start(route);
+
+    _tracking.busPosition.addListener(_onBusPositionChanged);
+    _geofence.alerts.addListener(_onGeofenceAlert);
+
+    _createBusIcon().then((_) {
+      _buildMapOverlays();
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Renders a cyan circle bus icon on a Flutter canvas and converts it to a
+  /// [BitmapDescriptor] used as the live bus marker on the map.
+  Future<void> _createBusIcon() async {
+    const size = 52.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Filled circle
+    canvas.drawCircle(
+      const Offset(26, 26),
+      22,
+      Paint()..color = AppTheme.driverCyan,
+    );
+    // White border
+    canvas.drawCircle(
+      const Offset(26, 26),
+      22,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+    // Bus body
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTRB(10, 15, 42, 31),
+        const Radius.circular(4),
+      ),
+      Paint()..color = Colors.white,
+    );
+    // Windows
+    final winPaint = Paint()..color = AppTheme.driverCyan;
+    for (final left in [13.0, 22.0, 31.0]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(left, 17, left + 7, 23),
+          const Radius.circular(2),
+        ),
+        winPaint,
+      );
+    }
+    // Wheels
+    final wheelPaint = Paint()..color = const Color(0xFF333333);
+    canvas.drawCircle(const Offset(17, 31), 4, wheelPaint);
+    canvas.drawCircle(const Offset(33, 31), 4, wheelPaint);
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    if (bytes != null && mounted) {
+      _busIcon = BitmapDescriptor.fromBytes(bytes.buffer.asUint8List());
+    }
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  void _onBusPositionChanged() {
+    _buildMapOverlays();
+    _geofence.evaluate(_tracking.busPosition.value, _tracking.route.stops);
+    if (_followCamera) {
+      _mapController?.moveCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _tracking.busPosition.value,
+            zoom: 15.5,
+            bearing: _tracking.busHeading.value,
+            tilt: 30,
+          ),
+        ),
+      );
+    }
+    setState(() {});
+  }
+
+  void _onGeofenceAlert() {
+    final alerts = _geofence.alerts.value;
+    if (alerts.isNotEmpty) {
+      _notifSvc.fromGeofence(alerts.last);
+    }
+  }
+
+  void _buildMapOverlays() {
+    final route = _tracking.route;
+    final busPos = _tracking.busPosition.value;
+
+    final markers = <Marker>{};
+    for (final stop in route.stops) {
+      markers.add(
+        Marker(
+          markerId: MarkerId(stop.name),
+          position: stop.location,
+          icon: BitmapDescriptor.defaultMarkerWithHue(switch (stop.status) {
+            StopStatus.completed => BitmapDescriptor.hueGreen,
+            StopStatus.current => BitmapDescriptor.hueViolet,
+            StopStatus.upcoming => BitmapDescriptor.hueCyan,
+            StopStatus.destination => BitmapDescriptor.hueOrange,
+          }),
+          infoWindow: InfoWindow(
+            title: stop.name,
+            snippet: '${stop.scheduledTime} · ${stop.studentCount} students',
+          ),
+        ),
+      );
+    }
+
+    markers.add(
+      Marker(
+        markerId: const MarkerId('bus'),
+        position: busPos,
+        icon:
+            _busIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+        rotation: _tracking.busHeading.value,
+        anchor: const Offset(0.5, 0.5),
+        infoWindow: const InfoWindow(title: '🚌 Your Bus'),
+        zIndex: 10,
+      ),
+    );
+
+    final polylines = <Polyline>{
+      Polyline(
+        polylineId: const PolylineId('route'),
+        points: route.polylinePoints,
+        color: const Color(0xFF0EA5E9),
+        width: 4,
+        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+      ),
+    };
+
+    final completedIdx = _tracking.waypointIndex;
+    if (completedIdx > 0) {
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('completed'),
+          points: route.polylinePoints.sublist(
+            0,
+            (completedIdx + 1).clamp(0, route.polylinePoints.length),
+          ),
+          color: const Color(0xFF10B981),
+          width: 5,
+        ),
+      );
+    }
+
+    _markers = markers;
+    _polylines = polylines;
   }
 
   @override
   void dispose() {
-    _busController.dispose();
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    _tracking.busPosition.removeListener(_onBusPositionChanged);
+    _geofence.alerts.removeListener(_onGeofenceAlert);
+    _tracking.stop();
+    _geofence.reset();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -43,46 +220,70 @@ class _DriverRouteState extends State<DriverRoute>
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
         children: [
-          // ── Header ───────────────────────────────────────────────────────
+          // ── Header ────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [AppTheme.driverCyan.withOpacity(0.2), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.driverCyan.withOpacity(0.2),
+                  Colors.transparent,
+                ],
               ),
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn()),
+                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Route Navigator',
-                          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                      Text('Route A · Morning Run',
-                          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
+                      Text(
+                        AppStrings.t('route_navigator'),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        _tracking.route.name,
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Row(
                   children: [
-                    AnimatedBuilder(
-                      animation: _busController,
-                      builder: (_, __) => Container(
-                        width: 8, height: 8,
-                        decoration: BoxDecoration(
-                          color: AppTheme.success,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: AppTheme.success.withOpacity(0.6), blurRadius: 8)],
-                        ),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppTheme.success,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.success.withOpacity(0.6),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text('LIVE',
-                        style: TextStyle(color: AppTheme.successLight, fontSize: 12, fontWeight: FontWeight.w700)),
+                    const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: AppTheme.successLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -93,7 +294,7 @@ class _DriverRouteState extends State<DriverRoute>
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // ── Map ──────────────────────────────────────────────────
+                // ── Google Map ─────────────────────────────────────────
                 GlassCard(
                   backgroundColor: const Color(0xCC05081E),
                   borderRadius: 20,
@@ -104,17 +305,63 @@ class _DriverRouteState extends State<DriverRoute>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Live Route Map',
-                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                            Text(
+                              AppStrings.t('live_route_map'),
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             Row(
                               children: [
-                                const Text('⚡ ', style: TextStyle(fontSize: 13)),
-                                AnimatedBuilder(
-                                  animation: _busController,
-                                  builder: (_, __) => Text(
-                                    '$_speed km/h',
+                                // Follow-camera toggle
+                                GestureDetector(
+                                  onTap: () => setState(
+                                    () => _followCamera = !_followCamera,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _followCamera
+                                          ? AppTheme.driverCyan.withOpacity(0.2)
+                                          : const Color(0x10FFFFFF),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _followCamera
+                                            ? AppTheme.driverCyan
+                                            : const Color(0x20FFFFFF),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _followCamera ? '📍 Follow' : '🗺 Free',
+                                      style: TextStyle(
+                                        color: _followCamera
+                                            ? AppTheme.driverCyan
+                                            : Colors.white54,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  '⚡ ',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                                ValueListenableBuilder<int>(
+                                  valueListenable: _tracking.speed,
+                                  builder: (_, spd, __) => Text(
+                                    '$spd km/h',
                                     style: const TextStyle(
-                                        color: AppTheme.driverAccent, fontSize: 13, fontWeight: FontWeight.w700),
+                                      color: AppTheme.driverAccent,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -123,29 +370,57 @@ class _DriverRouteState extends State<DriverRoute>
                         ),
                       ),
                       const Divider(color: Color(0x10FFFFFF), height: 1),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 210,
-                        child: AnimatedBuilder(
-                          animation: _busController,
-                          builder: (_, __) => CustomPaint(
-                            painter: _DriverRouteMapPainter(_busController.value),
-                            size: const Size(double.infinity, 210),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(20),
+                          bottomRight: Radius.circular(20),
+                        ),
+                        child: SizedBox(
+                          height: 320,
+                          child: GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: _tracking.busPosition.value,
+                              zoom: 13.5,
+                            ),
+                            markers: _markers,
+                            polylines: _polylines,
+                            myLocationEnabled: false,
+                            zoomControlsEnabled: false,
+                            mapToolbarEnabled: false,
+                            compassEnabled: false,
+                            trafficEnabled: true,
+                            onMapCreated: (controller) {
+                              _mapController = controller;
+                              if (_mapStyle != null) {
+                                controller.setMapStyle(_mapStyle!);
+                              }
+                            },
                           ),
                         ),
                       ),
-                      const Divider(color: Color(0x10FFFFFF), height: 1),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         child: Row(
                           children: [
-                            _LegendDot(color: AppTheme.success,  label: 'Completed'),
+                            _LegendDot(
+                              color: AppTheme.success,
+                              label: 'Completed',
+                            ),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.purple,   label: 'Current'),
+                            _LegendDot(
+                              color: AppTheme.purple,
+                              label: 'Current',
+                            ),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.info,     label: 'Next'),
+                            _LegendDot(color: AppTheme.info, label: 'Next'),
                             const SizedBox(width: 14),
-                            _LegendDot(color: AppTheme.warning,  label: 'School'),
+                            _LegendDot(
+                              color: AppTheme.warning,
+                              label: 'School',
+                            ),
                           ],
                         ),
                       ),
@@ -154,49 +429,128 @@ class _DriverRouteState extends State<DriverRoute>
                 ),
                 const SizedBox(height: 12),
 
-                // ── Live stats bar ────────────────────────────────────────
-                Row(
-                  children: [
-                    _LiveStatCard(icon: '⏱️', label: 'ETA School',    value: '15 min'),
-                    const SizedBox(width: 10),
-                    _LiveStatCard(icon: '📏', label: 'Distance Left', value: '4.2 km'),
-                    const SizedBox(width: 10),
-                    _LiveStatCard(icon: '⚡', label: 'Avg Speed',      value: '35 km/h'),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // ── Route stops ───────────────────────────────────────────
+                // ── Location sharing toggle ───────────────────────────
                 GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Route Stops',
-                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 16),
-                      ..._routeStops.asMap().entries.map((e) => _StopRow(
-                            stop: e.value,
-                            isLast: e.key == _routeStops.length - 1,
-                          )),
+                      Row(
+                        children: [
+                          Icon(
+                            _sharingLocation
+                                ? Icons.location_on
+                                : Icons.location_off,
+                            color: _sharingLocation
+                                ? AppTheme.success
+                                : context.textTertiary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Share Location',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _sharingLocation,
+                        activeColor: AppTheme.success,
+                        onChanged: (v) => setState(() => _sharingLocation = v),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // ── Action buttons ────────────────────────────────────────
+                // ── Live stats bar ────────────────────────────────────
+                Row(
+                  children: [
+                    ValueListenableBuilder<int>(
+                      valueListenable: _tracking.etaMinutes,
+                      builder: (_, eta, __) => _LiveStatCard(
+                        icon: '⏱️',
+                        label: AppStrings.t('eta_school'),
+                        value: '$eta min',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _LiveStatCard(
+                      icon: '📏',
+                      label: AppStrings.t('distance_left'),
+                      value: '4.2 km',
+                    ),
+                    const SizedBox(width: 10),
+                    ValueListenableBuilder<int>(
+                      valueListenable: _tracking.speed,
+                      builder: (_, spd, __) => _LiveStatCard(
+                        icon: '⚡',
+                        label: AppStrings.t('avg_speed'),
+                        value: '$spd km/h',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // ── Route stops ───────────────────────────────────────
+                GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Route Stops',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ..._tracking.route.stops.asMap().entries.map(
+                        (e) => _StopRow(
+                          stop: e.value,
+                          isLast: e.key == _tracking.route.stops.length - 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Action buttons ────────────────────────────────────
                 Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          gradient: AppTheme.driverGradient,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Center(
-                          child: Text('✅  Mark Stop Done',
-                              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                      child: GestureDetector(
+                        onTap: () {
+                          _tracking.markCurrentStopDone();
+                          setState(() {});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.driverGradient,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '✅  Mark Stop Done',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -207,11 +561,19 @@ class _DriverRouteState extends State<DriverRoute>
                         decoration: BoxDecoration(
                           color: AppTheme.warning.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+                          border: Border.all(
+                            color: AppTheme.warning.withOpacity(0.3),
+                          ),
                         ),
                         child: const Center(
-                          child: Text('⚠️  Report Issue',
-                              style: TextStyle(color: AppTheme.warningLight, fontSize: 14, fontWeight: FontWeight.w700)),
+                          child: Text(
+                            '⚠️  Report Issue',
+                            style: TextStyle(
+                              color: AppTheme.warningLight,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -226,9 +588,15 @@ class _DriverRouteState extends State<DriverRoute>
   }
 }
 
+// ── Helper Widgets ─────────────────────────────────────────────────────────────
+
 class _LiveStatCard extends StatelessWidget {
   final String icon, label, value;
-  const _LiveStatCard({required this.icon, required this.label, required this.value});
+  const _LiveStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -239,8 +607,18 @@ class _LiveStatCard extends StatelessWidget {
           children: [
             Text(icon, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 9)),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(color: context.textTertiary, fontSize: 9),
+            ),
           ],
         ),
       ),
@@ -257,40 +635,37 @@ class _LegendDot extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10)),
+        Text(
+          label,
+          style: TextStyle(color: context.textSecondary, fontSize: 10),
+        ),
       ],
     );
   }
 }
 
-class _StopData {
-  final String name, time, note, status, icon;
-  final int students;
-  const _StopData({required this.name, required this.time, required this.note,
-      required this.status, required this.icon, required this.students});
-}
-
-const _routeStops = [
-  _StopData(name: 'Bus Depot',          time: '06:55', students: 0, status: 'done',        icon: '🚌', note: 'Departure point'),
-  _StopData(name: 'Oak Street',         time: '07:15', students: 3, status: 'done',        icon: '📍', note: '3 students picked up'),
-  _StopData(name: 'Maple Avenue',       time: '07:22', students: 3, status: 'done',        icon: '📍', note: '3 students picked up'),
-  _StopData(name: 'Pine Road',          time: '07:30', students: 2, status: 'current',     icon: '📍', note: 'Just completed'),
-  _StopData(name: 'Cedar Blvd',         time: '07:37', students: 4, status: 'upcoming',    icon: '📍', note: '4 students waiting'),
-  _StopData(name: 'Lincoln Elementary', time: '07:45', students: 0, status: 'destination', icon: '🏫', note: 'Drop-off point'),
-];
-
 class _StopRow extends StatelessWidget {
-  final _StopData stop;
+  final StopData stop;
   final bool isLast;
   const _StopRow({required this.stop, required this.isLast});
 
   Color get _color => switch (stop.status) {
-    'done'        => AppTheme.success,
-    'current'     => AppTheme.purple,
-    'destination' => AppTheme.warning,
-    _             => AppTheme.info,
+    StopStatus.completed => AppTheme.success,
+    StopStatus.current => AppTheme.purple,
+    StopStatus.destination => AppTheme.warning,
+    _ => AppTheme.info,
+  };
+
+  String get _icon => switch (stop.status) {
+    StopStatus.completed => '✓',
+    StopStatus.destination => '🏫',
+    _ => '📍',
   };
 
   @override
@@ -303,28 +678,42 @@ class _StopRow extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 32, height: 32,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: _color.withOpacity(0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: _color, width: 2),
-                  boxShadow: stop.status == 'current'
-                      ? [BoxShadow(color: _color.withOpacity(0.5), blurRadius: 12)]
+                  boxShadow: stop.status == StopStatus.current
+                      ? [
+                          BoxShadow(
+                            color: _color.withOpacity(0.5),
+                            blurRadius: 12,
+                          ),
+                        ]
                       : null,
                 ),
                 child: Center(
-                  child: stop.status == 'done'
-                      ? Text('✓', style: TextStyle(color: _color, fontSize: 14, fontWeight: FontWeight.w700))
-                      : Text(stop.icon, style: const TextStyle(fontSize: 13)),
+                  child: stop.status == StopStatus.completed
+                      ? Text(
+                          '✓',
+                          style: TextStyle(
+                            color: _color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      : Text(_icon, style: const TextStyle(fontSize: 13)),
                 ),
               ),
               if (!isLast)
                 Container(
-                  width: 2, height: 30,
+                  width: 2,
+                  height: 30,
                   margin: const EdgeInsets.symmetric(vertical: 2),
-                  color: stop.status == 'done'
+                  color: stop.status == StopStatus.completed
                       ? AppTheme.success.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.08),
+                      : context.cardBgElevated,
                 ),
             ],
           ),
@@ -342,51 +731,82 @@ class _StopRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(stop.name,
-                            style: TextStyle(
-                              color: stop.status == 'current' || stop.status == 'destination'
-                                  ? Colors.white : Colors.white.withOpacity(0.75),
-                              fontSize: 14,
-                              fontWeight: stop.status == 'current' ? FontWeight.w700 : FontWeight.w500,
-                            )),
-                        if (stop.status == 'current') ...[
+                        Text(
+                          stop.name,
+                          style: TextStyle(
+                            color:
+                                stop.status == StopStatus.current ||
+                                    stop.status == StopStatus.destination
+                                ? context.textPrimary
+                                : context.textSecondary,
+                            fontSize: 14,
+                            fontWeight: stop.status == StopStatus.current
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                        if (stop.status == StopStatus.current) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.purple.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppTheme.purple.withOpacity(0.4)),
+                              border: Border.all(
+                                color: AppTheme.purple.withOpacity(0.4),
+                              ),
                             ),
-                            child: const Text('NEXT',
-                                style: TextStyle(color: AppTheme.parentAccent, fontSize: 9, fontWeight: FontWeight.w700)),
+                            child: const Text(
+                              'NEXT',
+                              style: TextStyle(
+                                color: AppTheme.parentAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(stop.note,
-                        style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 11)),
+                    if (stop.note != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        stop.note!,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.35),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${stop.time} AM',
+                      stop.scheduledTime,
                       style: TextStyle(
                         color: switch (stop.status) {
-                          'done'        => AppTheme.successLight,
-                          'current'     => AppTheme.parentAccent,
-                          'destination' => AppTheme.warning,
-                          _             => AppTheme.driverAccent,
+                          StopStatus.completed => AppTheme.successLight,
+                          StopStatus.current => AppTheme.parentAccent,
+                          StopStatus.destination => AppTheme.warning,
+                          _ => AppTheme.driverAccent,
                         },
-                        fontSize: 13, fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (stop.students > 0)
-                      Text('👦 ${stop.students}',
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                    if (stop.studentCount > 0)
+                      Text(
+                        '👦 ${stop.studentCount}',
+                        style: TextStyle(
+                          color: context.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -398,109 +818,18 @@ class _StopRow extends StatelessWidget {
   }
 }
 
-Widget _backBtn() => Container(
-  width: 38, height: 38,
+Widget _backBtn(BuildContext context) => Container(
+  width: 38,
+  height: 38,
   decoration: BoxDecoration(
-    color: Colors.white.withOpacity(0.08),
+    color: context.cardBgElevated,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    border: Border.all(color: context.inputBorder),
   ),
-  child: const Center(child: Text('←', style: TextStyle(color: Colors.white, fontSize: 16))),
+  child: Center(
+    child: Text(
+      '←',
+      style: TextStyle(color: context.textPrimary, fontSize: 16),
+    ),
+  ),
 );
-
-// ── Custom Painter ─────────────────────────────────────────────────────────────
-class _DriverRouteMapPainter extends CustomPainter {
-  final double progress;
-  _DriverRouteMapPainter(this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final sx = size.width / 340;
-    final sy = size.height / 210;
-    Offset s(double x, double y) => Offset(x * sx, y * sy);
-
-    final gridPaint = Paint()..color = Colors.white.withOpacity(0.04)..strokeWidth = 1;
-    for (final y in [42.0, 84.0, 126.0, 168.0]) {
-      canvas.drawLine(s(0, y), s(340, y), gridPaint);
-    }
-    for (final x in [68.0, 136.0, 204.0, 272.0]) {
-      canvas.drawLine(s(x, 0), s(x, 210), gridPaint);
-    }
-
-    final roadPaint = Paint()
-      ..color = Colors.white.withOpacity(0.12)
-      ..strokeWidth = 10 * sx
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(s(20, 155), s(320, 155), roadPaint);
-    canvas.drawLine(s(100, 20),  s(100, 165), roadPaint);
-    canvas.drawLine(s(20, 82),   s(320, 82),  roadPaint);
-
-    final dashPaint = Paint()
-      ..color = AppTheme.driverCyan.withOpacity(0.35)
-      ..strokeWidth = 3 * sx
-      ..strokeCap = StrokeCap.round;
-    _drawDashedPolyline(canvas, [s(50, 155), s(100, 155), s(100, 82), s(220, 82), s(300, 82)], dashPaint);
-
-    final donePaint = Paint()..color = AppTheme.success..strokeWidth = 3 * sx..strokeCap = StrokeCap.round;
-    final busProgress = 0.3 + progress * 0.35;
-    canvas.drawLine(s(50, 155), s(100, 155), donePaint);
-    canvas.drawLine(s(100, 155), s(100, 82), donePaint);
-    canvas.drawLine(s(100, 82), s(100 + busProgress * 200, 82), donePaint);
-
-    final stopDefs = [
-      (50.0, 155.0, 'done'), (100.0, 155.0, 'done'), (100.0, 120.0, 'done'),
-      (100.0, 82.0, 'current'), (220.0, 82.0, 'upcoming'), (300.0, 82.0, 'destination'),
-    ];
-    for (final st in stopDefs) {
-      final center = s(st.$1, st.$2);
-      final col = switch (st.$3) {
-        'done'        => AppTheme.success,
-        'current'     => AppTheme.purple,
-        'destination' => AppTheme.warning,
-        _             => AppTheme.info,
-      };
-      canvas.drawCircle(center, 10 * sx, Paint()..color = col.withOpacity(0.2));
-      canvas.drawCircle(center, 10 * sx, Paint()..color = col..style = PaintingStyle.stroke..strokeWidth = 2);
-      canvas.drawCircle(center, 4 * sx, Paint()..color = col);
-      if (st.$3 == 'destination') {
-        final tp = TextPainter(text: const TextSpan(text: '🏫', style: TextStyle(fontSize: 14)), textDirection: TextDirection.ltr)..layout();
-        tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2 + 18 * sy));
-      }
-    }
-
-    final busX = 100 + busProgress * 200;
-    const busY = 82.0;
-    final busCenter = s(busX, busY);
-    final busRect = Rect.fromCenter(center: busCenter, width: 28 * sx, height: 28 * sy);
-    final rrect = RRect.fromRectAndRadius(busRect, Radius.circular(8 * sx));
-    canvas.drawRRect(rrect, Paint()..color = AppTheme.driverCyan.withOpacity(0.9));
-    canvas.drawRRect(rrect, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 1.5);
-    final tp = TextPainter(text: const TextSpan(text: '🚌', style: TextStyle(fontSize: 14)), textDirection: TextDirection.ltr)..layout();
-    tp.paint(canvas, busCenter - Offset(tp.width / 2, tp.height / 2));
-  }
-
-  void _drawDashedPolyline(Canvas canvas, List<Offset> pts, Paint paint) {
-    for (int i = 0; i < pts.length - 1; i++) {
-      _drawDashedLine(canvas, pts[i], pts[i + 1], paint);
-    }
-  }
-
-  void _drawDashedLine(Canvas canvas, Offset s, Offset e, Paint paint) {
-    const dl = 6.0, gl = 4.0;
-    final dx = e.dx - s.dx, dy = e.dy - s.dy;
-    final dist = sqrt(dx * dx + dy * dy);
-    final sx2 = dx / dist, sy2 = dy / dist;
-    double drawn = 0; bool draw = true;
-    double x = s.dx, y = s.dy;
-    while (drawn < dist) {
-      final step = draw ? dl : gl;
-      final len = min(step, dist - drawn);
-      final nx = x + sx2 * len, ny = y + sy2 * len;
-      if (draw) canvas.drawLine(Offset(x, y), Offset(nx, ny), paint);
-      x = nx; y = ny; drawn += len; draw = !draw;
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DriverRouteMapPainter old) => old.progress != progress;
-}

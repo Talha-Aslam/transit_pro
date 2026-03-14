@@ -10,7 +10,15 @@ dependencies:
   flutter:
     sdk: flutter
   go_router: ^14.0.0
-    
+  image_picker: ^1.1.2
+  url_launcher: ^6.3.0
+  google_maps_flutter: ^2.10.0
+  geolocator: ^13.0.0
+  permission_handler: ^11.0.0
+  flutter_local_notifications: ^18.0.0
+  flutter_polyline_points: ^2.1.0
+  http: ^1.2.0
+  shared_preferences: ^2.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -19,3 +27,17 @@ dev_dependencies:
   
 flutter:
   uses-material-design: true
+  assets:
+    - assets/map_style.json
+    - assets/images/navbar/
+    - assets/images/profile/
+    - assets/images/profile_page/
+    - assets/images/role_selection/
+    - assets/images/schedule/
+    - assets/images/splash_screen/
+    - assets/images/splash_screen/bus_splash_icon.png
+    - assets/images/stats/
+    - assets/images/utilities/
+    - assets/images/
+    - assets/images/notification_bell.gif
+    - assets/images/path_transparent.gif
