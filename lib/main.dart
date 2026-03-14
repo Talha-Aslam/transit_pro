@@ -72,7 +72,7 @@ void main() async {
   // Skip in debug mode — running two Flutter engines simultaneously during
   // development causes jank, geolocator conflicts, and ANR (SIGQUIT) dumps.
   if (Platform.isAndroid && !kDebugMode) {
-    _startBackgroundService();
+    await _startBackgroundService();
   }
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -80,9 +80,26 @@ void main() async {
   runApp(const TransportKidApp());
 }
 
-void _startBackgroundService() {
+Future<void> _startBackgroundService() async {
+  final hasPermission = await _ensureLocationPermissionForService();
+  if (!hasPermission) return;
+
   const channel = MethodChannel('com.example.transit_pro/background_service');
-  channel.invokeMethod<void>('startService').catchError((_) {});
+  await channel.invokeMethod<void>('startService').catchError((_) {});
+}
+
+Future<bool> _ensureLocationPermissionForService() async {
+  if (!await Geolocator.isLocationServiceEnabled()) {
+    return false;
+  }
+
+  var permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+  }
+
+  return permission == LocationPermission.always ||
+      permission == LocationPermission.whileInUse;
 }
 
 class TransportKidApp extends StatefulWidget {

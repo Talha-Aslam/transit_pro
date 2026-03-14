@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_provider.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -18,18 +19,20 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
   @override
   void initState() {
     super.initState();
-    LanguageProvider.instance.addListener(_onLangChanged);
+    LanguageProvider.instance.addListener(_onRebuildNeeded);
+    ThemeProvider.instance.addListener(_onRebuildNeeded);
     _rainbowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
   }
 
-  void _onLangChanged() => setState(() {});
+  void _onRebuildNeeded() => setState(() {});
 
   @override
   void dispose() {
-    LanguageProvider.instance.removeListener(_onLangChanged);
+    LanguageProvider.instance.removeListener(_onRebuildNeeded);
+    ThemeProvider.instance.removeListener(_onRebuildNeeded);
     _rainbowCtrl.dispose();
     super.dispose();
   }
@@ -174,7 +177,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                 ),
               ),
             ),
-            // Content
+            // Main Content
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -522,6 +525,33 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     ),
                   );
                 },
+              ),
+            ),
+            // Theme toggle button on top of everything
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: IconButton(
+                    icon: Icon(
+                      context.isDark
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_rounded,
+                      color: context.isDark ? Colors.amber : Colors.indigo,
+                    ),
+                    onPressed: () {
+                      ThemeProvider.instance.toggle();
+                    },
+                    style: IconButton.styleFrom(
+                      backgroundColor: context.isDark
+                          ? Colors.white.withOpacity(0.1)
+                          : Colors.black.withOpacity(0.05),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

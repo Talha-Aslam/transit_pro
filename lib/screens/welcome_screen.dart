@@ -47,7 +47,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     // Progress bar — navigate when the bar finishes so they are perfectly synced
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 40000),
+      duration: const Duration(milliseconds: 4000),
     );
     _progressController.addStatusListener((status) async {
       if (status == AnimationStatus.completed && mounted) {
