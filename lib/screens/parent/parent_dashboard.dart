@@ -625,7 +625,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                 children: [
                                   _ScheduleChip(
                                     icon:
-                                        'assets/images/waiting_for_bus_transparent.png',
+                                        'assets/images/schedule/waiting_for_bus_transparent.png',
                                     label: AppStrings.t('pickup'),
                                     time: '07:15 AM',
                                     status: AppStrings.t('done'),
@@ -633,7 +633,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                   ),
                                   const SizedBox(width: 8),
                                   _ScheduleChip(
-                                    icon: 'assets/images/at_school.png',
+                                    icon:
+                                        'assets/images/schedule/at_school.png',
                                     label: AppStrings.t('at_school'),
                                     time: '07:45 AM',
                                     status: AppStrings.t('done'),
@@ -642,7 +643,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                   const SizedBox(width: 8),
                                   _ScheduleChip(
                                     icon:
-                                        'assets/images/drop_off_transparent.png',
+                                        'assets/images/schedule/drop_off_transparent.png',
                                     label: AppStrings.t('drop_off'),
                                     time: '03:30 PM',
                                     status: AppStrings.t('pending'),
@@ -666,25 +667,25 @@ class _ParentDashboardState extends State<ParentDashboard> {
                           childAspectRatio: 2.2,
                           children: [
                             _StatCard(
-                              icon: 'assets/images/total_trips.png',
+                              icon: 'assets/images/stats/total_trips.png',
                               label: AppStrings.t('total_trips'),
                               value: '142',
                               color: AppTheme.purple,
                             ),
                             _StatCard(
-                              icon: 'assets/images/on_time.png',
+                              icon: 'assets/images/stats/on_time.png',
                               label: AppStrings.t('on_time'),
                               value: '96%',
                               color: AppTheme.success,
                             ),
                             _StatCard(
-                              icon: 'assets/images/calendar.png',
+                              icon: 'assets/images/stats/calendar.png',
                               label: AppStrings.t('this_week'),
                               value: '5',
                               color: AppTheme.info,
                             ),
                             _StatCard(
-                              icon: 'assets/images/safety.png',
+                              icon: 'assets/images/stats/safety.png',
                               label: AppStrings.t('safe_rides'),
                               value: '142',
                               color: AppTheme.warning,

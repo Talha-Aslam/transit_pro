@@ -95,30 +95,11 @@ class _ParentProfileState extends State<ParentProfile> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _EditSheet(
+      builder: (_) => _ChildFlowSheet(
         title: "${AppStrings.t('edit_info')} - $label",
-        fields: [
-          _FieldDef(AppStrings.t('child_name'), child.name),
-          _FieldDef(AppStrings.t('grade'), child.grade),
-          _FieldDef(AppStrings.t('school'), child.school),
-          _FieldDef(AppStrings.t('bus_number_lbl'), child.busNumber),
-          _FieldDef(AppStrings.t('route_lbl'), child.route),
-          _FieldDef(AppStrings.t('bus_stop'), child.stop),
-          _FieldDef(AppStrings.t('driver_name'), child.driver),
-        ],
+        initialChild: child,
         accentColor: AppTheme.parentPurple,
-        onSave: (values) => _svc.updateChild(
-          index,
-          child.copyWith(
-            name: values[0],
-            grade: values[1],
-            school: values[2],
-            busNumber: values[3],
-            route: values[4],
-            stop: values[5],
-            driver: values[6],
-          ),
-        ),
+        onSave: (updatedChild) => _svc.updateChild(index, updatedChild),
       ),
     );
   }
@@ -128,29 +109,11 @@ class _ParentProfileState extends State<ParentProfile> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _EditSheet(
+      builder: (_) => _ChildFlowSheet(
         title: AppStrings.t('add_child'),
-        fields: [
-          _FieldDef(AppStrings.t('child_name'), ''),
-          _FieldDef(AppStrings.t('grade'), ''),
-          _FieldDef(AppStrings.t('school'), ''),
-          _FieldDef(AppStrings.t('bus_number_lbl'), ''),
-          _FieldDef(AppStrings.t('route_lbl'), ''),
-          _FieldDef(AppStrings.t('bus_stop'), ''),
-          _FieldDef(AppStrings.t('driver_name'), ''),
-        ],
+        initialChild: ChildInfo(),
         accentColor: AppTheme.parentPurple,
-        onSave: (values) => _svc.addChild(
-          ChildInfo(
-            name: values[0],
-            grade: values[1],
-            school: values[2],
-            busNumber: values[3],
-            route: values[4],
-            stop: values[5],
-            driver: values[6],
-          ),
-        ),
+        onSave: (newChild) => _svc.addChild(newChild),
       ),
     );
   }
@@ -1362,6 +1325,412 @@ class _EditSheetState extends State<_EditSheet> {
             ),
             const SizedBox(height: 8),
             // Save button
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _save,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        widget.accentColor,
+                        widget.accentColor.withOpacity(0.75),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Save Changes',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────── custom child sheet
+
+class _BusOption {
+  final String busNumber;
+  final String driver;
+  final String route;
+  _BusOption(this.busNumber, this.driver, this.route);
+}
+
+class _ChildFlowSheet extends StatefulWidget {
+  final String title;
+  final ChildInfo initialChild;
+  final Color accentColor;
+  final void Function(ChildInfo) onSave;
+
+  const _ChildFlowSheet({
+    required this.title,
+    required this.initialChild,
+    required this.accentColor,
+    required this.onSave,
+  });
+
+  @override
+  State<_ChildFlowSheet> createState() => _ChildFlowSheetState();
+}
+
+class _ChildFlowSheetState extends State<_ChildFlowSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _gradeCtrl;
+  late final TextEditingController _locationCtrl;
+
+  String? _instituteType;
+  String? _instituteName;
+  _BusOption? _selectedBus;
+
+  final Map<String, List<String>> _institutes = {
+    'School': ['Lincoln Elementary', 'Springfield High', 'Beaconhouse'],
+    'College': ['City College', 'State College', 'Punjab College'],
+    'University': ['University of Lahore', 'FAST NUCES', 'LUMS', 'UET'],
+  };
+
+  final List<_BusOption> _allBuses = [
+    _BusOption('Bus #42', 'Mike T.', 'Route A (Morning/Evening)'),
+    _BusOption('Bus #15', 'Ali H.', 'Route B (Express)'),
+    _BusOption('Bus #09', 'John D.', 'Route C (University Line)'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.initialChild.name);
+    _gradeCtrl = TextEditingController(text: widget.initialChild.grade);
+    _locationCtrl = TextEditingController(text: widget.initialChild.stop)
+      ..addListener(() => setState(() {})); // To trigger bus list visibility
+
+    if (widget.initialChild.school.isNotEmpty) {
+      for (final entry in _institutes.entries) {
+        if (entry.value.contains(widget.initialChild.school)) {
+          _instituteType = entry.key;
+          _instituteName = widget.initialChild.school;
+          break;
+        }
+      }
+      if (_instituteType == null) {
+        _instituteType = 'School';
+        _instituteName = null;
+      }
+    }
+
+    if (widget.initialChild.busNumber.isNotEmpty) {
+      try {
+        _selectedBus = _allBuses.firstWhere(
+          (b) => b.busNumber == widget.initialChild.busNumber,
+        );
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _gradeCtrl.dispose();
+    _locationCtrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    widget.onSave(
+      ChildInfo(
+        name: _nameCtrl.text.trim(),
+        grade: _gradeCtrl.text.trim(),
+        school: _instituteName ?? widget.initialChild.school,
+        busNumber: _selectedBus?.busNumber ?? widget.initialChild.busNumber,
+        route: _selectedBus?.route ?? widget.initialChild.route,
+        stop: _locationCtrl.text.trim(),
+        driver: _selectedBus?.driver ?? widget.initialChild.driver,
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    String hint,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          style: TextStyle(color: context.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: context.textHint),
+            filled: true,
+            fillColor: context.isDark
+                ? AppTheme.bgDarkBlue
+                : const Color(0xFFF1F5F9),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: context.inputBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: context.inputBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: widget.accentColor, width: 1.5),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+    String? hint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: context.isDark
+                ? AppTheme.bgDarkBlue
+                : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.inputBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isExpanded: true,
+              hint: hint != null
+                  ? Text(hint, style: TextStyle(color: context.textHint))
+                  : null,
+              dropdownColor: context.isDark ? AppTheme.bgDark : Colors.white,
+              style: TextStyle(color: context.textPrimary, fontSize: 14),
+              items: items,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final sheetBg = context.isDark ? AppTheme.bgDark : Colors.white;
+
+    final sheetHeight = MediaQuery.of(context).size.height * 0.85;
+
+    final availableSchools = _instituteType != null
+        ? _institutes[_instituteType]!
+        : <String>[];
+
+    final bool showBuses =
+        _instituteName != null && _locationCtrl.text.trim().isNotEmpty;
+
+    return SizedBox(
+      height: sheetHeight,
+      child: Container(
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: context.surfaceBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              widget.title,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      "Student / Child Name",
+                      _nameCtrl,
+                      "e.g. John Doe",
+                    ),
+                    _buildTextField(
+                      "Grade / Class",
+                      _gradeCtrl,
+                      "e.g. Grade 5",
+                    ),
+                    _buildDropdown<String>(
+                      label: "Institute Type",
+                      value: _instituteType,
+                      hint: "Select School / College / University",
+                      items: _institutes.keys
+                          .map(
+                            (k) => DropdownMenuItem(value: k, child: Text(k)),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _instituteType = val;
+                          _instituteName = null;
+                        });
+                      },
+                    ),
+                    if (_instituteType != null)
+                      _buildDropdown<String>(
+                        label: "Institute Name",
+                        value: _instituteName,
+                        hint: "Select your $_instituteType",
+                        items: availableSchools
+                            .map(
+                              (s) => DropdownMenuItem(value: s, child: Text(s)),
+                            )
+                            .toList(),
+                        onChanged: (val) {
+                          setState(() {
+                            _instituteName = val;
+                            _selectedBus = null;
+                          });
+                        },
+                      ),
+                    _buildTextField(
+                      "Current Location (Where you live)",
+                      _locationCtrl,
+                      "e.g. Oak Street",
+                    ),
+
+                    if (showBuses) ...[
+                      const Divider(),
+                      const SizedBox(height: 10),
+                      Text(
+                        "Available Buses for this Route",
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ..._allBuses.map((bus) {
+                        final isSelected = _selectedBus == bus;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() => _selectedBus = bus);
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? widget.accentColor.withOpacity(0.15)
+                                  : context.isDark
+                                  ? AppTheme.bgDarkBlue
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? widget.accentColor
+                                    : context.inputBorder,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "${bus.busNumber} • ${bus.route}",
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "Driver: ${bus.driver}",
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: widget.accentColor,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: GestureDetector(

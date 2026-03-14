@@ -80,7 +80,7 @@ class _SignupScreenState extends State<SignupScreen> {
   static final _roles = [
     _RoleCfg(
       'parent',
-      'assets/images/welcome_parent_transparent.gif',
+      'assets/images/role_selection/welcome_parent_transparent.gif',
       'Parent',
       AppTheme.parentGradient,
       AppTheme.parentPurple,
@@ -88,7 +88,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ),
     _RoleCfg(
       'driver',
-      'assets/images/welcome_driver_transparent.gif',
+      'assets/images/role_selection/welcome_driver_transparent.gif',
       'Driver',
       AppTheme.driverGradient,
       AppTheme.driverCyan,
@@ -96,7 +96,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ),
     _RoleCfg(
       'student',
-      'assets/images/welcome_student_transparent.gif',
+      'assets/images/role_selection/welcome_student_transparent.gif',
       'Student',
       AppTheme.studentGradient,
       AppTheme.studentAmber,
@@ -560,6 +560,62 @@ class _SignupScreenState extends State<SignupScreen> {
             glowColor: _cfg.glow,
             isLoading: _loading,
             onTap: _signup,
+          ),
+          const SizedBox(height: 20),
+
+          // Google Login Option
+          Row(
+            children: [
+              Expanded(
+                child: Divider(color: context.surfaceBorder, thickness: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Or continue with',
+                  style: TextStyle(color: context.textTertiary, fontSize: 13),
+                ),
+              ),
+              Expanded(
+                child: Divider(color: context.surfaceBorder, thickness: 1),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () {
+              // Add Google Sign-Up/Sign-In logic here
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: context.cardBgElevated,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: context.inputBorder),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/utilities/google.png',
+                    height: 20,
+                    width: 20,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.g_mobiledata, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Google',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

@@ -343,14 +343,15 @@ class _ParentScheduleState extends State<ParentSchedule> {
                         children: [
                           _TimeCard(
                             emoji:
-                                'assets/images/waiting_for_bus_transparent.png',
+                                'assets/images/schedule/waiting_for_bus_transparent.png',
                             label: AppStrings.t('morning_pickup'),
                             time: sel.pickup,
                             sub: AppStrings.t('oak_street_stop'),
                           ),
                           const SizedBox(width: 12),
                           _TimeCard(
-                            emoji: 'assets/images/drop_off_transparent.png',
+                            emoji:
+                                'assets/images/schedule/drop_off_transparent.png',
                             label: AppStrings.t('evening_drop'),
                             time: sel.dropoff,
                             sub: AppStrings.t('oak_street_stop'),
