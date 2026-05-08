@@ -364,16 +364,18 @@ class _NotifCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Text(
-                            notif.time,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.35),
-                              fontSize: 11,
-                            ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${notif.date} · ${notif.time}',
+                        style: TextStyle(
+                          color: context.textTertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         notif.message,
                         style: TextStyle(
