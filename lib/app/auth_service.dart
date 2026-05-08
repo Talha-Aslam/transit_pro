@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../theme/theme_provider.dart';
 
 /// Persists the logged-in role and theme preference across app restarts.
@@ -15,6 +17,9 @@ class AuthService {
   static const _roleKey = 'logged_in_role';
   static const _themeKey = 'theme_is_dark';
 
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   /// In-memory cache populated by [preload] before runApp().
   String? _cachedRole;
   String? get cachedRole => _cachedRole;
@@ -27,6 +32,35 @@ class AuthService {
     if (isDark != null) {
       ThemeProvider.instance.setMode(isDark ? ThemeMode.dark : ThemeMode.light);
     }
+  }
+
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return null; // The user canceled the sign-in
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithCredential(credential);
+
+      return userCredential;
+    } catch (e) {
+      debugPrint('Error signing in with Google: $e');
+      return null;
+    }
+  }
+
+  Future<void> signOut() async {
+    await _firebaseAuth.signOut();
+    await _googleSignIn.signOut();
+    await clearRole();
   }
 
   /// Saves [role] ('parent' | 'driver' | 'student') to persistent storage.

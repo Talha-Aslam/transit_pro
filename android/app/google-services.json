@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "231263449779",
+    "project_id": "transitpro-db",
+    "storage_bucket": "transitpro-db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231263449779:android:140f82afb54519da2f76c6",
+        "android_client_info": {
+          "package_name": "com.example.transit_pro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

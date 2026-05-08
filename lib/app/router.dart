@@ -26,11 +26,12 @@ import '../screens/parent/payment_screens.dart';
 import '../theme/app_theme.dart';
 
 final appRouter = GoRouter(
-  initialLocation: () {
-    final role = AuthService.instance.cachedRole;
-    return role != null ? AuthService.routeForRole(role) : '/';
-  }(),
+  initialLocation: '/splash',
   routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const WelcomeScreen(),
+    ),
     GoRoute(path: '/', builder: (context, state) => const WelcomeScreen()),
     GoRoute(
       path: '/role-select',
