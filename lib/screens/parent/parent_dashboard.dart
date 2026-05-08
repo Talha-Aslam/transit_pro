@@ -84,12 +84,34 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             builder: (_, info, __) => Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '$greeting‘‹',
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 13,
-                                  ),
+                                Row(
+                                  children: [
+                                    const Text(
+                                      '👋',
+                                      style: TextStyle(fontSize: 18),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ShaderMask(
+                                      shaderCallback: (bounds) =>
+                                          AppTheme.parentGradient.createShader(
+                                            Rect.fromLTWH(
+                                              0,
+                                              0,
+                                              bounds.width,
+                                              bounds.height,
+                                            ),
+                                          ),
+                                      blendMode: BlendMode.srcIn,
+                                      child: Text(
+                                        greeting,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
