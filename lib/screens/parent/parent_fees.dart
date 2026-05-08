@@ -173,7 +173,7 @@ class _StudentFeesState extends State<StudentFees> {
                 _StatPill(
                   icon: 'assets/images/utilities/check.png',
                   label: AppStrings.t('paid'),
-                  value: 'Rs.22,500',
+                  value: 'Rs.10,000',
                   color: AppTheme.success,
                 ),
                 const SizedBox(width: 10),
@@ -187,7 +187,7 @@ class _StudentFeesState extends State<StudentFees> {
                 _StatPill(
                   icon: 'assets/images/utilities/total.png',
                   label: AppStrings.t('total'),
-                  value: 'Rs.25,000',
+                  value: 'Rs.12,500',
                   color: AppTheme.info,
                 ),
               ],
@@ -257,68 +257,46 @@ class _StudentFeesState extends State<StudentFees> {
           ..._buildPayments(),
           const SizedBox(height: 16),
 
-          // ── Fee breakdown ─────────────────────────────
+          // ── Total paid fee ─────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
               padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    AppStrings.t('fee_breakdown'),
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _BreakdownRow(
-                    label: AppStrings.t('transport_fee'),
-                    amount: 'Rs.18,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('maintenance_levy'),
-                    amount: 'Rs.3,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('insurance'),
-                    amount: 'Rs.2,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('id_card_fee'),
-                    amount: 'Rs.500',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('gps_tracking'),
-                    amount: 'Rs.1,500',
-                  ),
-                  const Divider(color: Colors.white12, height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         AppStrings.t('total'),
                         style: TextStyle(
                           color: context.textPrimary,
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      ShaderMask(
-                        shaderCallback: (b) =>
-                            AppTheme.studentGradient.createShader(b),
-                        child: Text(
-                          'Rs.25,000',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        AppStrings.t('paid'),
+                        style: TextStyle(
+                          color: context.textTertiary,
+                          fontSize: 12,
                         ),
                       ),
                     ],
+                  ),
+                  ShaderMask(
+                    shaderCallback: (b) =>
+                        AppTheme.studentGradient.createShader(b),
+                    child: Text(
+                      'Rs.10,000',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ],
               ),
