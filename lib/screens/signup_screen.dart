@@ -15,6 +15,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String _selectedRole = 'parent';
   bool _loading = false;
   bool _showPass = false;
+  bool _showConfirmPass = false;
   bool _agreeTerms = false;
   int _step = 0; // 0 = role pick, 1 = form
 
@@ -503,10 +504,19 @@ class _SignupScreenState extends State<SignupScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _confirmPassCtrl,
-            obscureText: true,
+            obscureText: !_showConfirmPass,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
             decoration: InputDecoration(
               hintText: AppStrings.t('reenter_password_hint'),
+              suffixIcon: GestureDetector(
+                onTap: () =>
+                    setState(() => _showConfirmPass = !_showConfirmPass),
+                child: Icon(
+                  _showConfirmPass ? Icons.visibility_off : Icons.visibility,
+                  color: context.textTertiary,
+                  size: 20,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 18),
