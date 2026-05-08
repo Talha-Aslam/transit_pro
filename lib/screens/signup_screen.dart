@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
@@ -136,6 +137,25 @@ class _SignupScreenState extends State<SignupScreen> {
         context.go('/login/$_selectedRole');
       }
     });
+  }
+
+  Future<void> _googleContinue() async {
+    setState(() => _loading = true);
+
+    final userCredential = await AuthService.instance.signInWithGoogle();
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+
+    if (userCredential == null) {
+      return;
+    }
+
+    await AuthService.instance.saveRole(_selectedRole);
+    if (mounted) {
+      context.go(AuthService.routeForRole(_selectedRole));
+    }
   }
 
   @override
@@ -594,9 +614,7 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 20),
           GestureDetector(
-            onTap: () {
-              // Add Google Sign-Up/Sign-In logic here
-            },
+            onTap: _googleContinue,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 14),

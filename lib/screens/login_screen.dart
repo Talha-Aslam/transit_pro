@@ -90,6 +90,28 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  Future<void> _googleLogin() async {
+    setState(() {
+      _error = '';
+      _loading = true;
+    });
+
+    final userCredential = await AuthService.instance.signInWithGoogle();
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+
+    if (userCredential == null) {
+      return;
+    }
+
+    await AuthService.instance.saveRole(widget.role);
+    if (mounted) {
+      context.go(_cfg.path);
+    }
+  }
+
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
@@ -388,10 +410,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 20),
                           GestureDetector(
-                            onTap: () {
-                              // Perform Google Sign-In logic and map to correct role
-                              _login();
-                            },
+                            onTap: _googleLogin,
                             child: Container(
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(vertical: 14),
