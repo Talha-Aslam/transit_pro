@@ -111,20 +111,17 @@ class _ParentScheduleState extends State<ParentSchedule> {
 
   static const _holidays = [
     _Holiday(
-      date: 'Mar 3, 2026',
-      name: 'Spring Break Starts',
+      date: 'Jun 2026',
+      name: 'Eid ul Adha',
       color: AppTheme.warning,
+      rangeText: '3 days holiday',
     ),
     _Holiday(
-      date: 'Mar 14, 2026',
-      name: 'School Resumes',
+      date: 'Aug 14, 2026',
+      name: 'Independence Day',
       color: AppTheme.success,
     ),
-    _Holiday(
-      date: 'Apr 10, 2026',
-      name: 'Easter Holiday',
-      color: AppTheme.pink,
-    ),
+    _Holiday(date: 'Sep 2026', name: 'Eid Milad un Nabi', color: AppTheme.pink),
   ];
 
   @override
@@ -565,6 +562,17 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                       fontSize: 12,
                                     ),
                                   ),
+                                  if (h.rangeText != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      h.rangeText!,
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ],
@@ -678,6 +686,12 @@ class _RouteStop {
 
 class _Holiday {
   final String date, name;
+  final String? rangeText;
   final Color color;
-  const _Holiday({required this.date, required this.name, required this.color});
+  const _Holiday({
+    required this.date,
+    required this.name,
+    required this.color,
+    this.rangeText,
+  });
 }
