@@ -135,7 +135,7 @@ class AppStrings {
     'evening': 'EVENING',
     'upcoming_holidays': 'Upcoming Holidays',
     'oak_street_stop': 'Oak Street Stop',
-    'active': '? Active',
+    'active': 'Active',
     'completed_check': 'Completed',
     'upcoming_clock': 'Upcoming',
 
