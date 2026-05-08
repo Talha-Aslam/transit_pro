@@ -488,36 +488,50 @@ class _ParentTrackingState extends State<ParentTracking> {
                                 ),
                               ),
                               const SizedBox(height: 14),
-                              GridView.count(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                crossAxisCount: 2,
-                                mainAxisSpacing: 10,
-                                crossAxisSpacing: 10,
-                                childAspectRatio: 1.5,
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _InfoCard(
-                                    icon: '👨‍✈️',
-                                    label: AppStrings.t('driver'),
-                                    value: child?.driver ?? 'N/A',
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _InfoCard(
+                                          icon: '👨‍✈️',
+                                          label: AppStrings.t('driver'),
+                                          value: child?.driver ?? 'N/A',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _InfoCard(
+                                          icon: '🚌',
+                                          label: AppStrings.t('bus_number'),
+                                          value: child?.busNumber ?? 'N/A',
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  _InfoCard(
-                                    icon: '🚌',
-                                    label: AppStrings.t('bus_number'),
-                                    value: child?.busNumber ?? 'N/A',
-                                  ),
-                                  ValueListenableBuilder<int>(
-                                    valueListenable: _tracking.speed,
-                                    builder: (_, spd, __) => _InfoCard(
-                                      icon: '⚡',
-                                      label: AppStrings.t('speed'),
-                                      value: '$spd km/h',
-                                    ),
-                                  ),
-                                  _InfoCard(
-                                    icon: '👦',
-                                    label: AppStrings.t('students'),
-                                    value: '22 onboard',
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ValueListenableBuilder<int>(
+                                          valueListenable: _tracking.speed,
+                                          builder: (_, spd, __) => _InfoCard(
+                                            icon: '⚡',
+                                            label: AppStrings.t('speed'),
+                                            value: '$spd km/h',
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: _InfoCard(
+                                          icon: '👦',
+                                          label: AppStrings.t('students'),
+                                          value: '22 onboard',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
