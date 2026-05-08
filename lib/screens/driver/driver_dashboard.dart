@@ -67,7 +67,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     return ListenableBuilder(
       listenable: LanguageProvider.instance,
       builder: (context, _) => SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100),
+        padding: const EdgeInsets.only(bottom: 130),
         child: Column(
           children: [
             // ── Header ───────────────────────────────────────────────────────
@@ -447,14 +447,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 10),
                         GridView.count(
                           shrinkWrap: true,
+                          padding: EdgeInsets.zero,
                           physics: const NeverScrollableScrollPhysics(),
                           crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 2.0,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 2.6,
                           children: [
                             _QuickActionBtn(
                               icon: 'assets/images/utilities/emergency.png',

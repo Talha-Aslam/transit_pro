@@ -103,7 +103,7 @@ class _DriverProfileState extends State<DriverProfile> {
       valueListenable: _svc.driverInfo,
       builder: (context, info, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 100),
+          padding: const EdgeInsets.only(bottom: 120),
           child: Column(
             children: [
               // ── Profile header ──────────────────────────────────────
