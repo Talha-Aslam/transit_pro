@@ -29,6 +29,13 @@ class _ParentScheduleState extends State<ParentSchedule> {
   }
 
   static const _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  static const _fullWeekDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+  ];
   static const _dates = [23, 24, 25, 26, 27];
 
   static const _schedule = [
@@ -296,7 +303,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${_weekDays[_selectedDay]}day Schedule',
+                                '${_fullWeekDays[_selectedDay]} Schedule',
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 16,
