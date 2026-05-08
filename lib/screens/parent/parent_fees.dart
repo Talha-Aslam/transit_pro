@@ -468,30 +468,3 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-class _BreakdownRow extends StatelessWidget {
-  final String label, amount;
-  const _BreakdownRow({required this.label, required this.amount});
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

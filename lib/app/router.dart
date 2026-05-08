@@ -8,6 +8,8 @@ import '../screens/parent/parent_layout.dart';
 import '../screens/parent/language_screen.dart';
 import '../screens/parent/help_support_screen.dart';
 import '../screens/parent/live_chat_screen.dart';
+import '../screens/parent/driver_details_screen.dart';
+import '../screens/parent/driver_chat_screen.dart';
 import '../screens/parent/trip_history_screen.dart';
 import '../screens/parent/subscription_screen.dart';
 import '../screens/parent/emergency_contacts_screen.dart';
@@ -60,6 +62,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/parent/live-chat',
       builder: (context, state) => const LiveChatScreen(),
+    ),
+    GoRoute(
+      path: '/parent/driver-details',
+      builder: (context, state) => const DriverDetailsScreen(),
+    ),
+    GoRoute(
+      path: '/parent/driver-chat',
+      builder: (context, state) => const DriverChatScreen(),
     ),
     GoRoute(
       path: '/parent/trips',

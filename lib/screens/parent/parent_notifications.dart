@@ -80,11 +80,6 @@ class _ParentNotificationsState extends State<ParentNotifications> {
               ),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: widget.onBack,
-                    child: _backBtn(context),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Row(
                       children: [
@@ -408,15 +403,3 @@ class _NotifCard extends StatelessWidget {
   }
 }
 
-Widget _backBtn(BuildContext context) => Container(
-  width: 38,
-  height: 38,
-  decoration: BoxDecoration(
-    color: context.cardBgElevated,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: context.inputBorder),
-  ),
-  child: Center(
-    child: Icon(Icons.arrow_back, color: context.textPrimary, size: 16),
-  ),
-);

@@ -611,6 +611,49 @@ class _ParentProfileState extends State<ParentProfile> {
                         ),
                         const SizedBox(height: 12),
 
+                        // ── Transport support ───────────────────────────
+                        GlassCard(
+                          padding: EdgeInsets.zero,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  16,
+                                  18,
+                                  10,
+                                ),
+                                child: Text(
+                                  AppStrings.t('transport_support'),
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              _MenuItem(
+                                icon: '🧑‍✈️',
+                                label: AppStrings.t('my_driver'),
+                                desc: AppStrings.t('my_driver_desc'),
+                                onTap: () =>
+                                    context.push('/parent/driver-details'),
+                              ),
+                              _MenuItem(
+                                icon: '💬',
+                                label: AppStrings.t('driver_chat'),
+                                desc: AppStrings.t('driver_chat_desc'),
+                                isLast: true,
+                                onTap: () =>
+                                    context.push('/parent/driver-chat'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
                         // ── Menu items ────────────────────────────────────
                         GlassCard(
                           child: Column(

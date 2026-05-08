@@ -178,26 +178,6 @@ class _ParentTrackingState extends State<ParentTracking> {
                     ),
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: widget.onBack,
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: context.cardBgElevated,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: context.inputBorder),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.arrow_back,
-                                color: context.textPrimary,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
