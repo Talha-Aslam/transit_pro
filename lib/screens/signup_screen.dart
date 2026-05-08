@@ -117,6 +117,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _onLangChanged() => setState(() {});
 
+  String? get _passwordMismatchError {
+    final confirm = _confirmPassCtrl.text;
+    if (confirm.isEmpty) return null;
+    return _passCtrl.text != confirm ? AppStrings.t('pwd_no_match') : null;
+  }
+
   String _localizedRoleName(String id) {
     switch (id) {
       case 'parent':
@@ -130,6 +136,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _signup() {
     if (!_agreeTerms) return;
+    // block signup if passwords don't match
+    if (_passCtrl.text != _confirmPassCtrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('pwd_no_match'))),
+      );
+      return;
+    }
+
     setState(() => _loading = true);
     Future.delayed(const Duration(milliseconds: 1800), () {
       if (mounted) {
@@ -518,6 +532,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
             ),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
           _FieldLabel(AppStrings.t('confirm_password_lbl')),
@@ -537,7 +552,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   size: 20,
                 ),
               ),
+              errorText: _passwordMismatchError,
             ),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 18),
 
