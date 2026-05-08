@@ -94,8 +94,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         child: Text(
                           AppStrings.t('back'),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: context.textPrimary,
                             fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -225,7 +226,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   child: Text(
                                     AppStrings.t('reset_sent'),
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: context.textPrimary,
                                       fontSize: 13,
                                       height: 1.4,
                                     ),
