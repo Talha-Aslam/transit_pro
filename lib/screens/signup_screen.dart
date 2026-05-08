@@ -569,7 +569,8 @@ class _SignupScreenState extends State<SignupScreen> {
             gradient: _cfg.gradient,
             glowColor: _cfg.glow,
             isLoading: _loading,
-            onTap: _signup,
+            isEnabled: _agreeTerms,
+            onTap: _agreeTerms ? _signup : null,
           ),
           const SizedBox(height: 20),
 
