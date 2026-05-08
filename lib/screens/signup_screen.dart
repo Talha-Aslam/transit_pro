@@ -138,9 +138,9 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!_agreeTerms) return;
     // block signup if passwords don't match
     if (_passCtrl.text != _confirmPassCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.t('pwd_no_match'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppStrings.t('pwd_no_match'))));
       return;
     }
 
