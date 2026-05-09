@@ -691,7 +691,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             _StatCard(
                               icon: 'assets/images/stats/total_trips.png',
                               label: AppStrings.t('total_trips'),
-                              value: '142',
+                              value: '7',
                               color: AppTheme.purple,
                             ),
                             _StatCard(
@@ -709,7 +709,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             _StatCard(
                               icon: 'assets/images/stats/safety.png',
                               label: AppStrings.t('safe_rides'),
-                              value: '142',
+                              value: '7',
                               color: AppTheme.warning,
                             ),
                           ],
