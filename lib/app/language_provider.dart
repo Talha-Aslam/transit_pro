@@ -270,6 +270,7 @@ class AppStrings {
     'available_plans': 'AVAILABLE PLANS',
     'change_plan': 'Change Plan',
     'switch_plan': 'Switch Plan',
+    'starter_badge': 'Starter',
     'best_value': 'Best Value',
     'current_badge': 'Current',
     'active_renews': 'Active · Renews Apr 8, 2026',

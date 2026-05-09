@@ -190,6 +190,28 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
                       // Plan cards
                       _PlanCard(
+                        id: 'trail',
+                        selected: _selected == 'trail',
+                        name: AppStrings.t('Free Trial'),
+                        price: 'Rs. 0/mo',
+                        badge: SubscriptionProvider.instance.plan == 'trail'
+                            ? AppStrings.t('starter_badge')
+                            : null,
+                        features: [
+                          AppStrings.t('Enjoy free trial for 1 month.'),
+                          AppStrings.t('No payment required for trial access.'),
+                          AppStrings.t(
+                            'Receive pickup and drop-off notifications',
+                          ),
+                          AppStrings.t('Upgrade to premium after trial ends.'),
+                        ],
+                        color: AppTheme.success,
+                        onTap: () => setState(() => _selected = 'trail'),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Plan cards
+                      _PlanCard(
                         id: 'premium',
                         selected: _selected == 'premium',
                         name: AppStrings.t('plan_premium_name'),
@@ -214,8 +236,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         name: AppStrings.t('plan_family_name'),
                         price: 'Rs. 499/mo',
                         badge: SubscriptionProvider.instance.plan == 'family'
-                            ? AppStrings.t('current_badge')
-                            : AppStrings.t('best_value'),
+                            ? AppStrings.t('best_value')
+                            : null,
                         features: [
                           AppStrings.t('feat_everything_premium'),
                           AppStrings.t('feat_unlimited_profiles'),
