@@ -13,8 +13,10 @@ class SubscriptionProvider extends ChangeNotifier {
     switch (_plan) {
       case 'family':
         return 'Family';
-      case 'trail':
-        return 'Trail';
+      case 'free':
+        return 'Free';
+      case 'trial':
+        return 'Trial';
       case 'basic':
         return 'Basic';
       default:

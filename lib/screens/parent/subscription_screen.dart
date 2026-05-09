@@ -190,11 +190,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
                       // Plan cards
                       _PlanCard(
-                        id: 'trail',
-                        selected: _selected == 'trail',
+                        id: 'trial',
+                        selected: _selected == 'trial',
                         name: AppStrings.t('plan_trial_name'),
                         price: 'Rs. 0/mo',
-                        badge: SubscriptionProvider.instance.plan == 'trail'
+                        badge: SubscriptionProvider.instance.plan == 'trial'
                             ? AppStrings.t('starter_badge')
                             : null,
                         features: [
@@ -204,7 +204,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           AppStrings.t('feat_upgrade_after_trial'),
                         ],
                         color: AppTheme.success,
-                        onTap: () => setState(() => _selected = 'trail'),
+                        onTap: () => setState(() => _selected = 'trial'),
                       ),
                       const SizedBox(height: 8),
 
