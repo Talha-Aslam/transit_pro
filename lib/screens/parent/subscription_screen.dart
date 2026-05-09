@@ -192,18 +192,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       _PlanCard(
                         id: 'trail',
                         selected: _selected == 'trail',
-                        name: AppStrings.t('Free Trial'),
+                        name: AppStrings.t('plan_trial_name'),
                         price: 'Rs. 0/mo',
                         badge: SubscriptionProvider.instance.plan == 'trail'
                             ? AppStrings.t('starter_badge')
                             : null,
                         features: [
-                          AppStrings.t('Enjoy free trial for 1 month.'),
-                          AppStrings.t('No payment required for trial access.'),
-                          AppStrings.t(
-                            'Receive pickup and drop-off notifications',
-                          ),
-                          AppStrings.t('Upgrade to premium after trial ends.'),
+                          AppStrings.t('feat_enjoy_free_trial'),
+                          AppStrings.t('feat_no_payment_required'),
+                          AppStrings.t('feat_pickup_dropoff_notifications'),
+                          AppStrings.t('feat_upgrade_after_trial'),
                         ],
                         color: AppTheme.success,
                         onTap: () => setState(() => _selected = 'trail'),

@@ -541,6 +541,12 @@ class AppStrings {
         'Premium includes live GPS tracking, up to 3 child profiles, push & SMS alerts, full trip history and emergency contact management.',
 
     // Subscription plan features
+    'plan_trial_name': 'Free Trial',
+    'feat_enjoy_free_trial': 'Enjoy free trial for 1 month.',
+    'feat_no_payment_required': 'No payment required for trial access.',
+    'feat_pickup_dropoff_notifications':
+        'Receive pickup and drop-off notifications',
+    'feat_upgrade_after_trial': 'Upgrade to premium after trial ends.',
     'plan_premium_name': 'Premium',
     'plan_family_name': 'Family',
     'plan_basic_name': 'Basic',
@@ -876,6 +882,7 @@ class AppStrings {
     'available_plans': 'دستیاب پلانز',
     'change_plan': 'پلان تبدیل کریں',
     'switch_plan': 'پلان بدلیں',
+    'starter_badge': 'اسٹارٹر',
     'best_value': 'بہترین قیمت',
     'current_badge': 'موجودہ',
     'active_renews': 'فعال · 8 اپریل 2026 کو تجدید',
@@ -1132,6 +1139,12 @@ class AppStrings {
         'پریمیم میں لائیو GPS ٹریکنگ، 3 بچوں کے پروفائل، پش اور SMS الرٹس، مکمل سفر کی تاریخ اور ہنگامی رابطوں کا انتظام شامل ہے۔',
 
     // Subscription plan features
+    'plan_trial_name': 'ٹرائل',
+    'feat_enjoy_free_trial': 'فری ٹرائل کا لطف اٹھائیں',
+    'feat_no_payment_required': 'کوئی ادائیگی کی ضرورت نہیں',
+    'feat_pickup_dropoff_notifications': 'پک اپ اور ڈراپ آف کی اطلاعات',
+    'feat_upgrade_after_trial':
+        'ٹرائل کے ختم ہونے کے بعد پریمیم پر اپگریڈ کریں',
     'plan_premium_name': 'پریمیم',
     'plan_family_name': 'فیملی',
     'plan_basic_name': 'بیسک',
