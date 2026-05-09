@@ -31,7 +31,6 @@ class _ParentProfileState extends State<ParentProfile> {
   bool _boardingAlert = true;
   bool _arrivalAlert = true;
   bool _delayAlert = true;
-  bool _smsNotif = false;
   bool _emailNotif = true;
 
   void _onSubscriptionChanged() => setState(() {});
@@ -590,13 +589,6 @@ class _ParentProfileState extends State<ParentProfile> {
                                 value: _delayAlert,
                                 onChanged: (v) =>
                                     setState(() => _delayAlert = v),
-                              ),
-                              _divider(context),
-                              _PrefRow(
-                                label: AppStrings.t('sms_notifs'),
-                                desc: AppStrings.t('sms_notifs_desc'),
-                                value: _smsNotif,
-                                onChanged: (v) => setState(() => _smsNotif = v),
                               ),
                               _divider(context),
                               _PrefRow(
