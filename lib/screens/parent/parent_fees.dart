@@ -14,61 +14,24 @@ class StudentFees extends StatefulWidget {
 class _StudentFeesState extends State<StudentFees> {
   String _filter = 'All';
   final _svc = ParentDataService.instance;
-  int _seenFeeNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _svc.paidFeeMonths.addListener(_onFeeStateChanged);
-    _svc.feeNotifications.addListener(_onFeeNotificationChanged);
-    _svc.loadFeeState().then((_) {
-      if (!mounted) return;
-      _seenFeeNotificationCount = _svc.feeNotifications.value.length;
-      setState(() {});
-    });
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
-    _svc.paidFeeMonths.removeListener(_onFeeStateChanged);
-    _svc.feeNotifications.removeListener(_onFeeNotificationChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
 
-  void _onFeeStateChanged() => setState(() {});
-
-  void _onFeeNotificationChanged() {
-    final notifs = _svc.feeNotifications.value;
-    if (notifs.length <= _seenFeeNotificationCount) return;
-    _seenFeeNotificationCount = notifs.length;
-    final message = notifs.last;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Payment Confirmed'),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isCurrentMonthPaid = _svc.isMonthPaid('December 2024');
-    final paidAmount = isCurrentMonthPaid ? 'Rs.12,500' : 'Rs.10,000';
+    final paidAmount = 'Rs.10,000';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -167,33 +130,19 @@ class _StudentFeesState extends State<StudentFees> {
                   const SizedBox(height: 18),
                   // Pay now button
                   GestureDetector(
-                    onTap: isCurrentMonthPaid
-                        ? null
-                        : () => context.push(
-                            '/parent/payment',
-                            extra: {
-                              'amount': 'Rs.2,500',
-                              'month': 'December 2024',
-                            },
-                          ),
+                    onTap: () => context.push(
+                      '/parent/payment',
+                      extra: {'amount': 'Rs.2,500', 'month': 'December 2024'},
+                    ),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        gradient: isCurrentMonthPaid
-                            ? LinearGradient(
-                                colors: [
-                                  context.surfaceBorder,
-                                  context.surfaceBorder.withOpacity(0.9),
-                                ],
-                              )
-                            : AppTheme.studentGradient,
+                        gradient: AppTheme.studentGradient,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: isCurrentMonthPaid
-                                ? Colors.transparent
-                                : AppTheme.studentAmber.withOpacity(0.25),
+                            color: AppTheme.studentAmber.withOpacity(0.25),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -201,13 +150,9 @@ class _StudentFeesState extends State<StudentFees> {
                       ),
                       child: Center(
                         child: Text(
-                          isCurrentMonthPaid
-                              ? 'Paid for this month'
-                              : AppStrings.t('pay_now'),
-                          style: TextStyle(
-                            color: isCurrentMonthPaid
-                                ? context.textSecondary
-                                : Colors.white,
+                          AppStrings.t('pay_now'),
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
@@ -346,7 +291,7 @@ class _StudentFeesState extends State<StudentFees> {
                     shaderCallback: (b) =>
                         AppTheme.studentGradient.createShader(b),
                     child: Text(
-                      'Rs.12,500',
+                      'Rs.10,000',
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
