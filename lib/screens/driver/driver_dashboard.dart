@@ -136,7 +136,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => widget.onNavigate(3),
+                    onTap: () => widget.onNavigate(4),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -160,27 +160,34 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.error,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                '2',
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
+                        ValueListenableBuilder<List<AppNotification>>(
+                          valueListenable: NotificationService.instance.history,
+                          builder: (_, list, __) {
+                            final unread = list.where((n) => !n.read).length;
+                            if (unread == 0) return const SizedBox.shrink();
+                            return Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: const BoxDecoration(
+                                  color: AppTheme.error,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$unread',
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ),

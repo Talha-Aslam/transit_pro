@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/missed_bus_service.dart';
 import '../../theme/app_theme.dart';
@@ -48,6 +49,11 @@ class _DriverNotificationsState extends State<DriverNotifications> {
       _msgs[i] = _msgs[i].copyWith(read: true);
       _selectedMsg = _msgs[i];
     });
+    // Reflect this read state in the global notification history
+    final hist = NotificationService.instance.history.value;
+    NotificationService.instance.history.value = hist
+        .map((n) => n.id == msg.id ? n.copyWith(read: true) : n)
+        .toList();
   }
 
   @override
@@ -134,6 +140,8 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                           _msgs = _msgs
                               .map((m) => m.copyWith(read: true))
                               .toList();
+                          // Mark global history as read as well
+                          NotificationService.instance.markAllRead();
                         }),
                         child: Tooltip(
                           message: 'Mark all read',
