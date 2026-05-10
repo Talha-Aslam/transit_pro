@@ -1464,13 +1464,15 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: context.surfaceBorder,
-                    borderRadius: BorderRadius.circular(2),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: context.surfaceBorder,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
                 Text(
@@ -1718,13 +1720,32 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Request Sent'),
+          backgroundColor: context.isDark
+              ? const Color(0xFF10351F)
+              : const Color(0xFFEAF8EF),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E)),
+              const SizedBox(width: 10),
+              Text(
+                'Request Sent',
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
           content: Text(
             'Your request has been sent to ${bus.driver}. They will respond shortly.',
+            style: TextStyle(color: context.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF16A34A),
+              ),
               child: const Text('OK'),
             ),
           ],
