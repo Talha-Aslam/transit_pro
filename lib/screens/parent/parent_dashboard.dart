@@ -410,7 +410,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     Text(
                                       child == null
                                           ? 'N/A'
-                                          : '${child.busNumber.toUpperCase()} Â· ${child.route.toUpperCase()}',
+                                          : '${child.busNumber.toUpperCase()} - ${child.route.toUpperCase()}',
                                       style: TextStyle(
                                         color: context.textSecondary,
                                         fontSize: 11,
@@ -456,8 +456,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           ? ''
                                           : '\ud83d\udccd ${AppStrings.t('currently_at')} ${child.stop}',
                                       style: TextStyle(
-                                        color: context.textTertiary,
-                                        fontSize: 12,
+                                        color: context.textSecondary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
