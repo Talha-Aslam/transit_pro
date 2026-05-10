@@ -6,6 +6,7 @@ import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'driver_dashboard.dart';
 import 'driver_attendance.dart';
+import 'driver_booked_students_screen.dart';
 import 'driver_route.dart';
 import 'driver_notifications.dart';
 import 'driver_profile.dart';
@@ -20,7 +21,7 @@ class DriverLayout extends StatefulWidget {
 class _DriverLayoutState extends State<DriverLayout> {
   int _tab = 0;
 
-  static const int _routeTab = 2;
+  static const int _routeTab = 3;
 
   void _goToTab(int index) => setState(() => _tab = index);
 
@@ -28,6 +29,10 @@ class _DriverLayoutState extends State<DriverLayout> {
     _NavItem(
       icon: 'assets/images/navbar/home_transparent.png',
       label: AppStrings.t('dnav_home'),
+    ),
+    _NavItem(
+      icon: 'assets/images/navbar/student_details.png',
+      label: AppStrings.t('dnav_booked'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/student.png',
@@ -58,6 +63,7 @@ class _DriverLayoutState extends State<DriverLayout> {
             index: _tab,
             children: [
               DriverDashboard(onNavigate: _goToTab),
+              DriverBookedStudentsScreen(onBack: () => _goToTab(0)),
               DriverAttendance(onBack: () => _goToTab(0)),
               // DriverRoute hosts a GoogleMap platform view.
               // Render it ONLY while the Route tab is active - this fully

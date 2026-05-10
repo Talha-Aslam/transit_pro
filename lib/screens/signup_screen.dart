@@ -755,7 +755,7 @@ class _SignupScreenState extends State<SignupScreen> {
           Row(
             children: [
               Expanded(
-                child: _DocumentUploadTile(
+                child: _documentUploadTile(
                   title: 'Upload License',
                   subtitle: _licenseFileName ?? 'Front photo of license',
                   icon: Icons.badge_rounded,
@@ -765,7 +765,7 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _DocumentUploadTile(
+                child: _documentUploadTile(
                   title: 'Upload ID Card',
                   subtitle: _idCardFileName ?? 'CNIC / national ID photo',
                   icon: Icons.credit_card_rounded,
@@ -906,7 +906,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  Widget _DocumentUploadTile({
+  Widget _documentUploadTile({
     required String title,
     required String subtitle,
     required IconData icon,

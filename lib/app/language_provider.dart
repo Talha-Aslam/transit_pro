@@ -377,6 +377,7 @@ class AppStrings {
 
     // Driver navbar
     'dnav_home': 'Home',
+    'dnav_booked': 'Booked',
     'dnav_students': 'Students',
     'dnav_route': 'Route',
     'dnav_alerts': 'Alerts',
@@ -386,7 +387,7 @@ class AppStrings {
     'snav_home': 'Home',
     'snav_track': 'Track',
     'snav_schedule': 'Schedule',
-    'snav_qr': 'QR Pass',
+    'snav_student_details': 'Std Details',
     'snav_fees': 'Fees',
     'snav_profile': 'Profile',
 
@@ -988,6 +989,7 @@ class AppStrings {
 
     // Driver navbar
     'dnav_home': 'ہوم',
+    'dnav_booked': 'بک شدہ',
     'dnav_students': 'طلباء',
     'dnav_route': 'روٹ',
     'dnav_alerts': 'الرٹس',
@@ -997,7 +999,7 @@ class AppStrings {
     'snav_home': 'ہوم',
     'snav_track': 'ٹریک',
     'snav_schedule': 'شیڈول',
-    'snav_qr': 'کیو آر پاس',
+    'snav_student_details': 'تفصیلات',
     'snav_fees': 'فیس',
     'snav_profile': 'پروفائل',
 
