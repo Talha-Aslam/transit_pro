@@ -5,6 +5,7 @@ import '../../app/parent_data_service.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class ParentMissedBusScreen extends StatefulWidget {
   const ParentMissedBusScreen({super.key});
@@ -29,9 +30,10 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.85, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulse = Tween<double>(
+      begin: 0.85,
+      end: 1.15,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _service.studentActiveRequest.addListener(_rebuild);
     _parentService.children.addListener(_rebuild);
   }
@@ -97,8 +99,11 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Center(
-                          child: Icon(Icons.arrow_back,
-                              color: context.textPrimary, size: 16),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: context.textPrimary,
+                            size: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -107,16 +112,22 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Missed Bus',
-                              style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800)),
+                          Text(
+                            'Missed Bus',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                           if (child != null)
-                            Text(child.name,
-                                style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 12)),
+                            Text(
+                              child.name,
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -129,8 +140,7 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                 child: child == null
                     ? _NoChildState()
                     : SingleChildScrollView(
-                        padding:
-                            const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                         child: req == null
                             ? _ParentRequestForm(
                                 child: child,
@@ -192,40 +202,48 @@ class _ParentRequestForm extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                    child: Text('🧒', style: TextStyle(fontSize: 24))),
+                  child: Text('🧒', style: TextStyle(fontSize: 24)),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(child.name,
-                        style: TextStyle(
-                            color: context.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
+                    Text(
+                      child.name,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
                     Text(
                       '${child.grade} · ${child.school}',
                       style: TextStyle(
-                          color: context.textSecondary, fontSize: 11),
+                        color: context.textSecondary,
+                        fontSize: 11,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.warning.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text('MISSED BUS',
-                    style: TextStyle(
-                        color: AppTheme.warningLight,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5)),
+                child: Text(
+                  'MISSED BUS',
+                  style: TextStyle(
+                    color: AppTheme.warningLight,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
               ),
             ],
           ),
@@ -233,16 +251,18 @@ class _ParentRequestForm extends StatelessWidget {
         const SizedBox(height: 20),
 
         // Assigned stop
-        Text('Current Stop',
-            style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
+        Text(
+          'Current Stop',
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: context.cardBgElevated,
             borderRadius: BorderRadius.circular(14),
@@ -250,30 +270,34 @@ class _ParentRequestForm extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.location_on_rounded,
-                  color: AppTheme.purple, size: 18),
+              Icon(Icons.location_on_rounded, color: AppTheme.purple, size: 18),
               const SizedBox(width: 10),
-              Text(child.stop,
-                  style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14)),
+              Text(
+                child.stop,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
         // Missed bus
-        Text('Missed Bus',
-            style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
+        Text(
+          'Missed Bus',
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: context.cardBgElevated,
             borderRadius: BorderRadius.circular(14),
@@ -281,26 +305,35 @@ class _ParentRequestForm extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.directions_bus_rounded,
-                  color: AppTheme.driverCyan, size: 18),
+              Icon(
+                Icons.directions_bus_rounded,
+                color: AppTheme.driverCyan,
+                size: 18,
+              ),
               const SizedBox(width: 10),
-              Text('${child.busNumber}  ·  ${child.route}',
-                  style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14)),
+              Text(
+                '${child.busNumber}  ·  ${child.route}',
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
         // Destination
-        Text('Destination',
-            style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6)),
+        Text(
+          'Destination',
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -313,26 +346,57 @@ class _ParentRequestForm extends StatelessWidget {
                   : context.inputBorder,
             ),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedDestination,
-              hint: Text('Select destination',
-                  style: TextStyle(
-                      color: context.textHint, fontSize: 14)),
-              isExpanded: true,
-              dropdownColor: context.cardBg,
-              icon: Icon(Icons.keyboard_arrow_down_rounded,
-                  color: context.textSecondary),
-              items: stops
-                  .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s,
-                            style: TextStyle(
-                                color: context.textPrimary, fontSize: 14)),
-                      ))
-                  .toList(),
-              onChanged: onDestinationChanged,
-            ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () async {
+                  final query = Uri.encodeComponent(child.stop);
+                  final url =
+                      'https://www.google.com/maps/search/?api=1&query=$query';
+                  if (await canLaunchUrlString(url)) {
+                    await launchUrlString(url);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not open Maps')),
+                    );
+                  }
+                },
+                child: Icon(Icons.map, color: AppTheme.purple, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedDestination,
+                    hint: Text(
+                      'Select destination',
+                      style: TextStyle(color: context.textHint, fontSize: 14),
+                    ),
+                    isExpanded: true,
+                    dropdownColor: context.cardBg,
+                    icon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: context.textSecondary,
+                    ),
+                    items: stops
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(
+                              s,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onDestinationChanged,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 32),
@@ -346,7 +410,8 @@ class _ParentRequestForm extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: selectedDestination != null
                   ? const LinearGradient(
-                      colors: [AppTheme.purple, Color(0xFF9333EA)])
+                      colors: [AppTheme.purple, Color(0xFF9333EA)],
+                    )
                   : null,
               color: selectedDestination == null
                   ? context.cardBgElevated
@@ -357,20 +422,23 @@ class _ParentRequestForm extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.send_rounded,
-                      color: selectedDestination != null
-                          ? Colors.white
-                          : context.textTertiary,
-                      size: 18),
+                  Icon(
+                    Icons.send_rounded,
+                    color: selectedDestination != null
+                        ? Colors.white
+                        : context.textTertiary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Request Pickup for ${child.name.split(' ').first}',
                     style: TextStyle(
-                        color: selectedDestination != null
-                            ? Colors.white
-                            : context.textTertiary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14),
+                      color: selectedDestination != null
+                          ? Colors.white
+                          : context.textTertiary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -403,7 +471,11 @@ class _ParentStatusView extends StatelessWidget {
     switch (request.status) {
       case RequestStatus.searching:
         return _ParentSearchingView(
-            request: request, child: child, pulse: pulse, onCancel: onCancel);
+          request: request,
+          child: child,
+          pulse: pulse,
+          onCancel: onCancel,
+        );
       case RequestStatus.accepted:
         return _ParentAcceptedView(request: request, onDone: onClear);
       case RequestStatus.noDrivers:
@@ -445,19 +517,25 @@ class _ParentSearchingView extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: AppTheme.purple.withOpacity(0.15),
                 border: Border.all(
-                    color: AppTheme.purple.withOpacity(0.4), width: 2),
+                  color: AppTheme.purple.withOpacity(0.4),
+                  width: 2,
+                ),
               ),
               child: const Center(
-                  child: Text('🔍', style: TextStyle(fontSize: 40))),
+                child: Text('🔍', style: TextStyle(fontSize: 40)),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 20),
-        Text('Searching for ${child.name.split(' ').first}\'s bus…',
-            style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w700)),
+        Text(
+          'Searching for ${child.name.split(' ').first}\'s bus…',
+          style: TextStyle(
+            color: context.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 8),
         Text(
           'Looking for buses on ${request.assignedRoute}',
@@ -469,8 +547,7 @@ class _ParentSearchingView extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              _JourneyRow(
-                  from: request.currentStop, to: request.destination),
+              _JourneyRow(from: request.currentStop, to: request.destination),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -480,15 +557,17 @@ class _ParentSearchingView extends StatelessWidget {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation(AppTheme.purple),
+                      valueColor: AlwaysStoppedAnimation(AppTheme.purple),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('Alerting nearby drivers…',
-                      style: TextStyle(
-                          color: AppTheme.purple.withOpacity(0.8),
-                          fontSize: 12)),
+                  Text(
+                    'Alerting nearby drivers…',
+                    style: TextStyle(
+                      color: AppTheme.purple.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -498,17 +577,19 @@ class _ParentSearchingView extends StatelessWidget {
         GestureDetector(
           onTap: onCancel,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
             decoration: BoxDecoration(
               color: context.cardBgElevated,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: context.surfaceBorder),
             ),
-            child: Text('Cancel Request',
-                style: TextStyle(
-                    color: context.textSecondary,
-                    fontWeight: FontWeight.w600)),
+            child: Text(
+              'Cancel Request',
+              style: TextStyle(
+                color: context.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ],
@@ -540,15 +621,19 @@ class _ParentAcceptedView extends StatelessWidget {
             children: [
               const Text('✅', style: TextStyle(fontSize: 44)),
               const SizedBox(height: 10),
-              Text('Pickup Confirmed!',
-                  style: TextStyle(
-                      color: AppTheme.successLight,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800)),
+              Text(
+                'Pickup Confirmed!',
+                style: TextStyle(
+                  color: AppTheme.successLight,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('${request.studentName.split(' ').first} will be picked up soon',
-                  style: TextStyle(
-                      color: context.textSecondary, fontSize: 13)),
+              Text(
+                '${request.studentName.split(' ').first} will be picked up soon',
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -591,7 +676,9 @@ class _ParentAcceptedView extends StatelessWidget {
         GlassCard(
           padding: const EdgeInsets.all(16),
           child: _JourneyRow(
-              from: request.currentStop, to: request.destination),
+            from: request.currentStop,
+            to: request.destination,
+          ),
         ),
         const SizedBox(height: 24),
         SizedBox(
@@ -602,15 +689,19 @@ class _ParentAcceptedView extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                    colors: [AppTheme.purple, Color(0xFF9333EA)]),
+                  colors: [AppTheme.purple, Color(0xFF9333EA)],
+                ),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Center(
-                child: Text('Done',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
+                child: Text(
+                  'Done',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ),
             ),
           ),
@@ -641,17 +732,19 @@ class _ParentNoDriversView extends StatelessWidget {
             children: [
               const Text('⚠️', style: TextStyle(fontSize: 44)),
               const SizedBox(height: 12),
-              Text('No Buses Available',
-                  style: TextStyle(
-                      color: AppTheme.warningLight,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
+              Text(
+                'No Buses Available',
+                style: TextStyle(
+                  color: AppTheme.warningLight,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 6),
               Text(
                 'No nearby bus accepted the pickup request. Try again or contact the school.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: context.textSecondary, fontSize: 13),
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
             ],
           ),
@@ -666,15 +759,19 @@ class _ParentNoDriversView extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                        colors: [AppTheme.purple, Color(0xFF9333EA)]),
+                      colors: [AppTheme.purple, Color(0xFF9333EA)],
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Center(
-                    child: Text('Try Again',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14)),
+                    child: Text(
+                      'Try Again',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -689,11 +786,14 @@ class _ParentNoDriversView extends StatelessWidget {
                   border: Border.all(color: context.surfaceBorder),
                 ),
                 child: Center(
-                  child: Text('Contact School',
-                      style: TextStyle(
-                          color: context.textSecondary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14)),
+                  child: Text(
+                    'Contact School',
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -709,8 +809,10 @@ class _NoChildState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text('No child registered.',
-          style: TextStyle(color: context.textSecondary, fontSize: 14)),
+      child: Text(
+        'No child registered.',
+        style: TextStyle(color: context.textSecondary, fontSize: 14),
+      ),
     );
   }
 }
@@ -730,45 +832,60 @@ class _JourneyRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('FROM',
-                  style: TextStyle(
-                      color: context.textTertiary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8)),
+              Text(
+                'FROM',
+                style: TextStyle(
+                  color: context.textTertiary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(from,
-                  style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                from,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Icon(Icons.arrow_forward_rounded,
-              color: AppTheme.purple, size: 20),
+          child: Icon(
+            Icons.arrow_forward_rounded,
+            color: AppTheme.purple,
+            size: 20,
+          ),
         ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('TO',
-                  style: TextStyle(
-                      color: context.textTertiary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8)),
+              Text(
+                'TO',
+                style: TextStyle(
+                  color: context.textTertiary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(to,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                      color: context.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                to,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -807,16 +924,22 @@ class _InfoTile extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: TextStyle(
-                    color: context.textTertiary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600)),
-            Text(value,
-                style: TextStyle(
-                    color: context.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13)),
+            Text(
+              label,
+              style: TextStyle(
+                color: context.textTertiary,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ],
