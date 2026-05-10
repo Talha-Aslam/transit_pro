@@ -216,6 +216,11 @@ class _DriverRouteState extends State<DriverRoute> {
 
   @override
   Widget build(BuildContext context) {
+    final liveColor = _sharingLocation ? AppTheme.success : Colors.grey;
+    final liveTextColor = _sharingLocation
+        ? AppTheme.successLight
+        : Colors.grey;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 150),
       child: Column(
@@ -265,21 +270,23 @@ class _DriverRouteState extends State<DriverRoute> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: AppTheme.success,
+                        color: liveColor,
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.success.withOpacity(0.6),
-                            blurRadius: 8,
-                          ),
-                        ],
+                        boxShadow: _sharingLocation
+                            ? [
+                                BoxShadow(
+                                  color: AppTheme.success.withOpacity(0.6),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       'LIVE',
                       style: TextStyle(
-                        color: AppTheme.successLight,
+                        color: liveTextColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
