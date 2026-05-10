@@ -236,63 +236,197 @@ class _BookedPassengerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      enableBlur: false,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: context.cardBgElevated,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                passenger.avatar,
-                style: const TextStyle(fontSize: 22),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showPassengerDetails(context),
+        child: GlassCard(
+          enableBlur: false,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: context.cardBgElevated,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    passenger.avatar,
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  passenger.name,
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 14,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      passenger.name,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${passenger.grade} · ${passenger.school}',
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Parent: ${passenger.parentName}',
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.driverCyan.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppTheme.driverCyan.withOpacity(0.3),
+                  ),
+                ),
+                child: Text(
+                  passenger.busNumber,
+                  style: const TextStyle(
+                    color: AppTheme.driverAccent,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${passenger.grade} · ${passenger.school}',
-                  style: TextStyle(color: context.textTertiary, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPassengerDetails(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: context.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppTheme.driverCyan.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Parent: ${passenger.parentPhone}',
-                  style: TextStyle(color: context.textTertiary, fontSize: 12),
+                child: Center(
+                  child: Text(
+                    passenger.avatar,
+                    style: const TextStyle(fontSize: 22),
+                  ),
                 ),
-              ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      passenger.name,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      passenger.school,
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DetailRow(label: 'Grade', value: passenger.grade),
+              _DetailRow(label: 'Stop', value: passenger.stop),
+              _DetailRow(label: 'Bus', value: passenger.busNumber),
+              _DetailRow(label: 'Parent', value: passenger.parentName),
+              _DetailRow(label: 'Parent contact', value: passenger.parentPhone),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _DetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: context.textTertiary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.driverCyan.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppTheme.driverCyan.withOpacity(0.3)),
-            ),
+          Expanded(
             child: Text(
-              passenger.busNumber,
-              style: const TextStyle(
-                color: AppTheme.driverAccent,
-                fontSize: 11,
+              value,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -371,6 +505,7 @@ class _BookedPassenger {
   final String school;
   final String stop;
   final String busNumber;
+  final String parentName;
   final String parentPhone;
   final String avatar;
 
@@ -380,6 +515,7 @@ class _BookedPassenger {
     required this.school,
     required this.stop,
     required this.busNumber,
+    required this.parentName,
     required this.parentPhone,
     required this.avatar,
   });
@@ -392,6 +528,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Defence Pickup Point, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Sarah Johnson',
     parentPhone: '+1 555-0101',
     avatar: '👧',
   ),
@@ -401,6 +538,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Defence Pickup Point, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Michael Williams',
     parentPhone: '+1 555-0102',
     avatar: '👦',
   ),
@@ -410,6 +548,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Model Town Centre, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Rebecca Davis',
     parentPhone: '+1 555-0103',
     avatar: '👧',
   ),
@@ -419,6 +558,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Model Town Centre, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Daniel Brown',
     parentPhone: '+1 555-0104',
     avatar: '👦',
   ),
@@ -428,6 +568,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Canal Road Junction, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Maria Martinez',
     parentPhone: '+1 555-0105',
     avatar: '👧',
   ),
@@ -437,6 +578,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Canal Road Junction, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Robert Wilson',
     parentPhone: '+1 555-0106',
     avatar: '👦',
   ),
@@ -446,6 +588,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Aitchison College Entrance, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Nadia Anderson',
     parentPhone: '+1 555-0107',
     avatar: '👧',
   ),
@@ -455,6 +598,7 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Aitchison College Entrance, Lahore',
     busNumber: 'Bus #42',
+    parentName: 'Thomas Taylor',
     parentPhone: '+1 555-0108',
     avatar: '👦',
   ),

@@ -36,7 +36,7 @@ class _DriverLayoutState extends State<DriverLayout> {
     ),
     _NavItem(
       icon: 'assets/images/navbar/student.png',
-      label: AppStrings.t('dnav_students'),
+      label: AppStrings.t('dnav_attendance'),
     ),
     _NavItem(
       icon: 'assets/images/navbar/track_transparent.png',
