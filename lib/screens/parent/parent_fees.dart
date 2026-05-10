@@ -140,21 +140,18 @@ class _StudentFeesState extends State<StudentFees> {
                             Text(
                               AppStrings.t('outstanding_balance'),
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
+                                color: context.textPrimary,
                                 fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 2),
-                            ShaderMask(
-                              shaderCallback: (b) =>
-                                  AppTheme.studentGradient.createShader(b),
-                              child: Text(
-                                'Rs.2,500',
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                            Text(
+                              'Rs.2,500',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ],
