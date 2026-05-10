@@ -14,20 +14,40 @@ class DriverDetailsScreen extends StatefulWidget {
 
 class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   final _svc = ParentDataService.instance;
+  double _selectedRating = 5.0;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    _svc.driverRatings.addListener(_onRatingChanged);
+    _svc.loadDriverRatings();
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.driverRatings.removeListener(_onRatingChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+
+  void _onRatingChanged() => setState(() {});
+
+  Future<void> _submitWeeklyRating(ChildInfo child) async {
+    await _svc.rateDriverForChild(child, _selectedRating);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Thanks for rating ${child.driver} $_selectedRating/5 this week.',
+        ),
+        backgroundColor: const Color(0xFF16A34A),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +60,8 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
         : '—';
     final route = child?.route.isNotEmpty == true ? child!.route : '—';
     final stop = child?.stop.isNotEmpty == true ? child!.stop : '—';
+    final driverRating = child == null ? null : _svc.driverRatingFor(child);
+    final canRate = child != null && _svc.canRateDriver(child);
 
     return Scaffold(
       body: Container(
@@ -129,7 +151,10 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                                 borderRadius: BorderRadius.circular(22),
                               ),
                               child: const Center(
-                                child: Text('🧑‍✈️', style: TextStyle(fontSize: 34)),
+                                child: Text(
+                                  '🧑‍✈️',
+                                  style: TextStyle(fontSize: 34),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -144,7 +169,9 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              child?.school.isNotEmpty == true ? child!.school : AppStrings.t('no_driver_details'),
+                              child?.school.isNotEmpty == true
+                                  ? child!.school
+                                  : AppStrings.t('no_driver_details'),
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 13,
@@ -201,18 +228,99 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              AppStrings.t('my_driver_desc'),
+                              'Weekly Driver Rating',
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            _DetailLine(label: AppStrings.t('selected_bus'), value: busNumber),
-                            _DetailLine(label: AppStrings.t('selected_route'), value: route),
-                            _DetailLine(label: AppStrings.t('selected_stop'), value: stop),
-                            _DetailLine(label: AppStrings.t('driver'), value: driverName),
+                            const SizedBox(height: 8),
+                            Text(
+                              canRate
+                                  ? 'Rate your driver once per week based on punctuality, safety, and service.'
+                                  : 'You already rated this driver for this week.',
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                            if (driverRating != null) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'Last rating: ${driverRating.rating.toStringAsFixed(1)}/5',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(5, (index) {
+                                final starValue = index + 1;
+                                final active = starValue <= _selectedRating;
+                                return GestureDetector(
+                                  onTap: canRate
+                                      ? () => setState(
+                                          () => _selectedRating = starValue
+                                              .toDouble(),
+                                        )
+                                      : null,
+                                  child: Icon(
+                                    active
+                                        ? Icons.star_rounded
+                                        : Icons.star_border_rounded,
+                                    color: canRate
+                                        ? Colors.amber
+                                        : context.textHint,
+                                    size: 30,
+                                  ),
+                                );
+                              }),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: GestureDetector(
+                                onTap: canRate
+                                    ? () => _submitWeeklyRating(child)
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: canRate
+                                        ? AppTheme.parentGradient
+                                        : LinearGradient(
+                                            colors: [
+                                              context.surfaceBorder,
+                                              context.surfaceBorder,
+                                            ],
+                                          ),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      canRate
+                                          ? 'Submit Weekly Rating'
+                                          : 'Rating Submitted This Week',
+                                      style: TextStyle(
+                                        color: canRate
+                                            ? Colors.white
+                                            : context.textSecondary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -287,46 +395,6 @@ class _InfoTile extends StatelessWidget {
               color: context.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DetailLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DetailLine({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: context.textTertiary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],
