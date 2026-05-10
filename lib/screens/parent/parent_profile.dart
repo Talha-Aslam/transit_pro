@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
@@ -1865,6 +1866,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     String label,
     TextEditingController controller,
     String hint,
+    {
+    ValueChanged<String>? onChanged,
+    }
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1880,6 +1884,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          onChanged: onChanged,
           style: TextStyle(color: context.textPrimary, fontSize: 14),
           decoration: InputDecoration(
             hintText: hint,
@@ -1958,6 +1963,61 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     );
   }
 
+  Future<void> _openInstituteMap() async {
+    final institute = _instituteName ?? widget.initialChild.school;
+    if (institute.trim().isEmpty) return;
+
+    final query = [institute.trim(), if (_instituteType != null) _instituteType!]
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+    await _openMapQuery(query);
+  }
+
+  Future<void> _openCurrentLocationMap() async {
+    final location = _locationCtrl.text.trim();
+    if (location.isEmpty) return;
+    await _openMapQuery(location);
+  }
+
+  Future<void> _openMapQuery(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty) return;
+
+    final encoded = Uri.encodeComponent(query);
+    final webUri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encoded',
+    );
+
+    bool opened = false;
+    if (Platform.isAndroid) {
+      final androidGeo = Uri.parse('geo:0,0?q=$encoded');
+      if (await canLaunchUrl(androidGeo)) {
+        opened = await launchUrl(
+          androidGeo,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } else if (Platform.isIOS) {
+      final iosGoogleMaps = Uri.parse('comgooglemaps://?q=$encoded');
+      if (await canLaunchUrl(iosGoogleMaps)) {
+        opened = await launchUrl(
+          iosGoogleMaps,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    }
+
+    if (!opened && await canLaunchUrl(webUri)) {
+      opened = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open Google Maps right now.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
@@ -2032,26 +2092,108 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       },
                     ),
                     if (_instituteType != null)
-                      _buildDropdown<String>(
-                        label: "Institute Name",
-                        value: _instituteName,
-                        hint: "Select your $_instituteType",
-                        items: availableSchools
-                            .map(
-                              (s) => DropdownMenuItem(value: s, child: Text(s)),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _instituteName = val;
-                            _selectedBus = null;
-                          });
-                        },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: _buildDropdown<String>(
+                              label: "Institute Name",
+                              value: _instituteName,
+                              hint: "Select your $_instituteType",
+                              items: availableSchools
+                                  .map(
+                                    (s) => DropdownMenuItem(
+                                      value: s,
+                                      child: Text(s),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
+                                setState(() {
+                                  _instituteName = val;
+                                  _selectedBus = null;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Tooltip(
+                            message: "Open institute in Google Maps",
+                            child: GestureDetector(
+                              onTap: _instituteName == null
+                                  ? null
+                                  : _openInstituteMap,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 14),
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: _instituteName == null
+                                      ? context.surfaceBorder.withOpacity(0.45)
+                                      : AppTheme.info.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: _instituteName == null
+                                        ? context.surfaceBorder
+                                        : AppTheme.info.withOpacity(0.25),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.my_location_rounded,
+                                  color: _instituteName == null
+                                      ? context.textTertiary
+                                      : AppTheme.info,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    _buildTextField(
-                      "Current Location (Where you live)",
-                      _locationCtrl,
-                      "e.g. Oak Street",
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            "Current Location (Where you live)",
+                            _locationCtrl,
+                            "e.g. Oak Street",
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Tooltip(
+                          message: "Open location in Google Maps",
+                          child: GestureDetector(
+                            onTap: _locationCtrl.text.trim().isEmpty
+                                ? null
+                                : _openCurrentLocationMap,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: _locationCtrl.text.trim().isEmpty
+                                    ? context.surfaceBorder.withOpacity(0.45)
+                                    : AppTheme.info.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: _locationCtrl.text.trim().isEmpty
+                                      ? context.surfaceBorder
+                                      : AppTheme.info.withOpacity(0.25),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.my_location_rounded,
+                                color: _locationCtrl.text.trim().isEmpty
+                                    ? context.textTertiary
+                                    : AppTheme.info,
+                                size: 22,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
 
                     if (showBuses) ...[
