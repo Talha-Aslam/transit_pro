@@ -186,24 +186,31 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     children: [
                       GlassCard(
                         padding: const EdgeInsets.all(20),
-                        child: Column(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text('🔐', style: TextStyle(fontSize: 36)),
-                            const SizedBox(height: 8),
-                            Text(
-                              AppStrings.t('update_password'),
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              AppStrings.t('strong_password'),
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 12,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    AppStrings.t('update_password'),
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    AppStrings.t('strong_password'),
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
