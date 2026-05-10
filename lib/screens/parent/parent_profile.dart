@@ -1394,7 +1394,24 @@ class _BusOption {
   final String busNumber;
   final String driver;
   final String route;
-  _BusOption(this.busNumber, this.driver, this.route);
+  final String? phone;
+  final int seatCapacity;
+  final List<String> schools;
+  final bool verified;
+  final double rating;
+  final int totalTrips;
+
+  const _BusOption(
+    this.busNumber,
+    this.driver,
+    this.route, {
+    this.phone,
+    this.seatCapacity = 20,
+    this.schools = const [],
+    this.verified = false,
+    this.rating = 0.0,
+    this.totalTrips = 0,
+  });
 }
 
 class _ChildFlowSheet extends StatefulWidget {
@@ -1423,6 +1440,299 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   String? _instituteName;
   _BusOption? _selectedBus;
 
+  Future<void> _showDriverPreview(_BusOption bus) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        final isDark = context.isDark;
+        final sheetBg = isDark ? AppTheme.bgDark : Colors.white;
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: context.surfaceBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Driver Preview',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppTheme.parentPurple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.drive_eta_rounded,
+                        size: 30,
+                        color: AppTheme.parentAccent,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bus.driver,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            bus.busNumber + ' · ' + bus.route,
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bus.phone ?? 'Contact not available',
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.verified,
+                                size: 16,
+                                color: bus.verified
+                                    ? AppTheme.parentAccent
+                                    : context.textHint,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                bus.verified ? 'Verified' : 'Not verified',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Icon(
+                                Icons.confirmation_number_outlined,
+                                size: 16,
+                                color: context.textHint,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${bus.seatCapacity} seats',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              size: 16,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              bus.rating.toStringAsFixed(1),
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${bus.totalTrips} trips',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (bus.schools.isNotEmpty) ...[
+                  Text(
+                    'Serves',
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: bus.schools
+                        .map(
+                          (s) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.isDark
+                                  ? AppTheme.bgDarkBlue
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              s,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context, false),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: context.isDark
+                                ? const Color(0xFF2A2A3A)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: context.inputBorder),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context, true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                widget.accentColor,
+                                widget.accentColor.withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'Confirm',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _selectedBus = bus;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Selected ${bus.busNumber} — ${bus.driver}')),
+      );
+      // Show confirmation popup that the request has been sent to the driver
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Request Sent'),
+          content: Text(
+            'Your request has been sent to ${bus.driver}. They will respond shortly.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   final Map<String, List<String>> _institutes = {
     'School': ['Lincoln Elementary', 'Springfield High', 'Beaconhouse'],
     'College': ['City College', 'State College', 'Punjab College'],
@@ -1430,9 +1740,39 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   };
 
   final List<_BusOption> _allBuses = [
-    _BusOption('Bus #42', 'Mike T.', 'Route A (Morning/Evening)'),
-    _BusOption('Bus #15', 'Ali H.', 'Route B (Express)'),
-    _BusOption('Bus #09', 'John D.', 'Route C (University Line)'),
+    _BusOption(
+      'Bus #42',
+      'Mike T.',
+      'Route A (Morning/Evening)',
+      phone: '+1 555-0123',
+      seatCapacity: 24,
+      schools: ['Lincoln Elementary', 'Springfield High'],
+      verified: true,
+      rating: 4.7,
+      totalTrips: 1240,
+    ),
+    _BusOption(
+      'Bus #15',
+      'Ali H.',
+      'Route B (Express)',
+      phone: '+92 300-555-015',
+      seatCapacity: 18,
+      schools: ['Punjab College'],
+      verified: false,
+      rating: 4.1,
+      totalTrips: 480,
+    ),
+    _BusOption(
+      'Bus #09',
+      'John D.',
+      'Route C (University Line)',
+      phone: '+44 20 7946 0009',
+      seatCapacity: 30,
+      schools: ['University of Lahore', 'FAST NUCES'],
+      verified: true,
+      rating: 4.9,
+      totalTrips: 2035,
+    ),
   ];
 
   @override
@@ -1697,9 +2037,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       ..._allBuses.map((bus) {
                         final isSelected = _selectedBus == bus;
                         return GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedBus = bus);
-                          },
+                          onTap: () => _showDriverPreview(bus),
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             padding: const EdgeInsets.all(12),
