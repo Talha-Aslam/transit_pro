@@ -154,7 +154,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.2),
+                      AppTheme.driverCyan.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -210,11 +210,11 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                       GlassCard(
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.driverCyan.withOpacity(0.15),
-                            AppTheme.driverTeal.withOpacity(0.05),
+                            AppTheme.driverCyan.withValues(alpha: 0.15),
+                            AppTheme.driverTeal.withValues(alpha: 0.05),
                           ],
                         ),
-                        borderColor: AppTheme.driverCyan.withOpacity(0.3),
+                        borderColor: AppTheme.driverCyan.withValues(alpha: 0.3),
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -297,24 +297,24 @@ class _EligibilityBanner extends StatelessWidget {
     final String subtitle;
 
     if (isEligible) {
-      bg = AppTheme.success.withOpacity(0.12);
-      border = AppTheme.success.withOpacity(0.4);
-      iconBg = AppTheme.success.withOpacity(0.2);
+      bg = AppTheme.success.withValues(alpha: 0.12);
+      border = AppTheme.success.withValues(alpha: 0.4);
+      iconBg = AppTheme.success.withValues(alpha: 0.2);
       icon = '✅';
       title = 'Eligible for Rides';
       subtitle = 'All documents verified. You are cleared to accept rides.';
     } else if (missingCount > 0) {
-      bg = AppTheme.error.withOpacity(0.1);
-      border = AppTheme.error.withOpacity(0.35);
-      iconBg = AppTheme.error.withOpacity(0.15);
+      bg = AppTheme.error.withValues(alpha: 0.1);
+      border = AppTheme.error.withValues(alpha: 0.35);
+      iconBg = AppTheme.error.withValues(alpha: 0.15);
       icon = '🚫';
       title = 'Not Eligible for Rides';
       subtitle =
           '$missingCount document${missingCount > 1 ? 's' : ''} still need to be uploaded.';
     } else {
-      bg = AppTheme.warning.withOpacity(0.1);
-      border = AppTheme.warning.withOpacity(0.35);
-      iconBg = AppTheme.warning.withOpacity(0.15);
+      bg = AppTheme.warning.withValues(alpha: 0.1);
+      border = AppTheme.warning.withValues(alpha: 0.35);
+      iconBg = AppTheme.warning.withValues(alpha: 0.15);
       icon = '🕐';
       title = 'Verification Pending';
       subtitle =
@@ -386,7 +386,7 @@ class _DocCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.driverCyan.withOpacity(0.12),
+                  color: AppTheme.driverCyan.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
@@ -457,10 +457,10 @@ class _UploadButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(
-          color: AppTheme.driverCyan.withOpacity(0.1),
+          color: AppTheme.driverCyan.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppTheme.driverCyan.withOpacity(0.4),
+            color: AppTheme.driverCyan.withValues(alpha: 0.4),
             style: BorderStyle.solid,
           ),
         ),
@@ -495,9 +495,9 @@ class _PendingPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.warning.withOpacity(0.08),
+        color: AppTheme.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -555,9 +555,9 @@ class _RejectedRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppTheme.error.withOpacity(0.08),
+        color: AppTheme.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -574,7 +574,7 @@ class _RejectedRow extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.15),
+                color: AppTheme.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -608,22 +608,22 @@ class _StatusBadge extends StatelessWidget {
 
     switch (status) {
       case DocStatus.verified:
-        bg = AppTheme.success.withOpacity(0.15);
-        border = AppTheme.success.withOpacity(0.3);
+        bg = AppTheme.success.withValues(alpha: 0.15);
+        border = AppTheme.success.withValues(alpha: 0.3);
         textColor = AppTheme.successLight;
         label = 'Verified';
         icon = Icons.verified_rounded;
         break;
       case DocStatus.pending:
-        bg = AppTheme.warning.withOpacity(0.15);
-        border = AppTheme.warning.withOpacity(0.3);
+        bg = AppTheme.warning.withValues(alpha: 0.15);
+        border = AppTheme.warning.withValues(alpha: 0.3);
         textColor = AppTheme.warningLight;
         label = 'Pending';
         icon = Icons.hourglass_top_rounded;
         break;
       case DocStatus.rejected:
-        bg = AppTheme.error.withOpacity(0.15);
-        border = AppTheme.error.withOpacity(0.3);
+        bg = AppTheme.error.withValues(alpha: 0.15);
+        border = AppTheme.error.withValues(alpha: 0.3);
         textColor = AppTheme.errorLight;
         label = 'Rejected';
         icon = Icons.cancel_rounded;
@@ -774,9 +774,9 @@ class _PickerOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [

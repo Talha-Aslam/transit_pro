@@ -18,17 +18,17 @@ extension AppColors on BuildContext {
   Color get textHint => isDark ? Colors.white24 : const Color(0xFFCBD5E1);
 
   // Surfaces / cards
-  Color get cardBg => isDark ? Colors.white.withOpacity(0.06) : Colors.white;
+  Color get cardBg => isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
   Color get cardBgElevated =>
-      isDark ? Colors.white.withOpacity(0.10) : const Color(0xFFF1F5F9);
+      isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFF1F5F9);
   Color get surfaceBorder =>
-      isDark ? Colors.white.withOpacity(0.10) : const Color(0xFFE2E8F0);
+      isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFE2E8F0);
 
   // Inputs
   Color get inputFill =>
-      isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF1F5F9);
+      isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9);
   Color get inputBorder =>
-      isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFE2E8F0);
+      isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
 }
 
 class AppTheme {
@@ -138,12 +138,12 @@ class AppTheme {
   }) {
     return BoxDecoration(
       color: gradient == null
-          ? (color ?? Colors.white.withOpacity(0.06))
+          ? (color ?? Colors.white.withValues(alpha: 0.06))
           : null,
       gradient: gradient,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: borderColor ?? Colors.white.withOpacity(0.10),
+        color: borderColor ?? Colors.white.withValues(alpha: 0.10),
         width: borderWidth,
       ),
       boxShadow: shadows,
@@ -210,21 +210,21 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: Colors.white.withValues(alpha: 0.05),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: parentAccent, width: 1.5),
         ),
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.25),
+          color: Colors.white.withValues(alpha: 0.25),
           fontSize: 15,
         ),
         contentPadding: const EdgeInsets.symmetric(

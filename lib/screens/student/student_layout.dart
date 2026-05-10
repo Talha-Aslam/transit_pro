@@ -101,18 +101,18 @@ class _StudentLayoutState extends State<StudentLayout> {
               child: Container(
                 decoration: BoxDecoration(
                   color: context.isDark
-                      ? Colors.white.withOpacity(0.10)
-                      : Colors.white.withOpacity(0.55),
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : Colors.white.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(40),
                   border: Border.all(
                     color: context.isDark
-                        ? Colors.white.withOpacity(0.18)
-                        : Colors.white.withOpacity(0.80),
+                        ? Colors.white.withValues(alpha: 0.18)
+                        : Colors.white.withValues(alpha: 0.80),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
+                      color: Colors.black.withValues(alpha: 0.18),
                       blurRadius: 28,
                       offset: const Offset(0, 8),
                     ),
@@ -136,12 +136,12 @@ class _StudentLayoutState extends State<StudentLayout> {
                           decoration: isActive
                               ? BoxDecoration(
                                   color: context.isDark
-                                      ? Colors.white.withOpacity(0.20)
-                                      : Colors.white.withOpacity(0.72),
+                                      ? Colors.white.withValues(alpha: 0.20)
+                                      : Colors.white.withValues(alpha: 0.72),
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.10),
+                                      color: Colors.black.withValues(alpha: 0.10),
                                       blurRadius: 10,
                                       offset: const Offset(0, 3),
                                     ),

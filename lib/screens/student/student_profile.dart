@@ -152,7 +152,7 @@ class _StudentProfileState extends State<StudentProfile> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.studentAmber.withOpacity(0.18),
+                          AppTheme.studentAmber.withValues(alpha: 0.18),
                           Colors.transparent,
                         ],
                       ),
@@ -170,7 +170,7 @@ class _StudentProfileState extends State<StudentProfile> {
                                 borderRadius: BorderRadius.circular(28),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.studentAmber.withOpacity(
+                                    color: AppTheme.studentAmber.withValues(alpha: 
                                       0.3,
                                     ),
                                     blurRadius: 20,
@@ -252,13 +252,13 @@ class _StudentProfileState extends State<StudentProfile> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    AppTheme.studentAmber.withOpacity(0.2),
-                                    AppTheme.studentOrange.withOpacity(0.1),
+                                    AppTheme.studentAmber.withValues(alpha: 0.2),
+                                    AppTheme.studentOrange.withValues(alpha: 0.1),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppTheme.studentAmber.withOpacity(0.3),
+                                  color: AppTheme.studentAmber.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Text(
@@ -581,10 +581,10 @@ class _StudentProfileState extends State<StudentProfile> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: AppTheme.error.withOpacity(0.1),
+                          color: AppTheme.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: AppTheme.error.withOpacity(0.25),
+                            color: AppTheme.error.withValues(alpha: 0.25),
                           ),
                         ),
                         child: Center(
@@ -1058,7 +1058,7 @@ class _EditSheetState extends State<_EditSheet> {
                     gradient: LinearGradient(
                       colors: [
                         widget.accentColor,
-                        widget.accentColor.withOpacity(0.75),
+                        widget.accentColor.withValues(alpha: 0.75),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),

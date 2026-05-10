@@ -78,7 +78,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.driverCyan.withOpacity(0.2),
+                    AppTheme.driverCyan.withValues(alpha: 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -205,17 +205,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     gradient: LinearGradient(
                       colors: _routeStarted
                           ? [
-                              AppTheme.success.withOpacity(0.15),
-                              AppTheme.success.withOpacity(0.05),
+                              AppTheme.success.withValues(alpha: 0.15),
+                              AppTheme.success.withValues(alpha: 0.05),
                             ]
                           : [
-                              AppTheme.driverCyan.withOpacity(0.15),
-                              AppTheme.driverCyan.withOpacity(0.05),
+                              AppTheme.driverCyan.withValues(alpha: 0.15),
+                              AppTheme.driverCyan.withValues(alpha: 0.05),
                             ],
                     ),
                     borderColor:
                         (_routeStarted ? AppTheme.success : AppTheme.driverCyan)
-                            .withOpacity(0.25),
+                            .withValues(alpha: 0.25),
                     padding: const EdgeInsets.all(20),
                     child: Column(
                       children: [
@@ -259,14 +259,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                     (_routeStarted
                                             ? AppTheme.success
                                             : AppTheme.warning)
-                                        .withOpacity(0.2),
+                                        .withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color:
                                       (_routeStarted
                                               ? AppTheme.success
                                               : AppTheme.warning)
-                                          .withOpacity(0.4),
+                                          .withValues(alpha: 0.4),
                                 ),
                               ),
                               child: Row(
@@ -369,11 +369,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                     onTap: () => widget.onNavigate(2),
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.driverCyan.withOpacity(0.15),
-                        AppTheme.driverTeal.withOpacity(0.08),
+                        AppTheme.driverCyan.withValues(alpha: 0.15),
+                        AppTheme.driverTeal.withValues(alpha: 0.08),
                       ],
                     ),
-                    borderColor: AppTheme.driverCyan.withOpacity(0.25),
+                    borderColor: AppTheme.driverCyan.withValues(alpha: 0.25),
                     padding: const EdgeInsets.all(18),
                     child: Row(
                       children: [
@@ -385,7 +385,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.driverCyan.withOpacity(0.3),
+                                color: AppTheme.driverCyan.withValues(alpha: 0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
@@ -441,7 +441,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           width: 32,
                           height: 32,
                           decoration: BoxDecoration(
-                            color: AppTheme.driverCyan.withOpacity(0.2),
+                            color: AppTheme.driverCyan.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Center(
@@ -583,7 +583,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 (_routeStarted
                                         ? AppTheme.error
                                         : AppTheme.success)
-                                    .withOpacity(0.3),
+                                    .withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -694,9 +694,9 @@ class _QuickActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.13),
+          color: color.withValues(alpha: 0.13),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(
           children: [
@@ -792,7 +792,7 @@ class _SheetBase extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       padding: EdgeInsets.fromLTRB(
         20,
@@ -807,7 +807,7 @@ class _SheetBase extends StatelessWidget {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -968,13 +968,13 @@ class _AlertAllSheetState extends State<_AlertAllSheet> {
                 ),
                 decoration: BoxDecoration(
                   color: selected
-                      ? AppTheme.warning.withOpacity(0.15)
-                      : Colors.white.withOpacity(0.05),
+                      ? AppTheme.warning.withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: selected
-                        ? AppTheme.warning.withOpacity(0.5)
-                        : Colors.white.withOpacity(0.08),
+                        ? AppTheme.warning.withValues(alpha: 0.5)
+                        : Colors.white.withValues(alpha: 0.08),
                   ),
                 ),
                 child: Row(
@@ -1081,9 +1081,9 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.success.withOpacity(0.1),
+              color: AppTheme.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.success.withOpacity(0.25)),
+              border: Border.all(color: AppTheme.success.withValues(alpha: 0.25)),
             ),
             child: Row(
               children: [
@@ -1209,13 +1209,13 @@ class _UpdateRouteSheetState extends State<_UpdateRouteSheet> {
                 ),
                 decoration: BoxDecoration(
                   color: sel
-                      ? AppTheme.info.withOpacity(0.15)
-                      : Colors.white.withOpacity(0.05),
+                      ? AppTheme.info.withValues(alpha: 0.15)
+                      : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: sel
-                        ? AppTheme.info.withOpacity(0.5)
-                        : Colors.white.withOpacity(0.08),
+                        ? AppTheme.info.withValues(alpha: 0.5)
+                        : Colors.white.withValues(alpha: 0.08),
                   ),
                 ),
                 child: Row(
@@ -1293,9 +1293,9 @@ class _ActionRow extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [

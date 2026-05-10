@@ -26,7 +26,7 @@ class _ImageSourceSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1C1C2E),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -96,9 +96,9 @@ class _SourceButton extends StatelessWidget {
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: accentColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: accentColor.withOpacity(0.35)),
+              border: Border.all(color: accentColor.withValues(alpha: 0.35)),
             ),
             child: Icon(icon, color: accentColor, size: 30),
           ),

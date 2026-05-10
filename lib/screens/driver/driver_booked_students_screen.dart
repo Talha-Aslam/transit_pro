@@ -63,7 +63,7 @@ class _DriverBookedStudentsScreenState
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
+                  AppTheme.driverCyan.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -298,10 +298,10 @@ class _BookedPassengerCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.driverCyan.withOpacity(0.15),
+                  color: AppTheme.driverCyan.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: AppTheme.driverCyan.withOpacity(0.3),
+                    color: AppTheme.driverCyan.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
@@ -338,7 +338,7 @@ class _BookedPassengerCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.driverCyan.withOpacity(0.15),
+                  color: AppTheme.driverCyan.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
@@ -454,9 +454,9 @@ class _SummaryPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [

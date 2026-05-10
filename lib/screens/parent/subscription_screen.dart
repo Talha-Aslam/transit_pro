@@ -50,7 +50,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.parentPurple.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -99,11 +99,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       GlassCard(
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.parentPurple.withOpacity(0.3),
-                            AppTheme.parentIndigo.withOpacity(0.15),
+                            AppTheme.parentPurple.withValues(alpha: 0.3),
+                            AppTheme.parentIndigo.withValues(alpha: 0.15),
                           ],
                         ),
-                        borderColor: AppTheme.parentPurple.withOpacity(0.4),
+                        borderColor: AppTheme.parentPurple.withValues(alpha: 0.4),
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           children: [
@@ -156,10 +156,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.success.withOpacity(0.2),
+                                    color: AppTheme.success.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: AppTheme.success.withOpacity(0.4),
+                                      color: AppTheme.success.withValues(alpha: 0.4),
                                     ),
                                   ),
                                   child: Text(
@@ -323,7 +323,7 @@ class _PlanCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.1) : context.cardBgElevated,
+          color: selected ? color.withValues(alpha: 0.1) : context.cardBgElevated,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? color : context.surfaceBorder,
@@ -357,7 +357,7 @@ class _PlanCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: color.withOpacity(0.2),
+                                color: color.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -409,7 +409,7 @@ class _PlanCard extends StatelessWidget {
                     Icon(
                       Icons.check_circle_outline,
                       size: 14,
-                      color: color.withOpacity(0.8),
+                      color: color.withValues(alpha: 0.8),
                     ),
                     const SizedBox(width: 6),
                     Text(

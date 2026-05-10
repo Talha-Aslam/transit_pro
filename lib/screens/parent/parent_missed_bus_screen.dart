@@ -81,7 +81,7 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.purple.withOpacity(0.18),
+                      AppTheme.purple.withValues(alpha: 0.18),
                       Colors.transparent,
                     ],
                   ),
@@ -198,7 +198,7 @@ class _ParentRequestForm extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppTheme.purple.withOpacity(0.15),
+                  color: AppTheme.purple.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -232,7 +232,7 @@ class _ParentRequestForm extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.warning.withOpacity(0.12),
+                  color: AppTheme.warning.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -342,7 +342,7 @@ class _ParentRequestForm extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selectedDestination != null
-                  ? AppTheme.purple.withOpacity(0.5)
+                  ? AppTheme.purple.withValues(alpha: 0.5)
                   : context.inputBorder,
             ),
           ),
@@ -515,9 +515,9 @@ class _ParentSearchingView extends StatelessWidget {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.purple.withOpacity(0.15),
+                color: AppTheme.purple.withValues(alpha: 0.15),
                 border: Border.all(
-                  color: AppTheme.purple.withOpacity(0.4),
+                  color: AppTheme.purple.withValues(alpha: 0.4),
                   width: 2,
                 ),
               ),
@@ -564,7 +564,7 @@ class _ParentSearchingView extends StatelessWidget {
                   Text(
                     'Alerting nearby drivers…',
                     style: TextStyle(
-                      color: AppTheme.purple.withOpacity(0.8),
+                      color: AppTheme.purple.withValues(alpha: 0.8),
                       fontSize: 12,
                     ),
                   ),
@@ -613,9 +613,9 @@ class _ParentAcceptedView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.success.withOpacity(0.1),
+            color: AppTheme.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -724,9 +724,9 @@ class _ParentNoDriversView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.warning.withOpacity(0.1),
+            color: AppTheme.warning.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -915,7 +915,7 @@ class _InfoTile extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 18),

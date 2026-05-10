@@ -141,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        _cfg.glowColor.withOpacity(0.4),
+                        _cfg.glowColor.withValues(alpha: 0.4),
                         Colors.transparent,
                       ],
                     ),
@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               borderRadius: BorderRadius.circular(22),
                               boxShadow: [
                                 BoxShadow(
-                                  color: _cfg.glowColor.withOpacity(0.45),
+                                  color: _cfg.glowColor.withValues(alpha: 0.45),
                                   blurRadius: 28,
                                   offset: const Offset(0, 12),
                                 ),
@@ -247,10 +247,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: _cfg.glowColor.withOpacity(0.12),
+                                color: _cfg.glowColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: _cfg.glowColor.withOpacity(0.3),
+                                  color: _cfg.glowColor.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Column(
@@ -347,10 +347,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.error.withOpacity(0.1),
+                                color: AppTheme.error.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: AppTheme.error.withOpacity(0.3),
+                                  color: AppTheme.error.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(

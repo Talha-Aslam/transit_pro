@@ -79,7 +79,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      widget.accentColor.withOpacity(0.2),
+                      widget.accentColor.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -352,9 +352,9 @@ class _ContactCard extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withOpacity(0.3)),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
               child: Center(
                 child: Text(icon, style: const TextStyle(fontSize: 20)),

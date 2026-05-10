@@ -128,7 +128,7 @@ class _DriverChatScreenState extends State<DriverChatScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.parentPurple.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),

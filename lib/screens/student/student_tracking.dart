@@ -29,7 +29,7 @@ class _StudentTrackingState extends State<StudentTracking> {
 
     rootBundle.loadString('assets/map_style.json').then((style) {
       _mapStyle = style;
-      _mapController?.setMapStyle(style);
+      if (mounted) setState(() {});
     });
 
     final route = MockRouteBuilder.buildMorningRoute();
@@ -86,7 +86,7 @@ class _StudentTrackingState extends State<StudentTracking> {
         rotation: _tracking.busHeading.value,
         anchor: const Offset(0.5, 0.5),
         infoWindow: const InfoWindow(title: '🚌 Bus #42'),
-        zIndex: 10,
+        zIndexInt: 10,
       ),
     );
 
@@ -152,6 +152,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                               target: _tracking.busPosition.value,
                               zoom: 13.5,
                             ),
+                            style: _mapStyle,
                             markers: _markers,
                             polylines: _polylines,
                             myLocationEnabled: false,
@@ -161,9 +162,6 @@ class _StudentTrackingState extends State<StudentTracking> {
                             trafficEnabled: true,
                             onMapCreated: (controller) {
                               _mapController = controller;
-                              if (_mapStyle != null) {
-                                controller.setMapStyle(_mapStyle!);
-                              }
                             },
                           ),
                           // Status overlay
@@ -184,13 +182,13 @@ class _StudentTrackingState extends State<StudentTracking> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 '📍 Pine Road → School',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 11,
                                 ),
                               ),
@@ -207,11 +205,11 @@ class _StudentTrackingState extends State<StudentTracking> {
                 GlassCard(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.success.withOpacity(0.12),
-                      AppTheme.success.withOpacity(0.04),
+                      AppTheme.success.withValues(alpha: 0.12),
+                      AppTheme.success.withValues(alpha: 0.04),
                     ],
                   ),
-                  borderColor: AppTheme.success.withOpacity(0.2),
+                  borderColor: AppTheme.success.withValues(alpha: 0.2),
                   padding: const EdgeInsets.all(18),
                   child: Row(
                     children: [
@@ -452,7 +450,7 @@ class _StopItem extends StatelessWidget {
                   boxShadow: isCurrent
                       ? [
                           BoxShadow(
-                            color: color.withOpacity(0.5),
+                            color: color.withValues(alpha: 0.5),
                             blurRadius: 8,
                           ),
                         ]
@@ -464,7 +462,7 @@ class _StopItem extends StatelessWidget {
                   width: 2,
                   height: 24,
                   color: isPassed
-                      ? AppTheme.success.withOpacity(0.4)
+                      ? AppTheme.success.withValues(alpha: 0.4)
                       : context.surfaceBorder,
                 ),
             ],

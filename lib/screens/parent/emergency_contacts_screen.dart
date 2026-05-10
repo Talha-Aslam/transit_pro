@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -260,7 +260,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      widget.accentColor.withOpacity(0.2),
+                      widget.accentColor.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -421,7 +421,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.info.withOpacity(
+                                            color: AppTheme.info.withValues(alpha: 
                                               0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(
@@ -444,7 +444,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.error.withOpacity(
+                                            color: AppTheme.error.withValues(alpha: 
                                               0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(

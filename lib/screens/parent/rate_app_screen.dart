@@ -55,7 +55,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.parentPurple.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),

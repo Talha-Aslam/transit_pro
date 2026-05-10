@@ -119,10 +119,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: context.isDark
-                                ? Colors.white.withOpacity(
+                                ? Colors.white.withValues(alpha: 
                                     max(0.0, 0.15 - i * 0.02),
                                   )
-                                : Colors.black.withOpacity(
+                                : Colors.black.withValues(alpha: 
                                     max(0.0, 0.08 - i * 0.01),
                                   ),
                             width: 1,
@@ -149,7 +149,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       height: dot.size,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: dot.color.withOpacity(0.6),
+                        color: dot.color.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -275,8 +275,8 @@ class _LoadingBar extends StatelessWidget {
           height: 5,
           decoration: BoxDecoration(
             color: context.isDark
-                ? Colors.white.withOpacity(0.10)
-                : Colors.black.withOpacity(0.07),
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Stack(

@@ -73,7 +73,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
+                  AppTheme.driverCyan.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -324,12 +324,12 @@ class _DriverAttendanceState extends State<DriverAttendance> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: active
-                ? AppTheme.driverCyan.withOpacity(0.15)
+                ? AppTheme.driverCyan.withValues(alpha: 0.15)
                 : context.cardBgElevated,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: active
-                  ? AppTheme.driverCyan.withOpacity(0.5)
+                  ? AppTheme.driverCyan.withValues(alpha: 0.5)
                   : context.surfaceBorder,
             ),
           ),
@@ -364,9 +364,9 @@ class _SummaryCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(
           children: [
@@ -445,9 +445,9 @@ class _StudentCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: cfg.color.withOpacity(0.15),
+                color: cfg.color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: cfg.color.withOpacity(0.3)),
+                border: Border.all(color: cfg.color.withValues(alpha: 0.3)),
               ),
               child: Text(
                 '${cfg.icon} ${cfg.label}',

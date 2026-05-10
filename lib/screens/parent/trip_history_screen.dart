@@ -142,7 +142,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.parentPurple.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -184,10 +184,10 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.parentPurple.withOpacity(0.15),
+                        color: AppTheme.parentPurple.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: AppTheme.parentPurple.withOpacity(0.3),
+                          color: AppTheme.parentPurple.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
@@ -455,14 +455,14 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                             (t.statusOk
                                                     ? AppTheme.success
                                                     : AppTheme.warning)
-                                                .withOpacity(0.13),
+                                                .withValues(alpha: 0.13),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color:
                                               (t.statusOk
                                                       ? AppTheme.success
                                                       : AppTheme.warning)
-                                                  .withOpacity(0.3),
+                                                  .withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Center(
@@ -502,7 +502,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                                               ? AppTheme.success
                                                               : AppTheme
                                                                     .warning)
-                                                          .withOpacity(0.15),
+                                                          .withValues(alpha: 0.15),
                                                   borderRadius:
                                                       BorderRadius.circular(6),
                                                 ),

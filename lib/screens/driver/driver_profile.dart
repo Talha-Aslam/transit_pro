@@ -114,7 +114,7 @@ class _DriverProfileState extends State<DriverProfile> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.25),
+                      AppTheme.driverCyan.withValues(alpha: 0.25),
                       Colors.transparent,
                     ],
                   ),
@@ -128,15 +128,15 @@ class _DriverProfileState extends State<DriverProfile> {
                           width: 84,
                           height: 84,
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade200.withOpacity(0.3),
+                            color: Colors.blue.shade200.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(26),
                             border: Border.all(
-                              color: AppTheme.driverCyan.withOpacity(0.5),
+                              color: AppTheme.driverCyan.withValues(alpha: 0.5),
                               width: 3,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.driverCyan.withOpacity(0.3),
+                                color: AppTheme.driverCyan.withValues(alpha: 0.3),
                                 blurRadius: 24,
                                 offset: const Offset(0, 8),
                               ),
@@ -251,10 +251,10 @@ class _DriverProfileState extends State<DriverProfile> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.success.withOpacity(0.15),
+                            color: AppTheme.success.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: AppTheme.success.withOpacity(0.3),
+                              color: AppTheme.success.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -328,11 +328,11 @@ class _DriverProfileState extends State<DriverProfile> {
                     GlassCard(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.driverCyan.withOpacity(0.1),
-                          AppTheme.driverTeal.withOpacity(0.05),
+                          AppTheme.driverCyan.withValues(alpha: 0.1),
+                          AppTheme.driverTeal.withValues(alpha: 0.05),
                         ],
                       ),
-                      borderColor: AppTheme.driverCyan.withOpacity(0.2),
+                      borderColor: AppTheme.driverCyan.withValues(alpha: 0.2),
                       padding: const EdgeInsets.all(18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -638,10 +638,10 @@ class _DriverProfileState extends State<DriverProfile> {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: AppTheme.error.withOpacity(0.1),
+                          color: AppTheme.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: AppTheme.error.withOpacity(0.25),
+                            color: AppTheme.error.withValues(alpha: 0.25),
                           ),
                         ),
                         child: Center(
@@ -784,7 +784,7 @@ class _BusChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -1034,7 +1034,7 @@ class _EditSheetState extends State<_EditSheet> {
                     gradient: LinearGradient(
                       colors: [
                         widget.accentColor,
-                        widget.accentColor.withOpacity(0.75),
+                        widget.accentColor.withValues(alpha: 0.75),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),

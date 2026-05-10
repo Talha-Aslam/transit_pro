@@ -38,7 +38,7 @@ class _ParentTrackingState extends State<ParentTracking> {
     // Load dark map style
     rootBundle.loadString('assets/map_style.json').then((style) {
       _mapStyle = style;
-      _mapController?.setMapStyle(style);
+      if (mounted) setState(() {});
     });
 
     // Initialise route & tracking
@@ -99,7 +99,7 @@ class _ParentTrackingState extends State<ParentTracking> {
         rotation: _tracking.busHeading.value,
         anchor: const Offset(0.5, 0.5),
         infoWindow: const InfoWindow(title: '🚌 Bus #42'),
-        zIndex: 10,
+        zIndexInt: 10,
       ),
     );
 
@@ -171,7 +171,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.parentPurple.withOpacity(0.2),
+                          AppTheme.parentPurple.withValues(alpha: 0.2),
                           Colors.transparent,
                         ],
                       ),
@@ -217,11 +217,13 @@ class _ParentTrackingState extends State<ParentTracking> {
                           builder: (_, eta, __) => GlassCard(
                             gradient: LinearGradient(
                               colors: [
-                                AppTheme.parentPurple.withOpacity(0.2),
-                                AppTheme.info.withOpacity(0.1),
+                                AppTheme.parentPurple.withValues(alpha: 0.2),
+                                AppTheme.info.withValues(alpha: 0.1),
                               ],
                             ),
-                            borderColor: AppTheme.parentPurple.withOpacity(0.3),
+                            borderColor: AppTheme.parentPurple.withValues(
+                              alpha: 0.3,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 16,
@@ -329,21 +331,22 @@ class _ParentTrackingState extends State<ParentTracking> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: live
-                                                ? AppTheme.success.withOpacity(
-                                                    0.2,
+                                                ? AppTheme.success.withValues(
+                                                    alpha: 0.2,
                                                   )
-                                                : AppTheme.info.withOpacity(
-                                                    0.15,
+                                                : AppTheme.info.withValues(
+                                                    alpha: 0.15,
                                                   ),
                                             borderRadius: BorderRadius.circular(
                                               8,
                                             ),
                                             border: Border.all(
                                               color: live
-                                                  ? AppTheme.success
-                                                        .withOpacity(0.4)
-                                                  : AppTheme.info.withOpacity(
-                                                      0.3,
+                                                  ? AppTheme.success.withValues(
+                                                      alpha: 0.4,
+                                                    )
+                                                  : AppTheme.info.withValues(
+                                                      alpha: 0.3,
                                                     ),
                                             ),
                                           ),
@@ -381,6 +384,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       target: _tracking.busPosition.value,
                                       zoom: 13.5,
                                     ),
+                                    style: _mapStyle,
                                     markers: _markers,
                                     polylines: _polylines,
                                     myLocationEnabled: false,
@@ -390,9 +394,6 @@ class _ParentTrackingState extends State<ParentTracking> {
                                     trafficEnabled: true,
                                     onMapCreated: (controller) {
                                       _mapController = controller;
-                                      if (_mapStyle != null) {
-                                        controller.setMapStyle(_mapStyle!);
-                                      }
                                     },
                                   ),
                                 ),
@@ -552,7 +553,7 @@ class _LiveBadge extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.success.withOpacity(0.6),
+                    color: AppTheme.success.withValues(alpha: 0.6),
                     blurRadius: 6,
                   ),
                 ],
@@ -600,13 +601,13 @@ class _StopRow extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: _color.withOpacity(0.15),
+                  color: _color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: _color, width: 2),
                   boxShadow: stop.status == StopStatus.current
                       ? [
                           BoxShadow(
-                            color: _color.withOpacity(0.4),
+                            color: _color.withValues(alpha: 0.4),
                             blurRadius: 10,
                           ),
                         ]
@@ -640,7 +641,7 @@ class _StopRow extends StatelessWidget {
                   height: 28,
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   color: stop.status == StopStatus.completed
-                      ? AppTheme.success.withOpacity(0.4)
+                      ? AppTheme.success.withValues(alpha: 0.4)
                       : context.cardBgElevated,
                 ),
             ],
@@ -675,10 +676,10 @@ class _StopRow extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.purple.withOpacity(0.2),
+                          color: AppTheme.purple.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: AppTheme.purple.withOpacity(0.4),
+                            color: AppTheme.purple.withValues(alpha: 0.4),
                           ),
                         ),
                         child: const Text(

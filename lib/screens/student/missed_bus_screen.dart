@@ -79,7 +79,7 @@ class _MissedBusScreenState extends State<MissedBusScreen>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.error.withOpacity(0.18),
+                      AppTheme.error.withValues(alpha: 0.18),
                       Colors.transparent,
                     ],
                   ),
@@ -170,9 +170,9 @@ class _RequestForm extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.error.withOpacity(0.1),
+            color: AppTheme.error.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
@@ -180,7 +180,7 @@ class _RequestForm extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.error.withOpacity(0.15),
+                  color: AppTheme.error.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
@@ -308,7 +308,7 @@ class _RequestForm extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selectedDestination != null
-                  ? AppTheme.driverCyan.withOpacity(0.5)
+                  ? AppTheme.driverCyan.withValues(alpha: 0.5)
                   : context.inputBorder,
             ),
           ),
@@ -455,9 +455,9 @@ class _SearchingView extends StatelessWidget {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppTheme.warning.withOpacity(0.15),
+                color: AppTheme.warning.withValues(alpha: 0.15),
                 border: Border.all(
-                  color: AppTheme.warning.withOpacity(0.4),
+                  color: AppTheme.warning.withValues(alpha: 0.4),
                   width: 2,
                 ),
               ),
@@ -557,9 +557,9 @@ class _AcceptedView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.success.withOpacity(0.1),
+            color: AppTheme.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.success.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -710,9 +710,9 @@ class _NoDriversView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.warning.withOpacity(0.1),
+            color: AppTheme.warning.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
           ),
           child: Column(
             children: [
@@ -888,7 +888,7 @@ class _InfoTile extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 18),

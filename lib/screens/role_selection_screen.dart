@@ -110,7 +110,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     colors: [
                       const Color(
                         0xFF7C3AED,
-                      ).withOpacity(context.isDark ? 0.25 : 0.18),
+                      ).withValues(alpha: context.isDark ? 0.25 : 0.18),
                       Colors.transparent,
                     ],
                   ),
@@ -130,7 +130,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     colors: [
                       const Color(
                         0xFFF59E0B,
-                      ).withOpacity(context.isDark ? 0.15 : 0.12),
+                      ).withValues(alpha: context.isDark ? 0.15 : 0.12),
                       Colors.transparent,
                     ],
                   ),
@@ -150,7 +150,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     colors: [
                       const Color(
                         0xFF0EA5E9,
-                      ).withOpacity(context.isDark ? 0.20 : 0.15),
+                      ).withValues(alpha: context.isDark ? 0.20 : 0.15),
                       Colors.transparent,
                     ],
                   ),
@@ -170,7 +170,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     colors: [
                       const Color(
                         0xFF4F46E5,
-                      ).withOpacity(context.isDark ? 0.18 : 0.12),
+                      ).withValues(alpha: context.isDark ? 0.18 : 0.12),
                       Colors.transparent,
                     ],
                   ),
@@ -199,20 +199,20 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: context.isDark
-                                    ? AppTheme.purple.withOpacity(0.18)
-                                    : Colors.white.withOpacity(0.95),
+                                    ? AppTheme.purple.withValues(alpha: 0.18)
+                                    : Colors.white.withValues(alpha: 0.95),
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
                                   color: context.isDark
-                                      ? AppTheme.purple.withOpacity(0.45)
-                                      : AppTheme.purple.withOpacity(0.35),
+                                      ? AppTheme.purple.withValues(alpha: 0.45)
+                                      : AppTheme.purple.withValues(alpha: 0.35),
                                   width: 1.5,
                                 ),
                                 boxShadow: context.isDark
                                     ? null
                                     : [
                                         BoxShadow(
-                                          color: AppTheme.purple.withOpacity(
+                                          color: AppTheme.purple.withValues(alpha: 
                                             0.12,
                                           ),
                                           blurRadius: 16,
@@ -294,7 +294,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                           ? [
                                               BoxShadow(
                                                 color: role.glowColor
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                                 blurRadius: 30,
                                                 offset: const Offset(0, 8),
                                               ),
@@ -318,7 +318,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                             boxShadow: [
                                               BoxShadow(
                                                 color: role.glowColor
-                                                    .withOpacity(
+                                                    .withValues(alpha: 
                                                       context.isDark
                                                           ? 0.45
                                                           : 0.30,
@@ -388,13 +388,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                                             color: isSelected
                                                 ? null
                                                 : context.isDark
-                                                ? Colors.white.withOpacity(0.08)
+                                                ? Colors.white.withValues(alpha: 0.08)
                                                 : const Color(0xFFE2E8F0),
                                             border: Border.all(
                                               color: isSelected
                                                   ? role.accent
                                                   : context.isDark
-                                                  ? Colors.white.withOpacity(
+                                                  ? Colors.white.withValues(alpha: 
                                                       0.2,
                                                     )
                                                   : const Color(0xFFCBD5E1),
@@ -546,8 +546,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                     },
                     style: IconButton.styleFrom(
                       backgroundColor: context.isDark
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.black.withOpacity(0.05),
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.black.withValues(alpha: 0.05),
                       padding: const EdgeInsets.all(12),
                     ),
                   ),
@@ -608,7 +608,7 @@ class _LangChip extends StatelessWidget {
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: AppTheme.parentPurple.withOpacity(0.28),
+                      color: AppTheme.parentPurple.withValues(alpha: 0.28),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

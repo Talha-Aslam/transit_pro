@@ -56,7 +56,7 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.2),
+                      AppTheme.driverCyan.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -104,11 +104,11 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                       GlassCard(
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.driverCyan.withOpacity(0.15),
-                            AppTheme.driverTeal.withOpacity(0.05),
+                            AppTheme.driverCyan.withValues(alpha: 0.15),
+                            AppTheme.driverTeal.withValues(alpha: 0.05),
                           ],
                         ),
-                        borderColor: AppTheme.driverCyan.withOpacity(0.3),
+                        borderColor: AppTheme.driverCyan.withValues(alpha: 0.3),
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           children: [
@@ -404,7 +404,7 @@ class _MetricBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: value,
             minHeight: 6,
-            backgroundColor: color.withOpacity(0.15),
+            backgroundColor: color.withValues(alpha: 0.15),
             valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
@@ -422,9 +422,9 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.driverCyan.withOpacity(0.1),
+        color: AppTheme.driverCyan.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.driverCyan.withOpacity(0.25)),
+        border: Border.all(color: AppTheme.driverCyan.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

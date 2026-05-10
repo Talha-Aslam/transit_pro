@@ -81,11 +81,11 @@ class _StudentAttendanceState extends State<StudentAttendance>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppTheme.studentAmber.withOpacity(0.12),
-                  AppTheme.studentOrange.withOpacity(0.06),
+                  AppTheme.studentAmber.withValues(alpha: 0.12),
+                  AppTheme.studentOrange.withValues(alpha: 0.06),
                 ],
               ),
-              borderColor: AppTheme.studentAmber.withOpacity(0.25),
+              borderColor: AppTheme.studentAmber.withValues(alpha: 0.25),
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
@@ -147,7 +147,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                           boxShadow: _isScanning
                               ? [
                                   BoxShadow(
-                                    color: AppTheme.studentAmber.withOpacity(
+                                    color: AppTheme.studentAmber.withValues(alpha: 
                                       glow,
                                     ),
                                     blurRadius: 30,
@@ -216,7 +216,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                             ? LinearGradient(
                                 colors: [
                                   AppTheme.success,
-                                  AppTheme.success.withOpacity(0.7),
+                                  AppTheme.success.withValues(alpha: 0.7),
                                 ],
                               )
                             : AppTheme.studentGradient,
@@ -227,7 +227,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                                 (_isScanning
                                         ? AppTheme.success
                                         : AppTheme.studentAmber)
-                                    .withOpacity(0.3),
+                                    .withValues(alpha: 0.3),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -442,10 +442,10 @@ class _CheckinCard extends StatelessWidget {
     return GlassCard(
       gradient: done
           ? LinearGradient(
-              colors: [color.withOpacity(0.08), color.withOpacity(0.02)],
+              colors: [color.withValues(alpha: 0.08), color.withValues(alpha: 0.02)],
             )
           : null,
-      borderColor: done ? color.withOpacity(0.15) : null,
+      borderColor: done ? color.withValues(alpha: 0.15) : null,
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
@@ -453,7 +453,7 @@ class _CheckinCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(

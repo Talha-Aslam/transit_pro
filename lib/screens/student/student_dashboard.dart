@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -36,7 +36,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.studentAmber.withOpacity(0.2),
+                    AppTheme.studentAmber.withValues(alpha: 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -109,11 +109,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   GlassCard(
                     gradient: LinearGradient(
                       colors: [
-                        AppTheme.success.withOpacity(0.15),
-                        AppTheme.success.withOpacity(0.05),
+                        AppTheme.success.withValues(alpha: 0.15),
+                        AppTheme.success.withValues(alpha: 0.05),
                       ],
                     ),
-                    borderColor: AppTheme.success.withOpacity(0.25),
+                    borderColor: AppTheme.success.withValues(alpha: 0.25),
                     padding: const EdgeInsets.all(18),
                     child: Row(
                       children: [
@@ -125,7 +125,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.studentAmber.withOpacity(0.3),
+                                color: AppTheme.studentAmber.withValues(alpha: 0.3),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -179,11 +179,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: GlassCard(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.studentAmber.withOpacity(0.15),
-                          AppTheme.studentOrange.withOpacity(0.08),
+                          AppTheme.studentAmber.withValues(alpha: 0.15),
+                          AppTheme.studentOrange.withValues(alpha: 0.08),
                         ],
                       ),
-                      borderColor: AppTheme.studentAmber.withOpacity(0.25),
+                      borderColor: AppTheme.studentAmber.withValues(alpha: 0.25),
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -247,7 +247,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: AppTheme.studentAccent.withOpacity(0.2),
+                              color: AppTheme.studentAccent.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -272,11 +272,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: GlassCard(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.purple.withOpacity(0.15),
-                          AppTheme.info.withOpacity(0.08),
+                          AppTheme.purple.withValues(alpha: 0.15),
+                          AppTheme.info.withValues(alpha: 0.08),
                         ],
                       ),
-                      borderColor: AppTheme.purple.withOpacity(0.25),
+                      borderColor: AppTheme.purple.withValues(alpha: 0.25),
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -334,11 +334,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: GlassCard(
                       gradient: LinearGradient(
                         colors: [
-                          AppTheme.error.withOpacity(0.15),
-                          AppTheme.warning.withOpacity(0.08),
+                          AppTheme.error.withValues(alpha: 0.15),
+                          AppTheme.warning.withValues(alpha: 0.08),
                         ],
                       ),
-                      borderColor: AppTheme.error.withOpacity(0.25),
+                      borderColor: AppTheme.error.withValues(alpha: 0.25),
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -416,12 +416,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.studentAccent.withOpacity(
+                                  color: AppTheme.studentAccent.withValues(alpha: 
                                     0.15,
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: AppTheme.studentAccent.withOpacity(
+                                    color: AppTheme.studentAccent.withValues(alpha: 
                                       0.3,
                                     ),
                                   ),
@@ -613,16 +613,16 @@ class _StatCard extends StatelessWidget {
       enableBlur: false,
       padding: const EdgeInsets.all(12),
       gradient: LinearGradient(
-        colors: [color.withOpacity(0.12), color.withOpacity(0.04)],
+        colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0.04)],
       ),
-      borderColor: color.withOpacity(0.2),
+      borderColor: color.withValues(alpha: 0.2),
       child: Row(
         children: [
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(

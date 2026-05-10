@@ -156,7 +156,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppTheme.parentPurple.withOpacity(0.2),
+                  AppTheme.parentPurple.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -207,12 +207,12 @@ class _ParentScheduleState extends State<ParentSchedule> {
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? AppTheme.parentPurple.withOpacity(0.2)
+                                  ? AppTheme.parentPurple.withValues(alpha: 0.2)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
-                                    ? AppTheme.parentPurple.withOpacity(0.5)
+                                    ? AppTheme.parentPurple.withValues(alpha: 0.5)
                                     : Colors.transparent,
                               ),
                             ),
@@ -280,13 +280,13 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   gradient: sel.status == 'today'
                       ? LinearGradient(
                           colors: [
-                            AppTheme.parentPurple.withOpacity(0.12),
-                            AppTheme.info.withOpacity(0.06),
+                            AppTheme.parentPurple.withValues(alpha: 0.12),
+                            AppTheme.info.withValues(alpha: 0.06),
                           ],
                         )
                       : null,
                   borderColor: sel.status == 'today'
-                      ? AppTheme.parentPurple.withOpacity(0.25)
+                      ? AppTheme.parentPurple.withValues(alpha: 0.25)
                       : null,
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -323,10 +323,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.15),
+                              color: statusColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: statusColor.withOpacity(0.3),
+                                color: statusColor.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(
@@ -430,12 +430,12 @@ class _ParentScheduleState extends State<ParentSchedule> {
                           ),
                           decoration: BoxDecoration(
                             color: stop.type == 'school'
-                                ? AppTheme.warning.withOpacity(0.08)
+                                ? AppTheme.warning.withValues(alpha: 0.08)
                                 : context.cardBg,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: stop.type == 'school'
-                                  ? AppTheme.warning.withOpacity(0.15)
+                                  ? AppTheme.warning.withValues(alpha: 0.15)
                                   : context.surfaceBorder,
                             ),
                           ),

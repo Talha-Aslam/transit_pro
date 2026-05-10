@@ -73,7 +73,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.parentPurple.withOpacity(0.2),
+                    AppTheme.parentPurple.withValues(alpha: 0.2),
                     Colors.transparent,
                   ],
                 ),
@@ -127,10 +127,10 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.parentAccent.withOpacity(0.15),
+                          color: AppTheme.parentAccent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: AppTheme.parentAccent.withOpacity(0.3),
+                            color: AppTheme.parentAccent.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -176,15 +176,15 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: active
-                                        ? AppTheme.parentPurple.withOpacity(0.2)
-                                        : Colors.white.withOpacity(0.05),
+                                        ? AppTheme.parentPurple.withValues(alpha: 0.2)
+                                        : Colors.white.withValues(alpha: 0.05),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: active
-                                          ? AppTheme.parentPurple.withOpacity(
+                                          ? AppTheme.parentPurple.withValues(alpha: 
                                               0.5,
                                             )
-                                          : Colors.white.withOpacity(0.1),
+                                          : Colors.white.withValues(alpha: 0.1),
                                     ),
                                   ),
                                   child: Text(
@@ -328,9 +328,9 @@ class _NotifCard extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: notif.color.withOpacity(0.12),
+                    color: notif.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: notif.color.withOpacity(0.25)),
+                    border: Border.all(color: notif.color.withValues(alpha: 0.25)),
                   ),
                   child: Center(
                     child: Text(

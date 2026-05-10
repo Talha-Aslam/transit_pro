@@ -78,7 +78,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        AppTheme.parentPurple.withOpacity(0.2),
+                        AppTheme.parentPurple.withValues(alpha: 0.2),
                         Colors.transparent,
                       ],
                     ),
@@ -135,11 +135,11 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                       GlassCard(
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.parentPurple.withOpacity(0.16),
-                            AppTheme.info.withOpacity(0.05),
+                            AppTheme.parentPurple.withValues(alpha: 0.16),
+                            AppTheme.info.withValues(alpha: 0.05),
                           ],
                         ),
-                        borderColor: AppTheme.parentPurple.withOpacity(0.25),
+                        borderColor: AppTheme.parentPurple.withValues(alpha: 0.25),
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           children: [

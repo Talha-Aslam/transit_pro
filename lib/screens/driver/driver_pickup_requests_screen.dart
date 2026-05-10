@@ -63,7 +63,7 @@ class _DriverPickupRequestsScreenState
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.15),
+                      AppTheme.driverCyan.withValues(alpha: 0.15),
                       Colors.transparent,
                     ],
                   ),
@@ -113,7 +113,7 @@ class _DriverPickupRequestsScreenState
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppTheme.error.withOpacity(0.15),
+                          color: AppTheme.error.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -194,7 +194,7 @@ class _RequestCard extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: AppTheme.error.withOpacity(0.12),
+                        color: AppTheme.error.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Center(
@@ -227,7 +227,7 @@ class _RequestCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.warning.withOpacity(0.15),
+                        color: AppTheme.warning.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -329,7 +329,7 @@ class _RequestCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: AppTheme.error.withOpacity(0.5)),
+                                color: AppTheme.error.withValues(alpha: 0.5)),
                           ),
                           child: Center(
                             child: Text('Decline',

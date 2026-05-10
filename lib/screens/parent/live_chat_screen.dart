@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -100,7 +100,7 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withOpacity(0.2),
+                      AppTheme.parentPurple.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),

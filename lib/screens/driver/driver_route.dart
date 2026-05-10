@@ -233,7 +233,7 @@ class _DriverRouteState extends State<DriverRoute> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
+                  AppTheme.driverCyan.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -275,7 +275,7 @@ class _DriverRouteState extends State<DriverRoute> {
                         boxShadow: _sharingLocation
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.success.withOpacity(0.6),
+                                  color: AppTheme.success.withValues(alpha: 0.6),
                                   blurRadius: 8,
                                 ),
                               ]
@@ -334,7 +334,7 @@ class _DriverRouteState extends State<DriverRoute> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: _followCamera
-                                          ? AppTheme.driverCyan.withOpacity(0.2)
+                                          ? AppTheme.driverCyan.withValues(alpha: 0.2)
                                           : const Color(0x10FFFFFF),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
@@ -566,10 +566,10 @@ class _DriverRouteState extends State<DriverRoute> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         decoration: BoxDecoration(
-                          color: AppTheme.warning.withOpacity(0.15),
+                          color: AppTheme.warning.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: AppTheme.warning.withOpacity(0.3),
+                            color: AppTheme.warning.withValues(alpha: 0.3),
                           ),
                         ),
                         child: const Center(
@@ -688,13 +688,13 @@ class _StopRow extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: _color.withOpacity(0.15),
+                  color: _color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: _color, width: 2),
                   boxShadow: stop.status == StopStatus.current
                       ? [
                           BoxShadow(
-                            color: _color.withOpacity(0.5),
+                            color: _color.withValues(alpha: 0.5),
                             blurRadius: 12,
                           ),
                         ]
@@ -719,7 +719,7 @@ class _StopRow extends StatelessWidget {
                   height: 30,
                   margin: const EdgeInsets.symmetric(vertical: 2),
                   color: stop.status == StopStatus.completed
-                      ? AppTheme.success.withOpacity(0.4)
+                      ? AppTheme.success.withValues(alpha: 0.4)
                       : context.cardBgElevated,
                 ),
             ],
@@ -760,10 +760,10 @@ class _StopRow extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.purple.withOpacity(0.2),
+                              color: AppTheme.purple.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: AppTheme.purple.withOpacity(0.4),
+                                color: AppTheme.purple.withValues(alpha: 0.4),
                               ),
                             ),
                             child: const Text(
@@ -783,7 +783,7 @@ class _StopRow extends StatelessWidget {
                       Text(
                         stop.note!,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.35),
+                          color: Colors.white.withValues(alpha: 0.35),
                           fontSize: 11,
                         ),
                       ),

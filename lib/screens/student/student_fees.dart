@@ -66,11 +66,11 @@ class _StudentFeesState extends State<StudentFees> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppTheme.studentAmber.withOpacity(0.15),
-                  AppTheme.studentOrange.withOpacity(0.06),
+                  AppTheme.studentAmber.withValues(alpha: 0.15),
+                  AppTheme.studentOrange.withValues(alpha: 0.06),
                 ],
               ),
-              borderColor: AppTheme.studentAmber.withOpacity(0.25),
+              borderColor: AppTheme.studentAmber.withValues(alpha: 0.25),
               padding: const EdgeInsets.all(22),
               child: Column(
                 children: [
@@ -95,7 +95,7 @@ class _StudentFeesState extends State<StudentFees> {
                             Text(
                               AppStrings.t('outstanding_balance_s'),
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                                 fontSize: 12,
                               ),
                             ),
@@ -131,7 +131,7 @@ class _StudentFeesState extends State<StudentFees> {
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.studentAmber.withOpacity(0.25),
+                          color: AppTheme.studentAmber.withValues(alpha: 0.25),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -367,9 +367,9 @@ class _StudentFeesState extends State<StudentFees> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: GlassCard(
               gradient: LinearGradient(
-                colors: [p.color.withOpacity(0.06), p.color.withOpacity(0.02)],
+                colors: [p.color.withValues(alpha: 0.06), p.color.withValues(alpha: 0.02)],
               ),
-              borderColor: p.color.withOpacity(0.12),
+              borderColor: p.color.withValues(alpha: 0.12),
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
@@ -377,7 +377,7 @@ class _StudentFeesState extends State<StudentFees> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: p.color.withOpacity(0.15),
+                      color: p.color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -496,7 +496,7 @@ class _BreakdownRow extends StatelessWidget {
           Text(
             amount,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

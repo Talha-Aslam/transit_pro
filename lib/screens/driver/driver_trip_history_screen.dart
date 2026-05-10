@@ -165,7 +165,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.2),
+                      AppTheme.driverCyan.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -340,7 +340,7 @@ class _TripCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color:
                       (trip.isMorning ? AppTheme.warningLight : AppTheme.info)
-                          .withOpacity(0.15),
+                          .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -359,7 +359,7 @@ class _TripCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: (trip.statusOk ? AppTheme.success : AppTheme.error)
-                      .withOpacity(0.15),
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -397,7 +397,7 @@ class _TripCard extends StatelessWidget {
             child: Container(
               width: 1,
               height: 14,
-              color: context.textTertiary.withOpacity(0.3),
+              color: context.textTertiary.withValues(alpha: 0.3),
             ),
           ),
           Row(

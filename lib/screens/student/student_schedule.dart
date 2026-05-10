@@ -111,11 +111,11 @@ class _StudentScheduleState extends State<StudentSchedule> {
             child: GlassCard(
               gradient: LinearGradient(
                 colors: [
-                  AppTheme.studentAmber.withOpacity(0.10),
-                  AppTheme.studentOrange.withOpacity(0.04),
+                  AppTheme.studentAmber.withValues(alpha: 0.10),
+                  AppTheme.studentOrange.withValues(alpha: 0.04),
                 ],
               ),
-              borderColor: AppTheme.studentAmber.withOpacity(0.2),
+              borderColor: AppTheme.studentAmber.withValues(alpha: 0.2),
               padding: const EdgeInsets.all(18),
               child: Row(
                 children: [
@@ -334,9 +334,9 @@ class _TimelineItem extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.18),
+                color: color.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: color.withOpacity(0.3)),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
               child: Center(
                 child: Text(icon, style: const TextStyle(fontSize: 14)),
@@ -347,7 +347,7 @@ class _TimelineItem extends StatelessWidget {
                 width: 2,
                 height: 28,
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
               ),
           ],
         ),

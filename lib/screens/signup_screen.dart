@@ -237,7 +237,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [_cfg.glow.withOpacity(0.35), Colors.transparent],
+                      colors: [_cfg.glow.withValues(alpha: 0.35), Colors.transparent],
                     ),
                   ),
                 ),
@@ -296,7 +296,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 borderRadius: BorderRadius.circular(22),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: _cfg.glow.withOpacity(0.45),
+                                    color: _cfg.glow.withValues(alpha: 0.45),
                                     blurRadius: 28,
                                     offset: const Offset(0, 12),
                                   ),
@@ -415,12 +415,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? role.glow.withOpacity(0.12)
-                        : Colors.white.withOpacity(0.04),
+                        ? role.glow.withValues(alpha: 0.12)
+                        : Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isSelected
-                          ? role.accent.withOpacity(0.6)
+                          ? role.accent.withValues(alpha: 0.6)
                           : context.cardBgElevated,
                       width: isSelected ? 1.5 : 1,
                     ),
@@ -468,7 +468,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           border: Border.all(
                             color: isSelected
                                 ? role.accent
-                                : Colors.white.withOpacity(0.2),
+                                : Colors.white.withValues(alpha: 0.2),
                             width: 2,
                           ),
                         ),
@@ -710,7 +710,7 @@ class _SignupScreenState extends State<SignupScreen> {
               padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: AppTheme.parentAccent.withOpacity(0.5),
+                  color: AppTheme.parentAccent.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -918,9 +918,9 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.10),
+          color: accentColor.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: accentColor.withOpacity(0.28)),
+          border: Border.all(color: accentColor.withValues(alpha: 0.28)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -931,7 +931,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.16),
+                    color: accentColor.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: accentColor, size: 18),
@@ -968,10 +968,10 @@ class _SignupScreenState extends State<SignupScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.parentPurple.withOpacity(context.isDark ? 0.10 : 0.06),
+        color: AppTheme.parentPurple.withValues(alpha: context.isDark ? 0.10 : 0.06),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.parentPurple.withOpacity(
+          color: AppTheme.parentPurple.withValues(alpha: 
             context.isDark ? 0.28 : 0.20,
           ),
         ),
@@ -1196,7 +1196,7 @@ class _StepDot extends StatelessWidget {
         shape: BoxShape.circle,
         color: active ? color : context.surfaceBorder,
         border: Border.all(
-          color: active ? color : Colors.white.withOpacity(0.2),
+          color: active ? color : Colors.white.withValues(alpha: 0.2),
           width: 2,
         ),
       ),

@@ -85,7 +85,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.driverCyan.withOpacity(0.2),
+                      AppTheme.driverCyan.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -149,10 +149,10 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: AppTheme.driverAccent.withOpacity(0.15),
+                              color: AppTheme.driverAccent.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: AppTheme.driverAccent.withOpacity(0.3),
+                                color: AppTheme.driverAccent.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Icon(
@@ -182,12 +182,12 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: count > 0
-                                      ? AppTheme.error.withOpacity(0.15)
+                                      ? AppTheme.error.withValues(alpha: 0.15)
                                       : context.cardBgElevated,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: count > 0
-                                        ? AppTheme.error.withOpacity(0.4)
+                                        ? AppTheme.error.withValues(alpha: 0.4)
                                         : context.surfaceBorder,
                                   ),
                                 ),
@@ -276,14 +276,14 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: active
-                                          ? AppTheme.driverCyan.withOpacity(
+                                          ? AppTheme.driverCyan.withValues(alpha: 
                                               0.15,
                                             )
                                           : context.cardBgElevated,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: active
-                                            ? AppTheme.driverCyan.withOpacity(
+                                            ? AppTheme.driverCyan.withValues(alpha: 
                                                 0.4,
                                               )
                                             : context.surfaceBorder,
@@ -340,13 +340,13 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                             width: 44,
                                             height: 44,
                                             decoration: BoxDecoration(
-                                              color: msg.color.withOpacity(
+                                              color: msg.color.withValues(alpha: 
                                                 0.12,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(14),
                                               border: Border.all(
-                                                color: msg.color.withOpacity(
+                                                color: msg.color.withValues(alpha: 
                                                   0.25,
                                                 ),
                                               ),
@@ -482,7 +482,7 @@ class _DetailView extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppTheme.driverCyan.withOpacity(0.2),
+                  AppTheme.driverCyan.withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -517,9 +517,9 @@ class _DetailView extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: msg.color.withOpacity(0.15),
+                    color: msg.color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: msg.color.withOpacity(0.25)),
+                    border: Border.all(color: msg.color.withValues(alpha: 0.25)),
                   ),
                   child: Center(
                     child: Text(

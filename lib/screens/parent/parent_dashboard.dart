@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/missed_bus_service.dart';
@@ -72,7 +72,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.parentPurple.withOpacity(0.2),
+                          AppTheme.parentPurple.withValues(alpha: 0.2),
                           Colors.transparent,
                         ],
                       ),
@@ -245,11 +245,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         GlassCard(
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.success.withOpacity(0.15),
-                              AppTheme.success.withOpacity(0.05),
+                              AppTheme.success.withValues(alpha: 0.15),
+                              AppTheme.success.withValues(alpha: 0.05),
                             ],
                           ),
-                          borderColor: AppTheme.success.withOpacity(0.25),
+                          borderColor: AppTheme.success.withValues(alpha: 0.25),
                           padding: const EdgeInsets.all(18),
                           child: child == null
                               ? Center(
@@ -279,13 +279,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           height: 62,
                                           decoration: BoxDecoration(
                                             color: AppTheme.parentPurple
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(
                                               16,
                                             ),
                                             border: Border.all(
                                               color: AppTheme.success
-                                                  .withOpacity(0.4),
+                                                  .withValues(alpha: 0.4),
                                               width: 2,
                                             ),
                                           ),
@@ -369,11 +369,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                           onTap: () => widget.onNavigate(1),
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.parentPurple.withOpacity(0.2),
-                              AppTheme.parentIndigo.withOpacity(0.08),
+                              AppTheme.parentPurple.withValues(alpha: 0.2),
+                              AppTheme.parentIndigo.withValues(alpha: 0.08),
                             ],
                           ),
-                          borderColor: AppTheme.parentPurple.withOpacity(0.25),
+                          borderColor: AppTheme.parentPurple.withValues(alpha: 0.25),
                           padding: const EdgeInsets.all(13),
                           child: Row(
                             children: [
@@ -385,7 +385,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                   borderRadius: BorderRadius.circular(18),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppTheme.parentPurple.withOpacity(
+                                      color: AppTheme.parentPurple.withValues(alpha: 
                                         0.4,
                                       ),
                                       blurRadius: 20,
@@ -469,10 +469,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.parentAccent.withOpacity(0.2),
+                                  color: AppTheme.parentAccent.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: AppTheme.parentAccent.withOpacity(
+                                    color: AppTheme.parentAccent.withValues(alpha: 
                                       0.3,
                                     ),
                                   ),
@@ -502,13 +502,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
                               child: GlassCard(
                                 gradient: LinearGradient(
                                   colors: [
-                                    AppTheme.error.withOpacity(0.15),
-                                    AppTheme.warning.withOpacity(0.08),
+                                    AppTheme.error.withValues(alpha: 0.15),
+                                    AppTheme.warning.withValues(alpha: 0.08),
                                   ],
                                 ),
                                 borderColor: isActive
-                                    ? AppTheme.error.withOpacity(0.5)
-                                    : AppTheme.error.withOpacity(0.2),
+                                    ? AppTheme.error.withValues(alpha: 0.5)
+                                    : AppTheme.error.withValues(alpha: 0.2),
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
@@ -567,7 +567,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           vertical: 3,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.warning.withOpacity(
+                                          color: AppTheme.warning.withValues(alpha: 
                                             0.2,
                                           ),
                                           borderRadius: BorderRadius.circular(
@@ -626,11 +626,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppTheme.parentAccent
-                                            .withOpacity(0.15),
+                                            .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: AppTheme.parentAccent
-                                              .withOpacity(0.3),
+                                              .withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Text(
@@ -745,11 +745,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppTheme.parentAccent
-                                            .withOpacity(0.15),
+                                            .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: AppTheme.parentAccent
-                                              .withOpacity(0.3),
+                                              .withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Text(
@@ -835,9 +835,9 @@ class _StatCard extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.13),
+              color: color.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.27)),
+              border: Border.all(color: color.withValues(alpha: 0.27)),
             ),
             child: Center(
               child: Image.asset(
@@ -894,7 +894,7 @@ class _ScheduleChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: context.cardBgElevated),
         ),
@@ -925,9 +925,9 @@ class _ScheduleChip extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: color.withOpacity(0.3)),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
               child: Text(
                 status,
@@ -961,7 +961,7 @@ class _AlertRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.cardBg),
       ),
@@ -971,9 +971,9 @@ class _AlertRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withOpacity(0.25)),
+              border: Border.all(color: color.withValues(alpha: 0.25)),
             ),
             child: Center(
               child: Image.asset(

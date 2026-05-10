@@ -131,7 +131,7 @@ class _ParentProfileState extends State<ParentProfile> {
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.75),
+      barrierColor: Colors.black.withValues(alpha: 0.75),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
@@ -141,7 +141,7 @@ class _ParentProfileState extends State<ParentProfile> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withValues(alpha: 0.35),
                 blurRadius: 32,
                 offset: const Offset(0, 8),
               ),
@@ -154,7 +154,7 @@ class _ParentProfileState extends State<ParentProfile> {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppTheme.error.withOpacity(0.15),
+                  color: AppTheme.error.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -215,10 +215,10 @@ class _ParentProfileState extends State<ParentProfile> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         decoration: BoxDecoration(
-                          color: AppTheme.error.withOpacity(0.22),
+                          color: AppTheme.error.withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppTheme.error.withOpacity(0.55),
+                            color: AppTheme.error.withValues(alpha: 0.55),
                           ),
                         ),
                         alignment: Alignment.center,
@@ -261,7 +261,7 @@ class _ParentProfileState extends State<ParentProfile> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.parentPurple.withOpacity(0.25),
+                          AppTheme.parentPurple.withValues(alpha: 0.25),
                           Colors.transparent,
                         ],
                       ),
@@ -280,15 +280,15 @@ class _ParentProfileState extends State<ParentProfile> {
                                   223,
                                   156,
                                   55,
-                                ).withOpacity(0.8),
+                                ).withValues(alpha: 0.8),
                                 borderRadius: BorderRadius.circular(26),
                                 border: Border.all(
-                                  color: AppTheme.parentPurple.withOpacity(0.5),
+                                  color: AppTheme.parentPurple.withValues(alpha: 0.5),
                                   width: 3,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.parentPurple.withOpacity(
+                                    color: AppTheme.parentPurple.withValues(alpha: 
                                       0.3,
                                     ),
                                     blurRadius: 24,
@@ -379,10 +379,10 @@ class _ParentProfileState extends State<ParentProfile> {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.parentPurple.withOpacity(0.15),
+                                color: AppTheme.parentPurple.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppTheme.parentPurple.withOpacity(0.3),
+                                  color: AppTheme.parentPurple.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -456,11 +456,11 @@ class _ParentProfileState extends State<ParentProfile> {
                         GlassCard(
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.parentPurple.withOpacity(0.1),
-                              AppTheme.info.withOpacity(0.05),
+                              AppTheme.parentPurple.withValues(alpha: 0.1),
+                              AppTheme.info.withValues(alpha: 0.05),
                             ],
                           ),
-                          borderColor: AppTheme.parentPurple.withOpacity(0.2),
+                          borderColor: AppTheme.parentPurple.withValues(alpha: 0.2),
                           padding: const EdgeInsets.all(18),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -728,10 +728,10 @@ class _ParentProfileState extends State<ParentProfile> {
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             decoration: BoxDecoration(
-                              color: AppTheme.error.withOpacity(0.1),
+                              color: AppTheme.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: AppTheme.error.withOpacity(0.25),
+                                color: AppTheme.error.withValues(alpha: 0.25),
                               ),
                             ),
                             child: Center(
@@ -937,7 +937,7 @@ class _ChildCardState extends State<_ChildCard> {
       decoration: BoxDecoration(
         color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.parentPurple.withOpacity(0.15)),
+        border: Border.all(color: AppTheme.parentPurple.withValues(alpha: 0.15)),
       ),
       child: Column(
         children: [
@@ -1053,7 +1053,7 @@ class _ChildCardState extends State<_ChildCard> {
                       padding: const EdgeInsets.all(7),
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.parentPurple.withOpacity(0.12),
+                        color: AppTheme.parentPurple.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(9),
                       ),
                       child: Image.asset(
@@ -1072,7 +1072,7 @@ class _ChildCardState extends State<_ChildCard> {
                       padding: const EdgeInsets.all(7),
                       margin: const EdgeInsets.only(right: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.error.withOpacity(0.10),
+                        color: AppTheme.error.withValues(alpha: 0.10),
                         borderRadius: BorderRadius.circular(9),
                       ),
                       child: const Icon(
@@ -1375,7 +1375,7 @@ class _EditSheetState extends State<_EditSheet> {
                     gradient: LinearGradient(
                       colors: [
                         widget.accentColor,
-                        widget.accentColor.withOpacity(0.75),
+                        widget.accentColor.withValues(alpha: 0.75),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),
@@ -1502,7 +1502,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppTheme.parentPurple.withOpacity(0.1),
+                        color: AppTheme.parentPurple.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -1695,7 +1695,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                             gradient: LinearGradient(
                               colors: [
                                 widget.accentColor,
-                                widget.accentColor.withOpacity(0.8),
+                                widget.accentColor.withValues(alpha: 0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
@@ -2128,13 +2128,13 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                                 height: 46,
                                 decoration: BoxDecoration(
                                   color: _instituteName == null
-                                      ? context.surfaceBorder.withOpacity(0.45)
-                                      : AppTheme.info.withOpacity(0.12),
+                                      ? context.surfaceBorder.withValues(alpha: 0.45)
+                                      : AppTheme.info.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: _instituteName == null
                                         ? context.surfaceBorder
-                                        : AppTheme.info.withOpacity(0.25),
+                                        : AppTheme.info.withValues(alpha: 0.25),
                                   ),
                                 ),
                                 child: Icon(
@@ -2173,13 +2173,13 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               height: 46,
                               decoration: BoxDecoration(
                                 color: _locationCtrl.text.trim().isEmpty
-                                    ? context.surfaceBorder.withOpacity(0.45)
-                                    : AppTheme.info.withOpacity(0.12),
+                                    ? context.surfaceBorder.withValues(alpha: 0.45)
+                                    : AppTheme.info.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: _locationCtrl.text.trim().isEmpty
                                       ? context.surfaceBorder
-                                      : AppTheme.info.withOpacity(0.25),
+                                      : AppTheme.info.withValues(alpha: 0.25),
                                 ),
                               ),
                               child: Icon(
@@ -2216,7 +2216,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: isSelected
-                                  ? widget.accentColor.withOpacity(0.15)
+                                  ? widget.accentColor.withValues(alpha: 0.15)
                                   : context.isDark
                                   ? AppTheme.bgDarkBlue
                                   : const Color(0xFFF1F5F9),
@@ -2280,7 +2280,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                     gradient: LinearGradient(
                       colors: [
                         widget.accentColor,
-                        widget.accentColor.withOpacity(0.75),
+                        widget.accentColor.withValues(alpha: 0.75),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),

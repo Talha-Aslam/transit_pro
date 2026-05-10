@@ -117,11 +117,11 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            AppTheme.studentAmber.withOpacity(0.15),
-                            AppTheme.studentOrange.withOpacity(0.06),
+                            AppTheme.studentAmber.withValues(alpha: 0.15),
+                            AppTheme.studentOrange.withValues(alpha: 0.06),
                           ],
                         ),
-                        borderColor: AppTheme.studentAmber.withOpacity(0.3),
+                        borderColor: AppTheme.studentAmber.withValues(alpha: 0.3),
                         padding: const EdgeInsets.all(18),
                         child: Row(
                           children: [
@@ -398,10 +398,10 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
                             Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: AppTheme.info.withOpacity(0.1),
+                                color: AppTheme.info.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: AppTheme.info.withOpacity(0.25),
+                                  color: AppTheme.info.withValues(alpha: 0.25),
                                 ),
                               ),
                               child: Row(
@@ -840,10 +840,10 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                               Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.warning.withOpacity(0.1),
+                                  color: AppTheme.warning.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: AppTheme.warning.withOpacity(0.3),
+                                    color: AppTheme.warning.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Row(
@@ -931,7 +931,7 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                                     color: context.cardBgElevated,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: AppTheme.info.withOpacity(0.35),
+                                      color: AppTheme.info.withValues(alpha: 0.35),
                                     ),
                                   ),
                                   child: Row(
@@ -1432,7 +1432,7 @@ class _PayHeader extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppTheme.studentAmber.withOpacity(0.12), Colors.transparent],
+          colors: [AppTheme.studentAmber.withValues(alpha: 0.12), Colors.transparent],
         ),
       ),
       child: Row(
@@ -1500,7 +1500,7 @@ class _MethodCard extends StatelessWidget {
               ? null
               : [
                   BoxShadow(
-                    color: accentColor.withOpacity(0.08),
+                    color: accentColor.withValues(alpha: 0.08),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -1512,9 +1512,9 @@ class _MethodCard extends StatelessWidget {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.12),
+                color: accentColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: accentColor.withOpacity(0.25)),
+                border: Border.all(color: accentColor.withValues(alpha: 0.25)),
               ),
               child: Center(
                 child: Text(icon, style: const TextStyle(fontSize: 22)),
@@ -1585,9 +1585,9 @@ class _DriverInfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.06),
+        color: accentColor.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accentColor.withOpacity(0.25)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1598,7 +1598,7 @@ class _DriverInfoCard extends StatelessWidget {
                 width: 64,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
@@ -1725,7 +1725,7 @@ class _InfoRow extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.info.withOpacity(0.15),
+                    color: AppTheme.info.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Icon(
@@ -1768,7 +1768,7 @@ class _PlatformChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
             color: selected
-                ? accentColor.withOpacity(0.12)
+                ? accentColor.withValues(alpha: 0.12)
                 : context.cardBgElevated,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
@@ -1822,7 +1822,7 @@ class _CardPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.parentPurple.withOpacity(0.35),
+            color: AppTheme.parentPurple.withValues(alpha: 0.35),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -1929,7 +1929,7 @@ class _GradientButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: gradient.colors.first.withOpacity(0.3),
+                color: gradient.colors.first.withValues(alpha: 0.3),
                 blurRadius: 14,
                 offset: const Offset(0, 5),
               ),
@@ -1987,9 +1987,9 @@ class _SubmittedConfirmation extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.12),
+              color: accentColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(color: accentColor.withOpacity(0.3), width: 2),
+              border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 2),
             ),
             child: Center(
               child: Text(icon, style: const TextStyle(fontSize: 36)),
@@ -2033,7 +2033,7 @@ class _SubmittedConfirmation extends StatelessWidget {
           _GradientButton(
             label: actionLabel,
             gradient: LinearGradient(
-              colors: [accentColor, accentColor.withOpacity(0.75)],
+              colors: [accentColor, accentColor.withValues(alpha: 0.75)],
             ),
             onTap: onAction,
           ),

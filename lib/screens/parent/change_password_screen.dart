@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -140,7 +140,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      widget.accentColor.withOpacity(0.2),
+                      widget.accentColor.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -329,7 +329,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                 children: [
                                   Container(
                                     height: 5,
-                                    color: Colors.white.withOpacity(0.08),
+                                    color: Colors.white.withValues(alpha: 0.08),
                                   ),
                                   LayoutBuilder(
                                     builder: (ctx, box) => AnimatedContainer(
@@ -375,10 +375,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.error.withOpacity(0.1),
+                            color: AppTheme.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: AppTheme.error.withOpacity(0.3),
+                              color: AppTheme.error.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(

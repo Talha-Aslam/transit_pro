@@ -40,7 +40,7 @@ class GlassCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: gradient == null
             ? (backgroundColor ??
-                  (isDark ? Colors.white.withOpacity(0.06) : Colors.white))
+                  (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white))
             : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
@@ -48,7 +48,7 @@ class GlassCard extends StatelessWidget {
           color:
               borderColor ??
               (isDark
-                  ? Colors.white.withOpacity(0.10)
+                  ? Colors.white.withValues(alpha: 0.10)
                   : const Color(0xFFE2E8F0)),
           width: borderWidth,
         ),
@@ -58,7 +58,7 @@ class GlassCard extends StatelessWidget {
                 ? null
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -110,11 +110,11 @@ class AppSwitch extends StatelessWidget {
           color: value
               ? activeColor
               : (Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white.withOpacity(0.12)
+                    ? Colors.white.withValues(alpha: 0.12)
                     : const Color(0xFFE2E8F0)),
           border: Border.all(
             color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withOpacity(0.1)
+                ? Colors.white.withValues(alpha: 0.1)
                 : const Color(0xFFCBD5E1),
           ),
         ),
@@ -133,7 +133,7 @@ class AppSwitch extends StatelessWidget {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: Colors.black.withValues(alpha: 0.3),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -166,9 +166,9 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -224,12 +224,12 @@ class GradientButton extends StatelessWidget {
           height: height,
           decoration: BoxDecoration(
             gradient: isLoading ? null : gradient,
-            color: isLoading ? Colors.white.withOpacity(0.1) : null,
+            color: isLoading ? Colors.white.withValues(alpha: 0.1) : null,
             borderRadius: BorderRadius.circular(14),
             boxShadow: (!isLoading && !disabled && glowColor != null)
                 ? [
                     BoxShadow(
-                      color: glowColor!.withOpacity(0.4),
+                      color: glowColor!.withValues(alpha: 0.4),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
