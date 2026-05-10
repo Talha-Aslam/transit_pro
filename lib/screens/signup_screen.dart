@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/image_source_sheet.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -30,10 +32,14 @@ class _SignupScreenState extends State<SignupScreen> {
   late List<_ChildData> _children;
 
   // Driver-specific
+  final _picker = ImagePicker();
   final _licenseCtrl = TextEditingController();
   final _vehicleCtrl = TextEditingController();
   final _experienceCtrl = TextEditingController();
+  final _seatCapacityCtrl = TextEditingController();
   String? _vehicleType;
+  String? _licenseFileName;
+  String? _idCardFileName;
 
   // Student-specific
   final _studentIdCtrl = TextEditingController();
@@ -123,6 +129,25 @@ class _SignupScreenState extends State<SignupScreen> {
     return _passCtrl.text != confirm ? AppStrings.t('pwd_no_match') : null;
   }
 
+  Future<void> _pickDriverDocument({required bool isLicense}) async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.driverCyan,
+    );
+    if (source == null) return;
+
+    final picked = await _picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() {
+      if (isLicense) {
+        _licenseFileName = picked.name;
+      } else {
+        _idCardFileName = picked.name;
+      }
+    });
+  }
+
   String _localizedRoleName(String id) {
     switch (id) {
       case 'parent':
@@ -185,6 +210,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _licenseCtrl.dispose();
     _vehicleCtrl.dispose();
     _experienceCtrl.dispose();
+    _seatCapacityCtrl.dispose();
     _studentIdCtrl.dispose();
     _studentSchoolCtrl.dispose();
     LanguageProvider.instance.removeListener(_onLangChanged);
@@ -727,6 +753,30 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
           Row(
+            children: [
+              Expanded(
+                child: _DocumentUploadTile(
+                  title: 'Upload License',
+                  subtitle: _licenseFileName ?? 'Front photo of license',
+                  icon: Icons.badge_rounded,
+                  accentColor: AppTheme.driverCyan,
+                  onTap: () => _pickDriverDocument(isLicense: true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DocumentUploadTile(
+                  title: 'Upload ID Card',
+                  subtitle: _idCardFileName ?? 'CNIC / national ID photo',
+                  icon: Icons.credit_card_rounded,
+                  accentColor: AppTheme.driverCyan,
+                  onTap: () => _pickDriverDocument(isLicense: false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -765,6 +815,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          _FieldLabel('Transport seat capacity'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _seatCapacityCtrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: context.textPrimary, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'Enter seat capacity',
+              suffixIcon: Icon(
+                Icons.event_seat_rounded,
+                color: AppTheme.driverCyan,
+                size: 20,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           _FieldLabel(AppStrings.t('experience_yrs_lbl')),
@@ -838,6 +904,62 @@ class _SignupScreenState extends State<SignupScreen> {
       default:
         return [];
     }
+  }
+
+  Widget _DocumentUploadTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accentColor.withOpacity(0.28)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 18),
+                ),
+                const Spacer(),
+                Icon(Icons.upload_file_rounded, color: accentColor, size: 18),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: context.textSecondary, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── Child card ──────────────────────────────────────────────────────────

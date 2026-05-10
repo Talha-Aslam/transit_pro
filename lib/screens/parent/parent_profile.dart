@@ -1865,11 +1865,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   Widget _buildTextField(
     String label,
     TextEditingController controller,
-    String hint,
-    {
+    String hint, {
     ValueChanged<String>? onChanged,
-    }
-  ) {
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1967,9 +1965,10 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     final institute = _instituteName ?? widget.initialChild.school;
     if (institute.trim().isEmpty) return;
 
-    final query = [institute.trim(), if (_instituteType != null) _instituteType!]
-        .where((part) => part.isNotEmpty)
-        .join(' ');
+    final query = [
+      institute.trim(),
+      if (_instituteType != null) _instituteType!,
+    ].where((part) => part.isNotEmpty).join(' ');
     await _openMapQuery(query);
   }
 
