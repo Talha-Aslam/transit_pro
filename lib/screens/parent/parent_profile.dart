@@ -630,16 +630,9 @@ class _ParentProfileState extends State<ParentProfile> {
                                 icon: '🧑‍✈️',
                                 label: AppStrings.t('my_driver'),
                                 desc: AppStrings.t('my_driver_desc'),
-                                onTap: () =>
-                                    context.push('/parent/driver-details'),
-                              ),
-                              _MenuItem(
-                                icon: '💬',
-                                label: AppStrings.t('driver_chat'),
-                                desc: AppStrings.t('driver_chat_desc'),
                                 isLast: true,
                                 onTap: () =>
-                                    context.push('/parent/driver-chat'),
+                                    context.push('/parent/driver-details'),
                               ),
                             ],
                           ),
