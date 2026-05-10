@@ -68,6 +68,7 @@ class _StudentFeesState extends State<StudentFees> {
   @override
   Widget build(BuildContext context) {
     final isCurrentMonthPaid = _svc.isMonthPaid('December 2024');
+    final paidAmount = isCurrentMonthPaid ? 'Rs.12,500' : 'Rs.10,000';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -228,7 +229,7 @@ class _StudentFeesState extends State<StudentFees> {
                 _StatPill(
                   icon: 'assets/images/utilities/check.png',
                   label: AppStrings.t('paid'),
-                  value: 'Rs.10,000',
+                  value: paidAmount,
                   color: AppTheme.success,
                 ),
                 const SizedBox(width: 10),
@@ -345,7 +346,7 @@ class _StudentFeesState extends State<StudentFees> {
                     shaderCallback: (b) =>
                         AppTheme.studentGradient.createShader(b),
                     child: Text(
-                      'Rs.10,000',
+                      'Rs.12,500',
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
