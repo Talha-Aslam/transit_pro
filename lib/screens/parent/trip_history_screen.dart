@@ -12,14 +12,10 @@ class TripHistoryScreen extends StatefulWidget {
 }
 
 class _TripHistoryScreenState extends State<TripHistoryScreen> {
-  int _filterIndex = 0;
+  int _filterIndex = 1;
+  DateTime? _selectedCalendarDate;
 
-  List<String> get _filters => [
-    AppStrings.t('all_filter'),
-    AppStrings.t('morning_filter'),
-    AppStrings.t('afternoon'),
-    AppStrings.t('this_week'),
-  ];
+  List<String> get _filters => ['Today', 'Week', 'Month', 'Year'];
 
   @override
   void initState() {
@@ -35,90 +31,195 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 
   void _onLangChanged() => setState(() {});
 
-  List<_Trip> get _trips => [
-    _Trip(
-      date: 'Mon, Mar 3 2026',
-      type: AppStrings.t('trip_type_morning_pickup'),
-      from: 'Oak Street Stop',
-      to: 'Lincoln Elementary',
-      time: '07:15 AM',
-      duration: '28 min',
-      status: AppStrings.t('trip_status_on_time'),
-      statusOk: true,
-      isMorning: true,
-    ),
-    _Trip(
-      date: 'Mon, Mar 3 2026',
-      type: AppStrings.t('trip_type_afternoon_dropoff'),
-      from: 'Lincoln Elementary',
-      to: 'Oak Street Stop',
-      time: '03:30 PM',
-      duration: '31 min',
-      status: AppStrings.t('trip_status_on_time'),
-      statusOk: true,
-      isMorning: false,
-    ),
-    _Trip(
-      date: 'Tue, Mar 4 2026',
-      type: AppStrings.t('trip_type_morning_pickup'),
-      from: 'Oak Street Stop',
-      to: 'Lincoln Elementary',
-      time: '07:20 AM',
-      duration: '30 min',
-      status: AppStrings.t('trip_status_5_late'),
-      statusOk: false,
-      isMorning: true,
-    ),
-    _Trip(
-      date: 'Tue, Mar 4 2026',
-      type: AppStrings.t('trip_type_afternoon_dropoff'),
-      from: 'Lincoln Elementary',
-      to: 'Oak Street Stop',
-      time: '03:30 PM',
-      duration: '29 min',
-      status: AppStrings.t('trip_status_on_time'),
-      statusOk: true,
-      isMorning: false,
-    ),
-    _Trip(
-      date: 'Wed, Mar 5 2026',
-      type: AppStrings.t('trip_type_morning_pickup'),
-      from: 'Oak Street Stop',
-      to: 'Lincoln Elementary',
-      time: '07:14 AM',
-      duration: '27 min',
-      status: AppStrings.t('trip_status_1_early'),
-      statusOk: true,
-      isMorning: true,
-    ),
-    _Trip(
-      date: 'Wed, Mar 5 2026',
-      type: AppStrings.t('trip_type_afternoon_dropoff'),
-      from: 'Lincoln Elementary',
-      to: 'Oak Street Stop',
-      time: '03:30 PM',
-      duration: '32 min',
-      status: AppStrings.t('trip_status_on_time'),
-      statusOk: true,
-      isMorning: false,
-    ),
-    _Trip(
-      date: 'Thu, Mar 6 2026',
-      type: AppStrings.t('trip_type_morning_pickup'),
-      from: 'Oak Street Stop',
-      to: 'Lincoln Elementary',
-      time: '07:18 AM',
-      duration: '29 min',
-      status: AppStrings.t('trip_status_on_time'),
-      statusOk: true,
-      isMorning: true,
-    ),
-  ];
+  List<_Trip> get _trips {
+    final now = DateTime.now();
+
+    DateTime onDay(int dayOffset, int hour, int minute) {
+      return DateTime(now.year, now.month, now.day + dayOffset, hour, minute);
+    }
+
+    return [
+      _Trip(
+        date: onDay(0, 7, 15),
+        type: AppStrings.t('trip_type_morning_pickup'),
+        from: 'Oak Street Stop',
+        to: 'Lincoln Elementary',
+        time: '07:15 AM',
+        duration: '28 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: true,
+      ),
+      _Trip(
+        date: onDay(0, 15, 30),
+        type: AppStrings.t('trip_type_afternoon_dropoff'),
+        from: 'Lincoln Elementary',
+        to: 'Oak Street Stop',
+        time: '03:30 PM',
+        duration: '31 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: false,
+      ),
+      _Trip(
+        date: onDay(-1, 7, 20),
+        type: AppStrings.t('trip_type_morning_pickup'),
+        from: 'Oak Street Stop',
+        to: 'Lincoln Elementary',
+        time: '07:20 AM',
+        duration: '30 min',
+        status: AppStrings.t('trip_status_5_late'),
+        statusOk: false,
+        isMorning: true,
+      ),
+      _Trip(
+        date: onDay(-2, 15, 30),
+        type: AppStrings.t('trip_type_afternoon_dropoff'),
+        from: 'Lincoln Elementary',
+        to: 'Oak Street Stop',
+        time: '03:30 PM',
+        duration: '29 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: false,
+      ),
+      _Trip(
+        date: onDay(-4, 7, 14),
+        type: AppStrings.t('trip_type_morning_pickup'),
+        from: 'Oak Street Stop',
+        to: 'Lincoln Elementary',
+        time: '07:14 AM',
+        duration: '27 min',
+        status: AppStrings.t('trip_status_1_early'),
+        statusOk: true,
+        isMorning: true,
+      ),
+      _Trip(
+        date: onDay(-10, 15, 30),
+        type: AppStrings.t('trip_type_afternoon_dropoff'),
+        from: 'Lincoln Elementary',
+        to: 'Oak Street Stop',
+        time: '03:30 PM',
+        duration: '32 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: false,
+      ),
+      _Trip(
+        date: onDay(-40, 7, 18),
+        type: AppStrings.t('trip_type_morning_pickup'),
+        from: 'Oak Street Stop',
+        to: 'Lincoln Elementary',
+        time: '07:18 AM',
+        duration: '29 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: true,
+      ),
+      _Trip(
+        date: DateTime(now.year, 1, 18, 15, 25),
+        type: AppStrings.t('trip_type_afternoon_dropoff'),
+        from: 'Lincoln Elementary',
+        to: 'Oak Street Stop',
+        time: '03:25 PM',
+        duration: '30 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: false,
+      ),
+      _Trip(
+        date: DateTime(now.year - 1, 11, 22, 7, 12),
+        type: AppStrings.t('trip_type_morning_pickup'),
+        from: 'Oak Street Stop',
+        to: 'Lincoln Elementary',
+        time: '07:12 AM',
+        duration: '28 min',
+        status: AppStrings.t('trip_status_on_time'),
+        statusOk: true,
+        isMorning: true,
+      ),
+    ];
+  }
+
+  List<_Trip> get _filteredTrips {
+    final now = DateTime.now();
+    final today = DateUtils.dateOnly(now);
+
+    final selectedTrips = _selectedCalendarDate != null
+        ? _trips
+              .where(
+                (t) => _isSameDay(
+                  t.date,
+                  DateUtils.dateOnly(_selectedCalendarDate!),
+                ),
+              )
+              .toList()
+        : switch (_filterIndex) {
+            0 => _trips.where((t) => _isSameDay(t.date, today)).toList(),
+            1 => _trips.where((t) => _isInCurrentWeek(t.date, today)).toList(),
+            2 =>
+              _trips
+                  .where(
+                    (t) =>
+                        t.date.year == today.year &&
+                        t.date.month == today.month,
+                  )
+                  .toList(),
+            3 => _trips.where((t) => t.date.year == today.year).toList(),
+            _ => _trips,
+          };
+
+    selectedTrips.sort((a, b) => b.date.compareTo(a.date));
+    return selectedTrips;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isInCurrentWeek(DateTime value, DateTime today) {
+    final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+    final valueDay = DateUtils.dateOnly(value);
+    return !valueDay.isBefore(startOfWeek) && valueDay.isBefore(endOfWeek);
+  }
+
+  String _formatDate(DateTime date) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day} ${date.year}';
+  }
+
+  Future<void> _pickCalendarDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedCalendarDate ?? now,
+      firstDate: DateTime(now.year - 10),
+      lastDate: DateTime(now.year + 1, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() => _selectedCalendarDate = picked);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final onTime = _trips.where((t) => t.statusOk).length;
-    final late = _trips.length - onTime;
+    final filteredTrips = _filteredTrips;
+    final onTime = filteredTrips.where((t) => t.statusOk).length;
+    final late = filteredTrips.length - onTime;
 
     return Scaffold(
       body: Container(
@@ -183,7 +284,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         ),
                       ),
                       child: Text(
-                        '${_trips.length} ${AppStrings.t('trips_lbl')}',
+                        '${filteredTrips.length} ${AppStrings.t('trips_lbl')}',
                         style: TextStyle(
                           color: AppTheme.parentPurple,
                           fontSize: 12,
@@ -212,7 +313,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                               child: Column(
                                 children: [
                                   Text(
-                                    '${_trips.length}',
+                                    '${filteredTrips.length}',
                                     style: TextStyle(
                                       color: AppTheme.parentPurple,
                                       fontSize: 24,
@@ -296,49 +397,112 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                       // Filter chips
                       SizedBox(
                         height: 36,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _filters.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (_, i) {
-                            final selected = i == _filterIndex;
-                            return GestureDetector(
-                              onTap: () => setState(() => _filterIndex = i),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 7,
-                                ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _filters.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (_, i) {
+                                  final selected =
+                                      i == _filterIndex &&
+                                      _selectedCalendarDate == null;
+                                  return GestureDetector(
+                                    onTap: () => setState(() {
+                                      _filterIndex = i;
+                                      _selectedCalendarDate = null;
+                                    }),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 7,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: selected
+                                            ? AppTheme.parentGradient
+                                            : null,
+                                        color: selected
+                                            ? null
+                                            : context.cardBgElevated,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: selected
+                                              ? Colors.transparent
+                                              : context.surfaceBorder,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _filters[i],
+                                        style: TextStyle(
+                                          color: selected
+                                              ? Colors.white
+                                              : context.textSecondary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _pickCalendarDate,
+                              child: Container(
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
-                                  gradient: selected
-                                      ? AppTheme.parentGradient
-                                      : null,
-                                  color: selected
-                                      ? null
-                                      : context.cardBgElevated,
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: context.cardBgElevated,
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: selected
-                                        ? Colors.transparent
-                                        : context.surfaceBorder,
+                                    color: context.surfaceBorder,
                                   ),
                                 ),
-                                child: Text(
-                                  _filters[i],
-                                  style: TextStyle(
-                                    color: selected
-                                        ? Colors.white
-                                        : context.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                child: Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: context.textSecondary,
+                                  size: 18,
                                 ),
                               ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
                       ),
+                      if (_selectedCalendarDate != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Showing ${_formatDate(_selectedCalendarDate!)}',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _selectedCalendarDate = null),
+                              child: Text(
+                                'Clear',
+                                style: TextStyle(
+                                  color: AppTheme.parentPurple,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 14),
 
                       // Trip list
@@ -346,9 +510,22 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: [
-                            ..._trips.asMap().entries.map((e) {
+                            if (filteredTrips.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Text(
+                                  'No trips found for this range.',
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ...filteredTrips.asMap().entries.map((e) {
                               final t = e.value;
-                              final isLast = e.key == _trips.length - 1;
+                              final isLast = e.key == filteredTrips.length - 1;
                               return Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
@@ -447,7 +624,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                           Row(
                                             children: [
                                               Text(
-                                                t.date,
+                                                _formatDate(t.date),
                                                 style: TextStyle(
                                                   color: context.textTertiary,
                                                   fontSize: 10,
@@ -487,7 +664,8 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 }
 
 class _Trip {
-  final String date, type, from, to, time, duration, status;
+  final DateTime date;
+  final String type, from, to, time, duration, status;
   final bool statusOk;
   final bool isMorning;
 
