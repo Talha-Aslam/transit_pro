@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../app/language_provider.dart';
@@ -12,23 +13,62 @@ class StudentFees extends StatefulWidget {
 
 class _StudentFeesState extends State<StudentFees> {
   String _filter = 'All';
+  final _svc = ParentDataService.instance;
+  int _seenFeeNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    _svc.paidFeeMonths.addListener(_onFeeStateChanged);
+    _svc.feeNotifications.addListener(_onFeeNotificationChanged);
+    _svc.loadFeeState().then((_) {
+      if (!mounted) return;
+      _seenFeeNotificationCount = _svc.feeNotifications.value.length;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.paidFeeMonths.removeListener(_onFeeStateChanged);
+    _svc.feeNotifications.removeListener(_onFeeNotificationChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
 
+  void _onFeeStateChanged() => setState(() {});
+
+  void _onFeeNotificationChanged() {
+    final notifs = _svc.feeNotifications.value;
+    if (notifs.length <= _seenFeeNotificationCount) return;
+    _seenFeeNotificationCount = notifs.length;
+    final message = notifs.last;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Payment Confirmed'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isCurrentMonthPaid = _svc.isMonthPaid('December 2024');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -129,19 +169,33 @@ class _StudentFeesState extends State<StudentFees> {
                   const SizedBox(height: 18),
                   // Pay now button
                   GestureDetector(
-                    onTap: () => context.push(
-                      '/parent/payment',
-                      extra: {'amount': 'Rs.2,500', 'month': 'December 2024'},
-                    ),
+                    onTap: isCurrentMonthPaid
+                        ? null
+                        : () => context.push(
+                            '/parent/payment',
+                            extra: {
+                              'amount': 'Rs.2,500',
+                              'month': 'December 2024',
+                            },
+                          ),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        gradient: AppTheme.studentGradient,
+                        gradient: isCurrentMonthPaid
+                            ? LinearGradient(
+                                colors: [
+                                  context.surfaceBorder,
+                                  context.surfaceBorder.withOpacity(0.9),
+                                ],
+                              )
+                            : AppTheme.studentGradient,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.studentAmber.withOpacity(0.25),
+                            color: isCurrentMonthPaid
+                                ? Colors.transparent
+                                : AppTheme.studentAmber.withOpacity(0.25),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -149,9 +203,13 @@ class _StudentFeesState extends State<StudentFees> {
                       ),
                       child: Center(
                         child: Text(
-                          AppStrings.t('pay_now'),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          isCurrentMonthPaid
+                              ? 'Paid for this month'
+                              : AppStrings.t('pay_now'),
+                          style: TextStyle(
+                            color: isCurrentMonthPaid
+                                ? context.textSecondary
+                                : Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
@@ -308,6 +366,7 @@ class _StudentFeesState extends State<StudentFees> {
   }
 
   List<Widget> _buildPayments() {
+    final isDecemberPaid = _svc.isMonthPaid('December 2024');
     final payments = [
       _PaymentData(
         'November 2024',
@@ -340,9 +399,9 @@ class _StudentFeesState extends State<StudentFees> {
       _PaymentData(
         'December 2024',
         'Rs.2,500',
-        'Pending',
-        'Due: 15 Dec',
-        AppTheme.warning,
+        isDecemberPaid ? 'Paid' : 'Pending',
+        isDecemberPaid ? 'Paid via app' : 'Due: 15 Dec',
+        isDecemberPaid ? AppTheme.success : AppTheme.warning,
       ),
     ];
 
@@ -467,4 +526,3 @@ class _StatPill extends StatelessWidget {
     );
   }
 }
-

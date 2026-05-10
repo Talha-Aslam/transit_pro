@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/image_source_sheet.dart';
 import '../../widgets/glass_card.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -532,12 +537,12 @@ class OnlinePaymentScreen extends StatefulWidget {
 }
 
 class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
-  final _txnCtrl = TextEditingController();
   int _childIndex = 0;
   String _platform = 'jazzcash'; // 'jazzcash' | 'easypaisa'
+  File? _slipFile;
+  bool _launchingProvider = false;
   bool _submitted = false;
   bool _loading = false;
-  String _txnError = '';
 
   @override
   void initState() {
@@ -548,7 +553,6 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
-    _txnCtrl.dispose();
     super.dispose();
   }
 
@@ -581,15 +585,88 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
         : (d.easypaisaAccountName ?? '');
   }
 
-  void _confirmPayment() {
-    if (_txnCtrl.text.trim().isEmpty) {
-      setState(() => _txnError = AppStrings.t('enter_transaction_id'));
-      return;
+  Future<void> _openProvider() async {
+    final isJazz = _platform == 'jazzcash';
+    final appUris = isJazz
+        ? <Uri>[
+            Uri.parse('jazzcash://'),
+            Uri.parse(
+              'intent://#Intent;scheme=jazzcash;package=com.techlogix.mobilinkcustomer;end',
+            ),
+          ]
+        : <Uri>[
+            Uri.parse('easypaisa://'),
+            Uri.parse(
+              'intent://#Intent;scheme=easypaisa;package=pk.com.telenor.phoenix;end',
+            ),
+          ];
+    final webUri = isJazz
+        ? Uri.parse('https://www.jazzcash.com.pk/')
+        : Uri.parse('https://easypaisa.com.pk/');
+
+    setState(() => _launchingProvider = true);
+    try {
+      var launched = false;
+
+      for (final uri in appUris) {
+        if (await canLaunchUrl(uri)) {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (launched) break;
+        }
+      }
+
+      if (!launched) {
+        launched = await launchUrl(
+          webUri,
+          mode: LaunchMode.externalApplication,
+        );
+      }
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open payment provider.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _launchingProvider = false);
     }
+  }
+
+  Future<void> _pickTransactionSlip() async {
+    final source = await showImageSourceSheet(
+      context,
+      accentColor: AppTheme.info,
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
     setState(() {
-      _txnError = '';
-      _loading = true;
+      _slipFile = File(picked.path);
     });
+  }
+
+  void _confirmPayment() {
+    setState(() => _loading = true);
+    final child = widget.children.isNotEmpty
+        ? widget.children[_childIndex]
+        : const <String, String>{};
+    final driverName = child['driver']?.trim().isNotEmpty == true
+        ? child['driver']!.trim()
+        : _currentDriver.driverName;
+
+    // Mock driver-side confirmation for now. Replace with backend event later.
+    Future.delayed(const Duration(seconds: 3), () {
+      ParentDataService.instance.confirmFeeByDriver(
+        month: widget.month,
+        driverName: driverName,
+      );
+    });
+
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted)
         setState(() {
@@ -625,12 +702,12 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                           ),
                           _ConfirmLine(AppStrings.t('month_lbl'), widget.month),
                           _ConfirmLine(
-                            AppStrings.t('transaction_id_lbl'),
-                            _txnCtrl.text.trim(),
-                          ),
-                          _ConfirmLine(
                             AppStrings.t('platform_lbl'),
                             _platform == 'jazzcash' ? 'JazzCash' : 'EasyPaisa',
+                          ),
+                          _ConfirmLine(
+                            'Slip Status',
+                            _slipFile != null ? 'Uploaded' : 'Not uploaded',
                           ),
                         ],
                         actionLabel: AppStrings.t('back_to_fees'),
@@ -792,57 +869,139 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                             const SizedBox(height: 20),
 
                             if (_hasPlatform) ...[
-                              Text(
-                                AppStrings.t('enter_transaction_id'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                              GestureDetector(
+                                onTap: _launchingProvider
+                                    ? null
+                                    : _openProvider,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                    horizontal: 16,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: _platform == 'jazzcash'
+                                          ? const [
+                                              Color(0xFFD3290F),
+                                              Color(0xFFEA580C),
+                                            ]
+                                          : const [
+                                              Color(0xFF4CAF50),
+                                              Color(0xFF16A34A),
+                                            ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.open_in_new_rounded,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _launchingProvider
+                                            ? 'Opening...'
+                                            : (_platform == 'jazzcash'
+                                                  ? 'Open JazzCash'
+                                                  : 'Open EasyPaisa'),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _txnCtrl,
-                                onChanged: (_) =>
-                                    setState(() => _txnError = ''),
-                                decoration: InputDecoration(
-                                  hintText: AppStrings.t('txn_id_hint'),
-                                  filled: true,
-                                  fillColor: context.inputFill,
-                                  errorText: _txnError.isEmpty
-                                      ? null
-                                      : _txnError,
-                                  prefixIcon: Icon(
-                                    Icons.receipt_long_rounded,
-                                    color: context.textTertiary,
-                                    size: 18,
+                              const SizedBox(height: 10),
+                              GestureDetector(
+                                onTap: _pickTransactionSlip,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 14,
                                   ),
-                                  border: OutlineInputBorder(
+                                  decoration: BoxDecoration(
+                                    color: context.cardBgElevated,
                                     borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide(
-                                      color: context.inputBorder,
+                                    border: Border.all(
+                                      color: AppTheme.info.withOpacity(0.35),
                                     ),
                                   ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide(
-                                      color: context.inputBorder,
-                                    ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.upload_file_rounded,
+                                        color: AppTheme.info,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _slipFile == null
+                                              ? 'Upload Transaction Slip'
+                                              : 'Change Transaction Slip',
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_slipFile != null)
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: AppTheme.success,
+                                          size: 18,
+                                        ),
+                                    ],
                                   ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: AppTheme.info,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                ),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 28),
+                              if (_slipFile != null) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: context.cardBgElevated,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: context.surfaceBorder,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          _slipFile!,
+                                          width: 56,
+                                          height: 56,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          'Transaction slip saved and ready to upload as proof.',
+                                          style: TextStyle(
+                                            color: context.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 18),
                               _GradientButton(
                                 label: _loading
                                     ? '...'

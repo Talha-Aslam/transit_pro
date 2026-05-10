@@ -62,6 +62,8 @@ class ParentDataService {
   static final ParentDataService instance = ParentDataService._();
 
   static const _driverRatingsKey = 'parent_driver_ratings';
+  static const _paidFeeMonthsKey = 'parent_paid_fee_months';
+  static const _feeNotificationsKey = 'parent_fee_notifications';
 
   /// Notifier for the parent's own info.
   final parentInfo = ValueNotifier<ParentInfo>(ParentInfo());
@@ -87,6 +89,12 @@ class ParentDataService {
 
   /// Persisted weekly driver ratings, keyed by bus + driver.
   final driverRatings = ValueNotifier<Map<String, DriverRatingInfo>>({});
+
+  /// Months that have been confirmed paid by the driver.
+  final paidFeeMonths = ValueNotifier<Set<String>>({});
+
+  /// Parent-side fee notifications (driver confirmation messages).
+  final feeNotifications = ValueNotifier<List<String>>([]);
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -144,6 +152,36 @@ class ParentDataService {
       _driverRatingsKey,
       jsonEncode(updated.map((k, v) => MapEntry(k, v.toJson()))),
     );
+  }
+
+  Future<void> loadFeeState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final months = prefs.getStringList(_paidFeeMonthsKey) ?? <String>[];
+    final notifications =
+        prefs.getStringList(_feeNotificationsKey) ?? <String>[];
+    paidFeeMonths.value = months.toSet();
+    feeNotifications.value = notifications;
+  }
+
+  bool isMonthPaid(String month) {
+    return paidFeeMonths.value.contains(month);
+  }
+
+  Future<void> confirmFeeByDriver({
+    required String month,
+    required String driverName,
+  }) async {
+    final updatedMonths = Set<String>.from(paidFeeMonths.value)..add(month);
+    paidFeeMonths.value = updatedMonths;
+
+    final message = 'Driver $driverName confirmed your $month fee payment.';
+    final updatedNotifs = List<String>.from(feeNotifications.value)
+      ..add(message);
+    feeNotifications.value = updatedNotifs;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_paidFeeMonthsKey, updatedMonths.toList());
+    await prefs.setStringList(_feeNotificationsKey, updatedNotifs);
   }
 
   void updateParentInfo(ParentInfo info) {
