@@ -1122,31 +1122,51 @@ class _ChildCardState extends State<_ChildCard> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             height: 1,
             color: context.surfaceBorder,
             margin: const EdgeInsets.only(bottom: 12),
           ),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 2.2,
-            children: [
-              _MiniCard(
-                label: 'Bus Number',
-                value: c.busNumber.isEmpty ? '—' : c.busNumber,
-              ),
-              _MiniCard(label: 'Route', value: c.route.isEmpty ? '—' : c.route),
-              _MiniCard(label: 'Stop', value: c.stop.isEmpty ? '—' : c.stop),
-              _MiniCard(
-                label: 'Driver',
-                value: c.driver.isEmpty ? '—' : c.driver,
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final tileWidth = (constraints.maxWidth - 8) / 2;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  SizedBox(
+                    width: tileWidth,
+                    child: _MiniCard(
+                      label: 'Bus Number',
+                      value: c.busNumber.isEmpty ? '—' : c.busNumber,
+                    ),
+                  ),
+                  SizedBox(
+                    width: tileWidth,
+                    child: _MiniCard(
+                      label: 'Route',
+                      value: c.route.isEmpty ? '—' : c.route,
+                    ),
+                  ),
+                  SizedBox(
+                    width: tileWidth,
+                    child: _MiniCard(
+                      label: 'Stop',
+                      value: c.stop.isEmpty ? '—' : c.stop,
+                    ),
+                  ),
+                  SizedBox(
+                    width: tileWidth,
+                    child: _MiniCard(
+                      label: 'Driver',
+                      value: c.driver.isEmpty ? '—' : c.driver,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
