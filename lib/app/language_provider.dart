@@ -79,7 +79,7 @@ class AppStrings {
     'email_notifs': 'Email Notifications',
     'email_notifs_desc': 'Daily summary email',
     'trip_history': 'Trip History',
-    'trip_history_desc': '7 completed trips',
+    //'trip_history_desc': '7 completed trips',
     'subscription': 'Subscription',
     'transport_support': 'Transport Support',
     'my_driver': 'My Driver',

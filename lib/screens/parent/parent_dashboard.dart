@@ -5,6 +5,7 @@ import '../../app/missed_bus_service.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../models/missed_bus_request.dart';
+import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -692,7 +693,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             _StatCard(
                               icon: 'assets/images/stats/total_trips.png',
                               label: AppStrings.t('total_trips'),
-                              value: '7',
+                              value:
+                                  '${buildParentTripHistoryEntries(DateTime.now()).where((trip) => trip.completed).length}',
                               color: AppTheme.purple,
                             ),
                             _StatCard(

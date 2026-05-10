@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
+import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -31,115 +32,21 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 
   void _onLangChanged() => setState(() {});
 
-  List<_Trip> get _trips {
-    final now = DateTime.now();
-
-    DateTime onDay(int dayOffset, int hour, int minute) {
-      return DateTime(now.year, now.month, now.day + dayOffset, hour, minute);
-    }
-
-    return [
-      _Trip(
-        date: onDay(0, 7, 15),
-        type: AppStrings.t('trip_type_morning_pickup'),
-        from: 'Oak Street Stop',
-        to: 'Lincoln Elementary',
-        time: '07:15 AM',
-        duration: '28 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: true,
-      ),
-      _Trip(
-        date: onDay(0, 15, 30),
-        type: AppStrings.t('trip_type_afternoon_dropoff'),
-        from: 'Lincoln Elementary',
-        to: 'Oak Street Stop',
-        time: '03:30 PM',
-        duration: '31 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: false,
-      ),
-      _Trip(
-        date: onDay(-1, 7, 20),
-        type: AppStrings.t('trip_type_morning_pickup'),
-        from: 'Oak Street Stop',
-        to: 'Lincoln Elementary',
-        time: '07:20 AM',
-        duration: '30 min',
-        status: AppStrings.t('trip_status_5_late'),
-        statusOk: false,
-        isMorning: true,
-      ),
-      _Trip(
-        date: onDay(-2, 15, 30),
-        type: AppStrings.t('trip_type_afternoon_dropoff'),
-        from: 'Lincoln Elementary',
-        to: 'Oak Street Stop',
-        time: '03:30 PM',
-        duration: '29 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: false,
-      ),
-      _Trip(
-        date: onDay(-4, 7, 14),
-        type: AppStrings.t('trip_type_morning_pickup'),
-        from: 'Oak Street Stop',
-        to: 'Lincoln Elementary',
-        time: '07:14 AM',
-        duration: '27 min',
-        status: AppStrings.t('trip_status_1_early'),
-        statusOk: true,
-        isMorning: true,
-      ),
-      _Trip(
-        date: onDay(-10, 15, 30),
-        type: AppStrings.t('trip_type_afternoon_dropoff'),
-        from: 'Lincoln Elementary',
-        to: 'Oak Street Stop',
-        time: '03:30 PM',
-        duration: '32 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: false,
-      ),
-      _Trip(
-        date: onDay(-40, 7, 18),
-        type: AppStrings.t('trip_type_morning_pickup'),
-        from: 'Oak Street Stop',
-        to: 'Lincoln Elementary',
-        time: '07:18 AM',
-        duration: '29 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: true,
-      ),
-      _Trip(
-        date: DateTime(now.year, 1, 18, 15, 25),
-        type: AppStrings.t('trip_type_afternoon_dropoff'),
-        from: 'Lincoln Elementary',
-        to: 'Oak Street Stop',
-        time: '03:25 PM',
-        duration: '30 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: false,
-      ),
-      _Trip(
-        date: DateTime(now.year - 1, 11, 22, 7, 12),
-        type: AppStrings.t('trip_type_morning_pickup'),
-        from: 'Oak Street Stop',
-        to: 'Lincoln Elementary',
-        time: '07:12 AM',
-        duration: '28 min',
-        status: AppStrings.t('trip_status_on_time'),
-        statusOk: true,
-        isMorning: true,
-      ),
-    ];
-  }
+  List<_Trip> get _trips => buildParentTripHistoryEntries(DateTime.now())
+      .where((entry) => entry.completed)
+      .map(
+        (entry) => _Trip(
+          date: entry.date,
+          type: AppStrings.t(entry.typeKey),
+          from: entry.from,
+          to: entry.to,
+          time: entry.time,
+          status: AppStrings.t(entry.statusKey),
+          statusOk: entry.statusOk,
+          isMorning: entry.isMorning,
+        ),
+      )
+      .toList();
 
   List<_Trip> get _filteredTrips {
     final now = DateTime.now();
@@ -284,7 +191,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                         ),
                       ),
                       child: Text(
-                        '${filteredTrips.length} ${AppStrings.t('trips_lbl')}',
+                        '${_trips.length} ${AppStrings.t('trips_lbl')}',
                         style: TextStyle(
                           color: AppTheme.parentPurple,
                           fontSize: 12,
@@ -632,7 +539,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                '${t.time}  ·  ${t.duration}',
+                                                t.time,
                                                 style: TextStyle(
                                                   color: context.textTertiary,
                                                   fontSize: 10,
@@ -665,7 +572,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 
 class _Trip {
   final DateTime date;
-  final String type, from, to, time, duration, status;
+  final String type, from, to, time, status;
   final bool statusOk;
   final bool isMorning;
 
@@ -675,7 +582,6 @@ class _Trip {
     required this.from,
     required this.to,
     required this.time,
-    required this.duration,
     required this.status,
     required this.statusOk,
     required this.isMorning,

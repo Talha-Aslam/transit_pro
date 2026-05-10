@@ -653,7 +653,7 @@ class _ParentProfileState extends State<ParentProfile> {
                               _MenuItem(
                                 icon: '📋',
                                 label: AppStrings.t('trip_history'),
-                                desc: AppStrings.t('trip_history_desc'),
+                                //desc: AppStrings.t('trip_history_desc'),
                                 onTap: () => context.push('/parent/trips'),
                               ),
                               _MenuItem(
