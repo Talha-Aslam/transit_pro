@@ -82,7 +82,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         Expanded(
                           child: ValueListenableBuilder(
                             valueListenable: svc.parentInfo,
-                            builder: (_, info, __) => Column(
+                            builder: (_, info, _) => Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
@@ -195,7 +195,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: children.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const SizedBox(width: 8),
                               itemBuilder: (_, i) {
                                 final selected = i == safeIdx;
@@ -270,7 +270,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     // Child photo
                                     ValueListenableBuilder<List<File?>>(
                                       valueListenable: svc.childImages,
-                                      builder: (_, imgs, __) {
+                                      builder: (_, imgs, _) {
                                         final file = safeIdx < imgs.length
                                             ? imgs[safeIdx]
                                             : null;
@@ -493,7 +493,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         ValueListenableBuilder<MissedBusRequest?>(
                           valueListenable:
                               MissedBusService.instance.studentActiveRequest,
-                          builder: (_, req, __) {
+                          builder: (_, req, _) {
                             final isActive =
                                 req != null &&
                                 req.status == RequestStatus.searching;

@@ -637,13 +637,17 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
       context,
       accentColor: AppTheme.info,
     );
-    if (source == null) return;
+    if (source == null) {
+      return;
+    }
 
     final picked = await ImagePicker().pickImage(
       source: source,
       imageQuality: 85,
     );
-    if (picked == null) return;
+    if (picked == null) {
+      return;
+    }
 
     setState(() {
       _slipFile = File(picked.path);
@@ -734,7 +738,7 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                                 child: ListView.separated(
                                   scrollDirection: Axis.horizontal,
                                   itemCount: widget.children.length,
-                                  separatorBuilder: (_, __) =>
+                                  separatorBuilder: (_, _) =>
                                       const SizedBox(width: 8),
                                   itemBuilder: (_, i) {
                                     final sel = i == _childIndex;
@@ -1107,7 +1111,9 @@ class _CardPaymentScreenState extends State<CardPaymentScreen> {
   }
 
   void _pay() {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _loading = true);
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted)
@@ -1607,7 +1613,7 @@ class _DriverInfoCard extends StatelessWidget {
                     width: 50,
                     height: 22,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.account_balance_wallet_rounded,
                       color: accentColor,
                       size: 20,
@@ -1786,7 +1792,7 @@ class _PlatformChip extends StatelessWidget {
                   width: 82,
                   height: 28,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorBuilder: (_, _, _) => Icon(
                     Icons.account_balance_wallet_rounded,
                     color: accentColor,
                     size: 22,

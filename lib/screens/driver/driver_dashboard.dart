@@ -162,7 +162,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                         ),
                         ValueListenableBuilder<List<AppNotification>>(
                           valueListenable: NotificationService.instance.history,
-                          builder: (_, list, __) {
+                          builder: (_, list, _) {
                             final unread = list.where((n) => !n.read).length;
                             if (unread == 0) return const SizedBox.shrink();
                             return Positioned(
@@ -840,8 +840,12 @@ class _EmergencySheetState extends State<_EmergencySheet> {
 
   Future<void> _callEmergency() async {
     final uri = Uri(scheme: 'tel', path: '1122');
-    if (await canLaunchUrl(uri)) launchUrl(uri);
-    if (mounted) Navigator.pop(context);
+    if (await canLaunchUrl(uri)) {
+      launchUrl(uri);
+    }
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _sendSOS() async {
@@ -856,7 +860,9 @@ class _EmergencySheetState extends State<_EmergencySheet> {
     if (!mounted) return;
     setState(() => _sent = true);
     await Future.delayed(const Duration(seconds: 2));
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -947,7 +953,9 @@ class _AlertAllSheetState extends State<_AlertAllSheet> {
       icon: m.icon,
       color: AppTheme.warning,
     );
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -1051,8 +1059,9 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$_lat,$_lng',
     );
-    if (await canLaunchUrl(uri))
+    if (await canLaunchUrl(uri)) {
       launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   void _copyCoords() {
@@ -1069,7 +1078,9 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
       icon: '📍',
       color: AppTheme.success,
     );
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -1188,7 +1199,9 @@ class _UpdateRouteSheetState extends State<_UpdateRouteSheet> {
       icon: o.icon,
       color: _selected == 0 ? AppTheme.success : AppTheme.warning,
     );
-    if (mounted) Navigator.pop(context);
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override

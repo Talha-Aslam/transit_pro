@@ -108,7 +108,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               return Center(
                 child: AnimatedBuilder(
                   animation: _bounceController,
-                  builder: (_, __) {
+                  builder: (_, _) {
                     final scale = 0.95 + (_bounceController.value * 0.10);
                     return Transform.scale(
                       scale: scale,
@@ -142,7 +142,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 top: dot.top * size.height,
                 child: AnimatedBuilder(
                   animation: _bounceController,
-                  builder: (_, __) => Transform.translate(
+                  builder: (_, _) => Transform.translate(
                     offset: Offset(0, -_bounceController.value * 20),
                     child: Container(
                       width: dot.size,
@@ -169,7 +169,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       // Bus icon with bounce
                       AnimatedBuilder(
                         animation: _bounceAnim,
-                        builder: (_, __) => Transform.translate(
+                        builder: (_, _) => Transform.translate(
                           offset: Offset(0, _bounceAnim.value),
                           child: Center(
                             child: Image.asset(
@@ -234,7 +234,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       // Loading bar
                       AnimatedBuilder(
                         animation: _progressController,
-                        builder: (_, __) =>
+                        builder: (_, _) =>
                             _LoadingBar(progress: _progressController.value),
                       ),
                     ],

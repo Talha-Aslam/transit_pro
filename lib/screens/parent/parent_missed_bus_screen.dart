@@ -508,7 +508,7 @@ class _ParentSearchingView extends StatelessWidget {
         const SizedBox(height: 32),
         AnimatedBuilder(
           animation: pulse,
-          builder: (_, __) => Transform.scale(
+          builder: (_, _) => Transform.scale(
             scale: pulse.value,
             child: Container(
               width: 100,

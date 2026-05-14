@@ -40,7 +40,7 @@ class _DriverRouteState extends State<DriverRoute> {
 
     rootBundle.loadString('assets/map_style.json').then((style) {
       _mapStyle = style;
-      _mapController?.setMapStyle(style);
+      if (mounted) setState(() {});
     });
 
     final route = MockRouteBuilder.buildMorningRoute();
@@ -105,7 +105,7 @@ class _DriverRouteState extends State<DriverRoute> {
     final img = await picture.toImage(size.toInt(), size.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     if (bytes != null && mounted) {
-      _busIcon = BitmapDescriptor.fromBytes(bytes.buffer.asUint8List());
+      _busIcon = BitmapDescriptor.bytes(bytes.buffer.asUint8List());
     }
   }
 
@@ -170,7 +170,7 @@ class _DriverRouteState extends State<DriverRoute> {
         rotation: _tracking.busHeading.value,
         anchor: const Offset(0.5, 0.5),
         infoWindow: const InfoWindow(title: '🚌 Your Bus'),
-        zIndex: 10,
+        zIndexInt: 10,
       ),
     );
 
@@ -362,7 +362,7 @@ class _DriverRouteState extends State<DriverRoute> {
                                 ),
                                 ValueListenableBuilder<int>(
                                   valueListenable: _tracking.speed,
-                                  builder: (_, spd, __) => Text(
+                                  builder: (_, spd, _) => Text(
                                     '$spd km/h',
                                     style: const TextStyle(
                                       color: AppTheme.driverAccent,
@@ -396,11 +396,9 @@ class _DriverRouteState extends State<DriverRoute> {
                             mapToolbarEnabled: false,
                             compassEnabled: false,
                             trafficEnabled: true,
+                            style: _mapStyle,
                             onMapCreated: (controller) {
                               _mapController = controller;
-                              if (_mapStyle != null) {
-                                controller.setMapStyle(_mapStyle!);
-                              }
                             },
                           ),
                         ),
@@ -469,7 +467,7 @@ class _DriverRouteState extends State<DriverRoute> {
                       ),
                       Switch(
                         value: _sharingLocation,
-                        activeColor: AppTheme.success,
+                        activeThumbColor: AppTheme.success,
                         onChanged: (v) => setState(() => _sharingLocation = v),
                       ),
                     ],
@@ -482,7 +480,7 @@ class _DriverRouteState extends State<DriverRoute> {
                   children: [
                     ValueListenableBuilder<int>(
                       valueListenable: _tracking.etaMinutes,
-                      builder: (_, eta, __) => _LiveStatCard(
+                      builder: (_, eta, _) => _LiveStatCard(
                         icon: '⏱️',
                         label: AppStrings.t('eta_school'),
                         value: '$eta min',
@@ -497,7 +495,7 @@ class _DriverRouteState extends State<DriverRoute> {
                     const SizedBox(width: 10),
                     ValueListenableBuilder<int>(
                       valueListenable: _tracking.speed,
-                      builder: (_, spd, __) => _LiveStatCard(
+                      builder: (_, spd, _) => _LiveStatCard(
                         icon: '⚡',
                         label: AppStrings.t('avg_speed'),
                         value: '$spd km/h',

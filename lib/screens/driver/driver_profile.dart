@@ -145,7 +145,7 @@ class _DriverProfileState extends State<DriverProfile> {
                           child: ValueListenableBuilder<File?>(
                             valueListenable:
                                 ProfileService.instance.driverImage,
-                            builder: (_, file, __) => file != null
+                            builder: (_, file, _) => file != null
                                 ? ClipRRect(
                                     borderRadius: BorderRadius.circular(23),
                                     child: Image.file(
@@ -918,7 +918,9 @@ class _EditSheetState extends State<_EditSheet> {
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 

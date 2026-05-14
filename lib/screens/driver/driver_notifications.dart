@@ -168,7 +168,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                     ValueListenableBuilder(
                       valueListenable:
                           MissedBusService.instance.driverIncomingRequests,
-                      builder: (_, list, __) {
+                      builder: (_, list, _) {
                         final count = list.length;
                         return GestureDetector(
                           onTap: () => context.push('/driver/pickup-requests'),

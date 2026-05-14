@@ -262,7 +262,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                     children: [
                       ValueListenableBuilder<int>(
                         valueListenable: _tracking.etaMinutes,
-                        builder: (_, eta, __) => _ETAInfo(
+                        builder: (_, eta, _) => _ETAInfo(
                           icon: '⏱️',
                           label: 'ETA',
                           value: '$eta min',

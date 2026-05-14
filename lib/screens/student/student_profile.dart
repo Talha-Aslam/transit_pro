@@ -181,7 +181,7 @@ class _StudentProfileState extends State<StudentProfile> {
                               child: ValueListenableBuilder<File?>(
                                 valueListenable:
                                     ProfileService.instance.studentImage,
-                                builder: (_, file, __) => file != null
+                                builder: (_, file, _) => file != null
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(28),
                                         child: Image.file(

@@ -246,7 +246,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: _filters.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final sel = i == _filterIndex;
                     return GestureDetector(
@@ -286,7 +286,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                   itemCount: trips.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (_, i) => _TripCard(trip: trips[i]),
                 ),
               ),

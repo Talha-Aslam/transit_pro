@@ -299,7 +299,7 @@ class _ParentProfileState extends State<ParentProfile> {
                               child: ValueListenableBuilder<File?>(
                                 valueListenable:
                                     ProfileService.instance.parentImage,
-                                builder: (_, file, __) => ClipRRect(
+                                builder: (_, file, _) => ClipRRect(
                                   borderRadius: BorderRadius.circular(23),
                                   child: file != null
                                       ? Image.file(
@@ -957,7 +957,7 @@ class _ChildCardState extends State<_ChildCard> {
                       children: [
                         ValueListenableBuilder<List<File?>>(
                           valueListenable: _svc.childImages,
-                          builder: (_, imgs, __) {
+                          builder: (_, imgs, _) {
                             final file = widget.index < imgs.length
                                 ? imgs[widget.index]
                                 : null;
@@ -1526,7 +1526,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            bus.busNumber + ' · ' + bus.route,
+                            '·',
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 13,

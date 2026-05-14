@@ -310,7 +310,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: _filters.length,
-                                separatorBuilder: (_, __) =>
+                                separatorBuilder: (_, _) =>
                                     const SizedBox(width: 8),
                                 itemBuilder: (_, i) {
                                   final selected =

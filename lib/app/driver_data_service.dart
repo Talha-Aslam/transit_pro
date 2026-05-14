@@ -52,7 +52,14 @@ class DriverDataService {
   /// Notifier for the driver's own profile info.
   final driverInfo = ValueNotifier<DriverInfo>(DriverInfo());
 
+  /// Shared toggle for driver location sharing.
+  final locationSharing = ValueNotifier<bool>(true);
+
   void updateDriverInfo(DriverInfo info) {
     driverInfo.value = info;
+  }
+
+  void setLocationSharing(bool value) {
+    locationSharing.value = value;
   }
 }

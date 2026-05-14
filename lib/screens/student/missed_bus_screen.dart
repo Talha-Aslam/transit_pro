@@ -448,7 +448,7 @@ class _SearchingView extends StatelessWidget {
         // Pulsing ring
         AnimatedBuilder(
           animation: pulse,
-          builder: (_, __) => Transform.scale(
+          builder: (_, _) => Transform.scale(
             scale: pulse.value,
             child: Container(
               width: 100,

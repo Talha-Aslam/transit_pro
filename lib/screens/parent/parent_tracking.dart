@@ -214,7 +214,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                         // ── ETA Banner ──────────────────────────────────
                         ValueListenableBuilder<int>(
                           valueListenable: _tracking.etaMinutes,
-                          builder: (_, eta, __) => GlassCard(
+                          builder: (_, eta, _) => GlassCard(
                             gradient: LinearGradient(
                               colors: [
                                 AppTheme.parentPurple.withValues(alpha: 0.2),
@@ -324,7 +324,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       onTap: _tracking.toggleLive,
                                       child: ValueListenableBuilder<bool>(
                                         valueListenable: _tracking.isLive,
-                                        builder: (_, live, __) => Container(
+                                        builder: (_, live, _) => Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 10,
                                             vertical: 4,
@@ -497,7 +497,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       Expanded(
                                         child: ValueListenableBuilder<int>(
                                           valueListenable: _tracking.speed,
-                                          builder: (_, spd, __) => _InfoCard(
+                                          builder: (_, spd, _) => _InfoCard(
                                             icon: '⚡',
                                             label: AppStrings.t('speed'),
                                             value: '$spd km/h',
@@ -541,9 +541,9 @@ class _LiveBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: tracking.isSimulating,
-      builder: (_, sim, __) => ValueListenableBuilder<bool>(
+      builder: (_, sim, _) => ValueListenableBuilder<bool>(
         valueListenable: tracking.isLive,
-        builder: (_, live, __) => Row(
+        builder: (_, live, _) => Row(
           children: [
             Container(
               width: 8,
