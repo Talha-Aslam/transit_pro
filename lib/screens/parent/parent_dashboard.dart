@@ -373,7 +373,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                               AppTheme.parentIndigo.withValues(alpha: 0.08),
                             ],
                           ),
-                          borderColor: AppTheme.parentPurple.withValues(alpha: 0.25),
+                          borderColor: AppTheme.parentPurple.withValues(
+                            alpha: 0.25,
+                          ),
                           padding: const EdgeInsets.all(13),
                           child: Row(
                             children: [
@@ -385,8 +387,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                   borderRadius: BorderRadius.circular(18),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppTheme.parentPurple.withValues(alpha: 
-                                        0.4,
+                                      color: AppTheme.parentPurple.withValues(
+                                        alpha: 0.4,
                                       ),
                                       blurRadius: 20,
                                       offset: const Offset(0, 8),
@@ -469,11 +471,13 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  color: AppTheme.parentAccent.withValues(alpha: 0.2),
+                                  color: AppTheme.parentAccent.withValues(
+                                    alpha: 0.2,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: AppTheme.parentAccent.withValues(alpha: 
-                                      0.3,
+                                    color: AppTheme.parentAccent.withValues(
+                                      alpha: 0.3,
                                     ),
                                   ),
                                 ),
@@ -567,8 +571,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           vertical: 3,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.warning.withValues(alpha: 
-                                            0.2,
+                                          color: AppTheme.warning.withValues(
+                                            alpha: 0.2,
                                           ),
                                           borderRadius: BorderRadius.circular(
                                             8,
@@ -625,8 +629,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.parentAccent
-                                            .withValues(alpha: 0.15),
+                                        color: AppTheme.parentAccent.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: AppTheme.parentAccent
@@ -744,8 +749,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.parentAccent
-                                            .withValues(alpha: 0.15),
+                                        color: AppTheme.parentAccent.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: AppTheme.parentAccent

@@ -121,7 +121,9 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                             AppTheme.studentOrange.withValues(alpha: 0.06),
                           ],
                         ),
-                        borderColor: AppTheme.studentAmber.withValues(alpha: 0.3),
+                        borderColor: AppTheme.studentAmber.withValues(
+                          alpha: 0.3,
+                        ),
                         padding: const EdgeInsets.all(18),
                         child: Row(
                           children: [
@@ -844,10 +846,14 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                               Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.warning.withValues(alpha: 0.1),
+                                  color: AppTheme.warning.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: AppTheme.warning.withValues(alpha: 0.3),
+                                    color: AppTheme.warning.withValues(
+                                      alpha: 0.3,
+                                    ),
                                   ),
                                 ),
                                 child: Row(
@@ -935,7 +941,9 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
                                     color: context.cardBgElevated,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: AppTheme.info.withValues(alpha: 0.35),
+                                      color: AppTheme.info.withValues(
+                                        alpha: 0.35,
+                                      ),
                                     ),
                                   ),
                                   child: Row(
@@ -1438,7 +1446,10 @@ class _PayHeader extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppTheme.studentAmber.withValues(alpha: 0.12), Colors.transparent],
+          colors: [
+            AppTheme.studentAmber.withValues(alpha: 0.12),
+            Colors.transparent,
+          ],
         ),
       ),
       child: Row(
@@ -1995,7 +2006,10 @@ class _SubmittedConfirmation extends StatelessWidget {
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
-              border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 2),
+              border: Border.all(
+                color: accentColor.withValues(alpha: 0.3),
+                width: 2,
+              ),
             ),
             child: Center(
               child: Text(icon, style: const TextStyle(fontSize: 36)),

@@ -283,13 +283,15 @@ class _ParentProfileState extends State<ParentProfile> {
                                 ).withValues(alpha: 0.8),
                                 borderRadius: BorderRadius.circular(26),
                                 border: Border.all(
-                                  color: AppTheme.parentPurple.withValues(alpha: 0.5),
+                                  color: AppTheme.parentPurple.withValues(
+                                    alpha: 0.5,
+                                  ),
                                   width: 3,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.parentPurple.withValues(alpha: 
-                                      0.3,
+                                    color: AppTheme.parentPurple.withValues(
+                                      alpha: 0.3,
                                     ),
                                     blurRadius: 24,
                                     offset: const Offset(0, 8),
@@ -379,10 +381,14 @@ class _ParentProfileState extends State<ParentProfile> {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.parentPurple.withValues(alpha: 0.15),
+                                color: AppTheme.parentPurple.withValues(
+                                  alpha: 0.15,
+                                ),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppTheme.parentPurple.withValues(alpha: 0.3),
+                                  color: AppTheme.parentPurple.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               child: Row(
@@ -460,7 +466,9 @@ class _ParentProfileState extends State<ParentProfile> {
                               AppTheme.info.withValues(alpha: 0.05),
                             ],
                           ),
-                          borderColor: AppTheme.parentPurple.withValues(alpha: 0.2),
+                          borderColor: AppTheme.parentPurple.withValues(
+                            alpha: 0.2,
+                          ),
                           padding: const EdgeInsets.all(18),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -937,7 +945,9 @@ class _ChildCardState extends State<_ChildCard> {
       decoration: BoxDecoration(
         color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.parentPurple.withValues(alpha: 0.15)),
+        border: Border.all(
+          color: AppTheme.parentPurple.withValues(alpha: 0.15),
+        ),
       ),
       child: Column(
         children: [
@@ -2128,7 +2138,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                                 height: 46,
                                 decoration: BoxDecoration(
                                   color: _instituteName == null
-                                      ? context.surfaceBorder.withValues(alpha: 0.45)
+                                      ? context.surfaceBorder.withValues(
+                                          alpha: 0.45,
+                                        )
                                       : AppTheme.info.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
@@ -2173,7 +2185,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               height: 46,
                               decoration: BoxDecoration(
                                 color: _locationCtrl.text.trim().isEmpty
-                                    ? context.surfaceBorder.withValues(alpha: 0.45)
+                                    ? context.surfaceBorder.withValues(
+                                        alpha: 0.45,
+                                      )
                                     : AppTheme.info.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(

@@ -64,6 +64,7 @@ class ParentDataService {
   static const _driverRatingsKey = 'parent_driver_ratings';
   static const _paidFeeMonthsKey = 'parent_paid_fee_months';
   static const _feeNotificationsKey = 'parent_fee_notifications';
+  static const _paymentRemindersKey = 'parent_payment_reminders';
 
   /// Notifier for the parent's own info.
   final parentInfo = ValueNotifier<ParentInfo>(ParentInfo());
@@ -95,6 +96,9 @@ class ParentDataService {
 
   /// Parent-side fee notifications (driver confirmation messages).
   final feeNotifications = ValueNotifier<List<String>>([]);
+
+  /// Payment reminders for upcoming dues (month -> bool).
+  final paymentReminders = ValueNotifier<Map<String, bool>>({});
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -225,6 +229,53 @@ class ParentDataService {
 
   void selectChild(int index) {
     selectedChildIndex.value = index.clamp(0, children.value.length - 1);
+  }
+
+  // ── Payment Reminders ──────────────────────────────────────────────────────
+
+  Future<void> loadPaymentReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_paymentRemindersKey);
+    if (raw == null || raw.isEmpty) {
+      paymentReminders.value = {};
+      return;
+    }
+
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    paymentReminders.value = decoded.cast<String, bool>();
+  }
+
+  Future<void> setPaymentReminder(String month, bool enabled) async {
+    final updated = Map<String, bool>.from(paymentReminders.value);
+    updated[month] = enabled;
+    paymentReminders.value = updated;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_paymentRemindersKey, jsonEncode(updated));
+  }
+
+  bool hasPaymentReminder(String month) {
+    return paymentReminders.value[month] ?? false;
+  }
+
+  List<String> getUpcomingPayments() {
+    final now = DateTime.now();
+    final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final nextMonth =
+        '${now.year}-${(now.month + 1).toString().padLeft(2, '0')}';
+    return [currentMonth, nextMonth];
+  }
+
+  bool isPaymentDue(String month) {
+    final parts = month.split('-');
+    final year = int.parse(parts[0]);
+    final monthNum = int.parse(parts[1]);
+    final dueDate = DateTime(
+      year,
+      monthNum + 1,
+      1,
+    ).subtract(const Duration(days: 1));
+    return DateTime.now().isAfter(dueDate.subtract(const Duration(days: 5)));
   }
 }
 

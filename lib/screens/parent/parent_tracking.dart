@@ -98,7 +98,7 @@ class _ParentTrackingState extends State<ParentTracking> {
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
         rotation: _tracking.busHeading.value,
         anchor: const Offset(0.5, 0.5),
-        infoWindow: const InfoWindow(title: '🚌 Bus #42'),
+        infoWindow: const InfoWindow(title: '­ƒÜî Bus #42'),
         zIndexInt: 10,
       ),
     );
@@ -163,7 +163,7 @@ class _ParentTrackingState extends State<ParentTracking> {
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
-                  // ── Header ──────────────────────────────────────────────
+                  // ÔöÇÔöÇ Header ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
                   Container(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                     decoration: BoxDecoration(
@@ -193,7 +193,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                               Text(
                                 child == null
                                     ? ''
-                                    : '${child.busNumber} · ${child.route}',
+                                    : '${child.busNumber} ┬À ${child.route}',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 13,
@@ -211,7 +211,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
-                        // ── ETA Banner ──────────────────────────────────
+                        // ÔöÇÔöÇ ETA Banner ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
                         ValueListenableBuilder<int>(
                           valueListenable: _tracking.etaMinutes,
                           builder: (_, eta, _) => GlassCard(
@@ -294,7 +294,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ── Google Map ───────────────────────────────────
+                        // ÔöÇÔöÇ Google Map ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
                         GlassCard(
                           backgroundColor: const Color(0xCC0A0F28),
                           borderRadius: 20,
@@ -352,8 +352,8 @@ class _ParentTrackingState extends State<ParentTracking> {
                                           ),
                                           child: Text(
                                             live
-                                                ? '📡 Live GPS'
-                                                : '🔄 Simulated',
+                                                ? '­ƒôí Live GPS'
+                                                : '­ƒöä Simulated',
                                             style: TextStyle(
                                               color: live
                                                   ? AppTheme.successLight
@@ -427,7 +427,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ── Route Stops ─────────────────────────────────
+                        // ÔöÇÔöÇ Route Stops ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
                         GlassCard(
                           padding: const EdgeInsets.all(18),
                           child: Column(
@@ -454,7 +454,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                         ),
                         const SizedBox(height: 12),
 
-                        // ── Bus Info ────────────────────────────────────
+                        // ÔöÇÔöÇ Bus Info ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
                         GlassCard(
                           padding: const EdgeInsets.all(18),
                           child: Column(
@@ -476,7 +476,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                     children: [
                                       Expanded(
                                         child: _InfoCard(
-                                          icon: '👨‍✈️',
+                                          icon: '­ƒæ¿ÔÇìÔ£ê´©Å',
                                           label: AppStrings.t('driver'),
                                           value: child?.driver ?? 'N/A',
                                         ),
@@ -484,7 +484,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: _InfoCard(
-                                          icon: '🚌',
+                                          icon: '­ƒÜî',
                                           label: AppStrings.t('bus_number'),
                                           value: child?.busNumber ?? 'N/A',
                                         ),
@@ -498,7 +498,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                         child: ValueListenableBuilder<int>(
                                           valueListenable: _tracking.speed,
                                           builder: (_, spd, _) => _InfoCard(
-                                            icon: '⚡',
+                                            icon: 'ÔÜí',
                                             label: AppStrings.t('speed'),
                                             value: '$spd km/h',
                                           ),
@@ -507,7 +507,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: _InfoCard(
-                                          icon: '👦',
+                                          icon: '­ƒæª',
                                           label: AppStrings.t('students'),
                                           value: '22 onboard',
                                         ),
@@ -532,7 +532,7 @@ class _ParentTrackingState extends State<ParentTracking> {
   }
 }
 
-// ── Live Badge ─────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Live Badge ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 class _LiveBadge extends StatelessWidget {
   final TrackingService tracking;
   const _LiveBadge({required this.tracking});
@@ -575,7 +575,7 @@ class _LiveBadge extends StatelessWidget {
   }
 }
 
-// ── Stop Row ───────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Stop Row ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 class _StopRow extends StatelessWidget {
   final StopData stop;
   final bool isLast;
@@ -616,7 +616,7 @@ class _StopRow extends StatelessWidget {
                 child: Center(
                   child: stop.status == StopStatus.completed
                       ? Text(
-                          '✓',
+                          'Ô£ô',
                           style: TextStyle(
                             color: _color,
                             fontSize: 13,
@@ -624,7 +624,7 @@ class _StopRow extends StatelessWidget {
                           ),
                         )
                       : stop.status == StopStatus.destination
-                      ? const Text('🏫', style: TextStyle(fontSize: 12))
+                      ? const Text('­ƒÅ½', style: TextStyle(fontSize: 12))
                       : Container(
                           width: 8,
                           height: 8,
@@ -715,7 +715,7 @@ class _StopRow extends StatelessWidget {
   }
 }
 
-// ── Legend Dot ──────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Legend Dot ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 class _LegendDot extends StatelessWidget {
   final Color color;
   final String label;
@@ -740,7 +740,7 @@ class _LegendDot extends StatelessWidget {
   }
 }
 
-// ── Info Card ──────────────────────────────────────────────────────────────────
+// ÔöÇÔöÇ Info Card ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
 class _InfoCard extends StatelessWidget {
   final String icon, label, value;
   const _InfoCard({
