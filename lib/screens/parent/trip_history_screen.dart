@@ -43,6 +43,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
           time: entry.time,
           status: AppStrings.t(entry.statusKey),
           statusOk: entry.statusOk,
+          attendancePresent: entry.driverMarkedPresent,
           isMorning: entry.isMorning,
         ),
       )
@@ -122,11 +123,200 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
     setState(() => _selectedCalendarDate = picked);
   }
 
+  Widget _buildSectionHeader({
+    required BuildContext context,
+    required String title,
+    required int count,
+    required Color accent,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 22,
+          decoration: BoxDecoration(
+            color: accent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            color: context.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              color: accent,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTripRow({
+    required BuildContext context,
+    required _Trip t,
+    required bool isLast,
+    required bool showStatus,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(bottom: BorderSide(color: context.surfaceBorder)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: (t.attendancePresent ? AppTheme.success : AppTheme.error)
+                  .withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: (t.attendancePresent ? AppTheme.success : AppTheme.error)
+                    .withValues(alpha: 0.3),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                t.isMorning ? '🚌' : '🏫',
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        t.type,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            (t.attendancePresent
+                                    ? AppTheme.success
+                                    : AppTheme.error)
+                                .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        t.attendancePresent ? 'Present' : 'Absent',
+                        style: TextStyle(
+                          color: t.attendancePresent
+                              ? AppTheme.success
+                              : AppTheme.error,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (showStatus) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (t.statusOk ? AppTheme.success : AppTheme.warning)
+                                  .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          t.status,
+                          style: TextStyle(
+                            color: t.statusOk
+                                ? AppTheme.success
+                                : AppTheme.warning,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${t.from}  ${AppStrings.t('trip_to_arrow')}  ${t.to}',
+                  style: TextStyle(color: context.textSecondary, fontSize: 11),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      _formatDate(t.date),
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 10,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      t.time,
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredTrips = _filteredTrips;
-    final onTime = filteredTrips.where((t) => t.statusOk).length;
-    final late = filteredTrips.length - onTime;
+    final presentTrips = filteredTrips
+        .where((t) => t.attendancePresent)
+        .toList();
+    final absentTrips = filteredTrips
+        .where((t) => !t.attendancePresent)
+        .toList();
+    final onTime = presentTrips.where((t) => t.statusOk).length;
+    final late = presentTrips.length - onTime;
+    final present = filteredTrips.where((t) => t.attendancePresent).length;
+    final absent = filteredTrips.length - present;
 
     return Scaffold(
       body: Container(
@@ -412,148 +602,101 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                       ],
                       const SizedBox(height: 14),
 
-                      // Trip list
+                      // Present section
                       GlassCard(
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: [
-                            if (filteredTrips.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(18),
-                                child: Text(
-                                  'No trips found for this range.',
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                              child: _buildSectionHeader(
+                                context: context,
+                                title: 'Present Trips',
+                                count: present,
+                                accent: AppTheme.success,
                               ),
-                            ...filteredTrips.asMap().entries.map((e) {
-                              final t = e.value;
-                              final isLast = e.key == filteredTrips.length - 1;
-                              return Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  border: isLast
-                                      ? null
-                                      : Border(
-                                          bottom: BorderSide(
-                                            color: context.surfaceBorder,
-                                          ),
-                                        ),
+                            ),
+                            if (presentTrips.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  14,
                                 ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color:
-                                            (t.statusOk
-                                                    ? AppTheme.success
-                                                    : AppTheme.warning)
-                                                .withValues(alpha: 0.13),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color:
-                                              (t.statusOk
-                                                      ? AppTheme.success
-                                                      : AppTheme.warning)
-                                                  .withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          t.isMorning ? '🚌' : '🏫',
-                                          style: const TextStyle(fontSize: 18),
-                                        ),
-                                      ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'No present trips found for this range.',
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  t.type,
-                                                  style: TextStyle(
-                                                    color: context.textPrimary,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 7,
-                                                      vertical: 2,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      (t.statusOk
-                                                              ? AppTheme.success
-                                                              : AppTheme
-                                                                    .warning)
-                                                          .withValues(alpha: 0.15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  t.status,
-                                                  style: TextStyle(
-                                                    color: t.statusOk
-                                                        ? AppTheme.success
-                                                        : AppTheme.warning,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${t.from}  ${AppStrings.t('trip_to_arrow')}  ${t.to}',
-                                            style: TextStyle(
-                                              color: context.textSecondary,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Row(
-                                            children: [
-                                              Text(
-                                                _formatDate(t.date),
-                                                style: TextStyle(
-                                                  color: context.textTertiary,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                t.time,
-                                                style: TextStyle(
-                                                  color: context.textTertiary,
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              );
-                            }),
+                              )
+                            else
+                              ...presentTrips.asMap().entries.map((e) {
+                                final t = e.value;
+                                final isLast = e.key == presentTrips.length - 1;
+                                return _buildTripRow(
+                                  context: context,
+                                  t: t,
+                                  isLast: isLast,
+                                  showStatus: true,
+                                );
+                              }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Absent section
+                      GlassCard(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                              child: _buildSectionHeader(
+                                context: context,
+                                title: 'Absent Trips',
+                                count: absent,
+                                accent: AppTheme.error,
+                              ),
+                            ),
+                            if (absentTrips.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  0,
+                                  14,
+                                  14,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'No absent trips found for this range.',
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              ...absentTrips.asMap().entries.map((e) {
+                                final t = e.value;
+                                final isLast = e.key == absentTrips.length - 1;
+                                return _buildTripRow(
+                                  context: context,
+                                  t: t,
+                                  isLast: isLast,
+                                  showStatus: false,
+                                );
+                              }),
                           ],
                         ),
                       ),
@@ -574,6 +717,7 @@ class _Trip {
   final DateTime date;
   final String type, from, to, time, status;
   final bool statusOk;
+  final bool attendancePresent;
   final bool isMorning;
 
   const _Trip({
@@ -584,6 +728,7 @@ class _Trip {
     required this.time,
     required this.status,
     required this.statusOk,
+    required this.attendancePresent,
     required this.isMorning,
   });
 }

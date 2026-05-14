@@ -58,8 +58,11 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
     final busNumber = child?.busNumber.isNotEmpty == true
         ? child!.busNumber
         : '—';
-    final route = child?.route.isNotEmpty == true ? child!.route : '—';
     final stop = child?.stop.isNotEmpty == true ? child!.stop : '—';
+    final meta = _driverInfoMetaFor(
+      driverName: driverName,
+      transportNumber: busNumber,
+    );
     final driverRating = child == null ? null : _svc.driverRatingFor(child);
     final canRate = child != null && _svc.canRateDriver(child);
 
@@ -139,7 +142,9 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                             AppTheme.info.withValues(alpha: 0.05),
                           ],
                         ),
-                        borderColor: AppTheme.parentPurple.withValues(alpha: 0.25),
+                        borderColor: AppTheme.parentPurple.withValues(
+                          alpha: 0.25,
+                        ),
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           children: [
@@ -206,17 +211,37 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                         children: [
                           Expanded(
                             child: _InfoTile(
-                              label: AppStrings.t('selected_route'),
-                              value: route,
-                              icon: '🛣️',
+                              label: 'Contact Number',
+                              value: meta.contactNumber,
+                              icon: '📞',
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: _InfoTile(
-                              label: AppStrings.t('driver'),
-                              value: driverName,
-                              icon: '👨‍✈️',
+                              label: 'Experience',
+                              value: meta.experience,
+                              icon: '📅',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _InfoTile(
+                              label: 'Transport Number',
+                              value: meta.transportNumber,
+                              icon: '🚌',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _InfoTile(
+                              label: 'Total Seats',
+                              value: meta.totalSeats,
+                              icon: '👥',
                             ),
                           ),
                         ],
@@ -401,4 +426,46 @@ class _InfoTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DriverInfoMeta {
+  final String contactNumber;
+  final String experience;
+  final String transportNumber;
+  final String totalSeats;
+
+  const _DriverInfoMeta({
+    required this.contactNumber,
+    required this.experience,
+    required this.transportNumber,
+    required this.totalSeats,
+  });
+}
+
+_DriverInfoMeta _driverInfoMetaFor({
+  required String driverName,
+  required String transportNumber,
+}) {
+  const known = {
+    'Bus #42': _DriverInfoMeta(
+      contactNumber: '+92 300 1234567',
+      experience: '8 years',
+      transportNumber: 'Bus #42',
+      totalSeats: '28',
+    ),
+    'Bus #15': _DriverInfoMeta(
+      contactNumber: '+92 321 7654321',
+      experience: '5 years',
+      transportNumber: 'Bus #15',
+      totalSeats: '22',
+    ),
+  };
+
+  return known[transportNumber] ??
+      _DriverInfoMeta(
+        contactNumber: '+92 300 0000000',
+        experience: '4 years',
+        transportNumber: transportNumber == '—' ? 'N/A' : transportNumber,
+        totalSeats: '24',
+      );
 }

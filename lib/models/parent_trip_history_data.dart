@@ -6,6 +6,7 @@ class ParentTripHistoryEntry {
   final String time;
   final String statusKey;
   final bool statusOk;
+  final bool driverMarkedPresent;
   final bool isMorning;
   final bool completed;
 
@@ -17,6 +18,7 @@ class ParentTripHistoryEntry {
     required this.time,
     required this.statusKey,
     required this.statusOk,
+    this.driverMarkedPresent = true,
     required this.isMorning,
     this.completed = true,
   });
@@ -47,6 +49,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '03:30 PM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: false,
     ),
     ParentTripHistoryEntry(
@@ -57,6 +60,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '07:20 AM',
       statusKey: 'trip_status_5_late',
       statusOk: false,
+      driverMarkedPresent: false,
       isMorning: true,
     ),
     ParentTripHistoryEntry(
@@ -67,7 +71,19 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '03:30 PM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: false,
+    ),
+    ParentTripHistoryEntry(
+      date: onDay(-3, 7, 25),
+      typeKey: 'trip_type_morning_pickup',
+      from: 'Oak Street Stop',
+      to: 'Lincoln Elementary',
+      time: '07:25 AM',
+      statusKey: 'trip_status_5_late',
+      statusOk: false,
+      driverMarkedPresent: true,
+      isMorning: true,
     ),
     ParentTripHistoryEntry(
       date: onDay(-4, 7, 14),
@@ -77,6 +93,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '07:14 AM',
       statusKey: 'trip_status_1_early',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: true,
     ),
     ParentTripHistoryEntry(
@@ -87,6 +104,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '03:30 PM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: false,
     ),
     ParentTripHistoryEntry(
@@ -97,6 +115,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '07:18 AM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: false,
       isMorning: true,
     ),
     ParentTripHistoryEntry(
@@ -107,6 +126,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '03:25 PM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: false,
     ),
     ParentTripHistoryEntry(
@@ -117,6 +137,7 @@ List<ParentTripHistoryEntry> buildParentTripHistoryEntries(DateTime now) {
       time: '07:12 AM',
       statusKey: 'trip_status_on_time',
       statusOk: true,
+      driverMarkedPresent: true,
       isMorning: true,
     ),
   ];

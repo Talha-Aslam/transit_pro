@@ -136,7 +136,9 @@ class _DriverProfileState extends State<DriverProfile> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.driverCyan.withValues(alpha: 0.3),
+                                color: AppTheme.driverCyan.withValues(
+                                  alpha: 0.3,
+                                ),
                                 blurRadius: 24,
                                 offset: const Offset(0, 8),
                               ),
@@ -407,86 +409,6 @@ class _DriverProfileState extends State<DriverProfile> {
                                     ),
                                   ),
                                 ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── Bus info ────────────────────────────────────
-                    GlassCard(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.t('bus_info_section'),
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.driverGradient,
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    '🚌',
-                                    style: TextStyle(fontSize: 28),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'School ${info.busNumber}',
-                                    style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '2022 Ford Transit · Yellow',
-                                    style: TextStyle(
-                                      color: context.textTertiary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              _BusChip(
-                                label: AppStrings.t('capacity_lbl'),
-                                value: '28 seats',
-                              ),
-                              const SizedBox(width: 8),
-                              _BusChip(
-                                label: AppStrings.t('fuel_lbl'),
-                                value: 'CNG',
-                              ),
-                              const SizedBox(width: 8),
-                              _BusChip(
-                                label: AppStrings.t('last_service_lbl'),
-                                value: 'Feb 10',
                               ),
                             ],
                           ),
@@ -769,41 +691,6 @@ class _InfoCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BusChip extends StatelessWidget {
-  final String label, value;
-  const _BusChip({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          children: [
-            Text(
-              label,
-              style: TextStyle(color: context.textTertiary, fontSize: 9),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
