@@ -4,6 +4,49 @@ import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
+// Bulk alert option model (top-level)
+class _BulkAlertOption {
+  final String id;
+  final String label;
+  final String icon;
+  final String type;
+  final Color color;
+  final String titleTemplate;
+  final String bodyTemplate;
+
+  const _BulkAlertOption({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.type,
+    required this.color,
+    required this.titleTemplate,
+    required this.bodyTemplate,
+  });
+}
+
+final List<_BulkAlertOption> _bulkOptions = [
+  _BulkAlertOption(
+    id: 'emergency',
+    label: 'Emergency',
+    icon: '🚨',
+    type: 'alert',
+    color: AppTheme.error,
+    titleTemplate: '{{name}} emergency',
+    bodyTemplate:
+        'Urgent update regarding {{name}}. Please contact the driver immediately.',
+  ),
+  _BulkAlertOption(
+    id: 'custom',
+    label: 'Custom message',
+    icon: '✉️',
+    type: 'info',
+    color: AppTheme.driverCyan,
+    titleTemplate: '{{name}} update',
+    bodyTemplate: '{{message}}',
+  ),
+];
+
 class DriverAttendance extends StatefulWidget {
   final VoidCallback onBack;
   const DriverAttendance({super.key, required this.onBack});
@@ -43,7 +86,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     });
   }
 
-  Future<void> _sendAlertsToPresent() async {
+  Future<void> _showBulkAlertOptions() async {
     final presentStudents = _students
         .where((s) => s.status == 'boarded')
         .toList();
@@ -55,14 +98,133 @@ class _DriverAttendanceState extends State<DriverAttendance> {
       return;
     }
 
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.4,
+          minChildSize: 0.2,
+          maxChildSize: 0.8,
+          builder: (context, sc) {
+            return Container(
+              decoration: BoxDecoration(
+                color: context.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(18),
+                ),
+              ),
+              child: ListView(
+                controller: sc,
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(
+                    'Choose alert to send',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._bulkOptions.map(
+                    (opt) => ListTile(
+                      leading: Text(
+                        opt.icon,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      title: Text(
+                        opt.label,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        opt.id == 'custom'
+                            ? 'Send a custom message to parents'
+                            : opt.titleTemplate,
+                        style: TextStyle(color: context.textSecondary),
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        if (opt.id == 'custom') {
+                          final msg = await _askCustomMessage();
+                          if (msg == null || msg.trim().isEmpty) return;
+                          await _sendAlertsToPresentOf(opt, customMessage: msg);
+                        } else {
+                          await _sendAlertsToPresentOf(opt);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<String?> _askCustomMessage() async {
+    String? result;
+    final ctrl = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        backgroundColor: context.cardBg,
+        title: const Text('Custom message'),
+        content: TextField(
+          controller: ctrl,
+          minLines: 3,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'Type the message to send',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              result = ctrl.text.trim();
+              Navigator.pop(dCtx);
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return result;
+  }
+
+  Future<void> _sendAlertsToPresentOf(
+    _BulkAlertOption opt, {
+    String? customMessage,
+  }) async {
+    final presentStudents = _students
+        .where((s) => s.status == 'boarded')
+        .toList();
+    if (presentStudents.isEmpty) return;
+
     for (final student in presentStudents) {
+      final title = opt.titleTemplate
+          .replaceAll('{{name}}', student.name)
+          .replaceAll('{{message}}', customMessage ?? '');
+      final body = opt.bodyTemplate
+          .replaceAll('{{name}}', student.name)
+          .replaceAll('{{message}}', customMessage ?? '');
       await _notifSvc.show(
-        title: '✅ ${student.name} is on the bus',
-        body:
-            'Attendance update for ${student.name}: the student is present on ${student.stop}. Parent and student should stay updated.',
-        type: 'success',
-        icon: '✅',
-        color: AppTheme.success,
+        title: '${opt.icon} $title',
+        body: body,
+        type: opt.type,
+        icon: opt.icon,
+        color: opt.color,
       );
     }
 
@@ -70,7 +232,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Alerts sent for ${presentStudents.length} present students.',
+          '"${opt.label}" alerts sent for ${presentStudents.length} students.',
         ),
       ),
     );
@@ -210,7 +372,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                 SizedBox(
                   width: double.infinity,
                   child: GestureDetector(
-                    onTap: _sendAlertsToPresent,
+                    onTap: _showBulkAlertOptions,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
