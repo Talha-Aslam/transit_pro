@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -12,6 +13,7 @@ class DriverAttendance extends StatefulWidget {
 }
 
 class _DriverAttendanceState extends State<DriverAttendance> {
+  final _notifSvc = NotificationService.instance;
   late List<_Student> _students;
   String _search = '';
   String _filter = 'all';
@@ -36,17 +38,45 @@ class _DriverAttendanceState extends State<DriverAttendance> {
   void _toggleStatus(int id) {
     setState(() {
       final i = _students.indexWhere((s) => s.id == id);
-      final next = switch (_students[i].status) {
-        'waiting' => 'boarded',
-        'boarded' => 'absent',
-        _ => 'waiting',
-      };
+      final next = _students[i].status == 'boarded' ? 'absent' : 'boarded';
       _students[i] = _students[i].copyWith(status: next);
     });
   }
 
+  Future<void> _sendAlertsToPresent() async {
+    final presentStudents = _students
+        .where((s) => s.status == 'boarded')
+        .toList();
+    if (presentStudents.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No present students to alert.')),
+      );
+      return;
+    }
+
+    for (final student in presentStudents) {
+      await _notifSvc.show(
+        title: '✅ ${student.name} is on the bus',
+        body:
+            'Attendance update for ${student.name}: the student is present on ${student.stop}. Parent and student should stay updated.',
+        type: 'success',
+        icon: '✅',
+        color: AppTheme.success,
+      );
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Alerts sent for ${presentStudents.length} present students.',
+        ),
+      ),
+    );
+  }
+
   int get _boarded => _students.where((s) => s.status == 'boarded').length;
-  int get _waiting => _students.where((s) => s.status == 'waiting').length;
   int get _absent => _students.where((s) => s.status == 'absent').length;
 
   List<_Student> get _filtered => _students.where((s) {
@@ -121,12 +151,6 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                       color: AppTheme.success,
                     ),
                     const SizedBox(width: 10),
-                    _SummaryCard(
-                      icon: '\u23f3',
-                      label: AppStrings.t('pending'),
-                      value: _waiting,
-                      color: AppTheme.warning,
-                    ),
                     const SizedBox(width: 10),
                     _SummaryCard(
                       icon: '\u274c',
@@ -179,6 +203,79 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: _sendAlertsToPresent,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.success.withValues(alpha: 0.2),
+                            AppTheme.driverCyan.withValues(alpha: 0.12),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: AppTheme.success.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppTheme.success.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: AppTheme.success,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Send alerts to present students',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Notify all boarded students and their parents',
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: context.textTertiary,
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -236,7 +333,6 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                     children: [
                       _filterBtn('all', 'All (${_students.length})'),
                       _filterBtn('boarded', '✅ $_boarded'),
-                      _filterBtn('waiting', '⏳ $_waiting'),
                       _filterBtn('absent', '❌ $_absent'),
                     ],
                   ),
