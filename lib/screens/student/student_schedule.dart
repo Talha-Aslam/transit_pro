@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -37,254 +38,264 @@ class _StudentScheduleState extends State<StudentSchedule> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header ────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppStrings.t('my_schedule'),
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  AppStrings.t('pickup_dropoff_timings'),
-                  style: TextStyle(color: context.textSecondary, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Day selector ──────────────────────────────
-          SizedBox(
-            height: 52,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _days.length,
-              itemBuilder: (ctx, i) {
-                final sel = i == _selectedDay;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedDay = i),
-                  child: Container(
-                    width: 52,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      gradient: sel ? AppTheme.studentGradient : null,
-                      color: sel ? null : context.cardBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: sel
-                          ? null
-                          : Border.all(color: context.cardBgElevated),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _days[i],
-                        style: TextStyle(
-                          color: sel ? Colors.white : context.textSecondary,
-                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          fontSize: 13,
-                        ),
+    return ValueListenableBuilder<DriverTimingSlots>(
+      valueListenable: DriverDataService.instance.timingSlots,
+      builder: (context, slots, _) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header ────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.t('my_schedule'),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Route info card ───────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GlassCard(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.studentAmber.withValues(alpha: 0.10),
-                  AppTheme.studentOrange.withValues(alpha: 0.04),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      AppStrings.t('pickup_dropoff_timings'),
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              borderColor: AppTheme.studentAmber.withValues(alpha: 0.2),
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.studentGradient,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Center(
-                      child: Text('🚌', style: TextStyle(fontSize: 22)),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Route A · Bus #42',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+              const SizedBox(height: 16),
+
+              // ── Day selector ──────────────────────────────
+              SizedBox(
+                height: 52,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _days.length,
+                  itemBuilder: (ctx, i) {
+                    final sel = i == _selectedDay;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedDay = i),
+                      child: Container(
+                        width: 52,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          gradient: sel ? AppTheme.studentGradient : null,
+                          color: sel ? null : context.cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: sel
+                              ? null
+                              : Border.all(color: context.cardBgElevated),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _days[i],
+                            style: TextStyle(
+                              color: sel ? Colors.white : context.textSecondary,
+                              fontWeight: sel
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${AppStrings.t('your_stop')}: Pine Road',
-                          style: TextStyle(
-                            color: AppTheme.studentAccent,
-                            fontSize: 12,
-                          ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Route info card ───────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GlassCard(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.studentAmber.withValues(alpha: 0.10),
+                      AppTheme.studentOrange.withValues(alpha: 0.04),
+                    ],
+                  ),
+                  borderColor: AppTheme.studentAmber.withValues(alpha: 0.2),
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.studentGradient,
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                      ],
-                    ),
+                        child: const Center(
+                          child: Text('🚌', style: TextStyle(fontSize: 22)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Route A · Bus #42',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${AppStrings.t('your_stop')}: Pine Road',
+                              style: TextStyle(
+                                color: AppTheme.studentAccent,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      StatusBadge(
+                        label: AppStrings.t('active_status'),
+                        color: AppTheme.success,
+                      ),
+                    ],
                   ),
-                  StatusBadge(
-                    label: AppStrings.t('active_status'),
-                    color: AppTheme.success,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-          // ── Morning schedule ──────────────────────────
-          _SectionLabel(label: AppStrings.t('morning_pickup_s')),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GlassCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  _TimelineItem(
-                    icon: '🏠',
-                    title: AppStrings.t('be_at_stop'),
-                    subtitle: 'Pine Road bus stop',
-                    time: '07:15 AM',
-                    color: AppTheme.studentAmber,
-                    isFirst: true,
+              // ── Morning schedule ──────────────────────────
+              _SectionLabel(label: AppStrings.t('morning_pickup_s')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      _TimelineItem(
+                        icon: '🏠',
+                        title: AppStrings.t('be_at_stop'),
+                        subtitle: 'Home to school / college / university',
+                        time: formatTimeOfDay(slots.morningPickupFromHome),
+                        color: AppTheme.studentAmber,
+                        isFirst: true,
+                      ),
+                      _TimelineItem(
+                        icon: '🚌',
+                        title: AppStrings.t('bus_arrives'),
+                        subtitle: 'Estimated pickup',
+                        time: formatTimeOfDay(slots.morningPickupFromHome),
+                        color: AppTheme.info,
+                      ),
+                      _TimelineItem(
+                        icon: '✅',
+                        title: AppStrings.t('qr_checkin'),
+                        subtitle: 'Scan your QR pass',
+                        time: formatTimeOfDay(slots.morningPickupFromHome),
+                        color: AppTheme.success,
+                      ),
+                      _TimelineItem(
+                        icon: '🏫',
+                        title: AppStrings.t('reach_school'),
+                        subtitle: 'School / college / university drop-off',
+                        time: formatTimeOfDay(slots.morningDropoffAtSchool),
+                        color: AppTheme.purple,
+                        isLast: true,
+                      ),
+                    ],
                   ),
-                  _TimelineItem(
-                    icon: '🚌',
-                    title: AppStrings.t('bus_arrives'),
-                    subtitle: 'Estimated pickup',
-                    time: '07:22 AM',
-                    color: AppTheme.info,
-                  ),
-                  _TimelineItem(
-                    icon: '✅',
-                    title: AppStrings.t('qr_checkin'),
-                    subtitle: 'Scan your QR pass',
-                    time: '07:22 AM',
-                    color: AppTheme.success,
-                  ),
-                  _TimelineItem(
-                    icon: '🏫',
-                    title: AppStrings.t('reach_school'),
-                    subtitle: 'Lincoln Elementary',
-                    time: '07:35 AM',
-                    color: AppTheme.purple,
-                    isLast: true,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-          // ── Afternoon schedule ────────────────────────
-          _SectionLabel(label: AppStrings.t('afternoon_dropoff_s')),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GlassCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                children: [
-                  _TimelineItem(
-                    icon: '🏫',
-                    title: AppStrings.t('school_dismissal'),
-                    subtitle: 'Board at Gate B',
-                    time: '02:30 PM',
-                    color: AppTheme.purple,
-                    isFirst: true,
+              // ── Afternoon schedule ────────────────────────
+              _SectionLabel(label: AppStrings.t('afternoon_dropoff_s')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      _TimelineItem(
+                        icon: '🏫',
+                        title: AppStrings.t('school_dismissal'),
+                        subtitle: 'School / college / university pickup',
+                        time: formatTimeOfDay(slots.afternoonPickupFromSchool),
+                        color: AppTheme.purple,
+                        isFirst: true,
+                      ),
+                      _TimelineItem(
+                        icon: '✅',
+                        title: AppStrings.t('qr_checkout'),
+                        subtitle: 'Scan when boarding',
+                        time: formatTimeOfDay(slots.afternoonPickupFromSchool),
+                        color: AppTheme.success,
+                      ),
+                      _TimelineItem(
+                        icon: '🚌',
+                        title: AppStrings.t('bus_departs'),
+                        subtitle: 'Route return journey',
+                        time: formatTimeOfDay(slots.afternoonPickupFromSchool),
+                        color: AppTheme.info,
+                      ),
+                      _TimelineItem(
+                        icon: '🏠',
+                        title: AppStrings.t('reach_stop'),
+                        subtitle: 'Home drop-off',
+                        time: formatTimeOfDay(slots.afternoonDropoffAtHome),
+                        color: AppTheme.studentAmber,
+                        isLast: true,
+                      ),
+                    ],
                   ),
-                  _TimelineItem(
-                    icon: '✅',
-                    title: AppStrings.t('qr_checkout'),
-                    subtitle: 'Scan when boarding',
-                    time: '02:35 PM',
-                    color: AppTheme.success,
-                  ),
-                  _TimelineItem(
-                    icon: '🚌',
-                    title: AppStrings.t('bus_departs'),
-                    subtitle: 'Route A return journey',
-                    time: '02:40 PM',
-                    color: AppTheme.info,
-                  ),
-                  _TimelineItem(
-                    icon: '🏠',
-                    title: AppStrings.t('reach_stop'),
-                    subtitle: 'Pine Road bus stop',
-                    time: '03:05 PM',
-                    color: AppTheme.studentAmber,
-                    isLast: true,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-          // ── Weekly summary ────────────────────────────
-          _SectionLabel(label: AppStrings.t('this_week_summary')),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GlassCard(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _WeekStat(
-                    icon: '🚌',
-                    value: '8',
-                    label: AppStrings.t('rides_lbl'),
-                    color: AppTheme.studentAmber,
+              // ── Weekly summary ────────────────────────────
+              _SectionLabel(label: AppStrings.t('this_week_summary')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _WeekStat(
+                        icon: '🚌',
+                        value: '8',
+                        label: AppStrings.t('rides_lbl'),
+                        color: AppTheme.studentAmber,
+                      ),
+                      _WeekStat(
+                        icon: '⏱️',
+                        value: '100%',
+                        label: AppStrings.t('on_time'),
+                        color: AppTheme.success,
+                      ),
+                      _WeekStat(
+                        icon: '📲',
+                        value: '8',
+                        label: AppStrings.t('checkins_lbl'),
+                        color: AppTheme.info,
+                      ),
+                    ],
                   ),
-                  _WeekStat(
-                    icon: '⏱️',
-                    value: '100%',
-                    label: AppStrings.t('on_time'),
-                    color: AppTheme.success,
-                  ),
-                  _WeekStat(
-                    icon: '📲',
-                    value: '8',
-                    label: AppStrings.t('checkins_lbl'),
-                    color: AppTheme.info,
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

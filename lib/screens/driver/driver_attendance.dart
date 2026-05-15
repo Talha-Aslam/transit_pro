@@ -144,7 +144,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                       subtitle: Text(
                         opt.id == 'custom'
                             ? 'Send a custom message to parents'
-                            : opt.titleTemplate,
+                            : 'Send an emergency alert to parents',
                         style: TextStyle(color: context.textSecondary),
                       ),
                       onTap: () async {

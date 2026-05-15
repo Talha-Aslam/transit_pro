@@ -542,59 +542,7 @@ class _DriverRouteState extends State<DriverRoute> {
                 ),
                 const SizedBox(height: 12),
 
-                // ── Action buttons ────────────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          _tracking.markCurrentStopDone();
-                          setState(() {});
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.driverGradient,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '✅  Mark Stop Done',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warning.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppTheme.warning.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            '⚠️  Report Issue',
-                            style: TextStyle(
-                              color: AppTheme.warningLight,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox.shrink(),
               ],
             ),
           ),

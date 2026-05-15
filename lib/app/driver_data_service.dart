@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 /// Mutable model for the driver's profile information.
 class DriverInfo {
@@ -43,6 +43,43 @@ class DriverInfo {
   );
 }
 
+/// Shared pickup/drop-off timing slots used by driver and student screens.
+class DriverTimingSlots {
+  final TimeOfDay morningPickupFromHome;
+  final TimeOfDay morningDropoffAtSchool;
+  final TimeOfDay afternoonPickupFromSchool;
+  final TimeOfDay afternoonDropoffAtHome;
+
+  const DriverTimingSlots({
+    this.morningPickupFromHome = const TimeOfDay(hour: 7, minute: 15),
+    this.morningDropoffAtSchool = const TimeOfDay(hour: 8, minute: 0),
+    this.afternoonPickupFromSchool = const TimeOfDay(hour: 14, minute: 30),
+    this.afternoonDropoffAtHome = const TimeOfDay(hour: 15, minute: 15),
+  });
+
+  DriverTimingSlots copyWith({
+    TimeOfDay? morningPickupFromHome,
+    TimeOfDay? morningDropoffAtSchool,
+    TimeOfDay? afternoonPickupFromSchool,
+    TimeOfDay? afternoonDropoffAtHome,
+  }) => DriverTimingSlots(
+    morningPickupFromHome: morningPickupFromHome ?? this.morningPickupFromHome,
+    morningDropoffAtSchool:
+        morningDropoffAtSchool ?? this.morningDropoffAtSchool,
+    afternoonPickupFromSchool:
+        afternoonPickupFromSchool ?? this.afternoonPickupFromSchool,
+    afternoonDropoffAtHome:
+        afternoonDropoffAtHome ?? this.afternoonDropoffAtHome,
+  );
+}
+
+String formatTimeOfDay(TimeOfDay time) {
+  final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+  final minute = time.minute.toString().padLeft(2, '0');
+  final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+  return '$hour:$minute $period';
+}
+
 /// Singleton that holds the driver's profile data and notifies listeners
 /// whenever the data changes.
 class DriverDataService {
@@ -55,11 +92,20 @@ class DriverDataService {
   /// Shared toggle for driver location sharing.
   final locationSharing = ValueNotifier<bool>(true);
 
+  /// Shared pickup and drop-off slot timings.
+  final timingSlots = ValueNotifier<DriverTimingSlots>(
+    const DriverTimingSlots(),
+  );
+
   void updateDriverInfo(DriverInfo info) {
     driverInfo.value = info;
   }
 
   void setLocationSharing(bool value) {
     locationSharing.value = value;
+  }
+
+  void setTimingSlots(DriverTimingSlots slots) {
+    timingSlots.value = slots;
   }
 }
