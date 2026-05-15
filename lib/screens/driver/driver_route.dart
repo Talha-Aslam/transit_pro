@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/tracking_service.dart';
 import '../../app/geofence_service.dart';
@@ -20,6 +21,7 @@ class DriverRoute extends StatefulWidget {
 }
 
 class _DriverRouteState extends State<DriverRoute> {
+  final _svc = DriverDataService.instance;
   final _tracking = TrackingService.instance;
   final _geofence = GeofenceService.instance;
   final _notifSvc = NotificationService.instance;
@@ -28,14 +30,16 @@ class _DriverRouteState extends State<DriverRoute> {
   String? _mapStyle;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
-  bool _sharingLocation = true;
   bool _followCamera = true;
   BitmapDescriptor? _busIcon;
+
+  bool get _sharingLocation => _svc.locationSharing.value;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    _svc.locationSharing.addListener(_onLocationSharingChanged);
     _notifSvc.init();
 
     rootBundle.loadString('assets/map_style.json').then((style) {
@@ -110,6 +114,8 @@ class _DriverRouteState extends State<DriverRoute> {
   }
 
   void _onLangChanged() => setState(() {});
+
+  void _onLocationSharingChanged() => setState(() {});
 
   void _onBusPositionChanged() {
     _buildMapOverlays();
@@ -206,6 +212,7 @@ class _DriverRouteState extends State<DriverRoute> {
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.locationSharing.removeListener(_onLocationSharingChanged);
     _tracking.busPosition.removeListener(_onBusPositionChanged);
     _geofence.alerts.removeListener(_onGeofenceAlert);
     _tracking.stop();
@@ -275,7 +282,9 @@ class _DriverRouteState extends State<DriverRoute> {
                         boxShadow: _sharingLocation
                             ? [
                                 BoxShadow(
-                                  color: AppTheme.success.withValues(alpha: 0.6),
+                                  color: AppTheme.success.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   blurRadius: 8,
                                 ),
                               ]
@@ -334,7 +343,9 @@ class _DriverRouteState extends State<DriverRoute> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: _followCamera
-                                          ? AppTheme.driverCyan.withValues(alpha: 0.2)
+                                          ? AppTheme.driverCyan.withValues(
+                                              alpha: 0.2,
+                                            )
                                           : const Color(0x10FFFFFF),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
@@ -468,7 +479,7 @@ class _DriverRouteState extends State<DriverRoute> {
                       Switch(
                         value: _sharingLocation,
                         activeThumbColor: AppTheme.success,
-                        onChanged: (v) => setState(() => _sharingLocation = v),
+                        onChanged: _svc.setLocationSharing,
                       ),
                     ],
                   ),

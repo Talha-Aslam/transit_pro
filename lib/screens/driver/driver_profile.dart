@@ -28,24 +28,29 @@ class _DriverProfileState extends State<DriverProfile> {
   final _svc = DriverDataService.instance;
   final double _rating = 4.8;
 
-  bool _locationSharing = true;
   bool _parentAlerts = true;
   bool _routeReminders = true;
   bool _breakAlerts = false;
+
+  bool get _locationSharing => _svc.locationSharing.value;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    _svc.locationSharing.addListener(_onLocationSharingChanged);
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.locationSharing.removeListener(_onLocationSharingChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+
+  void _onLocationSharingChanged() => setState(() {});
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -437,8 +442,7 @@ class _DriverProfileState extends State<DriverProfile> {
                             label: AppStrings.t('share_location'),
                             desc: AppStrings.t('share_loc_desc'),
                             value: _locationSharing,
-                            onChanged: (v) =>
-                                setState(() => _locationSharing = v),
+                            onChanged: _svc.setLocationSharing,
                           ),
                           _divider(context),
                           _PrefRow(
