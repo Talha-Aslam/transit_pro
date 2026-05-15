@@ -755,11 +755,6 @@ const _statusConfig = {
     icon: '✅',
     label: 'Boarded',
   ),
-  'waiting': _StatusConfig(
-    color: AppTheme.warning,
-    icon: '⏳',
-    label: 'Waiting',
-  ),
   'absent': _StatusConfig(color: AppTheme.error, icon: '❌', label: 'Absent'),
 };
 
@@ -846,7 +841,7 @@ const _initialStudents = [
     name: 'Sophia Anderson',
     grade: 'Grade 3',
     stop: 'Cedar Blvd',
-    status: 'waiting',
+    status: 'absent',
     avatar: '👧',
     parentPhone: '+1 555-0107',
   ),
@@ -855,7 +850,7 @@ const _initialStudents = [
     name: 'James Taylor',
     grade: 'Grade 4',
     stop: 'Cedar Blvd',
-    status: 'waiting',
+    status: 'absent',
     avatar: '👦',
     parentPhone: '+1 555-0108',
   ),
@@ -873,7 +868,7 @@ const _initialStudents = [
     name: 'Benjamin Jackson',
     grade: 'Grade 2',
     stop: 'Cedar Blvd',
-    status: 'waiting',
+    status: 'absent',
     avatar: '👦',
     parentPhone: '+1 555-0110',
   ),
