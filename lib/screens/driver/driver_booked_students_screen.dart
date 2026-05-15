@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/language_provider.dart';
+import '../../app/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -321,80 +322,463 @@ class _BookedPassengerCard extends StatelessWidget {
   }
 
   void _showPassengerDetails(BuildContext context) {
-    showDialog<void>(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: context.cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PassengerDetailSheet(passenger: passenger),
+    );
+  }
+}
+
+class _PassengerDetailSheet extends StatefulWidget {
+  final _BookedPassenger passenger;
+
+  const _PassengerDetailSheet({required this.passenger});
+
+  @override
+  State<_PassengerDetailSheet> createState() => _PassengerDetailSheetState();
+}
+
+class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
+  late final TextEditingController _messageController;
+  late final List<_ChatMessage> _messages;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController = TextEditingController();
+    _messages = [
+      _ChatMessage(
+        sender: widget.passenger.parentName,
+        text: 'Please let me know when the bus reaches the stop.',
+        time: '07:05 AM',
+        isMe: false,
+      ),
+      _ChatMessage(
+        sender: widget.passenger.name,
+        text: 'I am ready at the pickup point.',
+        time: '07:07 AM',
+        isMe: false,
+      ),
+      _ChatMessage(
+        sender: 'Driver',
+        text: 'We are 5 minutes away.',
+        time: '07:08 AM',
+        isMe: true,
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendAlert({
+    required String title,
+    required String body,
+    required String icon,
+    required Color color,
+    String type = 'info',
+  }) async {
+    await NotificationService.instance.show(
+      title: '$icon $title',
+      body: body,
+      type: type,
+      icon: icon,
+      color: color,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$title sent to ${widget.passenger.parentName}')),
+    );
+  }
+
+  void _sendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _messages.add(
+        _ChatMessage(
+          sender: 'Driver',
+          text: text,
+          time: _timeNow(),
+          isMe: true,
+        ),
+      );
+      _messageController.clear();
+    });
+  }
+
+  String _timeNow() {
+    final now = TimeOfDay.now();
+    final hour = now.hourOfPeriod == 0 ? 12 : now.hourOfPeriod;
+    final minute = now.minute.toString().padLeft(2, '0');
+    final period = now.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final passenger = widget.passenger;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.65,
+      maxChildSize: 0.96,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: context.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          title: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppTheme.driverCyan.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    passenger.avatar,
-                    style: const TextStyle(fontSize: 22),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              controller: scrollController,
+              padding: EdgeInsets.fromLTRB(18, 12, 18, 18 + bottomInset),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: context.inputBorder,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      passenger.name,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: AppTheme.driverCyan.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Center(
+                          child: Text(
+                            passenger.avatar,
+                            style: const TextStyle(fontSize: 26),
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      passenger.school,
-                      style: TextStyle(
-                        color: context.textSecondary,
-                        fontSize: 12,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              passenger.name,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${passenger.grade} · ${passenger.school}',
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GlassCard(
+                    enableBlur: false,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _DetailRow(label: 'Grade', value: passenger.grade),
+                        _DetailRow(label: 'Stop', value: passenger.stop),
+                        _DetailRow(label: 'Bus', value: passenger.busNumber),
+                        _DetailRow(
+                          label: 'Parent',
+                          value: passenger.parentName,
+                        ),
+                        _DetailRow(
+                          label: 'Parent contact',
+                          value: passenger.parentPhone,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Chat with parent and child',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  GlassCard(
+                    enableBlur: false,
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      children: [
+                        ..._messages.map(
+                          (message) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _ChatBubble(message: message),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _messageController,
+                                minLines: 1,
+                                maxLines: 3,
+                                style: TextStyle(color: context.textPrimary),
+                                decoration: InputDecoration(
+                                  hintText: 'Write a message...',
+                                  hintStyle: TextStyle(color: context.textHint),
+                                  filled: true,
+                                  fillColor: context.cardBgElevated,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: _sendMessage,
+                              child: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.driverCyan,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Quick alerts to parent',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _AlertChip(
+                        label: 'Arrived',
+                        icon: '🏫',
+                        color: AppTheme.info,
+                        onTap: () => _sendAlert(
+                          title: '${passenger.name} arrived',
+                          body:
+                              '${passenger.name} has reached the destination stop.',
+                          icon: '🏫',
+                          color: AppTheme.info,
+                          type: 'info',
+                        ),
+                      ),
+                      _AlertChip(
+                        label: 'Delayed',
+                        icon: '⏳',
+                        color: const Color(0xFFF59E0B),
+                        onTap: () => _sendAlert(
+                          title: '${passenger.name} delayed',
+                          body:
+                              'Bus update for ${passenger.name}: arrival will be about 10 minutes late.',
+                          icon: '⏳',
+                          color: const Color(0xFFF59E0B),
+                          type: 'alert',
+                        ),
+                      ),
+                      _AlertChip(
+                        label: 'Emergency',
+                        icon: '🚨',
+                        color: AppTheme.error,
+                        onTap: () => _sendAlert(
+                          title: '${passenger.name} emergency',
+                          body:
+                              'Urgent update regarding ${passenger.name}. Please contact the driver immediately.',
+                          icon: '🚨',
+                          color: AppTheme.error,
+                          type: 'alert',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: context.cardBgElevated,
+                        foregroundColor: context.textPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _DetailRow(label: 'Grade', value: passenger.grade),
-              _DetailRow(label: 'Stop', value: passenger.stop),
-              _DetailRow(label: 'Bus', value: passenger.busNumber),
-              _DetailRow(label: 'Parent', value: passenger.parentName),
-              _DetailRow(label: 'Parent contact', value: passenger.parentPhone),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
             ),
-          ],
+          ),
         );
       },
     );
   }
+}
+
+class _ChatBubble extends StatelessWidget {
+  final _ChatMessage message;
+
+  const _ChatBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final align = message.isMe ? Alignment.centerRight : Alignment.centerLeft;
+    final bubbleColor = message.isMe
+        ? AppTheme.driverCyan.withValues(alpha: 0.2)
+        : context.cardBgElevated;
+
+    return Align(
+      alignment: align,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 320),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: message.isMe
+                ? AppTheme.driverCyan.withValues(alpha: 0.25)
+                : context.inputBorder,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: message.isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.sender,
+              style: TextStyle(
+                color: message.isMe
+                    ? AppTheme.driverAccent
+                    : context.textPrimary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message.text,
+              style: TextStyle(color: context.textPrimary, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message.time,
+              style: TextStyle(color: context.textTertiary, fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AlertChip extends StatelessWidget {
+  final String label;
+  final String icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AlertChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(icon, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatMessage {
+  final String sender;
+  final String text;
+  final String time;
+  final bool isMe;
+
+  const _ChatMessage({
+    required this.sender,
+    required this.text,
+    required this.time,
+    required this.isMe,
+  });
 }
 
 class _DetailRow extends StatelessWidget {
