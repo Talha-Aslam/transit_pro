@@ -343,7 +343,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                             ),
                           ),
                           Text(
-                            '$_boarded/${_students.length} students',
+                            '$_boarded/${_students.length} ${AppStrings.t('students').toLowerCase()}',
                             style: const TextStyle(
                               color: AppTheme.driverAccent,
                               fontSize: 13,
@@ -889,5 +889,23 @@ const _initialStudents = [
     status: 'boarded',
     avatar: '👦',
     parentPhone: '+1 555-0112',
+  ),
+  _Student(
+    id: 13,
+    name: 'Ali Khan',
+    grade: 'Undergraduate',
+    stop: 'University of Lahore',
+    status: 'boarded',
+    avatar: '🎓',
+    parentPhone: '+92 300 7001001',
+  ),
+  _Student(
+    id: 14,
+    name: 'Zara Ahmed',
+    grade: 'Undergraduate',
+    stop: 'LUMS',
+    status: 'absent',
+    avatar: '🎓',
+    parentPhone: '+92 300 7001002',
   ),
 ];

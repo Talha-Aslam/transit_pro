@@ -109,7 +109,7 @@ class _DriverBookedStudentsScreenState
                   child: Row(
                     children: [
                       _SummaryPill(
-                        label: AppStrings.t('booked_children_title'),
+                        label: AppStrings.t('total_students'),
                         value: _booked.length,
                         color: AppTheme.driverCyan,
                       ),
