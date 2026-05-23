@@ -170,8 +170,8 @@ class _StudentProfileState extends State<StudentProfile> {
                                 borderRadius: BorderRadius.circular(28),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.studentAmber.withValues(alpha: 
-                                      0.3,
+                                    color: AppTheme.studentAmber.withValues(
+                                      alpha: 0.3,
                                     ),
                                     blurRadius: 20,
                                     offset: const Offset(0, 6),
@@ -252,13 +252,19 @@ class _StudentProfileState extends State<StudentProfile> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    AppTheme.studentAmber.withValues(alpha: 0.2),
-                                    AppTheme.studentOrange.withValues(alpha: 0.1),
+                                    AppTheme.studentAmber.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    AppTheme.studentOrange.withValues(
+                                      alpha: 0.1,
+                                    ),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: AppTheme.studentAmber.withValues(alpha: 0.3),
+                                  color: AppTheme.studentAmber.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               child: Text(
