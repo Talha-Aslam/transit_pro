@@ -48,8 +48,7 @@ final List<_BulkAlertOption> _bulkOptions = [
 ];
 
 class DriverAttendance extends StatefulWidget {
-  final VoidCallback onBack;
-  const DriverAttendance({super.key, required this.onBack});
+  const DriverAttendance({super.key});
 
   @override
   State<DriverAttendance> createState() => _DriverAttendanceState();
@@ -272,8 +271,6 @@ class _DriverAttendanceState extends State<DriverAttendance> {
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
-                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -722,22 +719,6 @@ class _StudentCard extends StatelessWidget {
     );
   }
 }
-
-Widget _backBtn(BuildContext context) => Container(
-  width: 38,
-  height: 38,
-  decoration: BoxDecoration(
-    color: context.cardBgElevated,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: context.inputBorder),
-  ),
-  child: Center(
-    child: Text(
-      '←',
-      style: TextStyle(color: context.textPrimary, fontSize: 16),
-    ),
-  ),
-);
 
 class _StatusConfig {
   final Color color;

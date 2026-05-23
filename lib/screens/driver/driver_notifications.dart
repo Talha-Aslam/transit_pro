@@ -7,8 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class DriverNotifications extends StatefulWidget {
-  final VoidCallback onBack;
-  const DriverNotifications({super.key, required this.onBack});
+  const DriverNotifications({super.key});
 
   @override
   State<DriverNotifications> createState() => _DriverNotificationsState();
@@ -172,11 +171,6 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                 ),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: widget.onBack,
-                      child: _backBtn(context),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Row(
                         children: [

@@ -63,8 +63,8 @@ class _DriverLayoutState extends State<DriverLayout> {
             index: _tab,
             children: [
               DriverDashboard(onNavigate: _goToTab),
-              DriverBookedStudentsScreen(onBack: () => _goToTab(0)),
-              DriverAttendance(onBack: () => _goToTab(0)),
+              const DriverBookedStudentsScreen(),
+              const DriverAttendance(),
               // DriverRoute hosts a GoogleMap platform view.
               // Render it ONLY while the Route tab is active - this fully
               // tears down the native MapView (and its TextureView render loop)
@@ -73,10 +73,10 @@ class _DriverLayoutState extends State<DriverLayout> {
               // DriverRoute.dispose() calls TrackingService.stop(), so the
               // tracking lifecycle is self-contained.
               if (_tab == _routeTab)
-                DriverRoute(onBack: () => _goToTab(0))
+                const DriverRoute()
               else
                 const SizedBox.shrink(),
-              DriverNotifications(onBack: () => _goToTab(0)),
+              const DriverNotifications(),
               DriverProfile(
                 onNavigate: _goToTab,
                 onLogout: () {
@@ -146,7 +146,9 @@ class _DriverLayoutState extends State<DriverLayout> {
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.10),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.10,
+                                      ),
                                       blurRadius: 10,
                                       offset: const Offset(0, 3),
                                     ),

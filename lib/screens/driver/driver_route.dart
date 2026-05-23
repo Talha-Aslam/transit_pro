@@ -13,8 +13,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class DriverRoute extends StatefulWidget {
-  final VoidCallback onBack;
-  const DriverRoute({super.key, required this.onBack});
+  const DriverRoute({super.key});
 
   @override
   State<DriverRoute> createState() => _DriverRouteState();
@@ -247,8 +246,6 @@ class _DriverRouteState extends State<DriverRoute> {
             ),
             child: Row(
               children: [
-                GestureDetector(onTap: widget.onBack, child: _backBtn(context)),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
