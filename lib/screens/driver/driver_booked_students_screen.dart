@@ -506,6 +506,10 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                         _DetailRow(label: 'Stop', value: passenger.stop),
                         _DetailRow(label: 'Bus', value: passenger.busNumber),
                         _DetailRow(
+                          label: 'Emergency no.',
+                          value: passenger.emergencyPhone,
+                        ),
+                        _DetailRow(
                           label: 'Parent',
                           value: passenger.parentName,
                         ),
@@ -889,6 +893,7 @@ class _BookedPassenger {
   final String school;
   final String stop;
   final String busNumber;
+  final String emergencyPhone;
   final String parentName;
   final String parentPhone;
   final String avatar;
@@ -899,6 +904,7 @@ class _BookedPassenger {
     required this.school,
     required this.stop,
     required this.busNumber,
+    required this.emergencyPhone,
     required this.parentName,
     required this.parentPhone,
     required this.avatar,
@@ -912,8 +918,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Defence Pickup Point, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110001',
     parentName: 'Sarah Johnson',
-    parentPhone: '+1 555-0101',
+    parentPhone: '+92 321 4430101',
     avatar: '👧',
   ),
   _BookedPassenger(
@@ -922,8 +929,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Defence Pickup Point, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110002',
     parentName: 'Michael Williams',
-    parentPhone: '+1 555-0102',
+    parentPhone: '+92 321 4430102',
     avatar: '👦',
   ),
   _BookedPassenger(
@@ -932,8 +940,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Model Town Centre, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110003',
     parentName: 'Rebecca Davis',
-    parentPhone: '+1 555-0103',
+    parentPhone: '+92 321 4430103',
     avatar: '👧',
   ),
   _BookedPassenger(
@@ -942,8 +951,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Model Town Centre, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110004',
     parentName: 'Daniel Brown',
-    parentPhone: '+1 555-0104',
+    parentPhone: '+92 321 4430104',
     avatar: '👦',
   ),
   _BookedPassenger(
@@ -952,8 +962,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Canal Road Junction, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110005',
     parentName: 'Maria Martinez',
-    parentPhone: '+1 555-0105',
+    parentPhone: '+92 321 4430105',
     avatar: '👧',
   ),
   _BookedPassenger(
@@ -962,8 +973,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Canal Road Junction, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110006',
     parentName: 'Robert Wilson',
-    parentPhone: '+1 555-0106',
+    parentPhone: '+92 321 4430106',
     avatar: '👦',
   ),
   _BookedPassenger(
@@ -972,8 +984,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Aitchison College Entrance, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110007',
     parentName: 'Nadia Anderson',
-    parentPhone: '+1 555-0107',
+    parentPhone: '+92 321 4430107',
     avatar: '👧',
   ),
   _BookedPassenger(
@@ -982,8 +995,9 @@ const _initialBookedPassengers = [
     school: 'Lahore Grammar School - Askari Campus',
     stop: 'Aitchison College Entrance, Lahore',
     busNumber: 'Bus #42',
+    emergencyPhone: '+92 300 1110008',
     parentName: 'Thomas Taylor',
-    parentPhone: '+1 555-0108',
+    parentPhone: '+92 321 4430108',
     avatar: '👦',
   ),
   _BookedPassenger(
@@ -992,6 +1006,7 @@ const _initialBookedPassengers = [
     school: 'University of Lahore',
     stop: 'UOL Main Gate, Johar Town',
     busNumber: 'Bus #U1',
+    emergencyPhone: '+92 300 7000001',
     parentName: 'Self',
     parentPhone: '+92 300 7001001',
     avatar: '🎓',
@@ -1002,6 +1017,7 @@ const _initialBookedPassengers = [
     school: 'Lahore University of Management Sciences',
     stop: 'LUMS Main Gate, DHA',
     busNumber: 'Bus #U2',
+    emergencyPhone: '+92 300 7000002',
     parentName: 'Self',
     parentPhone: '+92 300 7001002',
     avatar: '🎓',
@@ -1012,6 +1028,7 @@ const _initialBookedPassengers = [
     school: 'National University of Sciences & Technology',
     stop: 'NUST Campus Stop, Islamabad',
     busNumber: 'Bus #U3',
+    emergencyPhone: '+92 300 7000003',
     parentName: 'Self',
     parentPhone: '+92 300 7001003',
     avatar: '🎓',
@@ -1022,6 +1039,7 @@ const _initialBookedPassengers = [
     school: 'Forman Christian College',
     stop: 'FCCU Main Gate, Lahore',
     busNumber: 'Bus #U4',
+    emergencyPhone: '+92 300 7000004',
     parentName: 'Self',
     parentPhone: '+92 300 7001004',
     avatar: '🎓',
