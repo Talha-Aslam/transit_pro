@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'geofence_service.dart';
+import 'language_provider.dart';
 
 /// Called when the user taps a notification while the app is terminated.
 /// Must be a top-level function annotated with @pragma('vm:entry-point').
@@ -134,21 +135,36 @@ class NotificationService {
 
     switch (alert.event) {
       case GeofenceEvent.approaching:
-        title = 'Bus Approaching ${alert.stop.name}';
-        body =
-            'Bus will arrive at ${alert.stop.name} in about ${(alert.distance / 50).round()} minutes.';
+        final mins = ((alert.distance / 50).round()).toString();
+        title = AppStrings.t(
+          'geofence_approaching_title',
+        ).replaceAll('{stop}', alert.stop.name);
+        body = AppStrings.t(
+          'geofence_approaching_body',
+        ).replaceAll('{stop}', alert.stop.name).replaceAll('{mins}', mins);
         icon = '🔔';
         color = const Color(0xFFF59E0B);
+        break;
       case GeofenceEvent.arrived:
-        title = 'Bus Arrived at ${alert.stop.name}';
-        body = 'The bus has arrived at ${alert.stop.name}. Please be ready!';
+        title = AppStrings.t(
+          'geofence_arrived_title',
+        ).replaceAll('{stop}', alert.stop.name);
+        body = AppStrings.t(
+          'geofence_arrived_body',
+        ).replaceAll('{stop}', alert.stop.name);
         icon = '✅';
         color = const Color(0xFF10B981);
+        break;
       case GeofenceEvent.departed:
-        title = 'Bus Left ${alert.stop.name}';
-        body = 'The bus has departed from ${alert.stop.name}.';
+        title = AppStrings.t(
+          'geofence_departed_title',
+        ).replaceAll('{stop}', alert.stop.name);
+        body = AppStrings.t(
+          'geofence_departed_body',
+        ).replaceAll('{stop}', alert.stop.name);
         icon = '🚌';
         color = const Color(0xFF3B82F6);
+        break;
     }
 
     await show(
@@ -172,8 +188,8 @@ class NotificationService {
         id: 1,
         type: 'success',
         icon: '✅',
-        title: 'Emma Boarded the Bus',
-        message: 'Your child has safely boarded Bus #42 at Oak Street stop.',
+        title: AppStrings.t('seed_emma_boarded_title'),
+        message: AppStrings.t('seed_emma_boarded_message'),
         time: '07:18 AM',
         date: 'Today',
         color: const Color(0xFF10B981),
@@ -182,8 +198,8 @@ class NotificationService {
         id: 2,
         type: 'info',
         icon: '🚌',
-        title: 'Bus Running Ahead',
-        message: 'Bus #42 is running 3 minutes ahead of schedule today.',
+        title: AppStrings.t('seed_bus_running_ahead_title'),
+        message: AppStrings.t('seed_bus_running_ahead_message'),
         time: '07:10 AM',
         date: 'Today',
         color: const Color(0xFF3B82F6),
@@ -192,9 +208,8 @@ class NotificationService {
         id: 3,
         type: 'alert',
         icon: '🔔',
-        title: 'Bus Approaching Stop',
-        message:
-            'Bus #42 will arrive at Pine Road stop in approximately 5 minutes.',
+        title: AppStrings.t('seed_bus_approaching_title'),
+        message: AppStrings.t('seed_bus_approaching_message'),
         time: '06:55 AM',
         date: 'Today',
         color: const Color(0xFFF59E0B),
@@ -204,8 +219,8 @@ class NotificationService {
         type: 'success',
         icon: '🏫',
         read: true,
-        title: 'Emma Arrived at School',
-        message: 'Emma has safely arrived at Lincoln Elementary School.',
+        title: AppStrings.t('seed_emma_arrived_title'),
+        message: AppStrings.t('seed_emma_arrived_message'),
         time: '07:45 AM',
         date: 'Yesterday',
         color: const Color(0xFF10B981),
@@ -215,9 +230,8 @@ class NotificationService {
         type: 'info',
         icon: '📍',
         read: true,
-        title: 'Route Update',
-        message:
-            'Due to road works, Route A will use alternate path via Oak Avenue.',
+        title: AppStrings.t('seed_route_update_title'),
+        message: AppStrings.t('seed_route_update_message'),
         time: '06:30 PM',
         date: 'Yesterday',
         color: const Color(0xFF8B5CF6),
@@ -227,8 +241,8 @@ class NotificationService {
         type: 'success',
         icon: '🌇',
         read: true,
-        title: 'Emma Dropped Off',
-        message: 'Emma has been safely dropped off at Oak Street stop.',
+        title: AppStrings.t('seed_emma_dropped_title'),
+        message: AppStrings.t('seed_emma_dropped_message'),
         time: '03:35 PM',
         date: 'Yesterday',
         color: const Color(0xFF10B981),
@@ -238,9 +252,8 @@ class NotificationService {
         type: 'alert',
         icon: '⚠️',
         read: true,
-        title: 'Schedule Change',
-        message:
-            "Tomorrow's pickup time has been moved to 07:30 AM due to a school event.",
+        title: AppStrings.t('seed_schedule_change_title'),
+        message: AppStrings.t('seed_schedule_change_message'),
         time: '04:00 PM',
         date: 'Mon, Feb 23',
         color: const Color(0xFFF59E0B),

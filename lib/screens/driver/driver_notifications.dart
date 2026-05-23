@@ -19,17 +19,97 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   String _activeTab = 'All';
   _Message? _selectedMsg;
   final _replyCtrl = TextEditingController();
+  late final VoidCallback _languageListener;
 
   @override
   void initState() {
     super.initState();
-    _msgs = List.from(_allMessages);
+    _msgs = _buildMessages();
+    _languageListener = () {
+      if (!mounted) return;
+      final readState = {for (final msg in _msgs) msg.id: msg.read};
+      setState(() {
+        _msgs = _buildMessages(readState: readState);
+        if (_selectedMsg != null) {
+          final selected = _msgs.where((m) => m.id == _selectedMsg!.id);
+          _selectedMsg = selected.isEmpty ? null : selected.first;
+        }
+      });
+    };
+    LanguageProvider.instance.addListener(_languageListener);
   }
 
   @override
   void dispose() {
+    LanguageProvider.instance.removeListener(_languageListener);
     _replyCtrl.dispose();
     super.dispose();
+  }
+
+  List<_Message> _buildMessages({Map<int, bool> readState = const {}}) {
+    bool isRead(int id, bool fallback) => readState[id] ?? fallback;
+    return [
+      _Message(
+        id: 1,
+        type: 'parent',
+        read: isRead(1, false),
+        sender: AppStrings.t('seed_sarah_johnson_sender'),
+        avatar: '👩',
+        msg: AppStrings.t('seed_sarah_johnson_message'),
+        time: '07:05 AM',
+        color: AppTheme.parentAccent,
+      ),
+      _Message(
+        id: 2,
+        type: 'admin',
+        read: isRead(2, false),
+        sender: AppStrings.t('seed_transport_admin_sender'),
+        avatar: '🏢',
+        msg: AppStrings.t('seed_transport_admin_message'),
+        time: '06:45 AM',
+        color: AppTheme.driverAccent,
+      ),
+      _Message(
+        id: 3,
+        type: 'parent',
+        read: isRead(3, true),
+        sender: AppStrings.t('seed_david_martinez_sender'),
+        avatar: '👨',
+        msg: AppStrings.t('seed_david_martinez_message'),
+        time: 'Yesterday',
+        color: AppTheme.parentAccent,
+      ),
+      _Message(
+        id: 4,
+        type: 'system',
+        read: isRead(4, true),
+        sender: AppStrings.t('seed_system_alert_sender'),
+        avatar: '⚙️',
+        msg: AppStrings.t('seed_system_alert_message'),
+        time: 'Yesterday',
+        color: AppTheme.success,
+      ),
+      _Message(
+        id: 5,
+        type: 'admin',
+        read: isRead(5, true),
+        sender: AppStrings.t('seed_transport_admin_sender'),
+        avatar: '🏢',
+        msg: AppStrings.t('seed_transport_admin_reminder_message'),
+        time: 'Mon, Feb 23',
+        color: AppTheme.driverAccent,
+      ),
+      _Message(
+        id: 6,
+        type: 'parent',
+        read: isRead(6, true),
+        sender: AppStrings.t('seed_emily_wilson_sender'),
+        avatar: '👩',
+        msg: AppStrings.t('seed_emily_wilson_message'),
+        time: 'Mon, Feb 23',
+        color: AppTheme.parentAccent,
+      ),
+    ];
   }
 
   int get _unread => _msgs.where((m) => !m.read).length;
@@ -144,15 +224,19 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                           NotificationService.instance.markAllRead();
                         }),
                         child: Tooltip(
-                          message: 'Mark all read',
+                          message: AppStrings.t('mark_all_read'),
                           child: Container(
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: AppTheme.driverAccent.withValues(alpha: 0.15),
+                              color: AppTheme.driverAccent.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: AppTheme.driverAccent.withValues(alpha: 0.3),
+                                color: AppTheme.driverAccent.withValues(
+                                  alpha: 0.3,
+                                ),
                               ),
                             ),
                             child: Icon(
@@ -172,75 +256,80 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                         final count = list.length;
                         return GestureDetector(
                           onTap: () => context.push('/driver/pickup-requests'),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: count > 0
-                                      ? AppTheme.error.withValues(alpha: 0.15)
-                                      : context.cardBgElevated,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: count > 0
-                                        ? AppTheme.error.withValues(alpha: 0.4)
-                                        : context.surfaceBorder,
+                          child: Tooltip(
+                            message: AppStrings.t('mark_all_read'),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.directions_bus_rounded,
+                                  decoration: BoxDecoration(
+                                    color: count > 0
+                                        ? AppTheme.error.withValues(alpha: 0.15)
+                                        : context.cardBgElevated,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
                                       color: count > 0
-                                          ? AppTheme.error
-                                          : context.textTertiary,
-                                      size: 14,
+                                          ? AppTheme.error.withValues(
+                                              alpha: 0.4,
+                                            )
+                                          : context.surfaceBorder,
                                     ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Pickups',
-                                      style: TextStyle(
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.directions_bus_rounded,
                                         color: count > 0
                                             ? AppTheme.error
                                             : context.textTertiary,
-                                        fontSize: 12,
-                                        fontWeight: count > 0
-                                            ? FontWeight.w700
-                                            : FontWeight.w400,
+                                        size: 14,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        AppStrings.t('pickups'),
+                                        style: TextStyle(
+                                          color: count > 0
+                                              ? AppTheme.error
+                                              : context.textTertiary,
+                                          fontSize: 12,
+                                          fontWeight: count > 0
+                                              ? FontWeight.w700
+                                              : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              if (count > 0)
-                                Positioned(
-                                  top: -4,
-                                  right: -4,
-                                  child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.error,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '$count',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
+                                if (count > 0)
+                                  Positioned(
+                                    top: -4,
+                                    right: -4,
+                                    child: Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: const BoxDecoration(
+                                        color: AppTheme.error,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '$count',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -276,15 +365,15 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: active
-                                          ? AppTheme.driverCyan.withValues(alpha: 
-                                              0.15,
+                                          ? AppTheme.driverCyan.withValues(
+                                              alpha: 0.15,
                                             )
                                           : context.cardBgElevated,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                         color: active
-                                            ? AppTheme.driverCyan.withValues(alpha: 
-                                                0.4,
+                                            ? AppTheme.driverCyan.withValues(
+                                                alpha: 0.4,
                                               )
                                             : context.surfaceBorder,
                                       ),
@@ -340,14 +429,14 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                             width: 44,
                                             height: 44,
                                             decoration: BoxDecoration(
-                                              color: msg.color.withValues(alpha: 
-                                                0.12,
+                                              color: msg.color.withValues(
+                                                alpha: 0.12,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(14),
                                               border: Border.all(
-                                                color: msg.color.withValues(alpha: 
-                                                  0.25,
+                                                color: msg.color.withValues(
+                                                  alpha: 0.25,
                                                 ),
                                               ),
                                             ),
@@ -504,7 +593,11 @@ class _DetailView extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${msg.type.capitalize()} · ${msg.time}',
+                        '${AppStrings.t(msg.type == 'parent'
+                            ? 'parents_tab'
+                            : msg.type == 'admin'
+                            ? 'admin_tab'
+                            : 'system_tab')} · ${msg.time}',
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 12,
@@ -519,7 +612,9 @@ class _DetailView extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: msg.color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: msg.color.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: msg.color.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Center(
                     child: Text(
@@ -550,7 +645,7 @@ class _DetailView extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Received: ${msg.time}',
+                        '${AppStrings.t('received')}: ${msg.time}',
                         style: TextStyle(
                           color: context.textTertiary,
                           fontSize: 12,
@@ -621,7 +716,7 @@ class _DetailView extends StatelessWidget {
                             ),
                             child: Center(
                               child: Text(
-                                '📤  Send Reply',
+                                '📤  ${AppStrings.t('send_reply')}',
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 14,
@@ -660,11 +755,6 @@ Widget _backBtn(BuildContext context) => Container(
   ),
 );
 
-extension _StrExt on String {
-  String capitalize() =>
-      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
-}
-
 class _Message {
   final int id;
   final String type, sender, avatar, msg, time;
@@ -693,71 +783,3 @@ class _Message {
     read: read ?? this.read,
   );
 }
-
-const _allMessages = [
-  _Message(
-    id: 1,
-    type: 'parent',
-    read: false,
-    sender: "Sarah Johnson (Emma's Mom)",
-    avatar: '👩',
-    msg:
-        'Hi Mike, Emma will not be coming to school today. Please note her as absent.',
-    time: '07:05 AM',
-    color: AppTheme.parentAccent,
-  ),
-  _Message(
-    id: 2,
-    type: 'admin',
-    read: false,
-    sender: 'Transport Admin',
-    avatar: '🏢',
-    msg:
-        'Please be aware: road works on Pine Road today. Use alternate route via Oak Ave.',
-    time: '06:45 AM',
-    color: AppTheme.driverAccent,
-  ),
-  _Message(
-    id: 3,
-    type: 'parent',
-    read: true,
-    sender: "David Martinez (Ava's Dad)",
-    avatar: '👨',
-    msg: 'Thank you for the on-time service today! Ava was very happy.',
-    time: 'Yesterday',
-    color: AppTheme.parentAccent,
-  ),
-  _Message(
-    id: 4,
-    type: 'system',
-    read: true,
-    sender: 'System Alert',
-    avatar: '⚙️',
-    msg:
-        'Your morning route is complete. 22/22 students delivered safely. Great job!',
-    time: 'Yesterday',
-    color: AppTheme.success,
-  ),
-  _Message(
-    id: 5,
-    type: 'admin',
-    read: true,
-    sender: 'Transport Admin',
-    avatar: '🏢',
-    msg:
-        'Reminder: Monthly vehicle inspection is scheduled for Friday, Feb 28.',
-    time: 'Mon, Feb 23',
-    color: AppTheme.driverAccent,
-  ),
-  _Message(
-    id: 6,
-    type: 'parent',
-    read: true,
-    sender: "Emily Wilson (William's Mom)",
-    avatar: '👩',
-    msg:
-        "William will need to be picked up at the alternate stop on Cedar Ave tomorrow.",
-    time: 'Mon, Feb 23',
-    color: AppTheme.parentAccent,
-  ),
-];

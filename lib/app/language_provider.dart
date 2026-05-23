@@ -431,7 +431,87 @@ class AppStrings {
     'admin_tab': 'Admin',
     'system_tab': 'System',
     'reply': 'REPLY',
+    'pickups': 'Pickups',
+    'received': 'Received',
+    'send_reply': 'Send Reply',
     'type_reply': 'Type your reply...',
+    'seed_sarah_johnson_sender': "Sarah Johnson (Emma's Mom)",
+    'seed_sarah_johnson_message':
+        'Hi Mike, Emma will not be coming to school today. Please note her as absent.',
+    'seed_transport_admin_sender': 'Transport Admin',
+    'seed_transport_admin_message':
+        'Please be aware: road works on Pine Road today. Use alternate route via Oak Ave.',
+    'seed_david_martinez_sender': "David Martinez (Ava's Dad)",
+    'seed_david_martinez_message':
+        'Thank you for the on-time service today! Ava was very happy.',
+    'seed_system_alert_sender': 'System Alert',
+    'seed_system_alert_message':
+        'Your morning route is complete. 22/22 students delivered safely. Great job!',
+    'seed_transport_admin_reminder_message':
+        'Reminder: Monthly vehicle inspection is scheduled for Friday, Feb 28.',
+    'seed_emily_wilson_sender': "Emily Wilson (William's Mom)",
+    'seed_emily_wilson_message':
+        'William will need to be picked up at the alternate stop on Cedar Ave tomorrow.',
+    // Driver Booked screen / chat keys
+    'booked_children_title': 'Booked Children & Students',
+    'booked_children_subtitle': 'All passengers booked with this driver',
+    'search_booked_hint': 'Search child, school, stop or phone',
+    'no_booked_found': 'No booked passengers found',
+    'chat_with_parent_child': 'Chat with parent and child',
+    'quick_alerts_to_parent': 'Quick alerts to parent',
+    'arrived': 'Arrived',
+    'has_reached_destination': 'has reached the destination stop.',
+    'bus_update_delayed':
+        'Bus update for {name}: arrival will be about 10 minutes late.',
+    'urgent_contact_driver':
+        'Urgent update regarding {name}. Please contact the driver immediately.',
+    'close': 'Close',
+    'emergency_no': 'Emergency no.',
+    'sample_parent_bus_reach':
+        'Please let me know when the bus reaches the stop.',
+    'sample_student_ready': 'I am ready at the pickup point.',
+    'sample_driver_away': 'We are 5 minutes away.',
+    'alert_sent_to': '{title} sent to {name}',
+    // Missed pickup notifications
+    'pickup_request_title': '🚌 Pickup Request — {from} → {to}',
+    'pickup_request_body': '{student} missed {bus}. Tap to accept or decline.',
+    'pickup_accepted_title': '✅ Driver Accepted — Bus incoming!',
+    'pickup_accepted_body':
+        '{driver} ({bus}) accepted your request. ETA: {eta}.',
+    'pickup_declined_title': '⚠️ No drivers available',
+    'pickup_declined_body':
+        'No nearby bus could accept your request right now. Please contact the school.',
+    // Geofence (driver alerts)
+    'geofence_approaching_title': 'Bus Approaching {stop}',
+    'geofence_approaching_body':
+        'Bus will arrive at {stop} in about {mins} minutes.',
+    'geofence_arrived_title': 'Bus Arrived at {stop}',
+    'geofence_arrived_body': 'The bus has arrived at {stop}. Please be ready!',
+    'geofence_departed_title': 'Bus Left {stop}',
+    'geofence_departed_body': 'The bus has departed from {stop}.',
+
+    // Seeded history messages
+    'seed_emma_boarded_title': 'Emma Boarded the Bus',
+    'seed_emma_boarded_message':
+        'Your child has safely boarded Bus #42 at Oak Street stop.',
+    'seed_bus_running_ahead_title': 'Bus Running Ahead',
+    'seed_bus_running_ahead_message':
+        'Bus #42 is running 3 minutes ahead of schedule today.',
+    'seed_bus_approaching_title': 'Bus Approaching Stop',
+    'seed_bus_approaching_message':
+        'Bus #42 will arrive at Pine Road stop in approximately 5 minutes.',
+    'seed_emma_arrived_title': 'Emma Arrived at School',
+    'seed_emma_arrived_message':
+        'Emma has safely arrived at Lincoln Elementary School.',
+    'seed_route_update_title': 'Route Update',
+    'seed_route_update_message':
+        'Due to road works, Route A will use alternate path via Oak Avenue.',
+    'seed_emma_dropped_title': 'Emma Dropped Off',
+    'seed_emma_dropped_message':
+        'Emma has been safely dropped off at Oak Street stop.',
+    'seed_schedule_change_title': 'Schedule Change',
+    'seed_schedule_change_message':
+        "Tomorrow's pickup time has been moved to 07:30 AM due to a school event.",
 
     // Driver profile
     'driver_info_section': 'DRIVER INFORMATION',
@@ -1043,7 +1123,87 @@ class AppStrings {
     'admin_tab': 'ایڈمن',
     'system_tab': 'سسٹم',
     'reply': 'جواب دیں',
+    'pickups': 'پک اپس',
+    'received': 'موصول ہوا',
+    'send_reply': 'جواب بھیجیں',
     'type_reply': 'اپنا جواب لکھیں...',
+    'seed_sarah_johnson_sender': 'سارہ جانسن (ایما کی والدہ)',
+    'seed_sarah_johnson_message':
+        'ہی مائیک، ایما آج اسکول نہیں آئے گی۔ براہ کرم اسے غیر حاضر درج کریں۔',
+    'seed_transport_admin_sender': 'ٹرانسپورٹ ایڈمن',
+    'seed_transport_admin_message':
+        'براہ کرم نوٹ کریں: آج پائن روڈ پر سڑک کا کام ہو رہا ہے۔ اوک ایوینیو والا متبادل راستہ استعمال کریں۔',
+    'seed_david_martinez_sender': 'ڈیوڈ مارٹینیز (ایوا کے والد)',
+    'seed_david_martinez_message':
+        'آج وقت پر سروس کے لیے شکریہ! ایوا بہت خوش تھی۔',
+    'seed_system_alert_sender': 'سسٹم الرٹ',
+    'seed_system_alert_message':
+        'آپ کا صبح کا روٹ مکمل ہو گیا ہے۔ 22/22 طلبہ محفوظ طریقے سے پہنچا دیے گئے۔ شاباش!',
+    'seed_transport_admin_reminder_message':
+        'یاد دہانی: ماہانہ گاڑی کی جانچ جمعہ، 28 فروری کو طے ہے۔',
+    'seed_emily_wilson_sender': 'ایملی ولسن (ولیم کی والدہ)',
+    'seed_emily_wilson_message':
+        'ولیم کو کل سیڈر ایو پر متبادل اسٹاپ سے پک اپ کرنا ہوگا۔',
+    // Driver Booked screen / chat keys
+    'booked_children_title': 'بک کیے گئے بچے اور طلباء',
+    'booked_children_subtitle': 'اس ڈرائیور کے ساتھ بک کیے گئے تمام مسافر',
+    'search_booked_hint': 'بچہ، اسکول، اسٹاپ یا فون تلاش کریں',
+    'no_booked_found': 'کوئی بکڈ مسافر نہیں ملا',
+    'chat_with_parent_child': 'والدین اور بچے سے چیٹ کریں',
+    'quick_alerts_to_parent': 'والدین کو فوری اطلاع',
+    'arrived': 'پہنچ گیا',
+    'has_reached_destination': 'منزل پر پہنچ گیا۔',
+    'bus_update_delayed':
+        '{name} کے لیے بس اپ ڈیٹ: آمد تقریباً 10 منٹ لیٹ ہوگی۔',
+    'urgent_contact_driver':
+        '{name} کے بارے میں فوری اطلاع۔ براہ کرم ڈرائیور سے فوری رابطہ کریں۔',
+    'close': 'بند کریں',
+    'emergency_no': 'ہنگامی نمبر',
+    'sample_parent_bus_reach': 'براہ کرم بتائیں جب بس اسٹاپ پر پہنچ جائے۔',
+    'sample_student_ready': 'میں پک اپ پوائنٹ پر تیار ہوں۔',
+    'sample_driver_away': 'ہم 5 منٹ کے فاصلے پر ہیں۔',
+    'alert_sent_to': '{title} کو بھیج دیا گیا {name}',
+    // Missed pickup notifications (Urdu)
+    'pickup_request_title': '🚌 پک اپ کی درخواست — {from} → {to}',
+    'pickup_request_body':
+        '{student} نے {bus} مس کیا۔ قبول یا انکار کرنے کے لیے ٹیپ کریں۔',
+    'pickup_accepted_title': '✅ ڈرائیور نے قبول کر لیا — بس آ رہی ہے!',
+    'pickup_accepted_body':
+        '{driver} ({bus}) نے آپ کی درخواست قبول کر لی۔ اندازاً: {eta}.',
+    'pickup_declined_title': '⚠️ کوئی ڈرائیور دستیاب نہیں',
+    'pickup_declined_body':
+        'قریب کی کوئی بس آپ کی درخواست قبول نہیں کر سکی۔ براہ کرم اسکول سے رابطہ کریں۔',
+    // Geofence (driver alerts) - Urdu
+    'geofence_approaching_title': 'بس {stop} کے قریب پہنچ رہی ہے',
+    'geofence_approaching_body':
+        'بس {stop} پر تقریباً {mins} منٹ میں پہنچے گی۔',
+    'geofence_arrived_title': 'بس {stop} پر پہنچ گئی',
+    'geofence_arrived_body': 'بس {stop} پر پہنچ چکی ہے۔ براہ کرم تیار رہیں!',
+    'geofence_departed_title': 'بس {stop} سے روانہ',
+    'geofence_departed_body': 'بس {stop} سے روانہ ہو گئی ہے۔',
+
+    // Seeded history messages - Urdu
+    'seed_emma_boarded_title': 'ایما نے بس پر سوار ہو گئی',
+    'seed_emma_boarded_message':
+        'آپ کا بچہ محفوظ طریقے سے بس #42 پر Oak Street اسٹاپ پر سوار ہو گیا ہے۔',
+    'seed_bus_running_ahead_title': 'بس شیڈیول سے آگے ہے',
+    'seed_bus_running_ahead_message':
+        'آج بس #42 شیڈیول سے 3 منٹ آگے چل رہی ہے۔',
+    'seed_bus_approaching_title': 'بس اسٹاپ کے قریب آرہی ہے',
+    'seed_bus_approaching_message':
+        'بس #42 تقریباً 5 منٹ میں Pine Road اسٹاپ پر پہنچے گی۔',
+    'seed_emma_arrived_title': 'ایما اسکول پہنچ گئی',
+    'seed_emma_arrived_message':
+        'ایما محفوظ طریقے سے Lincoln Elementary School پہنچ گئی ہے۔',
+    'seed_route_update_title': 'روٹ کی تازہ کاری',
+    'seed_route_update_message':
+        'روڈ ورکس کی وجہ سے روٹ A متبادل راستے Oak Avenue استعمال کرے گا۔',
+    'seed_emma_dropped_title': 'ایما کو اتار دیا گیا',
+    'seed_emma_dropped_message':
+        'ایما کو محفوظ طریقے سے Oak Street اسٹاپ پر اتارا گیا ہے۔',
+    'seed_schedule_change_title': 'شیڈول میں تبدیلی',
+    'seed_schedule_change_message':
+        'کل پک اپ کا وقت اسکول ایونٹ کی وجہ سے 07:30 AM پر منتقل کر دیا گیا ہے۔',
 
     // Driver profile
     'driver_info_section': 'ڈرائیور کی معلومات',

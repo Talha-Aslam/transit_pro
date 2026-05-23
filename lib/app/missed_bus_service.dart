@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/missed_bus_request.dart';
 import '../models/route_data.dart';
 import 'notification_service.dart';
+import 'language_provider.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -83,10 +84,14 @@ class MissedBusService {
       // Add to driver incoming list
       driverIncomingRequests.value = [req];
 
-      // Alert driver via local push notification
+      // Alert driver via local push notification (localized)
       NotificationService.instance.show(
-        title: '🚌 Pickup Request — $currentStop → $destination',
-        body: '$studentName missed $missedBusNumber. Tap to accept or decline.',
+        title: AppStrings.t(
+          'pickup_request_title',
+        ).replaceAll('{from}', currentStop).replaceAll('{to}', destination),
+        body: AppStrings.t('pickup_request_body')
+            .replaceAll('{student}', studentName)
+            .replaceAll('{bus}', missedBusNumber),
         type: 'pickup_request',
         icon: '🚨',
         color: AppTheme.warning,
@@ -112,9 +117,11 @@ class MissedBusService {
 
     // Notify student
     NotificationService.instance.show(
-      title: '✅ Driver Accepted — Bus incoming!',
-      body:
-          '${bus.driverName} (${bus.busNumber}) accepted your request. ETA: ${bus.etaMinutes} min.',
+      title: AppStrings.t('pickup_accepted_title'),
+      body: AppStrings.t('pickup_accepted_body')
+          .replaceAll('{driver}', bus.driverName)
+          .replaceAll('{bus}', bus.busNumber)
+          .replaceAll('{eta}', '${bus.etaMinutes} min'),
       type: 'pickup_accepted',
       icon: '✅',
       color: AppTheme.success,
@@ -147,9 +154,8 @@ class MissedBusService {
       studentActiveRequest.value = stale;
 
       NotificationService.instance.show(
-        title: '⚠️ No drivers available',
-        body:
-            'No nearby bus could accept your request right now. Please contact the school.',
+        title: AppStrings.t('pickup_declined_title'),
+        body: AppStrings.t('pickup_declined_body'),
         type: 'pickup_declined',
         icon: '⚠️',
         color: AppTheme.error,

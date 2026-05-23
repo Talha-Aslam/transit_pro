@@ -77,7 +77,7 @@ class _DriverBookedStudentsScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Booked Children & Students',
+                      AppStrings.t('booked_children_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 20,
@@ -85,7 +85,7 @@ class _DriverBookedStudentsScreenState
                       ),
                     ),
                     Text(
-                      'All passengers booked with this driver',
+                      AppStrings.t('booked_children_subtitle'),
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 13,
@@ -109,18 +109,32 @@ class _DriverBookedStudentsScreenState
                   child: Row(
                     children: [
                       _SummaryPill(
-                        label: 'Booked',
+                        label: AppStrings.t('booked_children_title'),
                         value: _booked.length,
                         color: AppTheme.driverCyan,
                       ),
                       const SizedBox(width: 10),
                       _SummaryPill(
-                        label: 'Stops',
+                        label: AppStrings.t('stop'),
                         value: groups.length,
                         color: AppTheme.success,
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  AppStrings.t('booked_children_title'),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppStrings.t('booked_children_subtitle'),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -147,7 +161,7 @@ class _DriverBookedStudentsScreenState
                             fontSize: 14,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Search child, school, stop or phone',
+                            hintText: AppStrings.t('search_booked_hint'),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
@@ -172,7 +186,7 @@ class _DriverBookedStudentsScreenState
                           const Text('🚌', style: TextStyle(fontSize: 40)),
                           const SizedBox(height: 12),
                           Text(
-                            'No booked passengers found',
+                            AppStrings.t('no_booked_found'),
                             style: TextStyle(
                               color: context.textTertiary,
                               fontSize: 14,
@@ -284,7 +298,7 @@ class _BookedPassengerCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Parent: ${passenger.parentName}',
+                      '${AppStrings.t('parent_guardian_lbl')}: ${passenger.parentName}',
                       style: TextStyle(
                         color: context.textTertiary,
                         fontSize: 12,
@@ -351,19 +365,19 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
     _messages = [
       _ChatMessage(
         sender: widget.passenger.parentName,
-        text: 'Please let me know when the bus reaches the stop.',
+        text: AppStrings.t('sample_parent_bus_reach'),
         time: '07:05 AM',
         isMe: false,
       ),
       _ChatMessage(
         sender: widget.passenger.name,
-        text: 'I am ready at the pickup point.',
+        text: AppStrings.t('sample_student_ready'),
         time: '07:07 AM',
         isMe: false,
       ),
       _ChatMessage(
         sender: 'Driver',
-        text: 'We are 5 minutes away.',
+        text: AppStrings.t('sample_driver_away'),
         time: '07:08 AM',
         isMe: true,
       ),
@@ -391,9 +405,12 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
       color: color,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title sent to ${widget.passenger.parentName}')),
-    );
+    final sentMsg = AppStrings.t('alert_sent_to')
+        .replaceAll('{title}', title)
+        .replaceAll('{name}', widget.passenger.parentName);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(sentMsg)));
   }
 
   void _sendMessage() {
@@ -502,19 +519,28 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _DetailRow(label: 'Grade', value: passenger.grade),
-                        _DetailRow(label: 'Stop', value: passenger.stop),
-                        _DetailRow(label: 'Bus', value: passenger.busNumber),
                         _DetailRow(
-                          label: 'Emergency no.',
+                          label: AppStrings.t('grade'),
+                          value: passenger.grade,
+                        ),
+                        _DetailRow(
+                          label: AppStrings.t('stop'),
+                          value: passenger.stop,
+                        ),
+                        _DetailRow(
+                          label: AppStrings.t('bus_lbl'),
+                          value: passenger.busNumber,
+                        ),
+                        _DetailRow(
+                          label: AppStrings.t('emergency_no'),
                           value: passenger.emergencyPhone,
                         ),
                         _DetailRow(
-                          label: 'Parent',
+                          label: AppStrings.t('parent_guardian_lbl'),
                           value: passenger.parentName,
                         ),
                         _DetailRow(
-                          label: 'Parent contact',
+                          label: AppStrings.t('phone_number'),
                           value: passenger.parentPhone,
                         ),
                       ],
@@ -522,7 +548,7 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Chat with parent and child',
+                    AppStrings.t('chat_with_parent_child'),
                     style: TextStyle(
                       color: context.textPrimary,
                       fontSize: 15,
@@ -550,7 +576,7 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                                 maxLines: 3,
                                 style: TextStyle(color: context.textPrimary),
                                 decoration: InputDecoration(
-                                  hintText: 'Write a message...',
+                                  hintText: AppStrings.t('type_reply'),
                                   hintStyle: TextStyle(color: context.textHint),
                                   filled: true,
                                   fillColor: context.cardBgElevated,
@@ -589,7 +615,7 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Quick alerts to parent',
+                    AppStrings.t('quick_alerts_to_parent'),
                     style: TextStyle(
                       color: context.textPrimary,
                       fontSize: 15,
@@ -602,39 +628,42 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                     runSpacing: 10,
                     children: [
                       _AlertChip(
-                        label: 'Arrived',
+                        label: AppStrings.t('arrived'),
                         icon: '🏫',
                         color: AppTheme.info,
                         onTap: () => _sendAlert(
-                          title: '${passenger.name} arrived',
+                          title: '${passenger.name} ${AppStrings.t('arrived')}',
                           body:
-                              '${passenger.name} has reached the destination stop.',
+                              '${passenger.name} ${AppStrings.t('has_reached_destination')}',
                           icon: '🏫',
                           color: AppTheme.info,
                           type: 'info',
                         ),
                       ),
                       _AlertChip(
-                        label: 'Delayed',
+                        label: AppStrings.t('delayed'),
                         icon: '⏳',
                         color: const Color(0xFFF59E0B),
                         onTap: () => _sendAlert(
-                          title: '${passenger.name} delayed',
-                          body:
-                              'Bus update for ${passenger.name}: arrival will be about 10 minutes late.',
+                          title: '${passenger.name} ${AppStrings.t('delayed')}',
+                          body: AppStrings.t(
+                            'bus_update_delayed',
+                          ).replaceAll('{name}', passenger.name),
                           icon: '⏳',
                           color: const Color(0xFFF59E0B),
                           type: 'alert',
                         ),
                       ),
                       _AlertChip(
-                        label: 'Emergency',
+                        label: AppStrings.t('emergency'),
                         icon: '🚨',
                         color: AppTheme.error,
                         onTap: () => _sendAlert(
-                          title: '${passenger.name} emergency',
-                          body:
-                              'Urgent update regarding ${passenger.name}. Please contact the driver immediately.',
+                          title:
+                              '${passenger.name} ${AppStrings.t('emergency')}',
+                          body: AppStrings.t(
+                            'urgent_contact_driver',
+                          ).replaceAll('{name}', passenger.name),
                           icon: '🚨',
                           color: AppTheme.error,
                           type: 'alert',
@@ -655,7 +684,7 @@ class _PassengerDetailSheetState extends State<_PassengerDetailSheet> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text('Close'),
+                      child: Text(AppStrings.t('close')),
                     ),
                   ),
                 ],
@@ -945,61 +974,7 @@ const _initialBookedPassengers = [
     parentPhone: '+92 321 4430103',
     avatar: '👧',
   ),
-  _BookedPassenger(
-    name: 'Noah Brown',
-    grade: 'Grade 6',
-    school: 'Lahore Grammar School - Askari Campus',
-    stop: 'Model Town Centre, Lahore',
-    busNumber: 'Bus #42',
-    emergencyPhone: '+92 300 1110004',
-    parentName: 'Daniel Brown',
-    parentPhone: '+92 321 4430104',
-    avatar: '👦',
-  ),
-  _BookedPassenger(
-    name: 'Ava Martinez',
-    grade: 'Grade 2',
-    school: 'Lahore Grammar School - Askari Campus',
-    stop: 'Canal Road Junction, Lahore',
-    busNumber: 'Bus #42',
-    emergencyPhone: '+92 300 1110005',
-    parentName: 'Maria Martinez',
-    parentPhone: '+92 321 4430105',
-    avatar: '👧',
-  ),
-  _BookedPassenger(
-    name: 'William Wilson',
-    grade: 'Grade 5',
-    school: 'Lahore Grammar School - Askari Campus',
-    stop: 'Canal Road Junction, Lahore',
-    busNumber: 'Bus #42',
-    emergencyPhone: '+92 300 1110006',
-    parentName: 'Robert Wilson',
-    parentPhone: '+92 321 4430106',
-    avatar: '👦',
-  ),
-  _BookedPassenger(
-    name: 'Sophia Anderson',
-    grade: 'Grade 3',
-    school: 'Lahore Grammar School - Askari Campus',
-    stop: 'Aitchison College Entrance, Lahore',
-    busNumber: 'Bus #42',
-    emergencyPhone: '+92 300 1110007',
-    parentName: 'Nadia Anderson',
-    parentPhone: '+92 321 4430107',
-    avatar: '👧',
-  ),
-  _BookedPassenger(
-    name: 'James Taylor',
-    grade: 'Grade 4',
-    school: 'Lahore Grammar School - Askari Campus',
-    stop: 'Aitchison College Entrance, Lahore',
-    busNumber: 'Bus #42',
-    emergencyPhone: '+92 300 1110008',
-    parentName: 'Thomas Taylor',
-    parentPhone: '+92 321 4430108',
-    avatar: '👦',
-  ),
+  // university dummies
   _BookedPassenger(
     name: 'Ali Khan',
     grade: 'Undergraduate',
@@ -1020,28 +995,6 @@ const _initialBookedPassengers = [
     emergencyPhone: '+92 300 7000002',
     parentName: 'Self',
     parentPhone: '+92 300 7001002',
-    avatar: '🎓',
-  ),
-  _BookedPassenger(
-    name: 'Hassan Raza',
-    grade: 'Postgraduate',
-    school: 'National University of Sciences & Technology',
-    stop: 'NUST Campus Stop, Islamabad',
-    busNumber: 'Bus #U3',
-    emergencyPhone: '+92 300 7000003',
-    parentName: 'Self',
-    parentPhone: '+92 300 7001003',
-    avatar: '🎓',
-  ),
-  _BookedPassenger(
-    name: 'Maya Singh',
-    grade: 'Undergraduate',
-    school: 'Forman Christian College',
-    stop: 'FCCU Main Gate, Lahore',
-    busNumber: 'Bus #U4',
-    emergencyPhone: '+92 300 7000004',
-    parentName: 'Self',
-    parentPhone: '+92 300 7001004',
     avatar: '🎓',
   ),
 ];
