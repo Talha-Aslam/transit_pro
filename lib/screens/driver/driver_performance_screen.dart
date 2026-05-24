@@ -226,33 +226,36 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                       const SizedBox(height: 14),
 
                       // Achievements
-                      GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Achievements',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                      SizedBox(
+                        width: double.infinity,
+                        child: GlassCard(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Achievements',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 14),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: const [
-                                _Badge('🏆', 'Top Driver'),
-                                _Badge('⭐', '5-Star Week'),
-                                _Badge('🎯', 'Perfect Route'),
-                                _Badge('⚡', 'Speed Demon'),
-                                _Badge('🕐', 'Never Late'),
-                                _Badge('😊', 'Parents\' Choice'),
-                              ],
-                            ),
-                          ],
+                              const SizedBox(height: 14),
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: const [
+                                  _Badge('🏆', 'Top Driver'),
+                                  _Badge('⭐', '5-Star Week'),
+                                  _Badge('🎯', 'Perfect Route'),
+                                  _Badge('⚡', 'Speed Demon'),
+                                  _Badge('🕐', 'Never Late'),
+                                  _Badge('😊', 'Parents\' Choice'),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
