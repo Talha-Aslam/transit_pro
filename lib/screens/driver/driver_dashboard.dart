@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../app/driver_alerts_service.dart';
 import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -160,10 +161,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             ),
                           ),
                         ),
-                        ValueListenableBuilder<List<AppNotification>>(
-                          valueListenable: NotificationService.instance.history,
-                          builder: (_, list, _) {
-                            final unread = list.where((n) => !n.read).length;
+                        ValueListenableBuilder<int>(
+                          valueListenable:
+                              DriverAlertsService.instance.unreadCount,
+                          builder: (_, unread, _) {
                             if (unread == 0) return const SizedBox.shrink();
                             return Positioned(
                               top: -4,
@@ -385,7 +386,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.driverCyan.withValues(alpha: 0.3),
+                                color: AppTheme.driverCyan.withValues(
+                                  alpha: 0.3,
+                                ),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
@@ -1094,7 +1097,9 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
             decoration: BoxDecoration(
               color: AppTheme.success.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.success.withValues(alpha: 0.25)),
+              border: Border.all(
+                color: AppTheme.success.withValues(alpha: 0.25),
+              ),
             ),
             child: Row(
               children: [

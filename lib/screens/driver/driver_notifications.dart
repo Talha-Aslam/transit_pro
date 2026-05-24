@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/driver_alerts_service.dart';
 import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/missed_bus_service.dart';
@@ -24,6 +25,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   void initState() {
     super.initState();
     _msgs = _buildMessages();
+    DriverAlertsService.instance.setUnreadCount(_unread);
     _languageListener = () {
       if (!mounted) return;
       final readState = {for (final msg in _msgs) msg.id: msg.read};
@@ -33,6 +35,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
           final selected = _msgs.where((m) => m.id == _selectedMsg!.id);
           _selectedMsg = selected.isEmpty ? null : selected.first;
         }
+        DriverAlertsService.instance.setUnreadCount(_unread);
       });
     };
     LanguageProvider.instance.addListener(_languageListener);
@@ -133,6 +136,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
     NotificationService.instance.history.value = hist
         .map((n) => n.id == msg.id ? n.copyWith(read: true) : n)
         .toList();
+    DriverAlertsService.instance.setUnreadCount(_unread);
   }
 
   @override
@@ -216,6 +220,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                               .toList();
                           // Mark global history as read as well
                           NotificationService.instance.markAllRead();
+                          DriverAlertsService.instance.setUnreadCount(0);
                         }),
                         child: Tooltip(
                           message: AppStrings.t('mark_all_read'),
