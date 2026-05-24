@@ -161,6 +161,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _signup() {
     if (!_agreeTerms) return;
+    if (_selectedRole == 'driver') {
+      final missing = _missingDriverField();
+      if (missing != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(missing)));
+        return;
+      }
+    }
     // block signup if passwords don't match
     if (_passCtrl.text != _confirmPassCtrl.text) {
       ScaffoldMessenger.of(
@@ -195,6 +204,30 @@ class _SignupScreenState extends State<SignupScreen> {
     if (mounted) {
       context.go(AuthService.routeForRole(_selectedRole));
     }
+  }
+
+  String? _missingDriverField() {
+    if (_nameCtrl.text.trim().isEmpty) return 'Please enter driver name';
+    if (_emailCtrl.text.trim().isEmpty) return 'Please enter email address';
+    if (_phoneCtrl.text.trim().isEmpty) return 'Please enter phone number';
+    if (_passCtrl.text.isEmpty) return 'Please enter password';
+    if (_confirmPassCtrl.text.isEmpty) return 'Please confirm password';
+    if (_licenseCtrl.text.trim().isEmpty) {
+      return 'Please enter license number';
+    }
+    if (_vehicleCtrl.text.trim().isEmpty) {
+      return 'Please enter vehicle number';
+    }
+    if (_vehicleType == null || _vehicleType!.trim().isEmpty) {
+      return 'Please select vehicle type';
+    }
+    if (_seatCapacityCtrl.text.trim().isEmpty) {
+      return 'Please enter seat capacity';
+    }
+    if (_experienceCtrl.text.trim().isEmpty) {
+      return 'Please enter experience';
+    }
+    return null;
   }
 
   @override
@@ -522,7 +555,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('email_address_lbl')),
+          _FieldLabel(AppStrings.t('email_address_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _emailCtrl,
@@ -544,7 +577,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Role-specific fields
           ..._roleSpecificFields(),
 
-          _FieldLabel(AppStrings.t('password_lbl')),
+          _FieldLabel(AppStrings.t('password_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _passCtrl,
@@ -564,7 +597,7 @@ class _SignupScreenState extends State<SignupScreen> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('confirm_password_lbl')),
+          _FieldLabel(AppStrings.t('confirm_password_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _confirmPassCtrl,
@@ -747,7 +780,7 @@ class _SignupScreenState extends State<SignupScreen> {
       // ── DRIVER ──────────────────────────────────────────────────────────
       case 'driver':
         return [
-          _FieldLabel(AppStrings.t('license_number_lbl')),
+          _FieldLabel(AppStrings.t('license_number_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _licenseCtrl,
@@ -788,7 +821,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(AppStrings.t('vehicle_number_lbl')),
+                    _FieldLabel(
+                      AppStrings.t('vehicle_number_lbl'),
+                      important: true,
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _vehicleCtrl,
@@ -808,7 +844,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(AppStrings.t('vehicle_type_lbl')),
+                    _FieldLabel(
+                      AppStrings.t('vehicle_type_lbl'),
+                      important: true,
+                    ),
                     const SizedBox(height: 8),
                     _buildDropdown(
                       hint: AppStrings.t('select_type_hint'),
@@ -822,7 +861,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _FieldLabel('Transport seat capacity'),
+          _FieldLabel('Transport seat capacity', important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _seatCapacityCtrl,
@@ -838,7 +877,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('experience_yrs_lbl')),
+          _FieldLabel(AppStrings.t('experience_yrs_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _experienceCtrl,
@@ -1174,16 +1213,26 @@ class _SignupScreenState extends State<SignupScreen> {
 
 class _FieldLabel extends StatelessWidget {
   final String text;
-  const _FieldLabel(this.text);
+  final bool important;
+  const _FieldLabel(this.text, {this.important = false});
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        color: context.textSecondary,
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          color: context.textSecondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+        children: [
+          TextSpan(text: text),
+          if (important)
+            const TextSpan(
+              text: ' *',
+              style: TextStyle(color: Colors.red),
+            ),
+        ],
       ),
     );
   }
