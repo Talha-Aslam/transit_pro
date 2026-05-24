@@ -15,8 +15,9 @@ class DriverTripHistoryScreen extends StatefulWidget {
 
 class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
   int _filterIndex = 0;
+  DateTime? _selectedDate;
 
-  final _filters = ['All', 'Morning', 'Afternoon', 'This Week'];
+  final _filters = ['All', 'Today', 'This Week', 'This Month'];
 
   @override
   void initState() {
@@ -32,8 +33,36 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
 
   void _rebuild() => setState(() {});
 
-  static const _trips = [
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime(2026, 3, 7),
+      firstDate: DateTime(2026, 1, 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.driverCyan),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() => _selectedDate = picked);
+  }
+
+  void _clearPickedDate() {
+    setState(() => _selectedDate = null);
+  }
+
+  static final _trips = [
     _Trip(
+      DateTime(2026, 3, 3),
       'Mon, Mar 3 2026',
       'Morning Route',
       'Bus Depot',
@@ -45,6 +74,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       true,
     ),
     _Trip(
+      DateTime(2026, 3, 3),
       'Mon, Mar 3 2026',
       'Afternoon Route',
       'Lincoln Elementary',
@@ -56,6 +86,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       false,
     ),
     _Trip(
+      DateTime(2026, 3, 4),
       'Tue, Mar 4 2026',
       'Morning Route',
       'Bus Depot',
@@ -67,6 +98,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       true,
     ),
     _Trip(
+      DateTime(2026, 3, 4),
       'Tue, Mar 4 2026',
       'Afternoon Route',
       'Lincoln Elementary',
@@ -78,6 +110,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       false,
     ),
     _Trip(
+      DateTime(2026, 3, 5),
       'Wed, Mar 5 2026',
       'Morning Route',
       'Bus Depot',
@@ -89,6 +122,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       true,
     ),
     _Trip(
+      DateTime(2026, 3, 5),
       'Wed, Mar 5 2026',
       'Afternoon Route',
       'Lincoln Elementary',
@@ -100,6 +134,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       false,
     ),
     _Trip(
+      DateTime(2026, 3, 6),
       'Thu, Mar 6 2026',
       'Morning Route',
       'Bus Depot',
@@ -111,6 +146,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       true,
     ),
     _Trip(
+      DateTime(2026, 3, 7),
       'Fri, Mar 7 2026',
       'Morning Route',
       'Bus Depot',
@@ -122,6 +158,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
       true,
     ),
     _Trip(
+      DateTime(2026, 3, 7),
       'Fri, Mar 7 2026',
       'Afternoon Route',
       'Lincoln Elementary',
@@ -135,15 +172,21 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
   ];
 
   List<_Trip> get _filtered {
+    final dateFiltered = _selectedDate == null
+        ? _trips
+        : _trips
+              .where((trip) => _isSameDay(trip.dateValue, _selectedDate!))
+              .toList();
+
     switch (_filterIndex) {
       case 1:
-        return _trips.where((t) => t.isMorning).toList();
+        return dateFiltered.take(2).toList();
       case 2:
-        return _trips.where((t) => !t.isMorning).toList();
+        return dateFiltered.take(6).toList();
       case 3:
-        return _trips.take(6).toList();
+        return dateFiltered;
       default:
-        return _trips;
+        return dateFiltered;
     }
   }
 
@@ -193,12 +236,58 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    Text(
-                      AppStrings.t('trip_history'),
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Text(
+                        AppStrings.t('trip_history'),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (_selectedDate != null) ...[
+                      GestureDetector(
+                        onTap: _clearPickedDate,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: context.cardBgElevated,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: context.inputBorder),
+                          ),
+                          child: Text(
+                            '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: context.cardBgElevated,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: context.inputBorder),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.calendar_month_rounded,
+                            color: context.textPrimary,
+                            size: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -280,16 +369,6 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (i == 3) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.calendar_month_rounded,
-                                size: 14,
-                                color: sel
-                                    ? Colors.white
-                                    : context.textSecondary,
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -317,6 +396,9 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
 
   Widget _vd(BuildContext context) =>
       Container(width: 1, height: 30, color: context.cardBgElevated);
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
 class _Stat extends StatelessWidget {
@@ -459,9 +541,11 @@ class _TripCard extends StatelessWidget {
 }
 
 class _Trip {
+  final DateTime dateValue;
   final String date, type, from, to, time, duration, status;
   final bool statusOk, isMorning;
   const _Trip(
+    this.dateValue,
     this.date,
     this.type,
     this.from,

@@ -105,10 +105,19 @@ class _DriverRouteState extends State<DriverRoute> {
     canvas.drawCircle(const Offset(33, 31), 4, wheelPaint);
 
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
-    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-    if (bytes != null && mounted) {
-      _busIcon = BitmapDescriptor.bytes(bytes.buffer.asUint8List());
+    // Defensive: guard against non-finite size values before converting to int.
+    final sizeInt = size.isFinite ? size.toInt() : 52;
+    try {
+      final img = await picture.toImage(sizeInt, sizeInt);
+      final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes != null && mounted) {
+        _busIcon = BitmapDescriptor.bytes(bytes.buffer.asUint8List());
+      }
+    } catch (e) {
+      // If image creation fails, log and continue without custom icon.
+      // Avoid crashing the app due to UnsupportedError: Infinity or NaN toInt
+      // ignore: avoid_print
+      print('createBusIcon failed: $e');
     }
   }
 
@@ -779,18 +788,4 @@ class _StopRow extends StatelessWidget {
   }
 }
 
-Widget _backBtn(BuildContext context) => Container(
-  width: 38,
-  height: 38,
-  decoration: BoxDecoration(
-    color: context.cardBgElevated,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(color: context.inputBorder),
-  ),
-  child: Center(
-    child: Text(
-      '←',
-      style: TextStyle(color: context.textPrimary, fontSize: 16),
-    ),
-  ),
-);
+// Back button helper removed: navbar-managed pages handle back navigation.
