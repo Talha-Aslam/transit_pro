@@ -31,7 +31,6 @@ class _DriverProfileState extends State<DriverProfile> {
 
   bool _parentAlerts = true;
   bool _routeReminders = true;
-  bool _breakAlerts = false;
 
   bool get _locationSharing => _svc.locationSharing.value;
 
@@ -460,13 +459,7 @@ class _DriverProfileState extends State<DriverProfile> {
                             onChanged: (v) =>
                                 setState(() => _routeReminders = v),
                           ),
-                          _divider(context),
-                          _PrefRow(
-                            label: AppStrings.t('break_alerts_lbl'),
-                            desc: AppStrings.t('break_alerts_desc'),
-                            value: _breakAlerts,
-                            onChanged: (v) => setState(() => _breakAlerts = v),
-                          ),
+                          // Break alerts removed from profile settings
                         ],
                       ),
                     ),
