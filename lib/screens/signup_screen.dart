@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'map_picker_screen.dart';
 import 'package:go_router/go_router.dart';
 import '../app/auth_service.dart';
 import '../app/language_provider.dart';
@@ -46,6 +48,10 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _studentGrade;
   final _studentSchoolCtrl = TextEditingController();
   bool _studentSchoolCustom = false;
+  final _studentPickupCtrl = TextEditingController();
+  final _studentDropoffCtrl = TextEditingController();
+  LatLng? _studentPickupLatLng;
+  LatLng? _studentDropoffLatLng;
 
   // Shared data
   static const _gradeOptions = ['School', 'College', 'University', 'Academy'];
@@ -263,6 +269,8 @@ class _SignupScreenState extends State<SignupScreen> {
     _seatCapacityCtrl.dispose();
     _studentIdCtrl.dispose();
     _studentSchoolCtrl.dispose();
+    _studentPickupCtrl.dispose();
+    _studentDropoffCtrl.dispose();
     LanguageProvider.instance.removeListener(_onLangChanged);
     super.dispose();
   }
@@ -961,6 +969,94 @@ class _SignupScreenState extends State<SignupScreen> {
             isCustom: _studentSchoolCustom,
             onCustomChanged: (val) =>
                 setState(() => _studentSchoolCustom = val),
+          ),
+          const SizedBox(height: 16),
+          _FieldLabel('Pickup location', important: true),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () async {
+              final res = await Navigator.of(context).push<LatLng?>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      MapPickerScreen(initial: _studentPickupLatLng),
+                ),
+              );
+              if (res != null) {
+                setState(() {
+                  _studentPickupLatLng = res;
+                  _studentPickupCtrl.text =
+                      '${res.latitude.toStringAsFixed(6)}, ${res.longitude.toStringAsFixed(6)}';
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: context.cardBgElevated,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.inputBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _studentPickupCtrl.text.isEmpty
+                          ? 'Select pickup on map'
+                          : _studentPickupCtrl.text,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.map, color: context.textTertiary),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldLabel('Dropoff location', important: true),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () async {
+              final res = await Navigator.of(context).push<LatLng?>(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      MapPickerScreen(initial: _studentDropoffLatLng),
+                ),
+              );
+              if (res != null) {
+                setState(() {
+                  _studentDropoffLatLng = res;
+                  _studentDropoffCtrl.text =
+                      '${res.latitude.toStringAsFixed(6)}, ${res.longitude.toStringAsFixed(6)}';
+                });
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: context.cardBgElevated,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.inputBorder),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _studentDropoffCtrl.text.isEmpty
+                          ? 'Select dropoff on map'
+                          : _studentDropoffCtrl.text,
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.map, color: context.textTertiary),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 16),
         ];

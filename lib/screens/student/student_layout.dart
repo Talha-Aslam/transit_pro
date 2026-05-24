@@ -7,7 +7,7 @@ import '../../theme/app_theme.dart';
 import 'student_dashboard.dart';
 import 'student_tracking.dart';
 import 'student_schedule.dart';
-import 'student_attendance.dart';
+// student_attendance removed from student layout
 import 'student_fees.dart';
 import 'student_profile.dart';
 
@@ -38,10 +38,7 @@ class _StudentLayoutState extends State<StudentLayout> {
       icon: 'assets/images/navbar/calendar_transparent.png',
       label: AppStrings.t('snav_schedule'),
     ),
-    _NavItem(
-      icon: 'assets/images/navbar/qr_pass.png',
-      label: AppStrings.t('snav_qr'),
-    ),
+    // QR tab removed for students
     _NavItem(
       icon: 'assets/images/navbar/fees.png',
       label: AppStrings.t('snav_fees'),
@@ -71,7 +68,6 @@ class _StudentLayoutState extends State<StudentLayout> {
               else
                 const SizedBox.shrink(),
               const StudentSchedule(),
-              const StudentAttendance(),
               const StudentFees(),
               StudentProfile(
                 onLogout: () {
@@ -141,7 +137,9 @@ class _StudentLayoutState extends State<StudentLayout> {
                                   borderRadius: BorderRadius.circular(30),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.10),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.10,
+                                      ),
                                       blurRadius: 10,
                                       offset: const Offset(0, 3),
                                     ),
