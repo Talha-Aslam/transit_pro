@@ -616,6 +616,140 @@ class _StudentProfileState extends State<StudentProfile> {
                   ),
                   const SizedBox(height: 16),
 
+                  // ── Notification preferences ───────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'NOTIFICATION PREFERENCES',
+                            style: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Boarding / Bus alerts
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      AppStrings.t('boarding_alerts'),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      AppStrings.t('boarding_alerts_desc'),
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              AppSwitch(
+                                value: _busAlerts,
+                                activeColor: AppTheme.studentAmber,
+                                onChanged: (v) =>
+                                    setState(() => _busAlerts = v),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Arrival notifications
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      AppStrings.t('arrival_notifs'),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      AppStrings.t('arrival_notifs_desc'),
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              AppSwitch(
+                                value: _arrivalAlerts,
+                                activeColor: AppTheme.studentAmber,
+                                onChanged: (v) =>
+                                    setState(() => _arrivalAlerts = v),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Delay alerts
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      AppStrings.t('delay_alerts'),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      AppStrings.t('delay_alerts_desc'),
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              AppSwitch(
+                                value: _delayAlerts,
+                                activeColor: AppTheme.studentAmber,
+                                onChanged: (v) =>
+                                    setState(() => _delayAlerts = v),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
                   // ── Settings ───────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -623,11 +757,7 @@ class _StudentProfileState extends State<StudentProfile> {
                       padding: const EdgeInsets.all(4),
                       child: Column(
                         children: [
-                          _SettingTile(
-                            icon: '🔔',
-                            label: AppStrings.t('notifications_lbl'),
-                            onTap: _showNotifSettings,
-                          ),
+                          // Notifications handled inline above — removed tile
                           _SettingTile(
                             icon: '🌐',
                             label: AppStrings.t('language'),
