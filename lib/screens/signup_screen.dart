@@ -170,6 +170,15 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
     }
+    if (_selectedRole == 'student') {
+      final missing = _missingStudentField();
+      if (missing != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(missing)));
+        return;
+      }
+    }
     // block signup if passwords don't match
     if (_passCtrl.text != _confirmPassCtrl.text) {
       ScaffoldMessenger.of(
@@ -226,6 +235,14 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     if (_experienceCtrl.text.trim().isEmpty) {
       return 'Please enter experience';
+    }
+    return null;
+  }
+
+  String? _missingStudentField() {
+    if (_nameCtrl.text.trim().isEmpty) return AppStrings.t('enter_full_name');
+    if (_studentSchoolCtrl.text.trim().isEmpty) {
+      return AppStrings.t('please_select_school');
     }
     return null;
   }
@@ -545,7 +562,10 @@ class _SignupScreenState extends State<SignupScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Common fields
-          _FieldLabel(AppStrings.t('full_name_lbl')),
+          _FieldLabel(
+            AppStrings.t('full_name_lbl'),
+            important: _selectedRole == 'student',
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
@@ -934,7 +954,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('school_institution_lbl')),
+          _FieldLabel(AppStrings.t('school_institution_lbl'), important: true),
           const SizedBox(height: 8),
           _buildSchoolSearch(
             ctrl: _studentSchoolCtrl,
