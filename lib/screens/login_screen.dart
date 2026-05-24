@@ -379,73 +379,79 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Google Login Option
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Divider(
-                                  color: context.surfaceBorder,
-                                  thickness: 1,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Text(
-                                  'Or continue with',
-                                  style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 13,
+                          if (widget.role != 'driver') ...[
+                            // Google Login Option
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Divider(
+                                    color: context.surfaceBorder,
+                                    thickness: 1,
                                   ),
                                 ),
-                              ),
-                              Expanded(
-                                child: Divider(
-                                  color: context.surfaceBorder,
-                                  thickness: 1,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          GestureDetector(
-                            onTap: _googleLogin,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(
-                                color: context.cardBgElevated,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: context.inputBorder),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    'assets/images/utilities/google.png',
-                                    height: 20,
-                                    width: 20,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            const Icon(
-                                              Icons.g_mobiledata,
-                                              size: 24,
-                                            ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Google',
+                                  child: Text(
+                                    'Or continue with',
                                     style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
+                                      color: context.textTertiary,
+                                      fontSize: 13,
                                     ),
                                   ),
-                                ],
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color: context.surfaceBorder,
+                                    thickness: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            GestureDetector(
+                              onTap: _googleLogin,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: context.cardBgElevated,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: context.inputBorder,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/utilities/google.png',
+                                      height: 20,
+                                      width: 20,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.g_mobiledata,
+                                                size: 24,
+                                              ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Google',
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

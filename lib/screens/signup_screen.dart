@@ -237,7 +237,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
-                      colors: [_cfg.glow.withValues(alpha: 0.35), Colors.transparent],
+                      colors: [
+                        _cfg.glow.withValues(alpha: 0.35),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
                 ),
@@ -637,58 +640,60 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Google Login Option
-          Row(
-            children: [
-              Expanded(
-                child: Divider(color: context.surfaceBorder, thickness: 1),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Or continue with',
-                  style: TextStyle(color: context.textTertiary, fontSize: 13),
+          if (_selectedRole != 'driver') ...[
+            // Google Login Option
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(color: context.surfaceBorder, thickness: 1),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Or continue with',
+                    style: TextStyle(color: context.textTertiary, fontSize: 13),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(color: context.surfaceBorder, thickness: 1),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: _googleContinue,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: context.cardBgElevated,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.inputBorder),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(
+                      'assets/images/utilities/google.png',
+                      height: 20,
+                      width: 20,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.g_mobiledata, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Google',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: Divider(color: context.surfaceBorder, thickness: 1),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _googleContinue,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: context.cardBgElevated,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: context.inputBorder),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/images/utilities/google.png',
-                    height: 20,
-                    width: 20,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.g_mobiledata, size: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Google',
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -968,11 +973,13 @@ class _SignupScreenState extends State<SignupScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.parentPurple.withValues(alpha: context.isDark ? 0.10 : 0.06),
+        color: AppTheme.parentPurple.withValues(
+          alpha: context.isDark ? 0.10 : 0.06,
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppTheme.parentPurple.withValues(alpha: 
-            context.isDark ? 0.28 : 0.20,
+          color: AppTheme.parentPurple.withValues(
+            alpha: context.isDark ? 0.28 : 0.20,
           ),
         ),
       ),
