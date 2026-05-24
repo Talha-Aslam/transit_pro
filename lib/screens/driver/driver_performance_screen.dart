@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/driver_trip_metrics.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -151,7 +152,11 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
                                 _ScorePill('⭐', '4.8', 'Rating'),
-                                _ScorePill('🏆', '248', 'Trips'),
+                                _ScorePill(
+                                  '🏆',
+                                  '${DriverTripMetrics.totalTrips}',
+                                  'Trips',
+                                ),
                                 _ScorePill('⏱️', '96%', 'On-Time'),
                                 _ScorePill('😊', '98%', 'Satisfaction'),
                               ],
@@ -271,9 +276,9 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
   }
 
   static const _stats = [
-    _MonthStat('January 2026', 48, 95.8, 4.9),
+    _MonthStat('January 2026', 50, 95.8, 4.9),
     _MonthStat('February 2026', 44, 97.7, 4.8),
-    _MonthStat('March 2026', 18, 96.0, 4.8),
+    _MonthStat('March 2026', 42, 96.0, 4.8),
   ];
 }
 

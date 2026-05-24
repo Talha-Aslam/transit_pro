@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../app/driver_data_service.dart';
+import '../../app/driver_trip_metrics.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -478,7 +479,8 @@ class _DriverProfileState extends State<DriverProfile> {
                           _MenuItem(
                             icon: '📋',
                             label: AppStrings.t('trip_history'),
-                            desc: '248 trips completed',
+                            desc:
+                                '${DriverTripMetrics.totalTrips} trips completed',
                             onTap: () => context.push('/driver/trips'),
                           ),
                           _MenuItem(

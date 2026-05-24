@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/driver_trip_metrics.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -216,7 +217,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _Stat(
-                        '${_trips.length}',
+                        '${DriverTripMetrics.totalTrips}',
                         'Total Trips',
                         AppTheme.driverCyan,
                       ),
@@ -266,13 +267,30 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                                 : context.surfaceBorder,
                           ),
                         ),
-                        child: Text(
-                          _filters[i],
-                          style: TextStyle(
-                            color: sel ? Colors.white : context.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _filters[i],
+                              style: TextStyle(
+                                color: sel
+                                    ? Colors.white
+                                    : context.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (i == 3) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.calendar_month_rounded,
+                                size: 14,
+                                color: sel
+                                    ? Colors.white
+                                    : context.textSecondary,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     );
