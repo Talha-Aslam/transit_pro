@@ -9,7 +9,6 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
-import 'student_driver_chat.dart';
 import 'student_driver_details_screen.dart';
 
 class StudentProfile extends StatefulWidget {
@@ -146,15 +145,15 @@ class _StudentProfileState extends State<StudentProfile> {
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
-                  // ── Avatar & info header ───────────────────────────────
+                  // ── Header: profile avatar, guardian info and actions ──
                   Container(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.studentAmber.withValues(alpha: 0.18),
+                          AppTheme.studentAmber.withValues(alpha: 0.12),
                           Colors.transparent,
                         ],
                       ),
@@ -162,61 +161,64 @@ class _StudentProfileState extends State<StudentProfile> {
                     child: Column(
                       children: [
                         Stack(
-                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
                           children: [
                             Container(
-                              width: 90,
-                              height: 90,
+                              width: 110,
+                              height: 110,
                               decoration: BoxDecoration(
                                 gradient: AppTheme.studentGradient,
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(26),
                                 boxShadow: [
                                   BoxShadow(
                                     color: AppTheme.studentAmber.withValues(
-                                      alpha: 0.3,
+                                      alpha: 0.25,
                                     ),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 6),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
                                   ),
                                 ],
                               ),
                               child: ValueListenableBuilder<File?>(
                                 valueListenable:
                                     ProfileService.instance.studentImage,
-                                builder: (_, file, _) => file != null
+                                builder: (_, file, __) => file != null
                                     ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(28),
+                                        borderRadius: BorderRadius.circular(26),
                                         child: Image.file(
                                           file,
-                                          width: 90,
-                                          height: 90,
+                                          width: 110,
+                                          height: 110,
                                           fit: BoxFit.cover,
                                         ),
                                       )
                                     : const Center(
                                         child: Text(
-                                          '🎓',
-                                          style: TextStyle(fontSize: 42),
+                                          '👩',
+                                          style: TextStyle(fontSize: 40),
                                         ),
                                       ),
                               ),
                             ),
                             Positioned(
-                              bottom: -4,
-                              right: -4,
+                              right: 6,
+                              bottom: 6,
                               child: GestureDetector(
                                 onTap: _pickImage,
                                 child: Container(
-                                  width: 26,
-                                  height: 26,
+                                  width: 36,
+                                  height: 36,
                                   decoration: BoxDecoration(
-                                    gradient: AppTheme.studentGradient,
-                                    borderRadius: BorderRadius.circular(8),
+                                    gradient: AppTheme.parentGradient,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: context.surfaceBorder,
+                                    ),
                                   ),
                                   child: const Center(
                                     child: Icon(
                                       Icons.camera_alt_rounded,
-                                      size: 13,
+                                      size: 16,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -234,57 +236,32 @@ class _StudentProfileState extends State<StudentProfile> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
-                          '${student.studentId} · ${student.grade}',
+                          guardian.email,
                           style: TextStyle(
                             color: context.textSecondary,
                             fontSize: 13,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
+                        Text(
+                          guardian.phone,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppTheme.studentAmber.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                    AppTheme.studentOrange.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: AppTheme.studentAmber.withValues(
-                                    alpha: 0.3,
-                                  ),
-                                ),
-                              ),
-                              child: Text(
-                                '🎒 ${student.school}',
-                                style: const TextStyle(
-                                  color: AppTheme.studentAccent,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: _editStudentInfo,
+                              onTap: _editGuardianInfo,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
+                                  horizontal: 14,
+                                  vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
                                   color: context.cardBg,
@@ -294,19 +271,17 @@ class _StudentProfileState extends State<StudentProfile> {
                                   ),
                                 ),
                                 child: Row(
-                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
-                                      Icons.edit_outlined,
-                                      size: 12,
-                                      color: context.textSecondary,
+                                    const Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: Colors.black54,
                                     ),
-                                    const SizedBox(width: 5),
+                                    const SizedBox(width: 8),
                                     Text(
                                       AppStrings.t('edit_info'),
                                       style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 12,
+                                        color: context.textPrimary,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -365,39 +340,194 @@ class _StudentProfileState extends State<StudentProfile> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Transport details ──────────────────────────────────
-                  _SectionHeader(AppStrings.t('transport_details')),
+                  // ── Children list ─────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GlassCard(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(14),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _DetailRow(
-                            icon: '🚌',
-                            label: AppStrings.t('bus_lbl'),
-                            value: student.busNumber,
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'STUDENT',
+                              style: TextStyle(
+                                color: context.textTertiary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                          _DetailRow(
-                            icon: '📍',
-                            label: AppStrings.t('route_lbl'),
-                            value: student.route,
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: context.cardBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.studentGradient,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      '👧',
+                                      style: TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student.name,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${student.grade} · ${student.school}',
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    GestureDetector(
+                                      onTap: _editStudentInfo,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.edit, size: 18),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    GestureDetector(
+                                      onTap: () {},
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          size: 18,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.keyboard_arrow_down,
+                                      color: context.textTertiary,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                          _DetailRow(
-                            icon: '🚏',
-                            label: AppStrings.t('stop_lbl'),
-                            value: student.stop,
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Transport Support tile ────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.t('transport_support'),
+                            style: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          _DetailRow(
-                            icon: '👨‍✈️',
-                            label: AppStrings.t('driver_lbl'),
-                            value: student.driverName,
-                          ),
-                          _DetailRow(
-                            icon: '📞',
-                            label: AppStrings.t('driver_phone_lbl'),
-                            value: student.driverPhone,
-                            isLast: true,
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => StudentDriverDetailsScreen(
+                                  student: student,
+                                ),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.parentGradient,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      '🧑‍✈️',
+                                      style: TextStyle(fontSize: 22),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        AppStrings.t('my_driver'),
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        AppStrings.t('selected_driver'),
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: context.textTertiary,
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -405,218 +535,64 @@ class _StudentProfileState extends State<StudentProfile> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Driver details + chat ─────────────────────────────
-                  _SectionHeader(AppStrings.t('driver_lbl')),
+                  // ── Parent / Guardian (moved header + edit inside card) ──
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GlassCard(
                       padding: const EdgeInsets.all(16),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Container(
-                                width: 58,
-                                height: 58,
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.parentGradient,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    '🧑‍✈️',
-                                    style: TextStyle(fontSize: 26),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                StudentDriverDetailsScreen(
-                                                  student: student,
-                                                ),
-                                          ),
-                                        );
-                                      },
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            student.driverName,
-                                            style: TextStyle(
-                                              color: context.textPrimary,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Icon(
-                                            Icons.arrow_forward_ios_rounded,
-                                            size: 12,
-                                            color: context.textTertiary,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      student.driverPhone,
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  AppStrings.t('parent_guardian_lbl'),
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.success.withValues(
-                                    alpha: 0.12,
+                              GestureDetector(
+                                onTap: _editGuardianInfo,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: AppTheme.success.withValues(
-                                      alpha: 0.3,
+                                  decoration: BoxDecoration(
+                                    color: context.cardBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: context.surfaceBorder,
                                     ),
                                   ),
-                                ),
-                                child: const Text(
-                                  'Online',
-                                  style: TextStyle(
-                                    color: AppTheme.success,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 12,
+                                        color: context.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        AppStrings.t('edit_info'),
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _DriverMiniTile(
-                                  icon: '🚌',
-                                  label: AppStrings.t('selected_bus'),
-                                  value: student.busNumber,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _DriverMiniTile(
-                                  icon: '📍',
-                                  label: AppStrings.t('selected_stop'),
-                                  value: student.stop,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => StudentDriverChat(
-                                    driverName: student.driverName,
-                                    busNumber: student.busNumber,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(
-                                gradient: AppTheme.parentGradient,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  AppStrings.t('driver_chat'),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Parent / Guardian ──────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            AppStrings.t('parent_guardian_lbl'),
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _editGuardianInfo,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: context.cardBg,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: context.surfaceBorder),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.edit_outlined,
-                                  size: 12,
-                                  color: context.textSecondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  AppStrings.t('edit_info'),
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GlassCard(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
                           _DetailRow(
                             icon: '👤',
                             label: AppStrings.t('name_lbl'),
@@ -879,55 +855,7 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _DriverMiniTile extends StatelessWidget {
-  final String icon;
-  final String label;
-  final String value;
-
-  const _DriverMiniTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: context.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.surfaceBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: context.textTertiary,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: context.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// _DriverMiniTile removed — replaced by compact transport support tile above.
 
 class _SettingTile extends StatelessWidget {
   final String icon, label;
