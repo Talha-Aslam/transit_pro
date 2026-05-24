@@ -167,14 +167,15 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Rating card
+                // Rating card (centered)
                 GlassCard(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         'Weekly Driver Rating',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 16,
@@ -184,6 +185,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         'Rate your driver once per week based on punctuality, safety, and service.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 13,
@@ -192,6 +194,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         'Last rating: 1.0/5',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.textPrimary,
                           fontWeight: FontWeight.w700,
@@ -199,24 +202,20 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: List.generate(5, (i) {
-                              final filled = i < 1;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 12.0),
-                                child: Icon(
-                                  Icons.star,
-                                  color: filled
-                                      ? Colors.amber
-                                      : context.surfaceBorder,
-                                  size: 32,
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (i) {
+                          final filled = i < 1;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: Icon(
+                              Icons.star,
+                              color: filled
+                                  ? Colors.amber
+                                  : context.surfaceBorder,
+                              size: 32,
+                            ),
+                          );
+                        }),
                       ),
                       const SizedBox(height: 14),
                       // Submit weekly rating button inside card
@@ -249,6 +248,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+
                 GestureDetector(
                   onTap: () {
                     Navigator.of(context).push(
@@ -285,52 +285,6 @@ class StudentDriverDetailsScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Detail extends StatelessWidget {
-  final String icon;
-  final String label;
-  final String value;
-  final bool isLast;
-
-  const _Detail({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.isLast = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Text(icon, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(color: context.textSecondary, fontSize: 13),
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: context.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (!isLast) Container(height: 1, color: context.surfaceBorder),
-      ],
     );
   }
 }

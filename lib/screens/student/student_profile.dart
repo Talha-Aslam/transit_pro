@@ -454,6 +454,87 @@ class _StudentProfileState extends State<StudentProfile> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // ── Parent / Guardian (moved header + edit inside card) ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'PARENT/GUARDIAN',
+                                  style: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _editGuardianInfo,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.cardBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: context.surfaceBorder,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 12,
+                                        color: context.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        AppStrings.t('edit_info'),
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _DetailRow(
+                            icon: '👤',
+                            label: AppStrings.t('name_lbl'),
+                            value: guardian.name,
+                          ),
+                          _DetailRow(
+                            icon: '📞',
+                            label: AppStrings.t('phone'),
+                            value: guardian.phone,
+                          ),
+                          _DetailRow(
+                            icon: '✉️',
+                            label: AppStrings.t('email'),
+                            value: guardian.email,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // ── Transport Support tile ────────────────────────────
                   Padding(
@@ -464,7 +545,7 @@ class _StudentProfileState extends State<StudentProfile> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            AppStrings.t('transport_support'),
+                            'TRANSPORT SUPPORT',
                             style: TextStyle(
                               color: context.textTertiary,
                               fontSize: 12,
@@ -535,88 +616,7 @@ class _StudentProfileState extends State<StudentProfile> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Parent / Guardian (moved header + edit inside card) ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GlassCard(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  AppStrings.t('parent_guardian_lbl'),
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: _editGuardianInfo,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: context.cardBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: context.surfaceBorder,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 12,
-                                        color: context.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        AppStrings.t('edit_info'),
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _DetailRow(
-                            icon: '👤',
-                            label: AppStrings.t('name_lbl'),
-                            value: guardian.name,
-                          ),
-                          _DetailRow(
-                            icon: '📞',
-                            label: AppStrings.t('phone'),
-                            value: guardian.phone,
-                          ),
-                          _DetailRow(
-                            icon: '✉️',
-                            label: AppStrings.t('email'),
-                            value: guardian.email,
-                            isLast: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
                   // ── Settings ───────────────────────────────────────────
-                  _SectionHeader(AppStrings.t('settings_lbl')),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GlassCard(
