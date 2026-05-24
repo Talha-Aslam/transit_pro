@@ -9,6 +9,8 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
+import 'student_driver_chat.dart';
+import 'student_driver_details_screen.dart';
 
 class StudentProfile extends StatefulWidget {
   final VoidCallback onLogout;
@@ -403,6 +405,161 @@ class _StudentProfileState extends State<StudentProfile> {
                   ),
                   const SizedBox(height: 16),
 
+                  // ── Driver details + chat ─────────────────────────────
+                  _SectionHeader(AppStrings.t('driver_lbl')),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 58,
+                                height: 58,
+                                decoration: BoxDecoration(
+                                  gradient: AppTheme.parentGradient,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    '🧑‍✈️',
+                                    style: TextStyle(fontSize: 26),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                StudentDriverDetailsScreen(
+                                                  student: student,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            student.driverName,
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Icon(
+                                            Icons.arrow_forward_ios_rounded,
+                                            size: 12,
+                                            color: context.textTertiary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      student.driverPhone,
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.success.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppTheme.success.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    color: AppTheme.success,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DriverMiniTile(
+                                  icon: '🚌',
+                                  label: AppStrings.t('selected_bus'),
+                                  value: student.busNumber,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _DriverMiniTile(
+                                  icon: '📍',
+                                  label: AppStrings.t('selected_stop'),
+                                  value: student.stop,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => StudentDriverChat(
+                                    driverName: student.driverName,
+                                    busNumber: student.busNumber,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.parentGradient,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  AppStrings.t('driver_chat'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // ── Parent / Guardian ──────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -718,6 +875,56 @@ class _DetailRow extends StatelessWidget {
         ),
         if (!isLast) Container(height: 1, color: context.cardBgElevated),
       ],
+    );
+  }
+}
+
+class _DriverMiniTile extends StatelessWidget {
+  final String icon;
+  final String label;
+  final String value;
+
+  const _DriverMiniTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: context.textTertiary,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
