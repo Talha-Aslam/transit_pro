@@ -97,7 +97,7 @@ class _StudentFeesState extends State<StudentFees> {
     final pendingTotal = _sumByStatus(payments, 'Pending');
     final overdueTotal = _sumByStatus(payments, 'Overdue');
     final totalFee = paidTotal + pendingTotal + overdueTotal;
-    final outstandingFee = pendingTotal + overdueTotal;
+    final outstandingFee = pendingTotal;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
