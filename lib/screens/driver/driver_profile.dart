@@ -470,6 +470,13 @@ class _DriverProfileState extends State<DriverProfile> {
                       child: Column(
                         children: [
                           _MenuItem(
+                            icon: '💳',
+                            label: AppStrings.t('payment_history'),
+                            desc: 'Monthly payment records',
+                            onTap: () =>
+                                context.push('/driver/payment-history'),
+                          ),
+                          _MenuItem(
                             icon: '📋',
                             label: AppStrings.t('trip_history'),
                             desc:

@@ -19,9 +19,11 @@ import '../screens/driver/driver_layout.dart';
 import '../screens/driver/driver_trip_history_screen.dart';
 import '../screens/driver/driver_performance_screen.dart';
 import '../screens/driver/driver_documents_screen.dart';
+import '../screens/driver/driver_payment_history_screen.dart';
 import '../screens/student/student_layout.dart';
 import '../screens/student/missed_bus_screen.dart';
 import '../screens/student/student_trip_history_screen.dart';
+import '../screens/student/student_rate_app_screen.dart';
 import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
@@ -153,6 +155,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const DriverDocumentsScreen(),
     ),
     GoRoute(
+      path: '/driver/payment-history',
+      builder: (context, state) => const DriverPaymentHistoryScreen(),
+    ),
+    GoRoute(
       path: '/driver/language',
       builder: (context, state) =>
           const LanguageScreen(accentColor: AppTheme.driverCyan),
@@ -195,6 +201,10 @@ final appRouter = GoRouter(
       path: '/student/help-support',
       builder: (context, state) =>
           const HelpSupportScreen(accentColor: AppTheme.studentAmber),
+    ),
+    GoRoute(
+      path: '/student/rate-app',
+      builder: (context, state) => const StudentRateAppScreen(),
     ),
     GoRoute(
       path: '/student/missed-bus',

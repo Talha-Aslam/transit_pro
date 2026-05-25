@@ -825,6 +825,11 @@ class _StudentProfileState extends State<StudentProfile> {
                             onTap: () => context.push('/student/help-support'),
                           ),
                           _SettingTile(
+                            icon: '⭐',
+                            label: AppStrings.t('rate_app'),
+                            onTap: () => context.push('/student/rate-app'),
+                          ),
+                          _SettingTile(
                             icon: '📋',
                             label: AppStrings.t('terms_lbl'),
                             isLast: true,
