@@ -86,65 +86,68 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ],
                     ),
                   ),
-                    ValueListenableBuilder<List<AppNotification>>(
-                      valueListenable: NotificationService.instance.history,
-                      builder: (context, history, _) {
-                        final unread = history.where((n) => !n.read).length;
-                        return GestureDetector(
-                          onTap: () => widget.onNavigate(3),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: context.cardBgElevated,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: context.inputBorder),
-                                ),
-                                child: const Center(
-                                  child: Text('🔔', style: TextStyle(fontSize: 18)),
+                  ValueListenableBuilder<List<AppNotification>>(
+                    valueListenable: NotificationService.instance.history,
+                    builder: (context, history, _) {
+                      final unread = history.where((n) => !n.read).length;
+                      return GestureDetector(
+                        onTap: () => widget.onNavigate(3),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: context.cardBgElevated,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: context.inputBorder),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  '🔔',
+                                  style: TextStyle(fontSize: 18),
                                 ),
                               ),
-                              if (unread > 0)
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: Container(
-                                    constraints: const BoxConstraints(
-                                      minWidth: 16,
-                                      minHeight: 16,
+                            ),
+                            if (unread > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minWidth: 16,
+                                    minHeight: 16,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.error,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: context.cardBgElevated,
+                                      width: 1.4,
                                     ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.error,
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: context.cardBgElevated,
-                                        width: 1.4,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      unread > 9 ? '9+' : '$unread',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1.0,
-                                      ),
+                                  ),
+                                  child: Text(
+                                    unread > 9 ? '9+' : '$unread',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.0,
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -549,7 +552,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _StatCard(
                         icon: '💰',
                         label: 'Fees Paid',
-                        value: '₹3.5K',
+                        value: 'Rs.2,500',
                         color: AppTheme.purple,
                       ),
                     ],
