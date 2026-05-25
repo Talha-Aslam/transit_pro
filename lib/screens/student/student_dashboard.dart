@@ -356,7 +356,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Missed Your Bus?',
+                                  AppStrings.t('missed_quick_title'),
                                   style: TextStyle(
                                     color: context.textPrimary,
                                     fontSize: 15,
@@ -365,7 +365,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  'Request a pickup from a nearby bus',
+                                  AppStrings.t('missed_quick_subtitle'),
                                   style: TextStyle(
                                     color: context.textSecondary,
                                     fontSize: 12,

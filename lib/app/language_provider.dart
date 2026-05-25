@@ -60,6 +60,15 @@ class AppStrings {
     'min': 'min',
     'currently_at': 'Currently at',
     'bus_approaching': 'Bus approaching your stop in 8 min',
+    // Missed bus / pickup quick actions
+    'missed_quick_title': 'Missed Your Bus?',
+    'missed_quick_subtitle': 'Request a pickup from a nearby bus',
+    'missed_bus_title': 'Missed Bus',
+    'missed_alert_title': 'Missed your bus?',
+    'missed_alert_subtitle':
+        'Send a request to nearby buses on the same route.',
+    'your_current_stop': 'Your Current Stop',
+    'send_pickup_request': 'Send Pickup Request',
 
     // Profile
     'edit_info': 'Edit Info',
@@ -753,6 +762,15 @@ class AppStrings {
     'min': 'منٹ',
     'currently_at': 'اس وقت یہاں ہے',
     'bus_approaching': 'بس 8 منٹ میں آپ کے اسٹاپ پر پہنچ رہی ہے',
+
+    // Missed bus / pickup quick actions - Urdu
+    'missed_quick_title': 'کیا آپ اپنی بس کھو بیٹھے؟',
+    'missed_quick_subtitle': 'قریب کی بس سے پک اپ کی درخواست بھیجیں',
+    'missed_bus_title': 'مسٹ بس',
+    'missed_alert_title': 'کیا آپ نے بس مس کر دی؟',
+    'missed_alert_subtitle': 'اسی روٹ پر قریب کی بسوں کو درخواست بھیجیں۔',
+    'your_current_stop': 'آپ کا موجودہ اسٹاپ',
+    'send_pickup_request': 'پک اپ کی درخواست بھیجیں',
 
     // Profile
     'edit_info': 'معلومات تبدیل کریں',

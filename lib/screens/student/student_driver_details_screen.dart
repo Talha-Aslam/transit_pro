@@ -1,14 +1,40 @@
 import 'package:flutter/material.dart';
 import '../../app/language_provider.dart';
 import '../../app/student_data_service.dart';
+import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import 'student_driver_chat.dart';
 
-class StudentDriverDetailsScreen extends StatelessWidget {
+class StudentDriverDetailsScreen extends StatefulWidget {
   final StudentInfo student;
 
   const StudentDriverDetailsScreen({super.key, required this.student});
+
+  @override
+  State<StudentDriverDetailsScreen> createState() =>
+      _StudentDriverDetailsScreenState();
+}
+
+class _StudentDriverDetailsScreenState
+    extends State<StudentDriverDetailsScreen> {
+  double _selectedRating = 5.0;
+
+  @override
+  void initState() {
+    super.initState();
+    final child = ChildInfo(
+      name: widget.student.name,
+      grade: widget.student.grade,
+      school: widget.student.school,
+      busNumber: widget.student.busNumber,
+      route: widget.student.route,
+      stop: widget.student.stop,
+      driver: widget.student.driverName,
+    );
+    final existing = ParentDataService.instance.driverRatingFor(child);
+    if (existing != null) _selectedRating = existing.rating;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +127,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          student.driverName,
+                          widget.student.driverName,
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 20,
@@ -110,7 +136,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          student.school,
+                          widget.student.school,
                           style: TextStyle(
                             color: context.textSecondary,
                             fontSize: 13,
@@ -131,19 +157,19 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       width: (MediaQuery.of(context).size.width - 56) / 2,
                       icon: '🚌',
                       label: AppStrings.t('selected_bus'),
-                      value: student.busNumber,
+                      value: widget.student.busNumber,
                     ),
                     _InfoTile(
                       width: (MediaQuery.of(context).size.width - 56) / 2,
                       icon: '📍',
                       label: AppStrings.t('selected_stop'),
-                      value: student.stop,
+                      value: widget.student.stop,
                     ),
                     _InfoTile(
                       width: (MediaQuery.of(context).size.width - 56) / 2,
                       icon: '📞',
                       label: AppStrings.t('driver_phone_lbl'),
-                      value: student.driverPhone,
+                      value: widget.student.driverPhone,
                     ),
                     _InfoTile(
                       width: (MediaQuery.of(context).size.width - 56) / 2,
@@ -155,7 +181,7 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       width: (MediaQuery.of(context).size.width - 56) / 2,
                       icon: '🚌',
                       label: 'Transport Number',
-                      value: student.busNumber,
+                      value: widget.student.busNumber,
                     ),
                     _InfoTile(
                       width: (MediaQuery.of(context).size.width - 56) / 2,
@@ -204,15 +230,20 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(5, (i) {
-                          final filled = i < 1;
+                          final idx = i + 1;
                           return Padding(
                             padding: const EdgeInsets.only(right: 12.0),
-                            child: Icon(
-                              Icons.star,
-                              color: filled
-                                  ? Colors.amber
-                                  : context.surfaceBorder,
-                              size: 32,
+                            child: IconButton(
+                              onPressed: () => setState(() {
+                                _selectedRating = idx.toDouble();
+                              }),
+                              icon: Icon(
+                                Icons.star,
+                                color: idx <= _selectedRating
+                                    ? Colors.amber
+                                    : context.surfaceBorder,
+                                size: 32,
+                              ),
                             ),
                           );
                         }),
@@ -222,8 +253,41 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: GestureDetector(
-                          onTap: () {
-                            // TODO: implement rating submission
+                          onTap: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final child = ChildInfo(
+                              name: widget.student.name,
+                              grade: widget.student.grade,
+                              school: widget.student.school,
+                              busNumber: widget.student.busNumber,
+                              route: widget.student.route,
+                              stop: widget.student.stop,
+                              driver: widget.student.driverName,
+                            );
+
+                            if (!ParentDataService.instance.canRateDriver(
+                              child,
+                            )) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(AppStrings.t('already_rated')),
+                                ),
+                              );
+                              return;
+                            }
+
+                            await ParentDataService.instance.rateDriverForChild(
+                              child,
+                              _selectedRating,
+                            );
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Rating submitted: ${_selectedRating.toStringAsFixed(1)}/5',
+                                ),
+                              ),
+                            );
+                            setState(() {});
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -254,8 +318,8 @@ class StudentDriverDetailsScreen extends StatelessWidget {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => StudentDriverChat(
-                          driverName: student.driverName,
-                          busNumber: student.busNumber,
+                          driverName: widget.student.driverName,
+                          busNumber: widget.student.busNumber,
                         ),
                       ),
                     );

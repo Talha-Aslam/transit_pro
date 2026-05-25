@@ -107,7 +107,7 @@ class _MissedBusScreenState extends State<MissedBusScreen>
                     ),
                     const SizedBox(width: 14),
                     Text(
-                      'Missed Bus',
+                      AppStrings.t('missed_bus_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 18,
@@ -193,7 +193,7 @@ class _RequestForm extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Missed your bus?',
+                      AppStrings.t('missed_alert_title'),
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 14,
@@ -202,7 +202,7 @@ class _RequestForm extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Send a request to nearby buses on the same route.',
+                      AppStrings.t('missed_alert_subtitle'),
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 12,
@@ -218,7 +218,7 @@ class _RequestForm extends StatelessWidget {
 
         // Current stop (read-only)
         Text(
-          'Your Current Stop',
+          AppStrings.t('your_current_stop'),
           style: TextStyle(
             color: context.textSecondary,
             fontSize: 11,
@@ -253,12 +253,11 @@ class _RequestForm extends StatelessWidget {
 
         // Missed bus (read-only)
         Text(
-          'Missed Bus',
+          AppStrings.t('missed_bus_title'),
           style: TextStyle(
             color: context.textSecondary,
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
           ),
         ),
         const SizedBox(height: 8),
@@ -375,7 +374,7 @@ class _RequestForm extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Send Pickup Request',
+                    AppStrings.t('send_pickup_request'),
                     style: TextStyle(
                       color: selectedDestination != null
                           ? Colors.white
