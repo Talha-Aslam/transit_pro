@@ -805,17 +805,7 @@ class _StudentProfileState extends State<StudentProfile> {
                             icon: '📋',
                             label: AppStrings.t('terms_lbl'),
                             isLast: true,
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text(
-                                    'Terms & Conditions · TransportKid v2.4.1',
-                                  ),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: AppTheme.studentAmber,
-                                ),
-                              );
-                            },
+                            onTap: () => context.push('/student/terms'),
                           ),
                         ],
                       ),

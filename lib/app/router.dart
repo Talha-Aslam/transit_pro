@@ -21,6 +21,7 @@ import '../screens/driver/driver_performance_screen.dart';
 import '../screens/driver/driver_documents_screen.dart';
 import '../screens/student/student_layout.dart';
 import '../screens/student/missed_bus_screen.dart';
+import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
 import '../screens/parent/parent_missed_bus_screen.dart';
@@ -197,6 +198,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/student/missed-bus',
       builder: (context, state) => const MissedBusScreen(),
+    ),
+    GoRoute(
+      path: '/student/terms',
+      builder: (context, state) => const TermsScreen(),
     ),
     GoRoute(
       path: '/student/notifications',
