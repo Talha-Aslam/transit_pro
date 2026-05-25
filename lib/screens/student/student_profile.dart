@@ -779,9 +779,14 @@ class _StudentProfileState extends State<StudentProfile> {
                         children: [
                           // Notifications handled inline above — removed tile
                           _SettingTile(
-                            icon: '🌐',
+                            icon: '📋',
                             label: AppStrings.t('trip_history'),
                             onTap: () => context.push('/student/trips'),
+                          ),
+                          _SettingTile(
+                            icon: '💳',
+                            label: AppStrings.t('subscription'),
+                            onTap: () => context.push('/student/subscription'),
                           ),
                           _SettingTile(
                             icon: '🌐',

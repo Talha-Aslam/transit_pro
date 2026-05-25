@@ -21,6 +21,7 @@ import '../screens/driver/driver_performance_screen.dart';
 import '../screens/driver/driver_documents_screen.dart';
 import '../screens/student/student_layout.dart';
 import '../screens/student/missed_bus_screen.dart';
+import '../screens/student/student_trip_history_screen.dart';
 import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
@@ -201,7 +202,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/student/trips',
-      builder: (context, state) => const TripHistoryScreen(),
+      builder: (context, state) => const StudentTripHistoryScreen(),
+    ),
+    GoRoute(
+      path: '/student/subscription',
+      builder: (context, state) => const SubscriptionScreen(),
     ),
     GoRoute(
       path: '/student/terms',
