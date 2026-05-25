@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../app/language_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class StudentFees extends StatefulWidget {
   const StudentFees({super.key});
@@ -11,6 +12,69 @@ class StudentFees extends StatefulWidget {
 
 class _StudentFeesState extends State<StudentFees> {
   String _filter = 'All';
+
+  List<_PaymentData> get _payments => [
+    _PaymentData(
+      'November 2024',
+      'Rs.2,500',
+      'Paid',
+      '15 Nov',
+      AppTheme.success,
+    ),
+    _PaymentData(
+      'October 2024',
+      'Rs.2,500',
+      'Paid',
+      '14 Oct',
+      AppTheme.success,
+    ),
+    _PaymentData(
+      'September 2024',
+      'Rs.2,500',
+      'Paid',
+      '12 Sep',
+      AppTheme.success,
+    ),
+    _PaymentData('August 2024', 'Rs.2,500', 'Paid', '10 Aug', AppTheme.success),
+    _PaymentData(
+      'December 2024',
+      'Rs.2,500',
+      'Pending',
+      'Due: 15 Dec',
+      AppTheme.warning,
+    ),
+    _PaymentData(
+      'July 2024',
+      'Rs.2,500',
+      'Overdue',
+      'Due: 28 Jul',
+      AppTheme.error,
+    ),
+  ];
+
+  int _amountToInt(String amount) {
+    final digits = amount.replaceAll(RegExp(r'[^0-9]'), '');
+    return int.tryParse(digits) ?? 0;
+  }
+
+  int _sumByStatus(List<_PaymentData> items, String status) {
+    return items
+        .where((p) => p.status == status)
+        .fold(0, (sum, p) => sum + _amountToInt(p.amount));
+  }
+
+  String _formatRs(int amount) {
+    final s = amount.toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      buf.write(s[i]);
+      final remaining = s.length - i - 1;
+      if (remaining > 0 && remaining % 3 == 0) {
+        buf.write(',');
+      }
+    }
+    return 'Rs.${buf.toString()}';
+  }
 
   @override
   void initState() {
@@ -28,6 +92,13 @@ class _StudentFeesState extends State<StudentFees> {
 
   @override
   Widget build(BuildContext context) {
+    final payments = _payments;
+    final paidTotal = _sumByStatus(payments, 'Paid');
+    final pendingTotal = _sumByStatus(payments, 'Pending');
+    final overdueTotal = _sumByStatus(payments, 'Overdue');
+    final totalFee = paidTotal + pendingTotal + overdueTotal;
+    final outstandingFee = pendingTotal + overdueTotal;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -104,7 +175,7 @@ class _StudentFeesState extends State<StudentFees> {
                               shaderCallback: (b) =>
                                   AppTheme.studentGradient.createShader(b),
                               child: Text(
-                                'Rs.2,500',
+                                _formatRs(outstandingFee),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 28,
@@ -123,27 +194,38 @@ class _StudentFeesState extends State<StudentFees> {
                   ),
                   const SizedBox(height: 18),
                   // Pay now button
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.studentGradient,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.studentAmber.withValues(alpha: 0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                  GestureDetector(
+                    onTap: () => context.push(
+                      '/parent/payment',
+                      extra: {
+                        'amount': _formatRs(outstandingFee),
+                        'month': 'December 2024',
+                      },
                     ),
-                    child: Center(
-                      child: Text(
-                        AppStrings.t('pay_now'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.studentGradient,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.studentAmber.withValues(
+                              alpha: 0.25,
+                            ),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          AppStrings.t('pay_now'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -162,21 +244,21 @@ class _StudentFeesState extends State<StudentFees> {
                 _StatPill(
                   icon: '✅',
                   label: AppStrings.t('paid'),
-                  value: 'Rs.22,500',
+                  value: _formatRs(paidTotal),
                   color: AppTheme.success,
                 ),
                 const SizedBox(width: 10),
                 _StatPill(
                   icon: '⏳',
                   label: AppStrings.t('pending'),
-                  value: 'Rs.2,500',
+                  value: _formatRs(pendingTotal),
                   color: AppTheme.warning,
                 ),
                 const SizedBox(width: 10),
                 _StatPill(
                   icon: '📅',
                   label: AppStrings.t('total'),
-                  value: 'Rs.25,000',
+                  value: _formatRs(totalFee),
                   color: AppTheme.info,
                 ),
               ],
@@ -254,36 +336,6 @@ class _StudentFeesState extends State<StudentFees> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    AppStrings.t('fee_breakdown'),
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _BreakdownRow(
-                    label: AppStrings.t('transport_fee'),
-                    amount: 'Rs.18,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('maintenance_levy'),
-                    amount: 'Rs.3,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('insurance'),
-                    amount: 'Rs.2,000',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('id_card_fee'),
-                    amount: 'Rs.500',
-                  ),
-                  _BreakdownRow(
-                    label: AppStrings.t('gps_tracking'),
-                    amount: 'Rs.1,500',
-                  ),
-                  const Divider(color: Colors.white12, height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -299,7 +351,7 @@ class _StudentFeesState extends State<StudentFees> {
                         shaderCallback: (b) =>
                             AppTheme.studentGradient.createShader(b),
                         child: Text(
-                          'Rs.25,000',
+                          _formatRs(totalFee),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 16,
@@ -319,43 +371,7 @@ class _StudentFeesState extends State<StudentFees> {
   }
 
   List<Widget> _buildPayments() {
-    final payments = [
-      _PaymentData(
-        'November 2024',
-        'Rs.2,500',
-        'Paid',
-        '15 Nov',
-        AppTheme.success,
-      ),
-      _PaymentData(
-        'October 2024',
-        'Rs.2,500',
-        'Paid',
-        '14 Oct',
-        AppTheme.success,
-      ),
-      _PaymentData(
-        'September 2024',
-        'Rs.2,500',
-        'Paid',
-        '12 Sep',
-        AppTheme.success,
-      ),
-      _PaymentData(
-        'August 2024',
-        'Rs.2,500',
-        'Paid',
-        '10 Aug',
-        AppTheme.success,
-      ),
-      _PaymentData(
-        'December 2024',
-        'Rs.2,500',
-        'Pending',
-        'Due: 15 Dec',
-        AppTheme.warning,
-      ),
-    ];
+    final payments = _payments;
 
     final filtered = _filter == 'All'
         ? payments
@@ -367,7 +383,10 @@ class _StudentFeesState extends State<StudentFees> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: GlassCard(
               gradient: LinearGradient(
-                colors: [p.color.withValues(alpha: 0.06), p.color.withValues(alpha: 0.02)],
+                colors: [
+                  p.color.withValues(alpha: 0.06),
+                  p.color.withValues(alpha: 0.02),
+                ],
               ),
               borderColor: p.color.withValues(alpha: 0.12),
               padding: const EdgeInsets.all(14),
@@ -474,34 +493,6 @@ class _StatPill extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BreakdownRow extends StatelessWidget {
-  final String label, amount;
-  const _BreakdownRow({required this.label, required this.amount});
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: context.textSecondary, fontSize: 13),
-          ),
-          Text(
-            amount,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
