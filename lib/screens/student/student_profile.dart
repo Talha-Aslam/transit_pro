@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../app/student_data_service.dart';
+import '../../app/subscription_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
@@ -31,15 +32,18 @@ class _StudentProfileState extends State<StudentProfile> {
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+  void _onSubscriptionChanged() => setState(() {});
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -254,8 +258,11 @@ class _StudentProfileState extends State<StudentProfile> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             GestureDetector(
                               onTap: _editGuardianInfo,
@@ -272,6 +279,7 @@ class _StudentProfileState extends State<StudentProfile> {
                                   ),
                                 ),
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(
                                       Icons.edit,
@@ -289,6 +297,11 @@ class _StudentProfileState extends State<StudentProfile> {
                                   ],
                                 ),
                               ),
+                            ),
+                            _SubscriptionChip(
+                              label:
+                                  '${SubscriptionProvider.instance.planDisplayName} Plan · ${AppStrings.t('active')}',
+                              color: AppTheme.studentAmber,
                             ),
                           ],
                         ),
@@ -959,6 +972,33 @@ class _QuickStat extends StatelessWidget {
           style: TextStyle(color: context.textTertiary, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+class _SubscriptionChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SubscriptionChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
