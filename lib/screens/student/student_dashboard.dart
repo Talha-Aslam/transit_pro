@@ -323,68 +323,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   ),
                   const SizedBox(height: 12),
 
-                  // ── QR Pass quick action ──────────────────────
-                  GestureDetector(
-                    onTap: () => widget.onNavigate(3),
-                    child: GlassCard(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.purple.withValues(alpha: 0.15),
-                          AppTheme.info.withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderColor: AppTheme.purple.withValues(alpha: 0.25),
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.mainGradient,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Center(
-                              child: Text('📱', style: TextStyle(fontSize: 24)),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  AppStrings.t('my_qr_pass'),
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Show QR for check-in/check-out',
-                                  style: TextStyle(
-                                    color: context.textSecondary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '→',
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
                   // ── Missed Bus quick action ────────────────────
                   GestureDetector(
                     onTap: () => context.push('/student/missed-bus'),
@@ -544,8 +482,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         color: AppTheme.success,
                       ),
                       _StatCard(
-                        icon: '📱',
-                        label: 'Check-ins',
+                        icon: '🛡️',
+                        label: AppStrings.t('safe_rides'),
                         value: '140',
                         color: AppTheme.info,
                       ),
@@ -565,13 +503,46 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Recent Activity',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Recent Activity',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => widget.onNavigate(3),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.studentAccent.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppTheme.studentAccent.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  AppStrings.t('view_all'),
+                                  style: TextStyle(
+                                    color: AppTheme.studentAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         _ActivityRow(

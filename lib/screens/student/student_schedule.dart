@@ -197,13 +197,6 @@ class _StudentScheduleState extends State<StudentSchedule> {
                         color: AppTheme.info,
                       ),
                       _TimelineItem(
-                        icon: '✅',
-                        title: AppStrings.t('qr_checkin'),
-                        subtitle: 'Scan your QR pass',
-                        time: formatTimeOfDay(slots.morningPickupFromHome),
-                        color: AppTheme.success,
-                      ),
-                      _TimelineItem(
                         icon: '🏫',
                         title: AppStrings.t('reach_school'),
                         subtitle: 'School / college / university drop-off',
