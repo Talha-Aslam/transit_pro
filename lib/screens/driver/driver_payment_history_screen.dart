@@ -19,34 +19,46 @@ class _DriverPaymentHistoryScreenState
 
   static final List<_PaymentRecord> _records = [
     _PaymentRecord(
-      'November 2024',
-      'Rs.2,500',
-      'Paid',
-      '15 Nov',
-      'Monthly fee',
-    ),
-    _PaymentRecord('October 2024', 'Rs.2,500', 'Paid', '14 Oct', 'Monthly fee'),
-    _PaymentRecord(
-      'September 2024',
-      'Rs.2,500',
-      'Paid',
-      '12 Sep',
-      'Monthly fee',
-    ),
-    _PaymentRecord('August 2024', 'Rs.2,500', 'Paid', '10 Aug', 'Monthly fee'),
-    _PaymentRecord(
-      'December 2024',
-      'Rs.2,500',
-      'Pending',
-      'Due: 15 Dec',
-      'Awaiting confirmation',
+      payerName: 'Ayesha Khan',
+      amount: 'Rs.2,500',
+      status: 'Paid',
+      date: '15 Nov',
+      details: 'Ali Raza · Bus #42',
     ),
     _PaymentRecord(
-      'July 2024',
-      'Rs.2,500',
-      'Overdue',
-      'Due: 28 Jul',
-      'Needs follow-up',
+      payerName: 'Muhammad Usman',
+      amount: 'Rs.2,500',
+      status: 'Paid',
+      date: '14 Oct',
+      details: 'Hassan Ali · Bus #15',
+    ),
+    _PaymentRecord(
+      payerName: 'Fatima Noor',
+      amount: 'Rs.2,500',
+      status: 'Paid',
+      date: '12 Sep',
+      details: 'Maryam Noor · Bus #42',
+    ),
+    _PaymentRecord(
+      payerName: 'Imran Malik',
+      amount: 'Rs.2,500',
+      status: 'Paid',
+      date: '10 Aug',
+      details: 'Zain Malik · Bus #15',
+    ),
+    _PaymentRecord(
+      payerName: 'Sana Raza',
+      amount: 'Rs.2,500',
+      status: 'Pending',
+      date: 'Due: 15 Dec',
+      details: 'Areeba Raza · Bus #42',
+    ),
+    _PaymentRecord(
+      payerName: 'Bilal Ahmed',
+      amount: 'Rs.2,500',
+      status: 'Overdue',
+      date: 'Due: 28 Jul',
+      details: 'Hamza Ahmed · Bus #15',
     ),
   ];
 
@@ -72,9 +84,24 @@ class _DriverPaymentHistoryScreenState
     for (var i = 0; i < s.length; i++) {
       buffer.write(s[i]);
       final remaining = s.length - i - 1;
-      if (remaining > 0 && remaining % 3 == 0) buffer.write(',');
+      if (remaining > 0 && remaining % 3 == 0) {
+        buffer.write(',');
+      }
     }
     return 'Rs.${buffer.toString()}';
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Paid':
+        return AppTheme.success;
+      case 'Pending':
+        return AppTheme.warning;
+      case 'Overdue':
+        return AppTheme.error;
+      default:
+        return AppTheme.driverCyan;
+    }
   }
 
   @override
@@ -207,7 +234,7 @@ class _DriverPaymentHistoryScreenState
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Monthly fee collection status',
+                                          'Who paid how much and when',
                                           style: TextStyle(
                                             color: context.textSecondary,
                                             fontSize: 12,
@@ -261,18 +288,19 @@ class _DriverPaymentHistoryScreenState
                             separatorBuilder: (_, index) =>
                                 const SizedBox(width: 8),
                             itemBuilder: (context, index) {
-                              final items = [
+                              final filters = [
+                                'All',
+                                'Paid',
+                                'Pending',
+                                'Overdue',
+                              ];
+                              final labels = [
                                 AppStrings.t('all'),
                                 AppStrings.t('paid'),
                                 AppStrings.t('pending'),
                                 AppStrings.t('overdue'),
                               ];
-                              final filter = [
-                                'All',
-                                'Paid',
-                                'Pending',
-                                'Overdue',
-                              ][index];
+                              final filter = filters[index];
                               final selected = _filter == filter;
                               return GestureDetector(
                                 onTap: () => setState(() => _filter = filter),
@@ -294,7 +322,7 @@ class _DriverPaymentHistoryScreenState
                                           ),
                                   ),
                                   child: Text(
-                                    items[index],
+                                    labels[index],
                                     style: TextStyle(
                                       color: selected
                                           ? Colors.white
@@ -378,7 +406,7 @@ class _DriverPaymentHistoryScreenState
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                record.title,
+                                                record.payerName,
                                                 style: TextStyle(
                                                   color: context.textPrimary,
                                                   fontSize: 15,
@@ -386,6 +414,35 @@ class _DriverPaymentHistoryScreenState
                                                 ),
                                               ),
                                             ),
+                                            Text(
+                                              record.amount,
+                                              style: TextStyle(
+                                                color: context.textPrimary,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          record.details,
+                                          style: TextStyle(
+                                            color: context.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              record.date,
+                                              style: TextStyle(
+                                                color: context.textTertiary,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                            const Spacer(),
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
@@ -410,35 +467,6 @@ class _DriverPaymentHistoryScreenState
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
                                                 ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          record.note,
-                                          style: TextStyle(
-                                            color: context.textSecondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              record.date,
-                                              style: TextStyle(
-                                                color: context.textTertiary,
-                                                fontSize: 11,
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                            Text(
-                                              record.amount,
-                                              style: TextStyle(
-                                                color: context.textPrimary,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w800,
                                               ),
                                             ),
                                           ],
@@ -472,7 +500,7 @@ class _DriverPaymentHistoryScreenState
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    AppStrings.t('payment_history'),
+                                    'All payment history',
                                     style: TextStyle(
                                       color: context.textTertiary,
                                       fontSize: 12,
@@ -507,19 +535,6 @@ class _DriverPaymentHistoryScreenState
         ),
       ),
     );
-  }
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Paid':
-        return AppTheme.success;
-      case 'Pending':
-        return AppTheme.warning;
-      case 'Overdue':
-        return AppTheme.error;
-      default:
-        return AppTheme.driverCyan;
-    }
   }
 }
 
@@ -570,17 +585,17 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _PaymentRecord {
-  final String title;
+  final String payerName;
   final String amount;
   final String status;
   final String date;
-  final String note;
+  final String details;
 
-  const _PaymentRecord(
-    this.title,
-    this.amount,
-    this.status,
-    this.date,
-    this.note,
-  );
+  const _PaymentRecord({
+    required this.payerName,
+    required this.amount,
+    required this.status,
+    required this.date,
+    required this.details,
+  });
 }
