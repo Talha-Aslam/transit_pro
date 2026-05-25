@@ -200,6 +200,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const MissedBusScreen(),
     ),
     GoRoute(
+      path: '/student/trips',
+      builder: (context, state) => const TripHistoryScreen(),
+    ),
+    GoRoute(
       path: '/student/terms',
       builder: (context, state) => const TermsScreen(),
     ),

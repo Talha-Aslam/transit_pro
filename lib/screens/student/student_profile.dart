@@ -780,6 +780,11 @@ class _StudentProfileState extends State<StudentProfile> {
                           // Notifications handled inline above — removed tile
                           _SettingTile(
                             icon: '🌐',
+                            label: AppStrings.t('trip_history'),
+                            onTap: () => context.push('/student/trips'),
+                          ),
+                          _SettingTile(
+                            icon: '🌐',
                             label: AppStrings.t('language'),
                             desc: LanguageProvider.instance.lang,
                             onTap: () => context.push('/student/language'),
