@@ -21,6 +21,7 @@ class StudentProfile extends StatefulWidget {
 
 class _StudentProfileState extends State<StudentProfile> {
   final _svc = StudentDataService.instance;
+  bool _studentCardExpanded = false;
 
   bool _busAlerts = true;
   bool _arrivalAlerts = true;
@@ -366,86 +367,146 @@ class _StudentProfileState extends State<StudentProfile> {
                               color: context.cardBg,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Row(
+                            child: Column(
                               children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    gradient: AppTheme.studentGradient,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      '👧',
-                                      style: TextStyle(fontSize: 22),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        student.name,
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${student.grade} · ${student.school}',
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                                 Row(
                                   children: [
-                                    GestureDetector(
-                                      onTap: _editStudentInfo,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.edit, size: 18),
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.studentGradient,
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: () {},
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.08),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.close,
-                                          size: 18,
-                                          color: Colors.red,
+                                      child: const Center(
+                                        child: Text(
+                                          '👧',
+                                          style: TextStyle(fontSize: 22),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: context.textTertiary,
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            student.name,
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${student.grade} · ${student.school}',
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _editStudentInfo,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(
+                                              Icons.edit,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        GestureDetector(
+                                          onTap: () {},
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(
+                                                alpha: 0.08,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 18,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        GestureDetector(
+                                          onTap: () => setState(() {
+                                            _studentCardExpanded =
+                                                !_studentCardExpanded;
+                                          }),
+                                          child: AnimatedRotation(
+                                            turns: _studentCardExpanded
+                                                ? 0.5
+                                                : 0,
+                                            duration: const Duration(
+                                              milliseconds: 180,
+                                            ),
+                                            child: Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: context.textTertiary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
+                                ),
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: _studentCardExpanded
+                                      ? Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 12,
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              _DetailRow(
+                                                icon: '🆔',
+                                                label: 'Student ID',
+                                                value: student.studentId,
+                                              ),
+                                              _DetailRow(
+                                                icon: '🚌',
+                                                label: AppStrings.t(
+                                                  'bus_number_lbl',
+                                                ),
+                                                value: student.busNumber,
+                                              ),
+                                              _DetailRow(
+                                                icon: '🛣️',
+                                                label: AppStrings.t(
+                                                  'route_lbl',
+                                                ),
+                                                value: student.route,
+                                              ),
+                                              _DetailRow(
+                                                icon: '📍',
+                                                label: AppStrings.t('bus_stop'),
+                                                value: student.stop,
+                                                isLast: true,
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
                                 ),
                               ],
                             ),
@@ -464,54 +525,13 @@ class _StudentProfileState extends State<StudentProfile> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'PARENT/GUARDIAN',
-                                  style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: _editGuardianInfo,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: context.cardBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: context.surfaceBorder,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 12,
-                                        color: context.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        AppStrings.t('edit_info'),
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'PARENT/GUARDIAN',
+                            style: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           _DetailRow(
