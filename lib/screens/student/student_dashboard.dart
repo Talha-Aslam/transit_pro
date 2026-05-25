@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
+import '../../app/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -85,18 +86,65 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ],
                     ),
                   ),
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: context.cardBgElevated,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: context.inputBorder),
+                    ValueListenableBuilder<List<AppNotification>>(
+                      valueListenable: NotificationService.instance.history,
+                      builder: (context, history, _) {
+                        final unread = history.where((n) => !n.read).length;
+                        return GestureDetector(
+                          onTap: () => widget.onNavigate(3),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: context.cardBgElevated,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: context.inputBorder),
+                                ),
+                                child: const Center(
+                                  child: Text('🔔', style: TextStyle(fontSize: 18)),
+                                ),
+                              ),
+                              if (unread > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 16,
+                                      minHeight: 16,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.error,
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: context.cardBgElevated,
+                                        width: 1.4,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      unread > 9 ? '9+' : '$unread',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                    child: const Center(
-                      child: Text('🔔', style: TextStyle(fontSize: 18)),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -125,7 +173,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.studentAmber.withValues(alpha: 0.3),
+                                color: AppTheme.studentAmber.withValues(
+                                  alpha: 0.3,
+                                ),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -183,7 +233,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           AppTheme.studentOrange.withValues(alpha: 0.08),
                         ],
                       ),
-                      borderColor: AppTheme.studentAmber.withValues(alpha: 0.25),
+                      borderColor: AppTheme.studentAmber.withValues(
+                        alpha: 0.25,
+                      ),
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -247,7 +299,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: AppTheme.studentAccent.withValues(alpha: 0.2),
+                              color: AppTheme.studentAccent.withValues(
+                                alpha: 0.2,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -416,13 +470,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.studentAccent.withValues(alpha: 
-                                    0.15,
+                                  color: AppTheme.studentAccent.withValues(
+                                    alpha: 0.15,
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: AppTheme.studentAccent.withValues(alpha: 
-                                      0.3,
+                                    color: AppTheme.studentAccent.withValues(
+                                      alpha: 0.3,
                                     ),
                                   ),
                                 ),
