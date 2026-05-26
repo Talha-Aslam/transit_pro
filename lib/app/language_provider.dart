@@ -560,9 +560,7 @@ class AppStrings {
     'documents_license': 'Documents & License',
     'documents_license_desc': 'All verified \u2713',
     // Student dashboard
-    'my_qr_pass': 'My QR Pass',
-    'show_qr': 'Show QR for check-in/check-out',
-    'total_rides': 'Total Rides',
+    'total_rides': 'Total Trips',
 
     // Student tracking
     'track_my_bus': 'Track My Bus',
@@ -578,14 +576,11 @@ class AppStrings {
     'afternoon_dropoff_s': 'Afternoon Drop-off',
     'be_at_stop': 'Be at Stop',
     'bus_arrives': 'Bus Arrives',
-    'qr_checkin': 'QR Check-in',
     'reach_school': 'Reach School',
     'school_dismissal': 'School Dismissal',
-    'qr_checkout': 'QR Check-out',
     'bus_departs': 'Bus Departs',
     'reach_stop': 'Reach Stop',
     'this_week_summary': 'This Week Summary',
-    'checkins_lbl': 'Check-ins',
     'active_status': 'Active',
     'your_stop': 'Your Stop',
     'day_mon': 'Mon',
@@ -596,7 +591,6 @@ class AppStrings {
     'day_sat': 'Sat',
 
     // Student attendance (QR)
-    'qr_pass': 'QR Pass',
     'show_pass_checkin': 'Show your pass for check-in & check-out',
     'monthly_report': 'Monthly Report',
     'total_checkins': 'Total\nCheck-ins',
@@ -1277,8 +1271,6 @@ class AppStrings {
     'documents_license_desc': 'تمام تصدیق شدہ',
 
     // Student dashboard
-    'my_qr_pass': 'میرا کیو آر پاس',
-    'show_qr': 'چیک ان/آؤٹ کے لیے کیو آر دکھائیں',
     'total_rides': 'کل سفر',
 
     // Student tracking
@@ -1294,12 +1286,9 @@ class AppStrings {
     'morning_pickup_s': 'صبح کا پک اپ',
     'be_at_stop': 'اسٹاپ پر پہنچیں',
     'bus_arrives': 'بس پہنچتی ہے',
-    'qr_checkin': 'کیو آر چیک ان',
     'reach_school': 'اسکول پہنچیں',
 
     // Student attendance (QR)
-    'qr_pass': 'کیو آر پاس',
-    'show_pass_checkin': 'چیک ان اور چیک آؤٹ کے لیے دکھائیں',
     'monthly_report': 'ماہانہ رپورٹ',
     'total_checkins': 'کل\nچیک ان',
 

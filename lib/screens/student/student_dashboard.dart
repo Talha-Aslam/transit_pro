@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
+import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -472,7 +473,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _StatCard(
                         icon: '🚌',
                         label: AppStrings.t('total_rides'),
-                        value: '142',
+                        value: buildParentTripHistoryEntries(DateTime.now())
+                            .where((e) => e.completed)
+                            .length
+                            .toString(),
                         color: AppTheme.studentAmber,
                       ),
                       _StatCard(
@@ -484,7 +488,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _StatCard(
                         icon: '🛡️',
                         label: AppStrings.t('safe_rides'),
-                        value: '140',
+                        value: buildParentTripHistoryEntries(DateTime.now())
+                            .where((e) => e.completed && e.statusOk)
+                            .length
+                            .toString(),
                         color: AppTheme.info,
                       ),
                       _StatCard(

@@ -6,6 +6,7 @@ import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../app/student_data_service.dart';
 import '../../app/subscription_provider.dart';
+import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
@@ -315,7 +316,10 @@ class _StudentProfileState extends State<StudentProfile> {
                           ),
                           _QuickStat(
                             icon: '📅',
-                            value: '180',
+                            value: buildParentTripHistoryEntries(DateTime.now())
+                                .where((e) => e.completed)
+                                .length
+                                .toString(),
                             label: AppStrings.t('rides_lbl'),
                             color: AppTheme.info,
                           ),
