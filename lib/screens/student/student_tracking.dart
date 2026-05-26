@@ -32,8 +32,11 @@ class _StudentTrackingState extends State<StudentTracking> {
       if (mounted) setState(() {});
     });
 
-    final route = MockRouteBuilder.buildMorningRoute();
-    _tracking.start(route);
+    if (!_tracking.isMoving.value) {
+      final route = MockRouteBuilder.buildMorningRoute();
+      _tracking.start(route);
+    }
+
     _tracking.busPosition.addListener(_onBusPositionChanged);
     _buildMapOverlays();
   }

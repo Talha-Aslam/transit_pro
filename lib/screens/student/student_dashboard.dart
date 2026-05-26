@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
-import '../../models/parent_trip_history_data.dart';
+import '../../app/student_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -76,12 +76,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Noorulain',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
+                        ValueListenableBuilder<StudentInfo>(
+                          valueListenable:
+                              StudentDataService.instance.studentInfo,
+                          builder: (_, info, __) => Text(
+                            info.name,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
@@ -470,34 +474,41 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     crossAxisSpacing: 10,
                     childAspectRatio: 2.2,
                     children: [
-                      _StatCard(
-                        icon: '🚌',
-                        label: AppStrings.t('total_rides'),
-                        value: buildParentTripHistoryEntries(
-                          DateTime.now(),
-                        ).where((e) => e.completed).length.toString(),
-                        color: AppTheme.studentAmber,
+                      ValueListenableBuilder<int>(
+                        valueListenable: StudentDataService.instance.totalRides,
+                        builder: (_, rides, __) => _StatCard(
+                          icon: '🚌',
+                          label: AppStrings.t('total_rides'),
+                          value: '$rides',
+                          color: AppTheme.studentAmber,
+                        ),
                       ),
-                      _StatCard(
-                        icon: '⏱️',
-                        label: 'On-Time',
-                        value: '96%',
-                        color: AppTheme.success,
+                      ValueListenableBuilder<int>(
+                        valueListenable: StudentDataService.instance.onTimeRate,
+                        builder: (_, rate, __) => _StatCard(
+                          icon: '⏱️',
+                          label: 'On-Time',
+                          value: '$rate%',
+                          color: AppTheme.success,
+                        ),
                       ),
-                      _StatCard(
-                        icon: '🛡️',
-                        label: AppStrings.t('safe_rides'),
-                        value: buildParentTripHistoryEntries(DateTime.now())
-                            .where((e) => e.completed && e.statusOk)
-                            .length
-                            .toString(),
-                        color: AppTheme.info,
+                      ValueListenableBuilder<int>(
+                        valueListenable: StudentDataService.instance.safeRides,
+                        builder: (_, safe, __) => _StatCard(
+                          icon: '🛡️',
+                          label: AppStrings.t('safe_rides'),
+                          value: '$safe',
+                          color: AppTheme.info,
+                        ),
                       ),
-                      _StatCard(
-                        icon: '💰',
-                        label: 'Fees Paid',
-                        value: 'Rs.2,500',
-                        color: AppTheme.purple,
+                      ValueListenableBuilder<String>(
+                        valueListenable: StudentDataService.instance.feesPaid,
+                        builder: (_, fees, __) => _StatCard(
+                          icon: '💰',
+                          label: 'Fees Paid',
+                          value: fees,
+                          color: AppTheme.purple,
+                        ),
                       ),
                     ],
                   ),

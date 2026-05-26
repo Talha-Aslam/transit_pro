@@ -1,5 +1,5 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
@@ -24,41 +24,40 @@ class _ParentTrackingState extends State<ParentTracking> {
   final _notifSvc = NotificationService.instance;
 
   GoogleMapController? _mapController;
-  String? _mapStyle;
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
+  String? _mapStyle;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-
-    _notifSvc.init();
-
-    // Load dark map style
-    rootBundle.loadString('assets/map_style.json').then((style) {
-      _mapStyle = style;
-      if (mounted) setState(() {});
-    });
-
-    // Initialise route & tracking
-    final route = MockRouteBuilder.buildMorningRoute();
-    _tracking.start(route);
-
-    // Listen to bus position updates
     _tracking.busPosition.addListener(_onBusPositionChanged);
     _geofence.alerts.addListener(_onGeofenceAlert);
 
-    // Build initial markers & polylines
-    _buildMapOverlays();
+    // Start simulation if not running (Ensures _tracking.route is initialized)
+    if (!_tracking.isMoving.value) {
+      final route = MockRouteBuilder.buildMorningRoute();
+      _tracking.start(route);
+    }
+
+    // Initial overlays (Needs _tracking.route)
+    _buildMapOverlays(ParentDataService.instance.currentChild);
+
+    // Load map style
+    DefaultAssetBundle.of(context).loadString('assets/map_style.json').then((
+      s,
+    ) {
+      if (mounted) setState(() => _mapStyle = s);
+    });
   }
 
   void _onLangChanged() => setState(() {});
 
   void _onBusPositionChanged() {
-    _buildMapOverlays();
+    _buildMapOverlays(ParentDataService.instance.currentChild);
     _geofence.evaluate(_tracking.busPosition.value, _tracking.route.stops);
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _onGeofenceAlert() {
@@ -68,53 +67,61 @@ class _ParentTrackingState extends State<ParentTracking> {
     }
   }
 
-  void _buildMapOverlays() {
+  void _buildMapOverlays(ChildInfo? child) {
     final route = _tracking.route;
     final busPos = _tracking.busPosition.value;
+    final studentStopName = child?.stop ?? '';
 
-    // Markers for stops
+    // Markers
     final markers = <Marker>{};
     for (final stop in route.stops) {
+      final isStudentStop = stop.name == studentStopName;
       markers.add(
         Marker(
           markerId: MarkerId(stop.name),
           position: stop.location,
-          icon: BitmapDescriptor.defaultMarkerWithHue(switch (stop.status) {
-            StopStatus.completed => BitmapDescriptor.hueGreen,
-            StopStatus.current => BitmapDescriptor.hueViolet,
-            StopStatus.upcoming => BitmapDescriptor.hueAzure,
-            StopStatus.destination => BitmapDescriptor.hueOrange,
-          }),
-          infoWindow: InfoWindow(title: stop.name, snippet: stop.scheduledTime),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            isStudentStop
+                ? BitmapDescriptor.hueYellow
+                : switch (stop.status) {
+                    StopStatus.completed => BitmapDescriptor.hueGreen,
+                    StopStatus.current => BitmapDescriptor.hueViolet,
+                    StopStatus.upcoming => BitmapDescriptor.hueAzure,
+                    StopStatus.destination => BitmapDescriptor.hueOrange,
+                  },
+          ),
+          infoWindow: InfoWindow(
+            title: isStudentStop ? '📍 ${stop.name} (Stop)' : stop.name,
+            snippet: stop.scheduledTime,
+          ),
         ),
       );
     }
 
-    // Bus marker
+    // Bus marker (Yellow/Amber per student system)
     markers.add(
       Marker(
         markerId: const MarkerId('bus'),
         position: busPos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
         rotation: _tracking.busHeading.value,
         anchor: const Offset(0.5, 0.5),
-        infoWindow: const InfoWindow(title: '­ƒÜî Bus #42'),
+        infoWindow: InfoWindow(title: '🚌 ${route.busNumber}'),
         zIndexInt: 10,
       ),
     );
 
-    // Route polyline
+    // Polylines
     final polylines = <Polyline>{
       Polyline(
         polylineId: const PolylineId('route'),
         points: route.polylinePoints,
-        color: const Color(0xFF7C3AED),
+        color: AppTheme.studentAmber.withValues(alpha: 0.3),
         width: 4,
         patterns: [PatternItem.dash(20), PatternItem.gap(10)],
       ),
     };
 
-    // Completed portion (solid green)
     final completedIdx = route.polylinePoints.indexWhere(
       (p) => p.latitude == busPos.latitude && p.longitude == busPos.longitude,
     );
@@ -123,7 +130,7 @@ class _ParentTrackingState extends State<ParentTracking> {
         Polyline(
           polylineId: const PolylineId('completed'),
           points: route.polylinePoints.sublist(0, completedIdx + 1),
-          color: const Color(0xFF10B981),
+          color: AppTheme.success,
           width: 5,
         ),
       );
@@ -154,232 +161,37 @@ class _ParentTrackingState extends State<ParentTracking> {
         return ValueListenableBuilder<int>(
           valueListenable: svc.selectedChildIndex,
           builder: (context, selIdx, _) {
-            final safeIdx = children.isEmpty
-                ? 0
-                : selIdx.clamp(0, children.length - 1);
-            final child = children.isEmpty ? null : children[safeIdx];
+            final child = svc.currentChild;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
-                  // ÔöÇÔöÇ Header ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppTheme.parentPurple.withValues(alpha: 0.2),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.t('live_tracking'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Text(
-                                child == null
-                                    ? ''
-                                    : '${child.busNumber} ┬À ${child.route}',
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _LiveBadge(tracking: _tracking),
-                      ],
-                    ),
+                  _Header(
+                    title: AppStrings.t('live_tracking'),
+                    onBack: widget.onBack,
+                    child: child,
+                    children: children,
+                    onChildSelected: (idx) {
+                      svc.selectedChildIndex.value = idx;
+                      _buildMapOverlays(svc.currentChild);
+                    },
                   ),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
-                        // ÔöÇÔöÇ ETA Banner ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-                        ValueListenableBuilder<int>(
-                          valueListenable: _tracking.etaMinutes,
-                          builder: (_, eta, _) => GlassCard(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.parentPurple.withValues(alpha: 0.2),
-                                AppTheme.info.withValues(alpha: 0.1),
-                              ],
-                            ),
-                            borderColor: AppTheme.parentPurple.withValues(
-                              alpha: 0.3,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'ESTIMATED ARRIVAL',
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.baseline,
-                                      textBaseline: TextBaseline.alphabetic,
-                                      children: [
-                                        Text(
-                                          '$eta',
-                                          style: TextStyle(
-                                            color: context.textPrimary,
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'min',
-                                          style: TextStyle(
-                                            color: context.textSecondary,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'ARRIVAL TIME',
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      '07:45 AM',
-                                      style: TextStyle(
-                                        color: AppTheme.parentAccent,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ÔöÇÔöÇ Google Map ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+                        // ── Google Map ─────────────────────────────────
                         GlassCard(
-                          backgroundColor: const Color(0xCC0A0F28),
-                          borderRadius: 20,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  14,
-                                  16,
-                                  10,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      AppStrings.t('route_map'),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: _tracking.toggleLive,
-                                      child: ValueListenableBuilder<bool>(
-                                        valueListenable: _tracking.isLive,
-                                        builder: (_, live, _) => Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: live
-                                                ? AppTheme.success.withValues(
-                                                    alpha: 0.2,
-                                                  )
-                                                : AppTheme.info.withValues(
-                                                    alpha: 0.15,
-                                                  ),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: live
-                                                  ? AppTheme.success.withValues(
-                                                      alpha: 0.4,
-                                                    )
-                                                  : AppTheme.info.withValues(
-                                                      alpha: 0.3,
-                                                    ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            live
-                                                ? '­ƒôí Live GPS'
-                                                : '­ƒöä Simulated',
-                                            style: TextStyle(
-                                              color: live
-                                                  ? AppTheme.successLight
-                                                  : AppTheme.info,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Divider(
-                                color: Color(0x10FFFFFF),
-                                height: 1,
-                              ),
-                              ClipRRect(
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(20),
-                                  bottomRight: Radius.circular(20),
-                                ),
-                                child: SizedBox(
-                                  height: 240,
-                                  child: GoogleMap(
+                          padding: EdgeInsets.zero,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: SizedBox(
+                              height: 220,
+                              child: Stack(
+                                children: [
+                                  GoogleMap(
                                     initialCameraPosition: CameraPosition(
                                       target: _tracking.busPosition.value,
                                       zoom: 13.5,
@@ -396,126 +208,211 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       _mapController = controller;
                                     },
                                   ),
+                                  Positioned(
+                                    top: 12,
+                                    right: 12,
+                                    child: _LiveBadge(tracking: _tracking),
+                                  ),
+                                  Positioned(
+                                    bottom: 12,
+                                    left: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '📍 ${child?.route ?? "Route A"}',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.9,
+                                          ),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 12,
+                                    right: 12,
+                                    child: GestureDetector(
+                                      onTap: _tracking.toggleLive,
+                                      child: ValueListenableBuilder<bool>(
+                                        valueListenable: _tracking.isLive,
+                                        builder: (_, live, _) => Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            live
+                                                ? Icons.gps_fixed
+                                                : Icons.gps_off,
+                                            color: live
+                                                ? AppTheme.success
+                                                : Colors.white70,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Bus status ──────────────────────────────────
+                        GlassCard(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.success.withValues(alpha: 0.12),
+                              AppTheme.success.withValues(alpha: 0.04),
+                            ],
+                          ),
+                          borderColor: AppTheme.success.withValues(alpha: 0.2),
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  gradient: AppTheme.studentGradient,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    '🚌',
+                                    style: TextStyle(fontSize: 26),
+                                  ),
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                child: Row(
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _LegendDot(
-                                      color: AppTheme.success,
-                                      label: AppStrings.t('completed'),
+                                    Text(
+                                      '${child?.busNumber ?? "Bus #42"} · ${child?.route ?? "Route"}',
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                    const SizedBox(width: 16),
-                                    _LegendDot(
-                                      color: AppTheme.purple,
-                                      label: AppStrings.t('current'),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    _LegendDot(
-                                      color: AppTheme.info,
-                                      label: AppStrings.t('upcoming'),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${AppStrings.t('driver')}: ${child?.driver ?? "N/A"}',
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ÔöÇÔöÇ Route Stops ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-                        GlassCard(
-                          padding: const EdgeInsets.all(18),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.t('route_stops'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              ..._tracking.route.stops.asMap().entries.map(
-                                (e) => _StopRow(
-                                  stop: e.value,
-                                  isLast:
-                                      e.key == _tracking.route.stops.length - 1,
-                                ),
+                              StatusBadge(
+                                label: AppStrings.t('on_time'),
+                                color: AppTheme.success,
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 12),
 
-                        // ÔöÇÔöÇ Bus Info ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+                        // ── Stat Row ────────────────────────────────────
                         GlassCard(
                           padding: const EdgeInsets.all(18),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              ValueListenableBuilder<int>(
+                                valueListenable: _tracking.speed,
+                                builder: (_, spd, _) => _StatChip(
+                                  icon: '⚡',
+                                  label: AppStrings.t('speed'),
+                                  value: '$spd km/h',
+                                  color: AppTheme.info,
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 40,
+                                color: context.surfaceBorder,
+                              ),
+                              ValueListenableBuilder<int>(
+                                valueListenable: _tracking.etaMinutes,
+                                builder: (_, eta, _) => _StatChip(
+                                  icon: '⏱️',
+                                  label: 'ETA',
+                                  value: '$eta min',
+                                  color: AppTheme.studentAmber,
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 40,
+                                color: context.surfaceBorder,
+                              ),
+                              _StatChip(
+                                icon: '🚏',
+                                label: AppStrings.t('stops_left'),
+                                value:
+                                    '${_tracking.route.stops.where((s) => s.status == StopStatus.upcoming || s.status == StopStatus.destination).length}',
+                                color: AppTheme.purple,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── Route progress ──────────────────────────────
+                        GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 18,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                AppStrings.t('bus_information'),
+                                AppStrings.t('route_progress'),
                                 style: TextStyle(
                                   color: context.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 14),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _InfoCard(
-                                          icon: '­ƒæ¿ÔÇìÔ£ê´©Å',
-                                          label: AppStrings.t('driver'),
-                                          value: child?.driver ?? 'N/A',
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _InfoCard(
-                                          icon: '­ƒÜî',
-                                          label: AppStrings.t('bus_number'),
-                                          value: child?.busNumber ?? 'N/A',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ValueListenableBuilder<int>(
-                                          valueListenable: _tracking.speed,
-                                          builder: (_, spd, _) => _InfoCard(
-                                            icon: 'ÔÜí',
-                                            label: AppStrings.t('speed'),
-                                            value: '$spd km/h',
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: _InfoCard(
-                                          icon: '­ƒæª',
-                                          label: AppStrings.t('students'),
-                                          value: '22 onboard',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                              const SizedBox(height: 20),
+                              ..._tracking.route.stops.asMap().entries.map((
+                                entry,
+                              ) {
+                                final idx = entry.key;
+                                final stop = entry.value;
+                                final isLast =
+                                    idx == _tracking.route.stops.length - 1;
+                                final isYourStop = stop.name == child?.stop;
+
+                                return _StopTimelineItem(
+                                  name: stop.name,
+                                  time: stop.scheduledTime,
+                                  status: stop.status,
+                                  isLast: isLast,
+                                  isYourStop: isYourStop,
+                                );
+                              }),
                             ],
                           ),
                         ),
@@ -532,7 +429,255 @@ class _ParentTrackingState extends State<ParentTracking> {
   }
 }
 
-// ÔöÇÔöÇ Live Badge ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+class _Header extends StatelessWidget {
+  final String title;
+  final VoidCallback onBack;
+  final ChildInfo? child;
+  final List<ChildInfo> children;
+  final Function(int) onChildSelected;
+
+  const _Header({
+    required this.title,
+    required this.onBack,
+    required this.child,
+    required this.children,
+    required this.onChildSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onBack,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: context.cardBgElevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: context.inputBorder),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '←',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                title,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (children.length > 1) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: children.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final isSelected = children[idx].name == child?.name;
+                  return GestureDetector(
+                    onTap: () => onChildSelected(idx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.parentPurple.withValues(alpha: 0.2)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppTheme.parentPurple
+                              : context.surfaceBorder,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          children[idx].name,
+                          style: TextStyle(
+                            color: isSelected
+                                ? context.textPrimary
+                                : context.textSecondary,
+                            fontSize: 13,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String icon, label, value;
+  final Color color;
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(icon, style: const TextStyle(fontSize: 22)),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(color: context.textTertiary, fontSize: 10),
+        ),
+      ],
+    );
+  }
+}
+
+class _StopTimelineItem extends StatelessWidget {
+  final String name, time;
+  final StopStatus status;
+  final bool isLast;
+  final bool isYourStop;
+
+  const _StopTimelineItem({
+    required this.name,
+    required this.time,
+    required this.status,
+    required this.isLast,
+    required this.isYourStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isCompleted = status == StopStatus.completed;
+    final bool isCurrent = status == StopStatus.current;
+    final bool isPastOrCurrent = isCompleted || isCurrent;
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Timeline line and dot ──────────────────────────────────────────
+          SizedBox(
+            width: 24,
+            child: Column(
+              children: [
+                // Top line (connector)
+                // Container(width: 2, height: 4, color: isPastOrCurrent ? AppTheme.success : context.surfaceBorder),
+                const SizedBox(height: 6),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: isPastOrCurrent
+                        ? AppTheme.success
+                        : context.surfaceBorder,
+                    shape: BoxShape.circle,
+                    boxShadow: isCurrent
+                        ? [
+                            BoxShadow(
+                              color: AppTheme.success.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : null,
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      // The line below should only be green if NEXT is completed/current.
+                      // But for simplicity in a stateless widget without next-stop context,
+                      // we use isCompleted as a proxy.
+                      color: isCompleted
+                          ? AppTheme.success
+                          : context.surfaceBorder.withValues(alpha: 0.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // ── Name and Time ──────────────────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      isYourStop
+                          ? "$name (${AppStrings.t('your_stop')})"
+                          : name,
+                      style: TextStyle(
+                        color: (isYourStop || isCurrent)
+                            ? context.textPrimary
+                            : context.textSecondary,
+                        fontSize: 15,
+                        fontWeight: (isYourStop || isCurrent)
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      color: context.textTertiary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LiveBadge extends StatelessWidget {
   final TrackingService tracking;
   const _LiveBadge({required this.tracking});
@@ -544,6 +689,7 @@ class _LiveBadge extends StatelessWidget {
       builder: (_, sim, _) => ValueListenableBuilder<bool>(
         valueListenable: tracking.isLive,
         builder: (_, live, _) => Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 8,
@@ -570,216 +716,6 @@ class _LiveBadge extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ÔöÇÔöÇ Stop Row ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-class _StopRow extends StatelessWidget {
-  final StopData stop;
-  final bool isLast;
-  const _StopRow({required this.stop, required this.isLast});
-
-  Color get _color => switch (stop.status) {
-    StopStatus.completed => AppTheme.success,
-    StopStatus.current => AppTheme.purple,
-    StopStatus.upcoming => AppTheme.info,
-    StopStatus.destination => AppTheme.warning,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 30,
-          child: Column(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _color, width: 2),
-                  boxShadow: stop.status == StopStatus.current
-                      ? [
-                          BoxShadow(
-                            color: _color.withValues(alpha: 0.4),
-                            blurRadius: 10,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: stop.status == StopStatus.completed
-                      ? Text(
-                          'Ô£ô',
-                          style: TextStyle(
-                            color: _color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      : stop.status == StopStatus.destination
-                      ? const Text('­ƒÅ½', style: TextStyle(fontSize: 12))
-                      : Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                ),
-              ),
-              if (!isLast)
-                Container(
-                  width: 2,
-                  height: 28,
-                  margin: const EdgeInsets.symmetric(vertical: 2),
-                  color: stop.status == StopStatus.completed
-                      ? AppTheme.success.withValues(alpha: 0.4)
-                      : context.cardBgElevated,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      stop.name,
-                      style: TextStyle(
-                        color: stop.status == StopStatus.current
-                            ? context.textPrimary
-                            : context.textSecondary,
-                        fontSize: 14,
-                        fontWeight: stop.status == StopStatus.current
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    if (stop.status == StopStatus.current) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.purple.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: AppTheme.purple.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: const Text(
-                          'NOW',
-                          style: TextStyle(
-                            color: AppTheme.parentAccent,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                Text(
-                  stop.scheduledTime,
-                  style: TextStyle(
-                    color: stop.status == StopStatus.completed
-                        ? AppTheme.successLight
-                        : stop.status == StopStatus.current
-                        ? AppTheme.parentAccent
-                        : context.textTertiary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ÔöÇÔöÇ Legend Dot ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendDot({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(color: context.textSecondary, fontSize: 11),
-        ),
-      ],
-    );
-  }
-}
-
-// ÔöÇÔöÇ Info Card ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-class _InfoCard extends StatelessWidget {
-  final String icon, label, value;
-  const _InfoCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.cardBgElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.cardBg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(icon, style: const TextStyle(fontSize: 18)),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(color: context.textSecondary, fontSize: 10),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: context.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

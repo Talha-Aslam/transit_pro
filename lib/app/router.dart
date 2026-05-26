@@ -27,6 +27,7 @@ import '../screens/student/student_rate_app_screen.dart';
 import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
+import '../screens/driver/subscription.dart';
 import '../screens/parent/parent_missed_bus_screen.dart';
 import '../screens/parent/payment_screens.dart';
 import '../theme/app_theme.dart';
@@ -157,7 +158,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/driver/subscription',
-      builder: (context, state) => const SubscriptionScreen(),
+      builder: (context, state) => const DriverSubscriptionScreen(),
     ),
     GoRoute(
       path: '/driver/payment-history',

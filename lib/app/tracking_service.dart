@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'student_data_service.dart';
+import 'geofence_service.dart';
 import '../models/route_data.dart';
 
 /// Singleton service that drives bus position along a route.
@@ -21,8 +23,14 @@ class TrackingService {
   final isLive = ValueNotifier<bool>(false);
   final isSimulating = ValueNotifier<bool>(false);
 
-  late RouteData _route;
-  RouteData get route => _route;
+  /// Helper to check if any form of tracking is active.
+  ValueNotifier<bool> get isMoving => isSimulating;
+
+  RouteData? _route;
+  RouteData get route {
+    _route ??= MockRouteBuilder.buildMorningRoute();
+    return _route!;
+  }
 
   /// Expose the current waypoint index so the route screen can build
   /// the "completed" polyline segment accurately.
@@ -122,7 +130,7 @@ class TrackingService {
 
   void _startSimulation() {
     isSimulating.value = true;
-    final pts = _route.polylinePoints;
+    final pts = route.polylinePoints;
     if (pts.isEmpty) return;
 
     _simTimer?.cancel();
@@ -131,6 +139,8 @@ class TrackingService {
       if (_waypointIndex >= pts.length - 1) {
         _waypointIndex = 0; // loop
         _resetStopStatuses();
+        GeofenceService.instance.reset();
+        StudentDataService.instance.completeRide();
       }
 
       _waypointIndex++;
@@ -147,7 +157,7 @@ class TrackingService {
   }
 
   void _updateStopStatuses(LatLng busPos) {
-    for (final stop in _route.stops) {
+    for (final stop in route.stops) {
       final dist = _distanceBetween(busPos, stop.location);
       if (dist < 150 && stop.status == StopStatus.upcoming) {
         stop.status = StopStatus.current;
@@ -160,13 +170,13 @@ class TrackingService {
   }
 
   void _resetStopStatuses() {
-    for (int i = 0; i < _route.stops.length; i++) {
-      final s = _route.stops[i];
+    for (int i = 0; i < route.stops.length; i++) {
+      final s = route.stops[i];
       if (i < 3) {
         s.status = StopStatus.completed;
       } else if (i == 3) {
         s.status = StopStatus.current;
-      } else if (i == _route.stops.length - 1) {
+      } else if (i == route.stops.length - 1) {
         s.status = StopStatus.destination;
       } else {
         s.status = StopStatus.upcoming;
@@ -175,7 +185,7 @@ class TrackingService {
   }
 
   void _updateEta() {
-    final pts = _route.polylinePoints;
+    final pts = route.polylinePoints;
     final remaining = pts.length - _waypointIndex;
     final totalEta = (remaining / pts.length * 15).round().clamp(1, 15);
     etaMinutes.value = totalEta;
@@ -218,10 +228,10 @@ class TrackingService {
 
   /// Advance to the next stop manually (for driver "Mark Stop Done").
   void markCurrentStopDone() {
-    final current = _route.currentStop;
+    final current = route.currentStop;
     if (current != null) {
       current.status = StopStatus.completed;
-      final next = _route.nextStop;
+      final next = route.nextStop;
       if (next != null) {
         next.status = StopStatus.current;
       }

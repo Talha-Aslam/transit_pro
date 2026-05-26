@@ -72,15 +72,32 @@ class ParentDataService {
   /// Notifier for the list of children.
   final children = ValueNotifier<List<ChildInfo>>([
     ChildInfo(
-      name: 'Emma Johnson',
+      name: 'Noorulain',
       grade: 'Grade 5',
       school: 'Lincoln Elementary School',
       busNumber: 'Bus #42',
       route: 'Route A',
-      stop: 'Oak Street',
+      stop: 'Pine Road',
+      driver: 'Ahmed Raza',
+    ),
+    ChildInfo(
+      name: 'Hassan',
+      grade: 'Grade 2',
+      school: 'Lincoln Elementary School',
+      busNumber: 'Bus #14',
+      route: 'Route B',
+      stop: 'Maple Avenue',
       driver: 'Mike T.',
     ),
   ]);
+
+  /// Helper to get the currently selected child.
+  ChildInfo? get currentChild {
+    if (children.value.isEmpty) return null;
+    final idx = selectedChildIndex.value;
+    if (idx < 0 || idx >= children.value.length) return children.value[0];
+    return children.value[idx];
+  }
 
   /// Per-child photo files (same length as [children]).
   final childImages = ValueNotifier<List<File?>>([null]);

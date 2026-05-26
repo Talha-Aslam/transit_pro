@@ -13,13 +13,13 @@ class StudentInfo {
   String driverPhone;
 
   StudentInfo({
-    this.name = 'Emma Johnson',
+    this.name = 'Noorulain',
     this.studentId = 'STU-2042',
     this.grade = 'Grade 5',
     this.school = 'Lincoln Elementary School',
     this.busNumber = 'Bus #42',
     this.route = 'Route A',
-    this.stop = 'Oak Street',
+    this.stop = 'Pine Road',
     this.driverName = 'Ahmed Raza',
     this.driverPhone = '+92 300 5554321',
   });
@@ -79,11 +79,23 @@ class StudentDataService {
   /// Notifier for the guardian's info.
   final guardianInfo = ValueNotifier<GuardianInfo>(GuardianInfo());
 
+  /// Tracking statistics
+  final totalRides = ValueNotifier<int>(42);
+  final onTimeRate = ValueNotifier<int>(96);
+  final safeRides = ValueNotifier<int>(38);
+  final feesPaid = ValueNotifier<String>('Rs.2,500');
+
   void updateStudentInfo(StudentInfo info) {
     studentInfo.value = info;
   }
 
   void updateGuardianInfo(GuardianInfo info) {
     guardianInfo.value = info;
+  }
+
+  void completeRide() {
+    totalRides.value++;
+    safeRides.value++;
+    // Potentially update onTimeRate or trigger a notification
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/student_data_service.dart';
+import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -472,7 +473,9 @@ class _StudentScheduleState extends State<StudentSchedule> {
                         children: [
                           _WeekStat(
                             icon: '🚌',
-                            value: '8',
+                            value: buildParentTripHistoryEntries(
+                              DateTime.now(),
+                            ).where((e) => e.completed).length.toString(),
                             label: AppStrings.t('rides_lbl'),
                             color: AppTheme.studentAmber,
                           ),
@@ -484,7 +487,9 @@ class _StudentScheduleState extends State<StudentSchedule> {
                           ),
                           _WeekStat(
                             icon: '🛡️',
-                            value: '8',
+                            value: buildParentTripHistoryEntries(
+                              DateTime.now(),
+                            ).where((e) => e.completed).length.toString(),
                             label: AppStrings.t('safe_rides'),
                             color: AppTheme.info,
                           ),
