@@ -16,7 +16,7 @@ class DriverDashboard extends StatefulWidget {
 }
 
 class _DriverDashboardState extends State<DriverDashboard> {
-  bool _routeStarted = true;
+  final bool _routeStarted = true;
 
   // ── Quick action handlers ──────────────────────────────────────────────
 

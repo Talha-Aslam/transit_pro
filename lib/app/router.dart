@@ -23,7 +23,6 @@ import '../screens/driver/driver_payment_history_screen.dart';
 import '../screens/student/student_layout.dart';
 import '../screens/student/missed_bus_screen.dart';
 import '../screens/student/student_trip_history_screen.dart';
-import '../screens/student/student_rate_app_screen.dart';
 import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
@@ -96,7 +95,8 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/parent/rate-app',
-      builder: (context, state) => const RateAppScreen(),
+      builder: (context, state) =>
+          const RateAppScreen(accentColor: AppTheme.parentPurple),
     ),
     GoRoute(
       path: '/parent/terms',
@@ -195,6 +195,11 @@ final appRouter = GoRouter(
           const TermsScreen(accentColor: AppTheme.driverCyan),
     ),
     GoRoute(
+      path: '/driver/rate-app',
+      builder: (context, state) =>
+          const RateAppScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
       path: '/student',
       builder: (context, state) => const StudentLayout(),
     ),
@@ -220,7 +225,8 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/student/rate-app',
-      builder: (context, state) => const StudentRateAppScreen(),
+      builder: (context, state) =>
+          const RateAppScreen(accentColor: AppTheme.studentAmber),
     ),
     GoRoute(
       path: '/student/missed-bus',

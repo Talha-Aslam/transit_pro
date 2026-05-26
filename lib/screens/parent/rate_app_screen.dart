@@ -5,7 +5,8 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class RateAppScreen extends StatefulWidget {
-  const RateAppScreen({super.key});
+  final Color accentColor;
+  const RateAppScreen({super.key, this.accentColor = AppTheme.parentPurple});
 
   @override
   State<RateAppScreen> createState() => _RateAppScreenState();
@@ -55,7 +56,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      AppTheme.parentPurple.withValues(alpha: 0.2),
+                      widget.accentColor.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -98,7 +99,10 @@ class _RateAppScreenState extends State<RateAppScreen> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _submitted
-                      ? _ThankYouView(stars: _stars)
+                      ? _ThankYouView(
+                          stars: _stars,
+                          accentColor: widget.accentColor,
+                        )
                       : Column(
                           children: [
                             const SizedBox(height: 10),
@@ -236,7 +240,14 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                     vertical: 16,
                                   ),
                                   decoration: BoxDecoration(
-                                    gradient: AppTheme.parentGradient,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        widget.accentColor,
+                                        widget.accentColor.withValues(
+                                          alpha: 0.8,
+                                        ),
+                                      ],
+                                    ),
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Center(
@@ -267,7 +278,8 @@ class _RateAppScreenState extends State<RateAppScreen> {
 
 class _ThankYouView extends StatelessWidget {
   final int stars;
-  const _ThankYouView({required this.stars});
+  final Color accentColor;
+  const _ThankYouView({required this.stars, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +291,9 @@ class _ThankYouView extends StatelessWidget {
             width: 90,
             height: 90,
             decoration: BoxDecoration(
-              gradient: AppTheme.parentGradient,
+              gradient: LinearGradient(
+                colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+              ),
               shape: BoxShape.circle,
             ),
             child: const Center(

@@ -524,6 +524,11 @@ class _DriverProfileState extends State<DriverProfile> {
                             onTap: () => context.push('/driver/help-support'),
                           ),
                           _MenuItem(
+                            icon: '⭐',
+                            label: AppStrings.t('rate_app_title'),
+                            onTap: () => context.push('/driver/rate-app'),
+                          ),
+                          _MenuItem(
                             icon: '📄',
                             label: AppStrings.t('terms_lbl'),
                             isLast: true,
