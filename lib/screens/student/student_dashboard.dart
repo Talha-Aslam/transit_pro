@@ -473,10 +473,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _StatCard(
                         icon: '🚌',
                         label: AppStrings.t('total_rides'),
-                        value: buildParentTripHistoryEntries(DateTime.now())
-                            .where((e) => e.completed)
-                            .length
-                            .toString(),
+                        value: buildParentTripHistoryEntries(
+                          DateTime.now(),
+                        ).where((e) => e.completed).length.toString(),
                         color: AppTheme.studentAmber,
                       ),
                       _StatCard(

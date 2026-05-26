@@ -316,10 +316,9 @@ class _StudentProfileState extends State<StudentProfile> {
                           ),
                           _QuickStat(
                             icon: '📅',
-                            value: buildParentTripHistoryEntries(DateTime.now())
-                                .where((e) => e.completed)
-                                .length
-                                .toString(),
+                            value: buildParentTripHistoryEntries(
+                              DateTime.now(),
+                            ).where((e) => e.completed).length.toString(),
                             label: AppStrings.t('rides_lbl'),
                             color: AppTheme.info,
                           ),
