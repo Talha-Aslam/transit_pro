@@ -1731,6 +1731,8 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
       },
     );
 
+    if (!mounted) return;
+
     if (confirmed == true) {
       setState(() {
         _selectedBus = bus;
@@ -1977,8 +1979,8 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
 
     final query = [
       institute.trim(),
-      if (_instituteType != null) _instituteType!,
-    ].where((part) => part.isNotEmpty).join(' ');
+      if (_instituteType != null) _instituteType,
+    ].where((part) => part != null && part.isNotEmpty).join(' ');
     await _openMapQuery(query);
   }
 
@@ -2277,7 +2279,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ],
                 ),

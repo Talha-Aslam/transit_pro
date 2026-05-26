@@ -120,24 +120,6 @@ class _StudentProfileState extends State<StudentProfile> {
     );
   }
 
-  void _showNotifSettings() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _NotifSheet(
-        busAlerts: _busAlerts,
-        arrivalAlerts: _arrivalAlerts,
-        delayAlerts: _delayAlerts,
-        onChanged: (bus, arr, del) => setState(() {
-          _busAlerts = bus;
-          _arrivalAlerts = arr;
-          _delayAlerts = del;
-        }),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<StudentInfo>(
@@ -187,7 +169,7 @@ class _StudentProfileState extends State<StudentProfile> {
                               child: ValueListenableBuilder<File?>(
                                 valueListenable:
                                     ProfileService.instance.studentImage,
-                                builder: (_, file, __) => file != null
+                                builder: (_, file, _) => file != null
                                     ? ClipRRect(
                                         borderRadius: BorderRadius.circular(26),
                                         child: Image.file(
@@ -919,31 +901,6 @@ class _StudentProfileState extends State<StudentProfile> {
           },
         );
       },
-    );
-  }
-}
-
-// ─── Helper widgets ───────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(
-            color: context.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
     );
   }
 }

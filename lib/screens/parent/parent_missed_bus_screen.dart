@@ -350,13 +350,14 @@ class _ParentRequestForm extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   final query = Uri.encodeComponent(child.stop);
                   final url =
                       'https://www.google.com/maps/search/?api=1&query=$query';
                   if (await canLaunchUrlString(url)) {
                     await launchUrlString(url);
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(content: Text('Could not open Maps')),
                     );
                   }

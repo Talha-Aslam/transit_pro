@@ -105,8 +105,8 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeAlerts = _alerts.where((a) => a.isActive).toList();
-    final resolvedAlerts = _alerts.where((a) => !a.isActive).toList();
+    final activeAlerts = _alerts.where((a) => a.isActive);
+    final resolvedAlerts = _alerts.where((a) => !a.isActive);
 
     return Scaffold(
       body: Container(
@@ -194,7 +194,7 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
                               onContact: () => _contactDriver('Driver Name'),
                             ),
                           );
-                        }).toList(),
+                        }),
                         const SizedBox(height: 12),
                       ],
                       if (resolvedAlerts.isNotEmpty) ...[
@@ -268,7 +268,7 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
                               ),
                             ),
                           );
-                        }).toList(),
+                        }),
                       ],
                       if (activeAlerts.isEmpty && resolvedAlerts.isEmpty)
                         Center(

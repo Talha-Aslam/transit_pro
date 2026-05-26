@@ -11,7 +11,7 @@ class DriversScreen extends StatelessWidget {
       padding: const EdgeInsets.all(12.0),
       child: ValueListenableBuilder(
         valueListenable: svc.driverInfo,
-        builder: (_, driver, __) => ListView(
+        builder: (_, driver, _) => ListView(
           children: [
             Card(
               child: ListTile(

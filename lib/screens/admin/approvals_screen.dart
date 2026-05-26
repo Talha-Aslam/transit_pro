@@ -20,7 +20,7 @@ class ApprovalsScreen extends StatelessWidget {
           Expanded(
             child: ValueListenableBuilder<List>(
               valueListenable: svc.driverIncomingRequests,
-              builder: (_, list, __) {
+              builder: (_, list, _) {
                 if (list.isEmpty) return const Text('No requests');
                 return ListView.builder(
                   itemCount: list.length,

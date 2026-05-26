@@ -152,7 +152,7 @@ class _PickupDropoffConfirmationScreenState
                         // Animated pulse circle
                         AnimatedBuilder(
                           animation: _pulseController,
-                          builder: (_, __) => Transform.scale(
+                          builder: (_, _) => Transform.scale(
                             scale: 1 + (_pulseController.value * 0.2),
                             child: Container(
                               width: 140,

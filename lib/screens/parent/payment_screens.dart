@@ -630,7 +630,9 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _launchingProvider = false);
+      if (mounted) {
+        setState(() => _launchingProvider = false);
+      }
     }
   }
 
@@ -674,11 +676,12 @@ class _OnlinePaymentScreenState extends State<OnlinePaymentScreen> {
     });
 
     Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _submitted = true;
         });
+      }
     });
   }
 
@@ -1124,11 +1127,12 @@ class _CardPaymentScreenState extends State<CardPaymentScreen> {
     }
     setState(() => _loading = true);
     Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _submitted = true;
         });
+      }
     });
   }
 

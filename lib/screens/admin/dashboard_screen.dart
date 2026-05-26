@@ -28,21 +28,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: ValueListenableBuilder<int>(
                   valueListenable: svc.totalDrivers,
-                  builder: (_, val, __) => _kpiCard('Drivers', val.toString()),
+                  builder: (_, val, _) => _kpiCard('Drivers', val.toString()),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: ValueListenableBuilder<int>(
                   valueListenable: svc.totalBuses,
-                  builder: (_, val, __) => _kpiCard('Buses', val.toString()),
+                  builder: (_, val, _) => _kpiCard('Buses', val.toString()),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: ValueListenableBuilder<int>(
                   valueListenable: svc.totalStudents,
-                  builder: (_, val, __) => _kpiCard('Students', val.toString()),
+                  builder: (_, val, _) => _kpiCard('Students', val.toString()),
                 ),
               ),
             ],
@@ -56,7 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: ValueListenableBuilder<List>(
               valueListenable: svc.pendingRequests,
-              builder: (_, list, __) {
+              builder: (_, list, _) {
                 if (list.isEmpty) return const Text('No pending requests');
                 return ListView.builder(
                   itemCount: list.length,
@@ -82,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _kpiCard(String label, String value) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.04),
+      color: Colors.white.withValues(alpha: 0.04),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Column(

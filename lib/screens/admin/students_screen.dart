@@ -11,7 +11,7 @@ class StudentsScreen extends StatelessWidget {
       padding: const EdgeInsets.all(12.0),
       child: ValueListenableBuilder<List>(
         valueListenable: svc.children,
-        builder: (_, list, __) {
+        builder: (_, list, _) {
           return ListView.builder(
             itemCount: list.length,
             itemBuilder: (_, i) {
