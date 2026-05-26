@@ -685,8 +685,13 @@ class _ParentProfileState extends State<ParentProfile> {
                               _MenuItem(
                                 icon: '⭐',
                                 label: AppStrings.t('rate_app'),
-                                isLast: true,
                                 onTap: () => context.push('/parent/rate-app'),
+                              ),
+                              _MenuItem(
+                                icon: '📄',
+                                label: AppStrings.t('terms_lbl'),
+                                isLast: true,
+                                onTap: () => context.push('/parent/terms'),
                               ),
                             ],
                           ),

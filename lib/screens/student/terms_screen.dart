@@ -4,7 +4,8 @@ import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 class TermsScreen extends StatelessWidget {
-  const TermsScreen({super.key});
+  final Color accentColor;
+  const TermsScreen({super.key, this.accentColor = AppTheme.studentAmber});
 
   List<String> _paragraphs(String content) {
     return content
@@ -46,7 +47,7 @@ class TermsScreen extends StatelessWidget {
                 borderRadius: 24,
                 gradient: LinearGradient(
                   colors: [
-                    AppTheme.studentAmber.withValues(alpha: 0.18),
+                    accentColor.withValues(alpha: 0.18),
                     AppTheme.info.withValues(alpha: 0.06),
                   ],
                 ),
@@ -57,7 +58,14 @@ class TermsScreen extends StatelessWidget {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        gradient: AppTheme.parentGradient,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            accentColor,
+                            accentColor.withValues(alpha: 0.8),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Center(
@@ -94,7 +102,7 @@ class TermsScreen extends StatelessWidget {
                               _MetaChip(
                                 icon: Icons.verified_rounded,
                                 label: 'TransportKid v2.4.1',
-                                color: AppTheme.studentAmber,
+                                color: accentColor,
                               ),
                               _MetaChip(
                                 icon: Icons.update_rounded,

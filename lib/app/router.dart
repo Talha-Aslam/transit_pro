@@ -99,6 +99,11 @@ final appRouter = GoRouter(
       builder: (context, state) => const RateAppScreen(),
     ),
     GoRoute(
+      path: '/parent/terms',
+      builder: (context, state) =>
+          const TermsScreen(accentColor: AppTheme.parentPurple),
+    ),
+    GoRoute(
       path: '/parent/payment',
       builder: (context, state) {
         final extra = (state.extra as Map<String, dynamic>?) ?? {};
@@ -183,6 +188,11 @@ final appRouter = GoRouter(
       path: '/driver/help-support',
       builder: (context, state) =>
           const HelpSupportScreen(accentColor: AppTheme.driverCyan),
+    ),
+    GoRoute(
+      path: '/driver/terms',
+      builder: (context, state) =>
+          const TermsScreen(accentColor: AppTheme.driverCyan),
     ),
     GoRoute(
       path: '/student',

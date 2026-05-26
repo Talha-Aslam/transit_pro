@@ -521,8 +521,13 @@ class _DriverProfileState extends State<DriverProfile> {
                           _MenuItem(
                             icon: '❓',
                             label: AppStrings.t('help_support'),
-                            isLast: true,
                             onTap: () => context.push('/driver/help-support'),
+                          ),
+                          _MenuItem(
+                            icon: '📄',
+                            label: AppStrings.t('terms_lbl'),
+                            isLast: true,
+                            onTap: () => context.push('/driver/terms'),
                           ),
                         ],
                       ),
