@@ -496,6 +496,11 @@ class _DriverProfileState extends State<DriverProfile> {
                             onTap: () => context.push('/driver/documents'),
                           ),
                           _MenuItem(
+                            icon: '💳',
+                            label: AppStrings.t('subscription'),
+                            onTap: () => context.push('/driver/subscription'),
+                          ),
+                          _MenuItem(
                             icon: '🌐',
                             label: AppStrings.t('language'),
                             desc: LanguageProvider.instance.lang,

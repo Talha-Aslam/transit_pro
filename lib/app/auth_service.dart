@@ -101,6 +101,8 @@ class AuthService {
   /// Converts a role string to its root route path.
   static String routeForRole(String role) {
     switch (role) {
+      case 'admin':
+        return '/admin';
       case 'driver':
         return '/driver';
       case 'student':
