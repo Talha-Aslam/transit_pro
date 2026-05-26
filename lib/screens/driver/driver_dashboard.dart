@@ -559,68 +559,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  // ── Start/End route button ─────────────────────────────────
-                  GestureDetector(
-                    onTap: () => setState(() => _routeStarted = !_routeStarted),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: _routeStarted
-                              ? [
-                                  const Color(0xFFEF4444),
-                                  const Color(0xFFB91C1C),
-                                ]
-                              : [
-                                  const Color(0xFF10B981),
-                                  const Color(0xFF059669),
-                                ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                (_routeStarted
-                                        ? AppTheme.error
-                                        : AppTheme.success)
-                                    .withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'assets/images/route_in_progress.png',
-                              width: 22,
-                              height: 22,
-                              cacheWidth: 44,
-                              cacheHeight: 44,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.medium,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              _routeStarted
-                                  ? AppStrings.t('end_route')
-                                  : AppStrings.t('start_route'),
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
