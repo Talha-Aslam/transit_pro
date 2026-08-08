@@ -30,7 +30,6 @@ import '../screens/driver/subscription.dart';
 import '../screens/parent/parent_missed_bus_screen.dart';
 import '../screens/parent/payment_screens.dart';
 import '../theme/app_theme.dart';
-import '../screens/admin/admin_layout.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -256,6 +255,5 @@ final appRouter = GoRouter(
       path: '/parent/missed-bus',
       builder: (context, state) => const ParentMissedBusScreen(),
     ),
-    GoRoute(path: '/admin', builder: (context, state) => const AdminLayout()),
   ],
 );

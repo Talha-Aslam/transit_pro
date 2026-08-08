@@ -99,10 +99,11 @@ class AuthService {
   }
 
   /// Converts a role string to its root route path.
+  ///
+  /// Admin is intentionally absent: it lives in the separate `transit_admin`
+  /// app, which authenticates against the same Firebase project.
   static String routeForRole(String role) {
     switch (role) {
-      case 'admin':
-        return '/admin';
       case 'driver':
         return '/driver';
       case 'student':
