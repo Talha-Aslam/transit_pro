@@ -200,13 +200,26 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    'Bus #42 · Route A',
-                                    style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  ValueListenableBuilder<StudentInfo>(
+                                    valueListenable: StudentDataService
+                                        .instance
+                                        .studentInfo,
+                                    builder: (_, info, _) {
+                                      final assignment = [
+                                        info.busNumber,
+                                        info.route,
+                                      ].where((s) => s.isNotEmpty).join(' · ');
+                                      return Text(
+                                        assignment.isEmpty
+                                            ? 'No bus assigned yet'
+                                            : assignment,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      );
+                                    },
                                   ),
                                   const Spacer(),
                                   StatusBadge(

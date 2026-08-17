@@ -1,10 +1,23 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:transit_core/transit_core.dart';
 
-/// Mutable model for a single child registered under a parent account.
+import '../data/payment_repository.dart';
+import '../data/rating_repository.dart';
+import '../data/user_repository.dart';
+import '../services/cloudinary_service.dart';
+import 'session_service.dart';
+
+/// A single child, flattened for the UI.
+///
+/// [id] is new and matters: the prototype identified a child only by name, so
+/// editing one meant rewriting the whole list, and two children called Ali were
+/// the same child. Every write now targets `students/{id}`.
 class ChildInfo {
+  final String id;
   String name;
   String grade;
   String school;
@@ -12,8 +25,10 @@ class ChildInfo {
   String route;
   String stop;
   String driver;
+  String? photoUrl;
 
   ChildInfo({
+    this.id = '',
     this.name = '',
     this.grade = '',
     this.school = '',
@@ -21,6 +36,7 @@ class ChildInfo {
     this.route = '',
     this.stop = '',
     this.driver = '',
+    this.photoUrl,
   });
 
   ChildInfo copyWith({
@@ -31,7 +47,9 @@ class ChildInfo {
     String? route,
     String? stop,
     String? driver,
+    String? photoUrl,
   }) => ChildInfo(
+    id: id,
     name: name ?? this.name,
     grade: grade ?? this.grade,
     school: school ?? this.school,
@@ -39,117 +57,164 @@ class ChildInfo {
     route: route ?? this.route,
     stop: stop ?? this.stop,
     driver: driver ?? this.driver,
+    photoUrl: photoUrl ?? this.photoUrl,
   );
 }
 
-/// Mutable model for the parent's own profile info.
+/// The parent's own details, from `users/{uid}`.
 class ParentInfo {
   String name;
   String email;
   String phone;
 
-  ParentInfo({
-    this.name = 'Sarah Johnson',
-    this.email = 'sarah@example.com',
-    this.phone = '+1 555-0100',
-  });
+  ParentInfo({this.name = '', this.email = '', this.phone = ''});
 }
 
-/// Singleton that holds the parent's profile data and notifies listeners
-/// whenever the data changes.
+/// Parent-facing view of the live session.
+///
+/// Keeps the notifier API the parent screens already bind to; the source behind
+/// it is now Firestore. Ratings and fee state, which used to live in
+/// `SharedPreferences` and therefore never reached the driver who was being
+/// rated or paid, are real documents now.
 class ParentDataService {
-  ParentDataService._();
+  ParentDataService._() {
+    SessionService.instance.onUser((_) => _rebuild());
+    SessionService.instance.onRoleData(_rebuild);
+  }
   static final ParentDataService instance = ParentDataService._();
 
-  static const _driverRatingsKey = 'parent_driver_ratings';
-  static const _paidFeeMonthsKey = 'parent_paid_fee_months';
-  static const _feeNotificationsKey = 'parent_fee_notifications';
+  /// Payment reminders stay device-local on purpose: this is a notification
+  /// preference for this phone, not shared data anyone else reads.
   static const _paymentRemindersKey = 'parent_payment_reminders';
 
-  /// Notifier for the parent's own info.
   final parentInfo = ValueNotifier<ParentInfo>(ParentInfo());
+  final children = ValueNotifier<List<ChildInfo>>([]);
 
-  /// Notifier for the list of children.
-  final children = ValueNotifier<List<ChildInfo>>([
-    ChildInfo(
-      name: 'Noorulain',
-      grade: 'Grade 5',
-      school: 'Lincoln Elementary School',
-      busNumber: 'Bus #42',
-      route: 'Route A',
-      stop: 'Pine Road',
-      driver: 'Ahmed Raza',
-    ),
-    ChildInfo(
-      name: 'Hassan',
-      grade: 'Grade 2',
-      school: 'Lincoln Elementary School',
-      busNumber: 'Bus #14',
-      route: 'Route B',
-      stop: 'Maple Avenue',
-      driver: 'Mike T.',
-    ),
-  ]);
+  /// Locally picked photos, held only until the Cloudinary upload lands and
+  /// `photoUrl` takes over. Keeps the avatar from flickering back to a
+  /// placeholder while the upload is in flight.
+  final childImages = ValueNotifier<List<File?>>([]);
 
-  /// Helper to get the currently selected child.
-  ChildInfo? get currentChild {
-    if (children.value.isEmpty) return null;
-    final idx = selectedChildIndex.value;
-    if (idx < 0 || idx >= children.value.length) return children.value[0];
-    return children.value[idx];
-  }
+  /// Mirrors [SessionService.selectedChildIndex] so existing screens keep
+  /// working; that notifier is the one the session actually follows.
+  ValueNotifier<int> get selectedChildIndex =>
+      SessionService.instance.selectedChildIndex;
 
-  /// Per-child photo files (same length as [children]).
-  final childImages = ValueNotifier<List<File?>>([null]);
-
-  /// Index of the currently-selected child (used by dashboard / tracking).
-  final selectedChildIndex = ValueNotifier<int>(0);
-
-  /// Persisted weekly driver ratings, keyed by bus + driver.
   final driverRatings = ValueNotifier<Map<String, DriverRatingInfo>>({});
-
-  /// Months that have been confirmed paid by the driver.
   final paidFeeMonths = ValueNotifier<Set<String>>({});
-
-  /// Parent-side fee notifications (driver confirmation messages).
   final feeNotifications = ValueNotifier<List<String>>([]);
-
-  /// Payment reminders for upcoming dues (month -> bool).
   final paymentReminders = ValueNotifier<Map<String, bool>>({});
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
+  ChildInfo? get currentChild => selectedChild;
+
   ChildInfo? get selectedChild {
     final list = children.value;
-    final idx = selectedChildIndex.value;
     if (list.isEmpty) return null;
-    return list[idx.clamp(0, list.length - 1)];
+    return list[selectedChildIndex.value.clamp(0, list.length - 1)];
   }
 
   File? get selectedChildImage {
     final imgs = childImages.value;
-    final idx = selectedChildIndex.value;
     if (imgs.isEmpty) return null;
-    return imgs[idx.clamp(0, imgs.length - 1)];
+    final idx = selectedChildIndex.value;
+    if (idx < 0 || idx >= imgs.length) return null;
+    return imgs[idx];
   }
 
-  String _driverKey(ChildInfo child) => '${child.busNumber}|${child.driver}';
+  /// Ratings are keyed by driver id now, not by `'Bus #42|Ahmed Raza'`. The old
+  /// key changed whenever a bus was reassigned or a name was corrected, which
+  /// silently reset the weekly gate.
+  String _driverKey(ChildInfo child) => child.driver;
 
-  Future<void> loadDriverRatings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_driverRatingsKey);
-    if (raw == null || raw.isEmpty) {
+  // ── Live rebuild ──────────────────────────────────────────────────────────
+
+  void _rebuild() {
+    final session = SessionService.instance;
+    final user = session.user.value;
+
+    if (user == null) {
+      parentInfo.value = ParentInfo();
+      children.value = [];
+      childImages.value = [];
       driverRatings.value = {};
+      paidFeeMonths.value = {};
+      feeNotifications.value = [];
       return;
     }
 
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    driverRatings.value = decoded.map(
-      (key, value) => MapEntry(
-        key,
-        DriverRatingInfo.fromJson(Map<String, dynamic>.from(value as Map)),
-      ),
+    if (user.role != UserRole.parent) return;
+
+    parentInfo.value = ParentInfo(
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
     );
+
+    final kids = session.children.value;
+    children.value = kids.map((s) {
+      final bus = session.busFor(s.busId);
+      final route = session.routeFor(s.routeId);
+      return ChildInfo(
+        id: s.id,
+        name: s.name,
+        grade: s.grade,
+        school: s.school,
+        busNumber: bus?.busNumber ?? '',
+        route: route?.name ?? '',
+        stop: session.stopNameFor(s) ?? '',
+        // The driver *id*, not a display name — see _driverKey.
+        driver: bus?.driverId ?? '',
+        photoUrl: s.photoUrl,
+      );
+    }).toList();
+
+    // Keep the local preview list the same length as the child list. Guarded on
+    // length: a ValueNotifier<List> compares by identity, so reassigning an
+    // equivalent list every rebuild would wake every listening screen for
+    // nothing.
+    if (childImages.value.length != kids.length) {
+      final imgs = List<File?>.from(childImages.value);
+      while (imgs.length < kids.length) {
+        imgs.add(null);
+      }
+      childImages.value = imgs.take(kids.length).toList();
+    }
+
+    _loadRatings(user.uid);
+    _loadFees(user.uid);
+  }
+
+  // ── Ratings ───────────────────────────────────────────────────────────────
+
+  String? _ratingsForUid;
+
+  Future<void> _loadRatings(String uid) async {
+    if (_ratingsForUid == uid) return;
+    _ratingsForUid = uid;
+    await loadDriverRatings();
+  }
+
+  /// Kept for the screens that call it directly on open.
+  Future<void> loadDriverRatings() async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) {
+      driverRatings.value = {};
+      return;
+    }
+    try {
+      final list = await RatingRepository.instance.fetchByRater(uid);
+      driverRatings.value = {
+        for (final r in list)
+          r.driverId: DriverRatingInfo(
+            rating: r.rating,
+            ratedAt: r.createdAt ?? DateTime.now(),
+          ),
+      };
+    } catch (e) {
+      debugPrint('load ratings failed: $e');
+    }
   }
 
   bool canRateDriver(ChildInfo child) {
@@ -158,97 +223,168 @@ class ParentDataService {
     return !info.isSameWeek(DateTime.now());
   }
 
-  DriverRatingInfo? driverRatingFor(ChildInfo child) {
-    return driverRatings.value[_driverKey(child)];
-  }
+  DriverRatingInfo? driverRatingFor(ChildInfo child) =>
+      driverRatings.value[_driverKey(child)];
 
   Future<void> rateDriverForChild(ChildInfo child, double rating) async {
-    final key = _driverKey(child);
-    final updated = Map<String, DriverRatingInfo>.from(driverRatings.value);
-    updated[key] = DriverRatingInfo(rating: rating, ratedAt: DateTime.now());
-    driverRatings.value = updated;
+    final uid = SessionService.instance.uid;
+    final driverId = _driverKey(child);
+    if (uid == null || driverId.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _driverRatingsKey,
-      jsonEncode(updated.map((k, v) => MapEntry(k, v.toJson()))),
+    final accepted = await RatingRepository.instance.submit(
+      driverId: driverId,
+      raterId: uid,
+      rating: rating,
+      studentId: child.id.isEmpty ? null : child.id,
     );
+    if (!accepted) return;
+
+    final updated = Map<String, DriverRatingInfo>.from(driverRatings.value);
+    updated[driverId] =
+        DriverRatingInfo(rating: rating, ratedAt: DateTime.now());
+    driverRatings.value = updated;
   }
 
+  // ── Fees ──────────────────────────────────────────────────────────────────
+
+  String? _feesForUid;
+
+  Future<void> _loadFees(String uid) async {
+    if (_feesForUid == uid) return;
+    _feesForUid = uid;
+    await loadFeeState();
+  }
+
+  /// Which months are settled, straight from `payments`.
+  ///
+  /// This used to be a `Set<String>` in `SharedPreferences`, which meant a
+  /// parent could mark their own fees paid by reinstalling the app, and the
+  /// driver never saw any of it.
   Future<void> loadFeeState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final months = prefs.getStringList(_paidFeeMonthsKey) ?? <String>[];
-    final notifications =
-        prefs.getStringList(_feeNotificationsKey) ?? <String>[];
-    paidFeeMonths.value = months.toSet();
-    feeNotifications.value = notifications;
+    final uid = SessionService.instance.uid;
+    if (uid == null) {
+      paidFeeMonths.value = {};
+      feeNotifications.value = [];
+      return;
+    }
+    try {
+      final payments =
+          await PaymentRepository.instance.watchForParent(uid).first;
+      paidFeeMonths.value = payments
+          .where((p) => p.status == PaymentStatus.paid)
+          .map((p) => p.monthKey)
+          .toSet();
+      feeNotifications.value = payments
+          .where((p) => p.status == PaymentStatus.paid)
+          .map((p) => 'Your ${p.monthKey} fee payment was confirmed.')
+          .toList();
+    } catch (e) {
+      debugPrint('load fees failed: $e');
+    }
   }
 
-  bool isMonthPaid(String month) {
-    return paidFeeMonths.value.contains(month);
-  }
+  bool isMonthPaid(String month) => paidFeeMonths.value.contains(month);
 
+  /// Confirmation is the *driver's* action, not the parent's.
+  ///
+  /// `firestore.rules` blocks a parent from setting `status: paid`, so this
+  /// only refreshes the local view after the driver has confirmed. It is kept
+  /// because the payment screens still call it.
   Future<void> confirmFeeByDriver({
     required String month,
     required String driverName,
   }) async {
-    final updatedMonths = Set<String>.from(paidFeeMonths.value)..add(month);
-    paidFeeMonths.value = updatedMonths;
-
-    final message = 'Driver $driverName confirmed your $month fee payment.';
-    final updatedNotifs = List<String>.from(feeNotifications.value)
-      ..add(message);
-    feeNotifications.value = updatedNotifs;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_paidFeeMonthsKey, updatedMonths.toList());
-    await prefs.setStringList(_feeNotificationsKey, updatedNotifs);
+    await loadFeeState();
   }
 
-  void updateParentInfo(ParentInfo info) {
+  // ── Profile writes ────────────────────────────────────────────────────────
+
+  Future<void> updateParentInfo(ParentInfo info) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
     parentInfo.value = info;
+    await UserRepository.instance
+        .updateUser(uid, {'name': info.name, 'phone': info.phone});
   }
 
-  void updateChild(int index, ChildInfo child) {
+  Future<void> updateChild(int index, ChildInfo child) async {
     final list = List<ChildInfo>.from(children.value);
+    if (index < 0 || index >= list.length) return;
     list[index] = child;
     children.value = list;
+
+    if (child.id.isEmpty) return;
+    await UserRepository.instance.updateStudent(child.id, {
+      'name': child.name,
+      'grade': child.grade,
+      'school': child.school,
+    });
   }
 
-  void updateChildImage(int index, File? image) {
+  /// Uploads the picked photo and stores its URL on the child.
+  ///
+  /// The prototype held a `File` in memory and called it done, so the photo was
+  /// gone on the next launch and no other device ever saw it.
+  Future<void> updateChildImage(int index, File? image) async {
     final imgs = List<File?>.from(childImages.value);
     while (imgs.length <= index) {
       imgs.add(null);
     }
     imgs[index] = image;
     childImages.value = List.unmodifiable(imgs);
-  }
 
-  void addChild(ChildInfo child) {
-    children.value = [...children.value, child];
-    childImages.value = [...childImages.value, null];
-  }
+    if (image == null) return;
+    final list = children.value;
+    if (index < 0 || index >= list.length) return;
+    final childId = list[index].id;
+    if (childId.isEmpty) return;
 
-  void removeChild(int index) {
-    final list = List<ChildInfo>.from(children.value);
-    list.removeAt(index);
-    children.value = list;
+    if (!CloudinaryService.instance.isConfigured) {
+      debugPrint('Cloudinary not configured — child photo kept locally only.');
+      return;
+    }
 
-    final imgs = List<File?>.from(childImages.value);
-    if (index < imgs.length) imgs.removeAt(index);
-    childImages.value = imgs;
-
-    // Keep selected index in bounds
-    if (selectedChildIndex.value >= list.length && list.isNotEmpty) {
-      selectedChildIndex.value = list.length - 1;
+    try {
+      final result =
+          await CloudinaryService.instance.uploadProfilePhoto(image, childId);
+      await UserRepository.instance
+          .updateStudent(childId, {'photoUrl': result.secureUrl});
+    } catch (e) {
+      debugPrint('child photo upload failed: $e');
     }
   }
 
-  void selectChild(int index) {
-    selectedChildIndex.value = index.clamp(0, children.value.length - 1);
+  Future<void> addChild(ChildInfo child) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+    await UserRepository.instance.addStudent(
+      Student(
+        id: '',
+        name: child.name,
+        parentId: uid,
+        grade: child.grade,
+        school: child.school,
+        instituteType: child.grade,
+      ),
+    );
+    // The children stream republishes; no local mutation needed.
   }
 
-  // ── Payment Reminders ──────────────────────────────────────────────────────
+  Future<void> removeChild(int index) async {
+    final list = children.value;
+    if (index < 0 || index >= list.length) return;
+    final id = list[index].id;
+    if (id.isEmpty) return;
+    await UserRepository.instance.deleteStudent(id);
+  }
+
+  void selectChild(int index) {
+    final count = children.value.length;
+    if (count == 0) return;
+    selectedChildIndex.value = index.clamp(0, count - 1);
+  }
+
+  // ── Payment reminders (device-local) ──────────────────────────────────────
 
   Future<void> loadPaymentReminders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -257,9 +393,12 @@ class ParentDataService {
       paymentReminders.value = {};
       return;
     }
-
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    paymentReminders.value = decoded.cast<String, bool>();
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      paymentReminders.value = decoded.map((k, v) => MapEntry(k, v == true));
+    } catch (_) {
+      paymentReminders.value = {};
+    }
   }
 
   Future<void> setPaymentReminder(String month, bool enabled) async {
@@ -271,27 +410,30 @@ class ParentDataService {
     await prefs.setString(_paymentRemindersKey, jsonEncode(updated));
   }
 
-  bool hasPaymentReminder(String month) {
-    return paymentReminders.value[month] ?? false;
-  }
+  bool hasPaymentReminder(String month) =>
+      paymentReminders.value[month] ?? false;
 
   List<String> getUpcomingPayments() {
     final now = DateTime.now();
-    final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final nextMonth =
-        '${now.year}-${(now.month + 1).toString().padLeft(2, '0')}';
-    return [currentMonth, nextMonth];
+    final current = DateTime(now.year, now.month);
+    final next = DateTime(now.year, now.month + 1);
+    return [_monthKey(current), _monthKey(next)];
   }
+
+  static String _monthKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
   bool isPaymentDue(String month) {
     final parts = month.split('-');
-    final year = int.parse(parts[0]);
-    final monthNum = int.parse(parts[1]);
-    final dueDate = DateTime(
-      year,
-      monthNum + 1,
-      1,
-    ).subtract(const Duration(days: 1));
+    if (parts.length != 2) return false;
+    final year = int.tryParse(parts[0]);
+    final monthNum = int.tryParse(parts[1]);
+    if (year == null || monthNum == null) return false;
+
+    // Last day of that month. DateTime normalises month 13 into January, so
+    // this is safe for December without a special case.
+    final dueDate = DateTime(year, monthNum + 1, 1)
+        .subtract(const Duration(days: 1));
     return DateTime.now().isAfter(dueDate.subtract(const Duration(days: 5)));
   }
 }

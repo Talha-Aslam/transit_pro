@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -111,17 +112,33 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
 
     setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() => _loading = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppStrings.t('pwd_changed')),
-        backgroundColor: AppTheme.success,
-      ),
-    );
-    context.pop();
+    try {
+      // Verifies the current password against Firebase before changing it. The
+      // previous version never checked it and never called Firebase at all — it
+      // just showed "Password changed" after a 1-second delay.
+      await AuthService.instance.changePassword(
+        currentPassword: current,
+        newPassword: next,
+      );
+
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('pwd_changed')),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+      context.pop();
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    }
   }
 
   @override

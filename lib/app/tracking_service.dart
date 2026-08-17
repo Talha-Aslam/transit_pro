@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'student_data_service.dart';
 import 'geofence_service.dart';
 import '../models/route_data.dart';
 
@@ -140,7 +139,10 @@ class TrackingService {
         _waypointIndex = 0; // loop
         _resetStopStatuses();
         GeofenceService.instance.reset();
-        StudentDataService.instance.completeRide();
+        // Deliberately does not bump the student's ride count any more. This
+        // is the *simulation* looping, not a journey; counting it inflated the
+        // dashboard with rides that never happened. Ride stats are derived
+        // from real attendance records in StudentDataService.
       }
 
       _waypointIndex++;

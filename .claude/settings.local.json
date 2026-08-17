@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"E:/Flutter Projects/FYP/FYPtransit_admin\" && ls -la && cat pubspec.yaml)",
+      "Read(//E:/Flutter Projects/FYP/FYPtransit_admin/**)",
+      "Bash(xargs wc -l)",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}

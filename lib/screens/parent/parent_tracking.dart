@@ -304,13 +304,25 @@ class _ParentTrackingState extends State<ParentTracking> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '${child?.busNumber ?? "Bus #42"} · ${child?.route ?? "Route"}',
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                    Builder(
+                                      builder: (_) {
+                                        final assignment = [
+                                          child?.busNumber ?? '',
+                                          child?.route ?? '',
+                                        ]
+                                            .where((s) => s.isNotEmpty)
+                                            .join(' · ');
+                                        return Text(
+                                          assignment.isEmpty
+                                              ? 'No bus assigned yet'
+                                              : assignment,
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        );
+                                      },
                                     ),
                                     const SizedBox(height: 3),
                                     Text(

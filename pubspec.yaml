@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 0.1.0
 
 environment:
-  sdk: ^3.10.9
+  sdk: ^3.10.0
 
 dependencies:
   flutter:
@@ -22,7 +22,13 @@ dependencies:
   firebase_core: ^4.7.0
   cloud_firestore: ^6.3.0
   firebase_auth: ^6.4.0
+  firebase_database: ^12.1.0
   google_sign_in: 6.2.1
+
+  # Shared domain layer — models, enums and config used by BOTH this app and
+  # the admin app. See ../../transit_core.
+  transit_core:
+    path: ../../transit_core
 dev_dependencies:
   flutter_test:
     sdk: flutter

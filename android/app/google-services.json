@@ -12,7 +12,28 @@
           "package_name": "com.example.transit_pro"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "231263449779-8eaaihdbhubrla8n34mlso7f8d9rtt5v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.transit_pro",
+            "certificate_hash": "f1da1598b8b63840f4328d89a4afca6e11cdd3cf"
+          }
+        },
+        {
+          "client_id": "231263449779-ci7op93perjji126269dko3p6gccfcen.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.transit_pro",
+            "certificate_hash": "b6b255a2be883c5eb93ad8934eeab994dbefc491"
+          }
+        },
+        {
+          "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
@@ -20,7 +41,71 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231263449779-3t0ru7d3nb5h23luipmoutdq0jc7isq0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.transitpro.transitAdmin"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231263449779:android:1f914a901fe6eec92f76c6",
+        "android_client_info": {
+          "package_name": "com.transitpro.transit_admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231263449779-l6fklb1bs39f0vphrgdhkksuq8m2lt2q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.transit_admin",
+            "certificate_hash": "b6b255a2be883c5eb93ad8934eeab994dbefc491"
+          }
+        },
+        {
+          "client_id": "231263449779-q8gfbmg0c4pr4p33ahlb88mui5ofk19o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.transit_admin",
+            "certificate_hash": "f1da1598b8b63840f4328d89a4afca6e11cdd3cf"
+          }
+        },
+        {
+          "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231263449779-3t0ru7d3nb5h23luipmoutdq0jc7isq0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.transitpro.transitAdmin"
+              }
+            }
+          ]
         }
       }
     }

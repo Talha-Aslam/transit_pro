@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
@@ -28,8 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
       icon: 'assets/images/role_selection/welcome_parent_transparent.gif',
       title: 'Parent Login',
       subtitle: "Access your child's journey",
-      demoEmail: 'sarah@example.com',
-      demoPass: 'parent123',
       path: '/parent',
     ),
     'driver': _LoginConfig(
@@ -39,8 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
       icon: 'assets/images/role_selection/welcome_driver_transparent.gif',
       title: 'Driver Login',
       subtitle: 'Start your route today',
-      demoEmail: 'mike@transport.com',
-      demoPass: 'driver123',
       path: '/driver',
     ),
     'student': _LoginConfig(
@@ -50,19 +47,25 @@ class _LoginScreenState extends State<LoginScreen> {
       icon: 'assets/images/role_selection/welcome_student_transparent.gif',
       title: 'Student Login',
       subtitle: 'Track your bus & attendance',
-      demoEmail: 'noorulain@school.com',
-      demoPass: 'student123',
       path: '/student',
     ),
   };
 
   _LoginConfig get _cfg => _configs[widget.role] ?? _configs['parent']!;
 
-  void _fillDemo() {
-    _emailCtrl.text = _cfg.demoEmail;
-    _passCtrl.text = _cfg.demoPass;
-    setState(() => _error = '');
-  }
+  /// The role this login screen is for.
+  ///
+  /// `/role-select` already asked once, before this screen was ever reached —
+  /// `widget.role` comes straight from that choice via the `/login/:role`
+  /// route. Reading it here (rather than trusting a stale field) is what makes
+  /// "pick Parent, go back, pick Student instead" behave correctly: `go_router`
+  /// builds a fresh [LoginScreen] per navigation, so this always reflects the
+  /// role actually showing on screen.
+  UserRole get _role => switch (widget.role) {
+        'driver' => UserRole.driver,
+        'student' => UserRole.student,
+        _ => UserRole.parent,
+      };
 
   void _onLangChanged() => setState(() {});
 
@@ -72,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     LanguageProvider.instance.addListener(_onLangChanged);
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
       setState(() => _error = AppStrings.t('fill_fields_login'));
       return;
@@ -81,13 +84,26 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = '';
       _loading = true;
     });
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        AuthService.instance.saveRole(widget.role);
-        setState(() => _loading = false);
-        context.go(_cfg.path);
-      }
-    });
+
+    try {
+      final user = await AuthService.instance.signIn(
+        email: _emailCtrl.text,
+        password: _passCtrl.text,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      // Route by the role stored in Firestore, NOT by the role in the URL.
+      // Someone who opens /login/driver but is registered as a parent lands in
+      // the parent app — the URL is a hint, never an authorisation.
+      context.go(AuthService.routeForUserRole(user.role));
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    }
   }
 
   Future<void> _googleLogin() async {
@@ -96,19 +112,37 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
     });
 
-    final userCredential = await AuthService.instance.signInWithGoogle();
+    try {
+      // This login screen is already role-specific — /role-select asked once,
+      // before the user ever got here. Passing that role through is what fixes
+      // Google sign-in ever losing track of it: AuthService writes it straight
+      // to Firestore, so it isn't riding along in memory waiting to be dropped.
+      final outcome = await AuthService.instance.signInWithGoogle(role: _role);
 
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() => _loading = false);
 
-    setState(() => _loading = false);
+      switch (outcome) {
+        case GoogleCancelled():
+          // Dismissing the account sheet is not a failure — say nothing.
+          return;
 
-    if (userCredential == null) {
-      return;
-    }
+        case GoogleNeedsProfile():
+          // First-time Google account, or one that closed the app before
+          // finishing onboarding last time. Either way the role is already
+          // recorded on the profile now — onboarding reads it from there and
+          // does not ask again.
+          context.go('/complete-profile');
 
-    await AuthService.instance.saveRole(widget.role);
-    if (mounted) {
-      context.go(_cfg.path);
+        case GoogleSignedIn(user: final user):
+          context.go(AuthService.routeForUserRole(user.role));
+      }
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
     }
   }
 
@@ -238,47 +272,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Demo hint
-                          GestureDetector(
-                            onTap: _fillDemo,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _cfg.glowColor.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _cfg.glowColor.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppStrings.t('use_demo'),
-                                    style: TextStyle(
-                                      color: _cfg.accent,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_cfg.demoEmail}  ·  ${_cfg.demoPass}',
-                                    style: TextStyle(
-                                      color: context.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-
                           // Email
                           _FieldLabel(AppStrings.t('email_address')),
                           const SizedBox(height: 8),
@@ -354,13 +347,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('⚠️  ', style: TextStyle(fontSize: 13)),
-                                  Text(
-                                    _error,
-                                    style: const TextStyle(
-                                      color: Color(0xFFFCA5A5),
-                                      fontSize: 13,
+                                  const Text(
+                                    '⚠️  ',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      _error,
+                                      style: const TextStyle(
+                                        color: Color(0xFFFCA5A5),
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -379,8 +378,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          if (widget.role != 'driver') ...[
-                            // Google Login Option
+                          // Google is offered for every role. Drivers used to be
+                          // excluded because there was nowhere to collect their
+                          // licence and vehicle; the onboarding screen now does
+                          // that, and a Google driver still lands in
+                          // pendingVerification like any other.
+                          ...[
                             Row(
                               children: [
                                 Expanded(
@@ -495,7 +498,7 @@ class _FieldLabel extends StatelessWidget {
 class _LoginConfig {
   final LinearGradient gradient;
   final Color glowColor, accent;
-  final String icon, title, subtitle, demoEmail, demoPass, path;
+  final String icon, title, subtitle, path;
 
   const _LoginConfig({
     required this.gradient,
@@ -504,8 +507,6 @@ class _LoginConfig {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.demoEmail,
-    required this.demoPass,
     required this.path,
   });
 }

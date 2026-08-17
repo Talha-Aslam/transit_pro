@@ -1,0 +1,46 @@
+{
+  "//": [
+    "Realtime Database rules — live bus positions only.",
+    "",
+    "Everything else lives in Firestore (see firestore.rules). This database",
+    "exists because Firestore bills per document write, and a 3-hour route",
+    "publishing every 5 seconds is ~2,160 writes per bus per day.",
+    "",
+    "Deploy with: firebase deploy --only database"
+  ],
+
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "liveLocations": {
+      "$busId": {
+        "//": [
+          "Any signed-in user may watch a bus. The payload is a coordinate and",
+          "a speed — it does not identify any child. Restricting reads to just",
+          "the assigned families would need a per-bus roster mirrored into RTDB,",
+          "which is Phase 4 work if the pilot warrants it.",
+          "",
+          "Writes are restricted to the driver currently assigned to the bus.",
+          "driverId is pinned to the writer's own uid so one driver cannot spoof",
+          "another bus's position."
+        ],
+        ".read": "auth != null",
+
+        ".write": "auth != null && (!newData.exists() || newData.child('driverId').val() === auth.uid)",
+
+        ".validate": "newData.hasChildren(['lat', 'lng', 'ts'])",
+
+        "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+        "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+        "heading": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 360" },
+        "speedKmh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200" },
+        "ts": { ".validate": "newData.isNumber()" },
+        "tripId": { ".validate": "newData.isString()" },
+        "driverId": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

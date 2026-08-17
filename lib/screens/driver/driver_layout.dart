@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../app/auth_service.dart';
+import '../../widgets/logout_flow.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'driver_dashboard.dart';
@@ -79,10 +78,10 @@ class _DriverLayoutState extends State<DriverLayout> {
               const DriverNotifications(),
               DriverProfile(
                 onNavigate: _goToTab,
-                onLogout: () {
-                  AuthService.instance.clearRole();
-                  context.go('/role-select');
-                },
+                onLogout: () => confirmAndSignOut(
+                  context,
+                  accentColor: AppTheme.driverCyan,
+                ),
               ),
             ],
           ),

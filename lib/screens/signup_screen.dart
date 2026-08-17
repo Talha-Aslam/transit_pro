@@ -1,13 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'map_picker_screen.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../app/auth_service.dart';
 import '../app/language_provider.dart';
+import '../app/profile_draft.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/image_source_sheet.dart';
+import '../widgets/profile_form_fields.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -31,7 +35,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPassCtrl = TextEditingController();
 
   // Parent-specific — dynamic children list
-  late List<_ChildData> _children;
+  late List<ChildFormData> _children;
 
   // Driver-specific
   final _picker = ImagePicker();
@@ -40,56 +44,19 @@ class _SignupScreenState extends State<SignupScreen> {
   final _experienceCtrl = TextEditingController();
   final _seatCapacityCtrl = TextEditingController();
   String? _vehicleType;
-  String? _licenseFileName;
-  String? _idCardFileName;
+
+  // Real files, not just names. The prototype kept `picked.name` and never
+  // uploaded anything, so a driver's licence existed only as a caption.
+  File? _licensePhoto;
+  File? _idCardPhoto;
 
   // Student-specific
   final _studentIdCtrl = TextEditingController();
   String? _studentGrade;
   final _studentSchoolCtrl = TextEditingController();
   bool _studentSchoolCustom = false;
-  final _studentPickupCtrl = TextEditingController();
-  final _studentDropoffCtrl = TextEditingController();
   LatLng? _studentPickupLatLng;
   LatLng? _studentDropoffLatLng;
-
-  // Shared data
-  static const _gradeOptions = ['School', 'College', 'University', 'Academy'];
-  static const _vehicleTypes = [
-    'Bus',
-    'Van',
-    'Carry Daba',
-    'Auto Rickshaw',
-    'Bike',
-    'Car',
-  ];
-  static const _schoolList = [
-    'Beaconhouse School System',
-    'The City School',
-    'Lahore Grammar School',
-    'Roots School System',
-    'Allied School',
-    'Foundation Public School',
-    'Froebels International School',
-    'Army Public School',
-    'Divisional Public School',
-    'Government High School',
-    'DHA Suffa University',
-    'University of Punjab',
-    'COMSATS University',
-    'NUST',
-    'FAST National University',
-    'Aga Khan University',
-    'Forman Christian College',
-    'Government College University',
-    'University of Lahore',
-    'UET Lahore',
-    'Air University',
-    'Quaid-i-Azam University',
-    'LUMS',
-    'Bahria University',
-    'Riphah International University',
-  ];
 
   static final _roles = [
     _RoleCfg(
@@ -123,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void initState() {
     super.initState();
-    _children = [_ChildData()];
+    _children = [ChildFormData()];
     LanguageProvider.instance.addListener(_onLangChanged);
   }
 
@@ -147,9 +114,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() {
       if (isLicense) {
-        _licenseFileName = picked.name;
+        _licensePhoto = File(picked.path);
       } else {
-        _idCardFileName = picked.name;
+        _idCardPhoto = File(picked.path);
       }
     });
   }
@@ -165,92 +132,96 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  void _signup() {
+  UserRole _roleFromId(String id) => switch (id) {
+        'driver' => UserRole.driver,
+        'student' => UserRole.student,
+        _ => UserRole.parent,
+      };
+
+  /// Everything the form has collected, in the shape `OnboardingService` wants.
+  ///
+  /// The same type the Google completion screen builds, which is what
+  /// guarantees the two routes create identical accounts.
+  ProfileDraft _buildDraft() => ProfileDraft(
+        role: _roleFromId(_selectedRole),
+        name: _nameCtrl.text,
+        email: _emailCtrl.text,
+        phone: _phoneCtrl.text,
+        children: _children
+            .map(
+              (c) => ChildDraft(
+                name: c.nameCtrl.text,
+                grade: c.grade ?? '',
+                school: c.schoolCtrl.text,
+              ),
+            )
+            .toList(),
+        studentIdNumber: _studentIdCtrl.text,
+        instituteType: _studentGrade ?? '',
+        school: _studentSchoolCtrl.text,
+        pickupLocation: _toGeo(_studentPickupLatLng),
+        dropoffLocation: _toGeo(_studentDropoffLatLng),
+        licenseNumber: _licenseCtrl.text,
+        experienceYears: int.tryParse(_experienceCtrl.text.trim()) ?? 0,
+        vehicleNumber: _vehicleCtrl.text,
+        vehicleType: _vehicleType ?? '',
+        seatCapacity: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+        licensePhoto: _licensePhoto,
+        idCardPhoto: _idCardPhoto,
+      );
+
+  static GeoCoord? _toGeo(LatLng? p) =>
+      p == null ? null : GeoCoord(p.latitude, p.longitude);
+
+  Future<void> _signup() async {
     if (!_agreeTerms) return;
-    if (_selectedRole == 'driver') {
-      final missing = _missingDriverField();
-      if (missing != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(missing)));
-        return;
-      }
+
+    if (_emailCtrl.text.trim().isEmpty || _passCtrl.text.isEmpty) {
+      _showError(AppStrings.t('fill_fields_login'));
+      return;
     }
-    if (_selectedRole == 'student') {
-      final missing = _missingStudentField();
-      if (missing != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(missing)));
-        return;
-      }
-    }
-    // block signup if passwords don't match
+
     if (_passCtrl.text != _confirmPassCtrl.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppStrings.t('pwd_no_match'))));
+      _showError(AppStrings.t('pwd_no_match'));
+      return;
+    }
+
+    final draft = _buildDraft();
+
+    // One validator for both sign-up routes. The old per-role checks disagreed
+    // with the asterisks on screen — pickup and dropoff were marked required
+    // but never actually verified.
+    final gap = ProfileRequirements.firstGapMessage(draft);
+    if (gap != null) {
+      _showError(gap);
       return;
     }
 
     setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        setState(() => _loading = false);
-        context.go('/login/$_selectedRole');
-      }
-    });
+
+    try {
+      final user = await AuthService.instance.signUp(
+        email: _emailCtrl.text,
+        password: _passCtrl.text,
+        draft: draft,
+      );
+
+      if (!mounted) return;
+      setState(() => _loading = false);
+
+      // Firebase signs the user in as part of account creation, and the profile
+      // is already complete, so go straight to their home.
+      context.go(AuthService.routeForUserRole(user.role));
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showError(e.message);
+    }
   }
 
-  Future<void> _googleContinue() async {
-    setState(() => _loading = true);
-
-    final userCredential = await AuthService.instance.signInWithGoogle();
-
+  void _showError(String message) {
     if (!mounted) return;
-
-    setState(() => _loading = false);
-
-    if (userCredential == null) {
-      return;
-    }
-
-    await AuthService.instance.saveRole(_selectedRole);
-    if (mounted) {
-      context.go(AuthService.routeForRole(_selectedRole));
-    }
-  }
-
-  String? _missingDriverField() {
-    if (_nameCtrl.text.trim().isEmpty) return 'Please enter driver name';
-    if (_emailCtrl.text.trim().isEmpty) return 'Please enter email address';
-    if (_phoneCtrl.text.trim().isEmpty) return 'Please enter phone number';
-    if (_passCtrl.text.isEmpty) return 'Please enter password';
-    if (_confirmPassCtrl.text.isEmpty) return 'Please confirm password';
-    if (_licenseCtrl.text.trim().isEmpty) {
-      return 'Please enter license number';
-    }
-    if (_vehicleCtrl.text.trim().isEmpty) {
-      return 'Please enter vehicle number';
-    }
-    if (_vehicleType == null || _vehicleType!.trim().isEmpty) {
-      return 'Please select vehicle type';
-    }
-    if (_seatCapacityCtrl.text.trim().isEmpty) {
-      return 'Please enter seat capacity';
-    }
-    if (_experienceCtrl.text.trim().isEmpty) {
-      return 'Please enter experience';
-    }
-    return null;
-  }
-
-  String? _missingStudentField() {
-    if (_nameCtrl.text.trim().isEmpty) return AppStrings.t('enter_full_name');
-    if (_studentSchoolCtrl.text.trim().isEmpty) {
-      return AppStrings.t('please_select_school');
-    }
-    return null;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -269,8 +240,6 @@ class _SignupScreenState extends State<SignupScreen> {
     _seatCapacityCtrl.dispose();
     _studentIdCtrl.dispose();
     _studentSchoolCtrl.dispose();
-    _studentPickupCtrl.dispose();
-    _studentDropoffCtrl.dispose();
     LanguageProvider.instance.removeListener(_onLangChanged);
     super.dispose();
   }
@@ -400,7 +369,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _StepDot(active: true, color: _cfg.accent),
+                              StepDot(active: true, color: _cfg.accent),
                               Container(
                                 width: 30,
                                 height: 2,
@@ -408,7 +377,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                     ? _cfg.accent
                                     : context.surfaceBorder,
                               ),
-                              _StepDot(active: _step >= 1, color: _cfg.accent),
+                              StepDot(active: _step >= 1, color: _cfg.accent),
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -463,7 +432,7 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _FieldLabel(AppStrings.t('select_your_role_lbl')),
+          FieldLabel(AppStrings.t('select_your_role_lbl')),
           const SizedBox(height: 14),
           ...(_roles.map((role) {
             final isSelected = _selectedRole == role.id;
@@ -570,10 +539,7 @@ class _SignupScreenState extends State<SignupScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Common fields
-          _FieldLabel(
-            AppStrings.t('full_name_lbl'),
-            important: _selectedRole == 'student',
-          ),
+          FieldLabel(AppStrings.t('full_name_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
@@ -583,7 +549,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('email_address_lbl'), important: true),
+          FieldLabel(AppStrings.t('email_address_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _emailCtrl,
@@ -592,7 +558,7 @@ class _SignupScreenState extends State<SignupScreen> {
             decoration: InputDecoration(hintText: AppStrings.t('enter_email')),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('phone_lbl')),
+          FieldLabel(AppStrings.t('phone_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _phoneCtrl,
@@ -605,7 +571,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Role-specific fields
           ..._roleSpecificFields(),
 
-          _FieldLabel(AppStrings.t('password_lbl'), important: true),
+          FieldLabel(AppStrings.t('password_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _passCtrl,
@@ -625,7 +591,7 @@ class _SignupScreenState extends State<SignupScreen> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('confirm_password_lbl'), important: true),
+          FieldLabel(AppStrings.t('confirm_password_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _confirmPassCtrl,
@@ -660,9 +626,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),
                     gradient: _agreeTerms ? _cfg.gradient : null,
-                    border: Border.all(
-                      color: _agreeTerms ? _cfg.accent : _cfg.accent,
-                    ),
+                    border: Border.all(color: _cfg.accent),
                   ),
                   child: _agreeTerms
                       ? Center(
@@ -699,62 +663,6 @@ class _SignupScreenState extends State<SignupScreen> {
             isEnabled: _agreeTerms,
             onTap: _agreeTerms ? _signup : null,
           ),
-          const SizedBox(height: 20),
-
-          if (_selectedRole != 'driver') ...[
-            // Google Login Option
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(color: context.surfaceBorder, thickness: 1),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'Or continue with',
-                    style: TextStyle(color: context.textTertiary, fontSize: 13),
-                  ),
-                ),
-                Expanded(
-                  child: Divider(color: context.surfaceBorder, thickness: 1),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _googleContinue,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: context.cardBgElevated,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.inputBorder),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/images/utilities/google.png',
-                      height: 20,
-                      width: 20,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.g_mobiledata, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Google',
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -765,12 +673,21 @@ class _SignupScreenState extends State<SignupScreen> {
       // ── PARENT ──────────────────────────────────────────────────────────
       case 'parent':
         return [
-          ..._children.asMap().entries.map((entry) {
-            return _buildChildCard(entry.key, entry.value);
-          }),
+          ..._children.asMap().entries.map(
+                (entry) => ChildCard(
+                  index: entry.key,
+                  data: entry.value,
+                  canRemove: _children.length > 1,
+                  onRemove: () => setState(() {
+                    _children[entry.key].dispose();
+                    _children.removeAt(entry.key);
+                  }),
+                  onChanged: () => setState(() {}),
+                ),
+              ),
           const SizedBox(height: 6),
           GestureDetector(
-            onTap: () => setState(() => _children.add(_ChildData())),
+            onTap: () => setState(() => _children.add(ChildFormData())),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -784,7 +701,7 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.add_circle_outline,
                     color: AppTheme.parentAccent,
                     size: 18,
@@ -792,7 +709,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(width: 8),
                   Text(
                     AppStrings.t('add_another_child'),
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: AppTheme.parentAccent,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
@@ -808,7 +725,7 @@ class _SignupScreenState extends State<SignupScreen> {
       // ── DRIVER ──────────────────────────────────────────────────────────
       case 'driver':
         return [
-          _FieldLabel(AppStrings.t('license_number_lbl'), important: true),
+          FieldLabel(AppStrings.t('license_number_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _licenseCtrl,
@@ -821,21 +738,27 @@ class _SignupScreenState extends State<SignupScreen> {
           Row(
             children: [
               Expanded(
-                child: _documentUploadTile(
+                child: DocumentUploadTile(
                   title: 'Upload License',
-                  subtitle: _licenseFileName ?? 'Front photo of license',
+                  subtitle: _licensePhoto == null
+                      ? 'Front photo of license'
+                      : 'Ready to upload',
                   icon: Icons.badge_rounded,
                   accentColor: AppTheme.driverCyan,
+                  isDone: _licensePhoto != null,
                   onTap: () => _pickDriverDocument(isLicense: true),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _documentUploadTile(
+                child: DocumentUploadTile(
                   title: 'Upload ID Card',
-                  subtitle: _idCardFileName ?? 'CNIC / national ID photo',
+                  subtitle: _idCardPhoto == null
+                      ? 'CNIC / national ID photo'
+                      : 'Ready to upload',
                   icon: Icons.credit_card_rounded,
                   accentColor: AppTheme.driverCyan,
+                  isDone: _idCardPhoto != null,
                   onTap: () => _pickDriverDocument(isLicense: false),
                 ),
               ),
@@ -849,7 +772,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(
+                    FieldLabel(
                       AppStrings.t('vehicle_number_lbl'),
                       important: true,
                     ),
@@ -872,15 +795,15 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(
+                    FieldLabel(
                       AppStrings.t('vehicle_type_lbl'),
                       important: true,
                     ),
                     const SizedBox(height: 8),
-                    _buildDropdown(
+                    ThemedDropdown(
                       hint: AppStrings.t('select_type_hint'),
                       value: _vehicleType,
-                      items: _vehicleTypes,
+                      items: kVehicleTypes,
                       onChanged: (v) => setState(() => _vehicleType = v),
                     ),
                   ],
@@ -889,13 +812,13 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _FieldLabel('Transport seat capacity', important: true),
+          const FieldLabel('TRANSPORT SEAT CAPACITY', important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _seatCapacityCtrl,
             keyboardType: TextInputType.number,
             style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Enter seat capacity',
               suffixIcon: Icon(
                 Icons.event_seat_rounded,
@@ -905,7 +828,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('experience_yrs_lbl'), important: true),
+          FieldLabel(AppStrings.t('experience_yrs_lbl'), important: true),
           const SizedBox(height: 8),
           TextField(
             controller: _experienceCtrl,
@@ -928,7 +851,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(AppStrings.t('student_id_lbl')),
+                    FieldLabel(
+                      AppStrings.t('student_id_lbl'),
+                      important: true,
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _studentIdCtrl,
@@ -948,12 +874,15 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _FieldLabel(AppStrings.t('grade_level_lbl')),
+                    FieldLabel(
+                      AppStrings.t('grade_level_lbl'),
+                      important: true,
+                    ),
                     const SizedBox(height: 8),
-                    _buildDropdown(
+                    ThemedDropdown(
                       hint: AppStrings.t('select_level_hint'),
                       value: _studentGrade,
-                      items: _gradeOptions,
+                      items: kGradeOptions,
                       onChanged: (v) => setState(() => _studentGrade = v),
                     ),
                   ],
@@ -962,101 +891,30 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _FieldLabel(AppStrings.t('school_institution_lbl'), important: true),
+          FieldLabel(AppStrings.t('school_institution_lbl'), important: true),
           const SizedBox(height: 8),
-          _buildSchoolSearch(
-            ctrl: _studentSchoolCtrl,
+          SchoolSearchField(
+            controller: _studentSchoolCtrl,
             isCustom: _studentSchoolCustom,
             onCustomChanged: (val) =>
                 setState(() => _studentSchoolCustom = val),
+            accentColor: AppTheme.studentAccent,
           ),
           const SizedBox(height: 16),
-          _FieldLabel('Pickup location', important: true),
+          const FieldLabel('PICKUP LOCATION', important: true),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () async {
-              final res = await Navigator.of(context).push<LatLng?>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MapPickerScreen(initial: _studentPickupLatLng),
-                ),
-              );
-              if (res != null) {
-                setState(() {
-                  _studentPickupLatLng = res;
-                  _studentPickupCtrl.text =
-                      '${res.latitude.toStringAsFixed(6)}, ${res.longitude.toStringAsFixed(6)}';
-                });
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              decoration: BoxDecoration(
-                color: context.cardBgElevated,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.inputBorder),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _studentPickupCtrl.text.isEmpty
-                          ? 'Select pickup on map'
-                          : _studentPickupCtrl.text,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.map, color: context.textTertiary),
-                ],
-              ),
-            ),
+          MapPointField(
+            placeholder: 'Select pickup on map',
+            value: _studentPickupLatLng,
+            onPicked: (p) => setState(() => _studentPickupLatLng = p),
           ),
           const SizedBox(height: 12),
-          _FieldLabel('Dropoff location', important: true),
+          const FieldLabel('DROPOFF LOCATION', important: true),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () async {
-              final res = await Navigator.of(context).push<LatLng?>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MapPickerScreen(initial: _studentDropoffLatLng),
-                ),
-              );
-              if (res != null) {
-                setState(() {
-                  _studentDropoffLatLng = res;
-                  _studentDropoffCtrl.text =
-                      '${res.latitude.toStringAsFixed(6)}, ${res.longitude.toStringAsFixed(6)}';
-                });
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              decoration: BoxDecoration(
-                color: context.cardBgElevated,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.inputBorder),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _studentDropoffCtrl.text.isEmpty
-                          ? 'Select dropoff on map'
-                          : _studentDropoffCtrl.text,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.map, color: context.textTertiary),
-                ],
-              ),
-            ),
+          MapPointField(
+            placeholder: 'Select dropoff on map',
+            value: _studentDropoffLatLng,
+            onPicked: (p) => setState(() => _studentDropoffLatLng = p),
           ),
           const SizedBox(height: 16),
         ];
@@ -1064,315 +922,6 @@ class _SignupScreenState extends State<SignupScreen> {
       default:
         return [];
     }
-  }
-
-  Widget _documentUploadTile({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: accentColor.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: accentColor.withValues(alpha: 0.28)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: accentColor, size: 18),
-                ),
-                const Spacer(),
-                Icon(Icons.upload_file_rounded, color: accentColor, size: 18),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: context.textSecondary, fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Child card ──────────────────────────────────────────────────────────
-  Widget _buildChildCard(int index, _ChildData child) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.parentPurple.withValues(
-          alpha: context.isDark ? 0.10 : 0.06,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.parentPurple.withValues(
-            alpha: context.isDark ? 0.28 : 0.20,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Card header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${AppStrings.t('child_lbl')} ${index + 1}',
-                style: TextStyle(
-                  color: AppTheme.parentAccent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              if (_children.length > 1)
-                GestureDetector(
-                  onTap: () => setState(() {
-                    child.dispose();
-                    _children.removeAt(index);
-                  }),
-                  child: const Icon(
-                    Icons.remove_circle_outline,
-                    color: Colors.redAccent,
-                    size: 20,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Name
-          _FieldLabel(AppStrings.t('childs_name_lbl')),
-          const SizedBox(height: 6),
-          TextField(
-            controller: child.nameCtrl,
-            style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: AppStrings.t('childs_name_hint'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Grade dropdown
-          _FieldLabel(AppStrings.t('grade_level_lbl')),
-          const SizedBox(height: 6),
-          _buildDropdown(
-            hint: AppStrings.t('select_level_hint'),
-            value: child.grade,
-            items: _gradeOptions,
-            onChanged: (v) => setState(() => child.grade = v),
-          ),
-          const SizedBox(height: 12),
-          // School search
-          _FieldLabel(AppStrings.t('school_institution_lbl')),
-          const SizedBox(height: 6),
-          _buildSchoolSearch(
-            ctrl: child.schoolCtrl,
-            isCustom: child.isCustomSchool,
-            onCustomChanged: (val) =>
-                setState(() => child.isCustomSchool = val),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Themed dropdown ─────────────────────────────────────────────────────
-  Widget _buildDropdown({
-    required String hint,
-    required String? value,
-    required List<String> items,
-    required void Function(String?) onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: context.cardBgElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.inputBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(
-            hint,
-            style: TextStyle(color: context.textTertiary, fontSize: 14),
-          ),
-          isExpanded: true,
-          dropdownColor: context.cardBgElevated,
-          iconEnabledColor: context.textTertiary,
-          style: TextStyle(color: context.textPrimary, fontSize: 15),
-          items: items
-              .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  // ── Searchable school field with autocomplete ────────────────────────────
-  Widget _buildSchoolSearch({
-    required TextEditingController ctrl,
-    required bool isCustom,
-    required void Function(bool) onCustomChanged,
-  }) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: ctrl.text),
-      optionsBuilder: (textEditingValue) {
-        final query = textEditingValue.text.trim().toLowerCase();
-        if (query.isEmpty) return const Iterable.empty();
-        final matches = _schoolList
-            .where((s) => s.toLowerCase().contains(query))
-            .toList();
-        // Add sentinel at the end to allow manual entry
-        return [...matches, '__manual__:${textEditingValue.text.trim()}'];
-      },
-      displayStringForOption: (option) =>
-          option.startsWith('__manual__:') ? '' : option,
-      onSelected: (option) {
-        if (option.startsWith('__manual__:')) {
-          ctrl.text = option.substring('__manual__:'.length);
-          onCustomChanged(true);
-        } else {
-          ctrl.text = option;
-          onCustomChanged(false);
-        }
-      },
-      fieldViewBuilder: (bCtx, fieldCtrl, focusNode, onFieldSubmitted) {
-        return TextField(
-          controller: fieldCtrl,
-          focusNode: focusNode,
-          onChanged: (value) => ctrl.text = value,
-          style: TextStyle(color: context.textPrimary, fontSize: 15),
-          decoration: InputDecoration(
-            hintText: AppStrings.t('search_school_hint'),
-            suffixIcon: isCustom
-                ? Icon(Icons.edit_note, color: AppTheme.parentAccent, size: 20)
-                : Icon(Icons.search, color: context.textTertiary, size: 18),
-          ),
-        );
-      },
-      optionsViewBuilder: (bCtx, onAutoCompleteSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(12),
-            color: context.cardBgElevated,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                shrinkWrap: true,
-                children: options.map((option) {
-                  final isManual = option.startsWith('__manual__:');
-                  final label = isManual
-                      ? '+ Add "${option.substring('__manual__:'.length)}" manually'
-                      : option;
-                  return InkWell(
-                    onTap: () => onAutoCompleteSelected(option),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          color: isManual
-                              ? AppTheme.parentAccent
-                              : context.textPrimary,
-                          fontSize: 14,
-                          fontWeight: isManual
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  final bool important;
-  const _FieldLabel(this.text, {this.important = false});
-  @override
-  Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          color: context.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
-        children: [
-          TextSpan(text: text),
-          if (important)
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: Colors.red),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepDot extends StatelessWidget {
-  final bool active;
-  final Color color;
-  const _StepDot({required this.active, required this.color});
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? color : context.surfaceBorder,
-        border: Border.all(
-          color: active ? color : Colors.white.withValues(alpha: 0.2),
-          width: 2,
-        ),
-      ),
-    );
   }
 }
 
@@ -1388,17 +937,4 @@ class _RoleCfg {
     this.glow,
     this.accent,
   );
-}
-
-/// Holds per-child form state for the parent signup flow.
-class _ChildData {
-  final nameCtrl = TextEditingController();
-  final schoolCtrl = TextEditingController();
-  String? grade;
-  bool isCustomSchool = false;
-
-  void dispose() {
-    nameCtrl.dispose();
-    schoolCtrl.dispose();
-  }
 }

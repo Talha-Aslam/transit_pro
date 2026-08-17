@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../app/auth_service.dart';
+import '../app/session_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -49,17 +51,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 4000),
     );
-    _progressController.addStatusListener((status) async {
-      if (status == AnimationStatus.completed && mounted) {
-        final savedRole = await AuthService.instance.getSavedRole();
-        if (!mounted) return;
-        if (savedRole != null) {
-          if (!mounted) return;
-          context.go(AuthService.routeForRole(savedRole));
-        } else {
-          context.go('/role-select');
-        }
-      }
+    _progressController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) _routeOnward();
     });
     _progressController.forward();
 
@@ -80,6 +73,76 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         top: 0.10 + _random.nextDouble() * 0.80,
       ),
     );
+  }
+
+  /// Decides where the splash hands off to.
+  ///
+  /// It used to read the saved role out of SharedPreferences and go straight
+  /// there. That key outlives the Firebase session, so a signed-out user with a
+  /// stale pref was pushed to `/parent` and then immediately bounced back to
+  /// `/role-select` by the router guard — a visible flash of the wrong screen.
+  /// The live session is the only thing worth trusting here.
+  Future<void> _routeOnward() async {
+    final auth = AuthService.instance;
+    final session = SessionService.instance;
+
+    if (!auth.isSignedIn) {
+      if (mounted) context.go('/role-select');
+      return;
+    }
+
+    // The profile normally lands during the 4-second splash animation. If the
+    // network is slow it may not have, so wait briefly rather than guessing.
+    if (session.isLoading) {
+      await _waitForSession();
+    }
+    if (!mounted) return;
+
+    if (session.hasError) {
+      // The profile couldn't even be read — a genuine backend/permissions
+      // failure (see SessionState.error), not "hasn't finished onboarding".
+      // Routing by role.cachedRole here would send the user into a dashboard
+      // that will just hit the same wall trying to load its own data. Ending
+      // the session cleanly and sending them back to pick a role again is
+      // honest about not knowing their status, and next time buys a fresh
+      // attempt against whatever is actually wrong.
+      await auth.signOut();
+      if (mounted) context.go('/role-select');
+      return;
+    }
+
+    if (session.needsProfile) {
+      context.go('/complete-profile');
+      return;
+    }
+
+    final role = session.role;
+    context.go(
+      role != null
+          ? AuthService.routeForUserRole(role)
+          : AuthService.routeForRole(auth.cachedRole ?? 'parent'),
+    );
+  }
+
+  /// Waits for the first profile snapshot, giving up after a few seconds so a
+  /// dead connection cannot strand the user on the splash screen forever.
+  Future<void> _waitForSession() async {
+    final session = SessionService.instance;
+    final done = Completer<void>();
+
+    void listener() {
+      if (!session.isLoading && !done.isCompleted) done.complete();
+    }
+
+    session.state.addListener(listener);
+    try {
+      await done.future.timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {},
+      );
+    } finally {
+      session.state.removeListener(listener);
+    }
   }
 
   void _onLangChanged() => setState(() {});

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../app/auth_service.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
@@ -15,6 +16,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
   bool _loading = false;
   bool _sent = false;
+  String _error = '';
 
   @override
   void initState() {
@@ -24,17 +26,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   void _onLangChanged() => setState(() {});
 
-  void _sendReset() {
-    if (_emailCtrl.text.isEmpty) return;
-    setState(() => _loading = true);
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _sent = true;
-        });
-      }
+  Future<void> _sendReset() async {
+    if (_emailCtrl.text.trim().isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = '';
     });
+
+    try {
+      await AuthService.instance.sendPasswordResetEmail(_emailCtrl.text);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _sent = true;
+      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    }
   }
 
   @override
@@ -182,6 +194,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 hintText: AppStrings.t('email_hint'),
                               ),
                             ),
+                            if (_error.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('⚠️',
+                                      style: TextStyle(fontSize: 13)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _error,
+                                      style: TextStyle(
+                                        color: AppTheme.error,
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 20),
                             GradientButton(
                               label: AppStrings.t('send_reset'),

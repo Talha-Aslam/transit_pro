@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../app/auth_service.dart';
+import '../../widgets/logout_flow.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import 'student_dashboard.dart';
@@ -76,10 +75,10 @@ class _StudentLayoutState extends State<StudentLayout> {
               const StudentNotifications(),
               const StudentFees(),
               StudentProfile(
-                onLogout: () {
-                  AuthService.instance.clearRole();
-                  context.go('/role-select');
-                },
+                onLogout: () => confirmAndSignOut(
+                  context,
+                  accentColor: AppTheme.studentAmber,
+                ),
               ),
             ],
           ),

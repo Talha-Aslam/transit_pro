@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/driver_alerts_service.dart';
+import '../../app/driver_data_service.dart';
 import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -117,21 +118,42 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Mike Thompson',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Bus #42 · Route A – East District',
-                          style: TextStyle(
-                            color: AppTheme.driverAccent,
-                            fontSize: 12,
-                          ),
+                        ValueListenableBuilder<DriverInfo>(
+                          valueListenable:
+                              DriverDataService.instance.driverInfo,
+                          builder: (_, info, _) {
+                            // Vehicle and route are only known once an admin
+                            // has assigned them, so say so rather than showing
+                            // a bus this driver does not drive.
+                            final assignment = [
+                              info.busNumber,
+                              info.route,
+                            ].where((s) => s.isNotEmpty).join(' · ');
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  info.name,
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  assignment.isEmpty
+                                      ? 'No vehicle assigned yet'
+                                      : assignment,
+                                  style: const TextStyle(
+                                    color: AppTheme.driverAccent,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),

@@ -445,6 +445,16 @@ Optionally set `RouteService.instance.apiKey` for real Directions routing. Witho
 
 Project **`transitpro-db`** (sender `231263449779`) is already configured for all platforms in `lib/firebase_options.dart`. Use the **Firebase Emulator Suite** during development to avoid consuming free-tier quota.
 
+**Free (Spark) plan covers this project:** Auth (email/password + Google, unlimited) · Firestore 50k reads / 20k writes per day · Realtime Database 10 GB/month, 100 concurrent connections. Estimated pilot usage (~65 users, 2 buses) is roughly 8k reads and 500 writes per day — comfortably inside the free tier.
+
+> ⚠️ **Cloud Storage is NOT provisioned.** Verified 2026-08-12: both `transitpro-db.firebasestorage.app` and `transitpro-db.appspot.com` return `404 — "The specified bucket does not exist."` The `storageBucket` value in `firebase_options.dart` is FlutterFire's *predicted default name*, **not** evidence the bucket exists.
+>
+> This project appears recent enough to fall under Google's post-2024 policy requiring the **Blaze plan** to provision a Storage bucket. Storage is needed for driver documents, payment slips, and profile photos (Phase 1).
+>
+> **This is the same blocker as Open Decision #1** — both Maps and Storage require a card on file. Enabling Blaze once solves both and still costs ~$0 under the free limits. Fallback without a card: OpenStreetMap for maps + Cloudinary (25 GB free) for files.
+>
+> Do **not** work around this by storing base64 images in Firestore — the 1 MB document cap and read costs make it a dead end.
+
 ---
 
 ## 10. Roadmap
@@ -495,6 +505,7 @@ Payment gateway (keep deep-link + manual slip confirmation — realistic without
 |---|---|---|---|
 | 1 | **Maps provider** | (a) Google Maps + billing enabled — 30 min, ~$0, card required. (b) `flutter_map` + OpenStreetMap — no key, no card, permanently free, ~3–5 days to migrate 4 map screens; loses `map_style.json` and camera tilt | ⏳ **Open — blocks Phase 0.** There is no keyless "demo" Google Maps path for a Flutter *mobile* app; the watermarked demo mode is a Maps **JavaScript** API behaviour and does not apply to the native Android/iOS SDK |
 | 2 | **Azure $100 credit — best use** | (a) Azure OpenAI for the assistant (better rate limits than Gemini free). (b) Host the ETA model as a small FastAPI service on Container Apps — gives a real "backend service" to write about. (c) Hold as reserve if Firebase quota is exceeded during the pilot | ⏳ Open. Recommend **not** rebuilding the backend on Azure — Firebase's realtime + FCM story is worth more here. Note the credit expires (12 months on Azure for Students) |
+| 1b | **File storage** | Verified 2026-08-12: **no Storage bucket exists** on `transitpro-db`. Needed for driver documents, payment slips, profile photos. (a) Enable Blaze — also solves #1, ~$0, card required. (b) Cloudinary 25 GB free, no card. (c) Supabase Storage 1 GB free | ⏳ **Open — same card blocker as #1.** Resolve both together |
 | 3 | Dead screens | Route them, or delete | ⏳ Open |
 | 4 | Student vs parent overlap | Student fees route into the parent payment flow; several student screens use parent widgets and purple accents | ⏳ Open |
 | 5 | Per-day schedules | `DriverTimingSlots` has one global slot set; the UI implies per-day | ⏳ Open |
