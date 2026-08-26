@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 import '../app/auth_service.dart';
@@ -23,8 +22,6 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   String _selectedRole = 'parent';
   bool _loading = false;
-  bool _showPass = false;
-  bool _showConfirmPass = false;
   bool _agreeTerms = false;
   int _step = 0; // 0 = role pick, 1 = form
 
@@ -50,13 +47,22 @@ class _SignupScreenState extends State<SignupScreen> {
   File? _licensePhoto;
   File? _idCardPhoto;
 
+  /// Where the driver runs, and the rounds families can book. Collected here as
+  /// well as on the Google completion screen, and validated by the same
+  /// `ProfileRequirements` — the two forms have to ask for the same things or one
+  /// route produces accounts the other would reject.
+  final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+  final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
+  double _serviceRadiusKm = 5;
+  GeoCoord? _baseLocation;
+
   // Student-specific
   final _studentIdCtrl = TextEditingController();
   String? _studentGrade;
   final _studentSchoolCtrl = TextEditingController();
   bool _studentSchoolCustom = false;
-  LatLng? _studentPickupLatLng;
-  LatLng? _studentDropoffLatLng;
+  GeoCoord? _studentPickupLatLng;
+  GeoCoord? _studentDropoffLatLng;
 
   static final _roles = [
     _RoleCfg(
@@ -95,12 +101,6 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _onLangChanged() => setState(() {});
-
-  String? get _passwordMismatchError {
-    final confirm = _confirmPassCtrl.text;
-    if (confirm.isEmpty) return null;
-    return _passCtrl.text != confirm ? AppStrings.t('pwd_no_match') : null;
-  }
 
   Future<void> _pickDriverDocument({required bool isLicense}) async {
     final source = await showImageSourceSheet(
@@ -153,25 +153,31 @@ class _SignupScreenState extends State<SignupScreen> {
                 name: c.nameCtrl.text,
                 grade: c.grade ?? '',
                 school: c.schoolCtrl.text,
+                studentIdNumber: c.studentIdCtrl.text,
+                pickupLocation: c.pickup,
               ),
             )
             .toList(),
         studentIdNumber: _studentIdCtrl.text,
         instituteType: _studentGrade ?? '',
         school: _studentSchoolCtrl.text,
-        pickupLocation: _toGeo(_studentPickupLatLng),
-        dropoffLocation: _toGeo(_studentDropoffLatLng),
+        pickupLocation: _studentPickupLatLng,
+        dropoffLocation: _studentDropoffLatLng,
         licenseNumber: _licenseCtrl.text,
         experienceYears: int.tryParse(_experienceCtrl.text.trim()) ?? 0,
         vehicleNumber: _vehicleCtrl.text,
         vehicleType: _vehicleType ?? '',
         seatCapacity: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+        serviceAreas: _serviceAreas
+            .where((a) => !a.isBlank)
+            .map((a) => a.toModel())
+            .toList(),
+        serviceRadiusKm: _serviceRadiusKm,
+        baseLocation: _baseLocation,
+        schedules: _rounds.map((r) => r.toModel()).toList(),
         licensePhoto: _licensePhoto,
         idCardPhoto: _idCardPhoto,
       );
-
-  static GeoCoord? _toGeo(LatLng? p) =>
-      p == null ? null : GeoCoord(p.latitude, p.longitude);
 
   Future<void> _signup() async {
     if (!_agreeTerms) return;
@@ -216,6 +222,14 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       setState(() => _loading = false);
       _showError(e.message);
+    } catch (e) {
+      // Defence-in-depth: `AuthService.signUp` has its own catch-all, but
+      // this call is fire-and-forget from the button, so any exception type
+      // that somehow still escaped it must not leave `_loading` stuck `true`
+      // forever.
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showError('Something went wrong. Please try again.');
     }
   }
 
@@ -238,6 +252,12 @@ class _SignupScreenState extends State<SignupScreen> {
     _vehicleCtrl.dispose();
     _experienceCtrl.dispose();
     _seatCapacityCtrl.dispose();
+    for (final a in _serviceAreas) {
+      a.dispose();
+    }
+    for (final r in _rounds) {
+      r.dispose();
+    }
     _studentIdCtrl.dispose();
     _studentSchoolCtrl.dispose();
     LanguageProvider.instance.removeListener(_onLangChanged);
@@ -534,6 +554,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildFormStep() {
     return GlassCard(
+      // This card is the page's scroll content and can run to a dozen+
+      // fields/cards for a driver — it repaints on every scroll frame, so a
+      // live BackdropFilter here would re-blur constantly. Skip it; the
+      // translucent fill/border still reads as glass.
+      enableBlur: false,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -571,46 +596,9 @@ class _SignupScreenState extends State<SignupScreen> {
           // Role-specific fields
           ..._roleSpecificFields(),
 
-          FieldLabel(AppStrings.t('password_lbl'), important: true),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _passCtrl,
-            obscureText: !_showPass,
-            style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: AppStrings.t('create_password_hint'),
-              suffixIcon: GestureDetector(
-                onTap: () => setState(() => _showPass = !_showPass),
-                child: Icon(
-                  _showPass ? Icons.visibility_off : Icons.visibility,
-                  color: context.textTertiary,
-                  size: 20,
-                ),
-              ),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 16),
-          FieldLabel(AppStrings.t('confirm_password_lbl'), important: true),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _confirmPassCtrl,
-            obscureText: !_showConfirmPass,
-            style: TextStyle(color: context.textPrimary, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: AppStrings.t('reenter_password_hint'),
-              suffixIcon: GestureDetector(
-                onTap: () =>
-                    setState(() => _showConfirmPass = !_showConfirmPass),
-                child: Icon(
-                  _showConfirmPass ? Icons.visibility_off : Icons.visibility,
-                  color: context.textTertiary,
-                  size: 20,
-                ),
-              ),
-              errorText: _passwordMismatchError,
-            ),
-            onChanged: (_) => setState(() {}),
+          _PasswordFields(
+            passwordController: _passCtrl,
+            confirmController: _confirmPassCtrl,
           ),
           const SizedBox(height: 18),
 
@@ -675,6 +663,7 @@ class _SignupScreenState extends State<SignupScreen> {
         return [
           ..._children.asMap().entries.map(
                 (entry) => ChildCard(
+                  key: ValueKey(entry.value),
                   index: entry.key,
                   data: entry.value,
                   canRemove: _children.length > 1,
@@ -838,6 +827,8 @@ class _SignupScreenState extends State<SignupScreen> {
               hintText: AppStrings.t('experience_hint'),
             ),
           ),
+          const SizedBox(height: 24),
+          ..._driverServiceFields(),
           const SizedBox(height: 16),
         ];
 
@@ -906,6 +897,7 @@ class _SignupScreenState extends State<SignupScreen> {
           MapPointField(
             placeholder: 'Select pickup on map',
             value: _studentPickupLatLng,
+            accentColor: AppTheme.studentAmber,
             onPicked: (p) => setState(() => _studentPickupLatLng = p),
           ),
           const SizedBox(height: 12),
@@ -914,6 +906,7 @@ class _SignupScreenState extends State<SignupScreen> {
           MapPointField(
             placeholder: 'Select dropoff on map',
             value: _studentDropoffLatLng,
+            accentColor: AppTheme.studentAmber,
             onPicked: (p) => setState(() => _studentDropoffLatLng = p),
           ),
           const SizedBox(height: 16),
@@ -922,6 +915,230 @@ class _SignupScreenState extends State<SignupScreen> {
       default:
         return [];
     }
+  }
+
+  /// Service areas, travel radius and bookable rounds.
+  ///
+  /// Mirrors the same section on the Google profile-completion screen and shares
+  /// its widgets, so a driver who signs up manually and one who signs in with
+  /// Google are asked for identical information and end up with identical
+  /// documents.
+  List<Widget> _driverServiceFields() => [
+    _serviceHeading(
+      'Where do you drive?',
+      'Parents find you by their child\'s school, so list every institution '
+          'you already run to.',
+    ),
+    const SizedBox(height: 14),
+    ..._serviceAreas.asMap().entries.map(
+      (e) => ServiceAreaCard(
+        key: ValueKey(e.value),
+        index: e.key,
+        data: e.value,
+        canRemove: _serviceAreas.length > 1,
+        onRemove: () => setState(() {
+          _serviceAreas[e.key].dispose();
+          _serviceAreas.removeAt(e.key);
+        }),
+        onChanged: () => setState(() {}),
+        accentColor: AppTheme.driverCyan,
+      ),
+    ),
+    _serviceAddButton(
+      'Add another destination',
+      () => setState(() => _serviceAreas.add(ServiceAreaFormData())),
+    ),
+    const SizedBox(height: 18),
+    const FieldLabel('YOUR STARTING POINT (OPTIONAL)'),
+    const SizedBox(height: 8),
+    MapPointField(
+      placeholder: 'Tap to pin where you start your day',
+      value: _baseLocation,
+      accentColor: AppTheme.driverCyan,
+      onPicked: (p) => setState(() => _baseLocation = p),
+    ),
+    const SizedBox(height: 16),
+    FieldLabel('HOW FAR WILL YOU TRAVEL? — ${_serviceRadiusKm.round()} KM'),
+    Slider(
+      value: _serviceRadiusKm,
+      min: 1,
+      max: 30,
+      divisions: 29,
+      activeColor: AppTheme.driverCyan,
+      label: '${_serviceRadiusKm.round()} km',
+      onChanged: (v) => setState(() => _serviceRadiusKm = v),
+    ),
+    Text(
+      'Families further than this from your starting point will not see you.',
+      style: TextStyle(color: context.textTertiary, fontSize: 11),
+    ),
+    const SizedBox(height: 24),
+    _serviceHeading(
+      'Your rounds',
+      'Add one round per trip you run. A 6:30 group and a 7:30 group are two '
+          'rounds, and each gets its own seats — so a 12-seater offers 12 seats '
+          'on both.',
+    ),
+    const SizedBox(height: 14),
+    ..._rounds.asMap().entries.map(
+      (e) => RoundCard(
+        key: ValueKey(e.value),
+        index: e.key,
+        data: e.value,
+        canRemove: _rounds.length > 1,
+        onRemove: () => setState(() {
+          _rounds[e.key].dispose();
+          _rounds.removeAt(e.key);
+        }),
+        onChanged: () => setState(() {}),
+        accentColor: AppTheme.driverCyan,
+      ),
+    ),
+    _serviceAddButton(
+      'Add another round',
+      () => setState(() {
+        _rounds.add(
+          RoundFormData.fresh(
+            ordinal: _rounds.length + 1,
+            seats: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+          ),
+        );
+      }),
+    ),
+  ];
+
+  Widget _serviceHeading(String title, String subtitle) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(height: 1, color: context.surfaceBorder),
+      const SizedBox(height: 16),
+      Text(
+        title,
+        style: TextStyle(
+          color: context.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        subtitle,
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
+      ),
+    ],
+  );
+
+  Widget _serviceAddButton(String label, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: AppTheme.driverCyan.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.add_circle_outline,
+                color: AppTheme.driverCyan,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppTheme.driverCyan,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+/// Owns the visibility toggles and live mismatch check locally, so typing in
+/// either field only repaints these two fields instead of the entire
+/// (blur-backed) signup form.
+class _PasswordFields extends StatefulWidget {
+  final TextEditingController passwordController;
+  final TextEditingController confirmController;
+
+  const _PasswordFields({
+    required this.passwordController,
+    required this.confirmController,
+  });
+
+  @override
+  State<_PasswordFields> createState() => _PasswordFieldsState();
+}
+
+class _PasswordFieldsState extends State<_PasswordFields> {
+  bool _showPass = false;
+  bool _showConfirmPass = false;
+
+  String? get _mismatchError {
+    final confirm = widget.confirmController.text;
+    if (confirm.isEmpty) return null;
+    return widget.passwordController.text != confirm
+        ? AppStrings.t('pwd_no_match')
+        : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FieldLabel(AppStrings.t('password_lbl'), important: true),
+        const SizedBox(height: 8),
+        TextField(
+          controller: widget.passwordController,
+          obscureText: !_showPass,
+          style: TextStyle(color: context.textPrimary, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: AppStrings.t('create_password_hint'),
+            suffixIcon: GestureDetector(
+              onTap: () => setState(() => _showPass = !_showPass),
+              child: Icon(
+                _showPass ? Icons.visibility_off : Icons.visibility,
+                color: context.textTertiary,
+                size: 20,
+              ),
+            ),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
+        FieldLabel(AppStrings.t('confirm_password_lbl'), important: true),
+        const SizedBox(height: 8),
+        TextField(
+          controller: widget.confirmController,
+          obscureText: !_showConfirmPass,
+          style: TextStyle(color: context.textPrimary, fontSize: 15),
+          decoration: InputDecoration(
+            hintText: AppStrings.t('reenter_password_hint'),
+            suffixIcon: GestureDetector(
+              onTap: () => setState(() => _showConfirmPass = !_showConfirmPass),
+              child: Icon(
+                _showConfirmPass ? Icons.visibility_off : Icons.visibility,
+                color: context.textTertiary,
+                size: 20,
+              ),
+            ),
+            errorText: _mismatchError,
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ],
+    );
   }
 }
 

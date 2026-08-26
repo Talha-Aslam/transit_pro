@@ -8,10 +8,45 @@ class ChildDraft {
   final String grade;
   final String school;
 
-  const ChildDraft({this.name = '', this.grade = '', this.school = ''});
+  /// The school's own roll number, if the family has one. Optional — a parent
+  /// registering a five-year-old usually does not, and demanding it would block
+  /// them. Uniqueness never depends on it: see [Student.publicCode].
+  final String studentIdNumber;
+
+  /// Where the child is collected from. Optional at sign-up, but without it
+  /// driver matchmaking can only rank by name, not proximity.
+  final GeoCoord? pickupLocation;
+
+  const ChildDraft({
+    this.name = '',
+    this.grade = '',
+    this.school = '',
+    this.studentIdNumber = '',
+    this.pickupLocation,
+  });
 
   bool get isBlank =>
       name.trim().isEmpty && grade.trim().isEmpty && school.trim().isEmpty;
+
+  /// Name reduced for duplicate detection — case and inner spacing folded, so
+  /// `"Jack  Jones"` and `"jack jones"` are recognised as the same child.
+  String get comparableName =>
+      name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  ChildDraft copyWith({
+    String? name,
+    String? grade,
+    String? school,
+    String? studentIdNumber,
+    GeoCoord? pickupLocation,
+  }) =>
+      ChildDraft(
+        name: name ?? this.name,
+        grade: grade ?? this.grade,
+        school: school ?? this.school,
+        studentIdNumber: studentIdNumber ?? this.studentIdNumber,
+        pickupLocation: pickupLocation ?? this.pickupLocation,
+      );
 }
 
 /// Everything a sign-up form can collect, for any role.
@@ -47,6 +82,21 @@ class ProfileDraft {
   final String vehicleType;
   final int seatCapacity;
 
+  /// The institutions this driver runs to. Without at least one, no parent can
+  /// ever find them — which is why it is a required field rather than something
+  /// to fill in later from the profile screen.
+  final List<ServiceArea> serviceAreas;
+
+  /// How far the driver will travel to collect a student, from [baseLocation].
+  final double serviceRadiusKm;
+  final GeoCoord? baseLocation;
+
+  /// The bookable rounds. Reuses the domain type rather than a parallel draft
+  /// class: a brand-new driver's rounds have `bookedSeats: 0`, which is exactly
+  /// what [DriverSchedule] already represents, and a second near-identical type
+  /// would just be somewhere for the two to drift apart.
+  final List<DriverSchedule> schedules;
+
   /// Local files, uploaded to Cloudinary during provisioning. Null when the
   /// driver has already uploaded that document.
   final File? licensePhoto;
@@ -69,6 +119,10 @@ class ProfileDraft {
     this.vehicleNumber = '',
     this.vehicleType = '',
     this.seatCapacity = 0,
+    this.serviceAreas = const [],
+    this.serviceRadiusKm = 0,
+    this.baseLocation,
+    this.schedules = const [],
     this.licensePhoto,
     this.idCardPhoto,
   });
@@ -95,6 +149,10 @@ class ProfileDraft {
     String? vehicleNumber,
     String? vehicleType,
     int? seatCapacity,
+    List<ServiceArea>? serviceAreas,
+    double? serviceRadiusKm,
+    GeoCoord? baseLocation,
+    List<DriverSchedule>? schedules,
     File? licensePhoto,
     File? idCardPhoto,
   }) =>
@@ -115,6 +173,10 @@ class ProfileDraft {
         vehicleNumber: vehicleNumber ?? this.vehicleNumber,
         vehicleType: vehicleType ?? this.vehicleType,
         seatCapacity: seatCapacity ?? this.seatCapacity,
+        serviceAreas: serviceAreas ?? this.serviceAreas,
+        serviceRadiusKm: serviceRadiusKm ?? this.serviceRadiusKm,
+        baseLocation: baseLocation ?? this.baseLocation,
+        schedules: schedules ?? this.schedules,
         licensePhoto: licensePhoto ?? this.licensePhoto,
         idCardPhoto: idCardPhoto ?? this.idCardPhoto,
       );
@@ -149,6 +211,25 @@ class ProfileRequirements {
             if (kids[i].grade.trim().isEmpty) gaps.add('$label — grade');
             if (kids[i].school.trim().isEmpty) gaps.add('$label — school');
           }
+
+          // Two children on the same account with the same name is almost always
+          // a double-tap on "Add child", not twins. Catching it here matters
+          // because the two records are then indistinguishable on a driver's
+          // roster, and the parent has no way to tell which one they attached to
+          // a driver. Twins with genuinely identical names are the rare case, and
+          // the fix — a middle name or an initial — is one the parent can apply
+          // themselves.
+          final seen = <String>{};
+          for (final kid in kids) {
+            final key = kid.comparableName;
+            if (key.isEmpty) continue;
+            if (!seen.add(key)) {
+              gaps.add(
+                'Two children named "${kid.name.trim()}" — give them '
+                'distinguishable names',
+              );
+            }
+          }
         }
 
       case UserRole.student:
@@ -166,6 +247,34 @@ class ProfileRequirements {
         if (d.experienceYears <= 0) gaps.add('Years of experience');
         if (d.licensePhoto == null) gaps.add('Licence photo');
         if (d.idCardPhoto == null) gaps.add('ID card photo');
+
+        // Both of these are required rather than optional-with-a-nudge-later,
+        // because a driver missing either is invisible to every parent in the
+        // city while their own profile looks finished. Silent invisibility is
+        // the worst failure mode this flow has: the driver waits for requests
+        // that can never arrive and has nothing on screen telling them why.
+        if (d.serviceAreas.isEmpty) {
+          gaps.add('At least one school, college or university you serve');
+        }
+
+        final rounds = d.schedules;
+        if (rounds.isEmpty) {
+          gaps.add('At least one pickup or drop-off round');
+        } else {
+          for (var i = 0; i < rounds.length; i++) {
+            final label = rounds[i].label.trim().isEmpty
+                ? 'Round ${i + 1}'
+                : rounds[i].label.trim();
+            if (rounds[i].startTime.trim().isEmpty) {
+              gaps.add('$label — start time');
+            }
+            if (rounds[i].totalSeats <= 0) gaps.add('$label — seats');
+          }
+
+          if (rounds.every((r) => r.totalSeats <= 0)) {
+            gaps.add('Seats on at least one round');
+          }
+        }
 
       case UserRole.admin:
         break;

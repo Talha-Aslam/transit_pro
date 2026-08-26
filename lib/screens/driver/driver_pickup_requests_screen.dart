@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/missed_bus_service.dart';
+import '../../app/session_service.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -31,18 +32,22 @@ class _DriverPickupRequestsScreenState
 
   void _rebuild() => setState(() {});
 
-  void _confirmAccept(MissedBusRequest req) {
-    showModalBottomSheet(
+  Future<void> _confirmAccept(MissedBusRequest req) async {
+    final accepted = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _ConfirmSheet(
         request: req,
-        onConfirm: () {
-          _service.acceptRequest(req.id);
-          Navigator.pop(context);
-        },
+        onConfirm: () => Navigator.pop(context, true),
       ),
     );
+    if (accepted != true || !mounted) return;
+    try {
+      await _service.acceptRequest(req.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   @override
@@ -170,6 +175,9 @@ class _RequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      // One instance per row of a `ListView.builder` — the blur pass would
+      // repeat for every visible card on every scroll frame.
+      enableBlur: false,
       padding: const EdgeInsets.all(0),
       clipContent: true,
       child: Column(
@@ -428,6 +436,42 @@ class _ConfirmSheet extends StatelessWidget {
             textAlign: TextAlign.center,
             style:
                 TextStyle(color: context.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          Builder(
+            builder: (_) {
+              final farePaisa =
+                  SessionService.instance.driver.value?.missedBusFarePaisa ??
+                      0;
+              final hasFare = farePaisa > 0;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: (hasFare ? AppTheme.success : AppTheme.warning)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (hasFare ? AppTheme.success : AppTheme.warning)
+                        .withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Text(
+                  hasFare
+                      ? 'The family will be shown a fare of Rs.${(farePaisa / 100).round()}, payable to you directly.'
+                      : "You haven't set a pickup fare — the family won't "
+                          'see one. Set it under My Service before accepting '
+                          'if you want to charge for this.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: hasFare
+                        ? AppTheme.successLight
+                        : AppTheme.warningLight,
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 24),
           Row(

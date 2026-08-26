@@ -1,3 +1,11 @@
+// This whole file is invented data used by parent_dashboard.dart and
+// parent/trip_history_screen.dart. A real replacement would stream from
+// TripRepository, but `fetchAttendanceForStudent` returns bare
+// AttendanceRecords (studentId/status/stopId/markedAt) with no reference back
+// to the parent Trip document, so there's no ready path to the
+// date/route/on-time verdict this screen needs — that join (and probably a
+// new `watchTripsForStudent`-style method) is real repository design work,
+// not a quick wiring change, so it's deferred rather than half-done here.
 class ParentTripHistoryEntry {
   final DateTime date;
   final String typeKey;

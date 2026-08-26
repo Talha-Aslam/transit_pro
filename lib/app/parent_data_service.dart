@@ -7,6 +7,7 @@ import 'package:transit_core/transit_core.dart';
 
 import '../data/payment_repository.dart';
 import '../data/rating_repository.dart';
+import '../data/trip_repository.dart';
 import '../data/user_repository.dart';
 import '../services/cloudinary_service.dart';
 import 'session_service.dart';
@@ -27,6 +28,17 @@ class ChildInfo {
   String driver;
   String? photoUrl;
 
+  /// Where the child is collected from / dropped off, from
+  /// `Student.pickupLocation`/`.dropoffLocation`. Set at signup but, until
+  /// now, never surfaced (or editable) anywhere past that point.
+  GeoCoord? pickup;
+  GeoCoord? dropoff;
+
+  /// Which of the assigned driver's `DriverSchedule` rounds this child rides
+  /// — `Student.scheduleId`. Null when the driver runs a single round (or
+  /// none at all), in which case there is nothing to choose.
+  String? scheduleId;
+
   ChildInfo({
     this.id = '',
     this.name = '',
@@ -37,6 +49,9 @@ class ChildInfo {
     this.stop = '',
     this.driver = '',
     this.photoUrl,
+    this.pickup,
+    this.dropoff,
+    this.scheduleId,
   });
 
   ChildInfo copyWith({
@@ -48,6 +63,9 @@ class ChildInfo {
     String? stop,
     String? driver,
     String? photoUrl,
+    GeoCoord? pickup,
+    GeoCoord? dropoff,
+    String? scheduleId,
   }) => ChildInfo(
     id: id,
     name: name ?? this.name,
@@ -58,6 +76,9 @@ class ChildInfo {
     stop: stop ?? this.stop,
     driver: driver ?? this.driver,
     photoUrl: photoUrl ?? this.photoUrl,
+    pickup: pickup ?? this.pickup,
+    dropoff: dropoff ?? this.dropoff,
+    scheduleId: scheduleId ?? this.scheduleId,
   );
 }
 
@@ -87,6 +108,11 @@ class ParentDataService {
   /// preference for this phone, not shared data anyone else reads.
   static const _paymentRemindersKey = 'parent_payment_reminders';
 
+  /// Boarding/arrival/delay alert toggles, same device-local reasoning as
+  /// [_paymentRemindersKey] — these are per-phone notification preferences,
+  /// not account data.
+  static const _notificationPrefsKey = 'parent_notification_prefs';
+
   final parentInfo = ValueNotifier<ParentInfo>(ParentInfo());
   final children = ValueNotifier<List<ChildInfo>>([]);
 
@@ -104,6 +130,10 @@ class ParentDataService {
   final paidFeeMonths = ValueNotifier<Set<String>>({});
   final feeNotifications = ValueNotifier<List<String>>([]);
   final paymentReminders = ValueNotifier<Map<String, bool>>({});
+
+  /// Keyed by 'boarding' / 'arrival' / 'delay'. Missing keys default to `true`
+  /// in [notificationPrefFor] — the toggles have always defaulted on.
+  final notificationPrefs = ValueNotifier<Map<String, bool>>({});
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -164,9 +194,19 @@ class ParentDataService {
         busNumber: bus?.busNumber ?? '',
         route: route?.name ?? '',
         stop: session.stopNameFor(s) ?? '',
-        // The driver *id*, not a display name — see _driverKey.
-        driver: bus?.driverId ?? '',
+        // The driver *id*, not a display name — see _driverKey. Prefers the
+        // admin-assigned bus's driver, but falls back to the student's own
+        // direct `driverId` — set when a self-signed-up driver (the actual
+        // pilot path; see `Student.driverId`'s doc comment) accepts this
+        // child's ride request without ever going through a `Bus` document.
+        // Without the fallback, a pilot family's driver id was always empty
+        // here, which silently broke both the weekly rating gate and any
+        // lookup keyed on "this child's driver".
+        driver: bus?.driverId ?? s.driverId ?? '',
         photoUrl: s.photoUrl,
+        pickup: s.pickupLocation,
+        dropoff: s.dropoffLocation,
+        scheduleId: s.scheduleId,
       );
     }).toList();
 
@@ -223,6 +263,39 @@ class ParentDataService {
     return !info.isSameWeek(DateTime.now());
   }
 
+  /// Whether [child] has ever actually completed a ride with the driver
+  /// currently assigned to them.
+  ///
+  /// [canRateDriver] above only answers "have I already rated this driver
+  /// this week" — it says nothing about whether a ride ever happened, so a
+  /// driver merely *assigned* to a child (via [_driverKey]) but never ridden
+  /// with could be rated. This is the other, required half of the gate: at
+  /// least one `boarded` attendance record whose denormalised `driverId`
+  /// matches the child's *current* driver id. Matching on the current id
+  /// specifically matters — a child may have ridden with a previous driver
+  /// who no longer serves them, and that history must not count towards
+  /// rating today's driver.
+  ///
+  /// Needs a Firestore read (via [TripRepository.fetchAttendanceForStudent]),
+  /// so unlike [canRateDriver] this is async; callers should resolve it once
+  /// (e.g. in `initState`) and cache the result rather than calling it from
+  /// `build`.
+  Future<bool> hasRiddenWithDriver(ChildInfo child) async {
+    final driverId = _driverKey(child);
+    if (driverId.isEmpty || child.id.isEmpty) return false;
+    try {
+      final records = await TripRepository.instance.fetchAttendanceForStudent(
+        child.id,
+      );
+      return records.any(
+        (r) => r.driverId == driverId && r.status == AttendanceStatus.boarded,
+      );
+    } catch (e) {
+      debugPrint('hasRiddenWithDriver failed: $e');
+      return false;
+    }
+  }
+
   DriverRatingInfo? driverRatingFor(ChildInfo child) =>
       driverRatings.value[_driverKey(child)];
 
@@ -240,8 +313,10 @@ class ParentDataService {
     if (!accepted) return;
 
     final updated = Map<String, DriverRatingInfo>.from(driverRatings.value);
-    updated[driverId] =
-        DriverRatingInfo(rating: rating, ratedAt: DateTime.now());
+    updated[driverId] = DriverRatingInfo(
+      rating: rating,
+      ratedAt: DateTime.now(),
+    );
     driverRatings.value = updated;
   }
 
@@ -268,8 +343,9 @@ class ParentDataService {
       return;
     }
     try {
-      final payments =
-          await PaymentRepository.instance.watchForParent(uid).first;
+      final payments = await PaymentRepository.instance
+          .watchForParent(uid)
+          .first;
       paidFeeMonths.value = payments
           .where((p) => p.status == PaymentStatus.paid)
           .map((p) => p.monthKey)
@@ -303,8 +379,10 @@ class ParentDataService {
     final uid = SessionService.instance.uid;
     if (uid == null) return;
     parentInfo.value = info;
-    await UserRepository.instance
-        .updateUser(uid, {'name': info.name, 'phone': info.phone});
+    await UserRepository.instance.updateUser(uid, {
+      'name': info.name,
+      'phone': info.phone,
+    });
   }
 
   Future<void> updateChild(int index, ChildInfo child) async {
@@ -318,6 +396,9 @@ class ParentDataService {
       'name': child.name,
       'grade': child.grade,
       'school': child.school,
+      'pickupLocation': ?child.pickup?.toMap(),
+      'dropoffLocation': ?child.dropoff?.toMap(),
+      'scheduleId': ?child.scheduleId,
     });
   }
 
@@ -345,10 +426,13 @@ class ParentDataService {
     }
 
     try {
-      final result =
-          await CloudinaryService.instance.uploadProfilePhoto(image, childId);
-      await UserRepository.instance
-          .updateStudent(childId, {'photoUrl': result.secureUrl});
+      final result = await CloudinaryService.instance.uploadProfilePhoto(
+        image,
+        childId,
+      );
+      await UserRepository.instance.updateStudent(childId, {
+        'photoUrl': result.secureUrl,
+      });
     } catch (e) {
       debugPrint('child photo upload failed: $e');
     }
@@ -413,6 +497,36 @@ class ParentDataService {
   bool hasPaymentReminder(String month) =>
       paymentReminders.value[month] ?? false;
 
+  // ── Notification preferences (device-local) ───────────────────────────────
+
+  Future<void> loadNotificationPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_notificationPrefsKey);
+    if (raw == null || raw.isEmpty) {
+      notificationPrefs.value = {};
+      return;
+    }
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      notificationPrefs.value = decoded.map((k, v) => MapEntry(k, v == true));
+    } catch (_) {
+      notificationPrefs.value = {};
+    }
+  }
+
+  Future<void> setNotificationPref(String key, bool enabled) async {
+    final updated = Map<String, bool>.from(notificationPrefs.value);
+    updated[key] = enabled;
+    notificationPrefs.value = updated;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_notificationPrefsKey, jsonEncode(updated));
+  }
+
+  /// Defaults to `true` for a key never explicitly set — the toggles have
+  /// always defaulted on.
+  bool notificationPrefFor(String key) => notificationPrefs.value[key] ?? true;
+
   List<String> getUpcomingPayments() {
     final now = DateTime.now();
     final current = DateTime(now.year, now.month);
@@ -432,8 +546,11 @@ class ParentDataService {
 
     // Last day of that month. DateTime normalises month 13 into January, so
     // this is safe for December without a special case.
-    final dueDate = DateTime(year, monthNum + 1, 1)
-        .subtract(const Duration(days: 1));
+    final dueDate = DateTime(
+      year,
+      monthNum + 1,
+      1,
+    ).subtract(const Duration(days: 1));
     return DateTime.now().isAfter(dueDate.subtract(const Duration(days: 5)));
   }
 }

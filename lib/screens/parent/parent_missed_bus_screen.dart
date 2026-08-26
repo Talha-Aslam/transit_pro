@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart' show GeoCoord;
 import '../../app/missed_bus_service.dart';
 import '../../app/parent_data_service.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/profile_form_fields.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class ParentMissedBusScreen extends StatefulWidget {
@@ -18,7 +20,10 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
     with SingleTickerProviderStateMixin {
   final _service = MissedBusService.instance;
   final _parentService = ParentDataService.instance;
-  String? _selectedDestination;
+  GeoCoord? _currentStopCoord;
+  String? _currentStopAddress;
+  GeoCoord? _destinationCoord;
+  String? _destinationAddress;
 
   late AnimationController _pulseCtrl;
   late Animation<double> _pulse;
@@ -48,18 +53,36 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
 
   void _rebuild() => setState(() {});
 
-  void _submitRequest() {
-    if (_selectedDestination == null) return;
+  /// A human-readable label to persist for a picked point — the resolved
+  /// address once reverse-geocoding catches up, or the raw coordinates as an
+  /// honest fallback if the parent submits before that finishes.
+  String _labelFor(GeoCoord coord, String? address) =>
+      address ??
+      '${coord.lat.toStringAsFixed(6)}, ${coord.lng.toStringAsFixed(6)}';
+
+  Future<void> _submitRequest() async {
+    final currentStopCoord = _currentStopCoord;
+    final destinationCoord = _destinationCoord;
+    if (currentStopCoord == null || destinationCoord == null) return;
     final child = _parentService.selectedChild;
-    if (child == null) return;
-    _service.raiseRequest(
-      studentName: child.name,
-      studentId: 'STU-PARENT',
-      missedBusNumber: child.busNumber,
-      assignedRoute: child.route,
-      currentStop: child.stop,
-      destination: _selectedDestination!,
-    );
+    if (child == null || child.id.isEmpty) return;
+    try {
+      await _service.raiseRequest(
+        studentName: child.name,
+        studentId: child.id,
+        missedBusNumber: child.busNumber,
+        assignedRoute: child.route,
+        currentStop: _labelFor(currentStopCoord, _currentStopAddress),
+        destination: _labelFor(destinationCoord, _destinationAddress),
+        currentStopCoord: currentStopCoord,
+        destinationCoord: destinationCoord,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not send request: $e')));
+    }
   }
 
   @override
@@ -144,9 +167,18 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                         child: req == null
                             ? _ParentRequestForm(
                                 child: child,
-                                selectedDestination: _selectedDestination,
-                                onDestinationChanged: (v) =>
-                                    setState(() => _selectedDestination = v),
+                                currentStopCoord: _currentStopCoord,
+                                destinationCoord: _destinationCoord,
+                                onCurrentStopPicked: (p) =>
+                                    setState(() => _currentStopCoord = p),
+                                onCurrentStopAddressResolved: (a) => setState(
+                                  () => _currentStopAddress = a,
+                                ),
+                                onDestinationPicked: (p) =>
+                                    setState(() => _destinationCoord = p),
+                                onDestinationAddressResolved: (a) => setState(
+                                  () => _destinationAddress = a,
+                                ),
                                 onSubmit: _submitRequest,
                               )
                             : _ParentStatusView(
@@ -169,28 +201,35 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
 // ─── Form ─────────────────────────────────────────────────────────────────────
 class _ParentRequestForm extends StatelessWidget {
   final ChildInfo child;
-  final String? selectedDestination;
-  final ValueChanged<String?> onDestinationChanged;
+  final GeoCoord? currentStopCoord;
+  final GeoCoord? destinationCoord;
+  final ValueChanged<GeoCoord> onCurrentStopPicked;
+  final ValueChanged<String?> onCurrentStopAddressResolved;
+  final ValueChanged<GeoCoord> onDestinationPicked;
+  final ValueChanged<String?> onDestinationAddressResolved;
   final VoidCallback onSubmit;
 
   const _ParentRequestForm({
     required this.child,
-    required this.selectedDestination,
-    required this.onDestinationChanged,
+    required this.currentStopCoord,
+    required this.destinationCoord,
+    required this.onCurrentStopPicked,
+    required this.onCurrentStopAddressResolved,
+    required this.onDestinationPicked,
+    required this.onDestinationAddressResolved,
     required this.onSubmit,
   });
 
   @override
   Widget build(BuildContext context) {
-    final stops = MissedBusService.routeStops
-        .where((s) => s != child.stop)
-        .toList();
+    final canSubmit = currentStopCoord != null && destinationCoord != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Child info card
         GlassCard(
+          enableBlur: false,
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -250,7 +289,8 @@ class _ParentRequestForm extends StatelessWidget {
         ),
         const SizedBox(height: 20),
 
-        // Assigned stop
+        // Current stop — where to pick the child up from right now, dropped
+        // on the map rather than trusting the stale registered stop label.
         Text(
           'Current Stop',
           style: TextStyle(
@@ -261,27 +301,11 @@ class _ParentRequestForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: context.cardBgElevated,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.surfaceBorder),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.location_on_rounded, color: AppTheme.purple, size: 18),
-              const SizedBox(width: 10),
-              Text(
-                child.stop,
-                style: TextStyle(
-                  color: context.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+        MapPointField(
+          placeholder: 'Tap to pin where they are',
+          value: currentStopCoord,
+          onPicked: onCurrentStopPicked,
+          onAddressResolved: onCurrentStopAddressResolved,
         ),
         const SizedBox(height: 16),
 
@@ -335,88 +359,71 @@ class _ParentRequestForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: context.inputFill,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selectedDestination != null
-                  ? AppTheme.purple.withValues(alpha: 0.5)
-                  : context.inputBorder,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: MapPointField(
+                placeholder: 'Tap to pin where they need to go',
+                value: destinationCoord,
+                onPicked: onDestinationPicked,
+                onAddressResolved: onDestinationAddressResolved,
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final query = Uri.encodeComponent(child.stop);
-                  final url =
-                      'https://www.google.com/maps/search/?api=1&query=$query';
-                  if (await canLaunchUrlString(url)) {
-                    await launchUrlString(url);
-                  } else {
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Could not open Maps')),
-                    );
-                  }
-                },
+            const SizedBox(width: 10),
+            // Jumps to the picked current stop in Google Maps — useful once
+            // a pin exists; before that there's nothing meaningful to open,
+            // so this just nudges the parent to pin the current stop first.
+            GestureDetector(
+              onTap: () async {
+                final coord = currentStopCoord;
+                if (coord == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Pin the current stop first'),
+                    ),
+                  );
+                  return;
+                }
+                final messenger = ScaffoldMessenger.of(context);
+                final url =
+                    'https://www.google.com/maps/search/?api=1&query=${coord.lat},${coord.lng}';
+                if (await canLaunchUrlString(url)) {
+                  await launchUrlString(url);
+                } else {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Could not open Maps')),
+                  );
+                }
+              },
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: context.cardBgElevated,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.surfaceBorder),
+                ),
                 child: Icon(Icons.map, color: AppTheme.purple, size: 18),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: selectedDestination,
-                    hint: Text(
-                      'Select destination',
-                      style: TextStyle(color: context.textHint, fontSize: 14),
-                    ),
-                    isExpanded: true,
-                    dropdownColor: context.cardBg,
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: context.textSecondary,
-                    ),
-                    items: stops
-                        .map(
-                          (s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(
-                              s,
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: onDestinationChanged,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 32),
 
         // Submit
         GestureDetector(
-          onTap: selectedDestination != null ? onSubmit : null,
+          onTap: canSubmit ? onSubmit : null,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 15),
             decoration: BoxDecoration(
-              gradient: selectedDestination != null
+              gradient: canSubmit
                   ? const LinearGradient(
                       colors: [AppTheme.purple, Color(0xFF9333EA)],
                     )
                   : null,
-              color: selectedDestination == null
-                  ? context.cardBgElevated
-                  : null,
+              color: canSubmit ? null : context.cardBgElevated,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
@@ -425,18 +432,14 @@ class _ParentRequestForm extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.send_rounded,
-                    color: selectedDestination != null
-                        ? Colors.white
-                        : context.textTertiary,
+                    color: canSubmit ? Colors.white : context.textTertiary,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Request Pickup for ${child.name.split(' ').first}',
                     style: TextStyle(
-                      color: selectedDestination != null
-                          ? Colors.white
-                          : context.textTertiary,
+                      color: canSubmit ? Colors.white : context.textTertiary,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -545,6 +548,7 @@ class _ParentSearchingView extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         GlassCard(
+          enableBlur: false,
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
@@ -640,6 +644,7 @@ class _ParentAcceptedView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         GlassCard(
+          enableBlur: false,
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
@@ -670,11 +675,19 @@ class _ParentAcceptedView extends StatelessWidget {
                 value: request.assignedDriverPhone ?? '—',
                 color: AppTheme.purple,
               ),
+              const SizedBox(height: 12),
+              _InfoTile(
+                icon: Icons.payments_rounded,
+                label: 'Fare (pay driver directly)',
+                value: request.fareDisplay ?? 'Ask driver',
+                color: AppTheme.warning,
+              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         GlassCard(
+          enableBlur: false,
           padding: const EdgeInsets.all(16),
           child: _JourneyRow(
             from: request.currentStop,

@@ -199,7 +199,13 @@ class _StudentNotificationsState extends State<StudentNotifications> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  for (final date in ['Today', 'Yesterday', 'Mon, Feb 23']) ...[
+                  // Distinct date labels actually present in the filtered
+                  // list, in order — not a fixed 3-bucket list, which used to
+                  // make anything older than "Mon, Feb 23" silently disappear.
+                  // `_filtered` is already newest-first (from
+                  // `NotificationService.history`), so first-occurrence order
+                  // here is chronological.
+                  for (final date in {for (final n in _filtered) n.date}) ...[
                     Builder(
                       builder: (context) {
                         final group = _filtered

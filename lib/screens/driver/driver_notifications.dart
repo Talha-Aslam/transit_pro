@@ -1,11 +1,62 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+
 import '../../app/driver_alerts_service.dart';
-import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/missed_bus_service.dart';
+import '../../app/session_service.dart';
+import '../../data/messaging_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+
+/// Icon + accent colour for a notification, by its domain type.
+(String, Color) _appearanceFor(NotificationType type) => switch (type) {
+      NotificationType.emergency => ('🚨', AppTheme.error),
+      NotificationType.missedBus => ('🚌', AppTheme.error),
+      NotificationType.absent => ('⚠️', AppTheme.warning),
+      NotificationType.delay => ('⏰', AppTheme.warning),
+      NotificationType.boarded => ('✅', AppTheme.success),
+      NotificationType.busArrived => ('🏫', AppTheme.success),
+      NotificationType.busApproaching => ('🔔', AppTheme.warning),
+      NotificationType.busDeparted => ('🚌', AppTheme.info),
+      NotificationType.routeStarted => ('📍', AppTheme.info),
+      NotificationType.routeCompleted => ('🌇', AppTheme.success),
+      NotificationType.pickupAssigned => ('🧑‍✈️', AppTheme.success),
+      NotificationType.rideRequest => ('📬', AppTheme.warning),
+      NotificationType.rideRequestAnswered => ('📨', AppTheme.info),
+      NotificationType.payment => ('💳', AppTheme.success),
+      NotificationType.document => ('📜', AppTheme.purple),
+      NotificationType.chat => ('💬', AppTheme.info),
+      NotificationType.system => ('🔔', AppTheme.info),
+    };
+
+/// Which of this screen's three tabs a notification falls under.
+///
+/// `UserNotification` carries no sender-role field — it is a one-way inbox
+/// item, not a chat message with a known author — so this is an approximation
+/// by domain type rather than a real "who sent this" read. A family's seat
+/// request or chat message reads as `Parents`; records an admin action would
+/// produce read as `Admin`; the fully automated bus/route/attendance events
+/// read as `System`.
+String _tabFor(NotificationType type) => switch (type) {
+      NotificationType.chat || NotificationType.rideRequest => 'Parents',
+      NotificationType.document ||
+      NotificationType.payment ||
+      NotificationType.rideRequestAnswered ||
+      NotificationType.pickupAssigned =>
+        'Admin',
+      _ => 'System',
+    };
+
+String _timeLabel(DateTime? when) {
+  if (when == null) return 'Just now';
+  final hour12 = when.hour % 12 == 0 ? 12 : when.hour % 12;
+  final minute = when.minute.toString().padLeft(2, '0');
+  return '$hour12:$minute ${when.hour < 12 ? 'AM' : 'PM'}';
+}
 
 class DriverNotifications extends StatefulWidget {
   const DriverNotifications({super.key});
@@ -15,539 +66,519 @@ class DriverNotifications extends StatefulWidget {
 }
 
 class _DriverNotificationsState extends State<DriverNotifications> {
-  late List<_Message> _msgs;
+  final _session = SessionService.instance;
+
+  List<UserNotification> _notifications = const [];
   String _activeTab = 'All';
-  _Message? _selectedMsg;
+  UserNotification? _selectedMsg;
+
   final _replyCtrl = TextEditingController();
-  late final VoidCallback _languageListener;
+
+  String? _subUid;
+  StreamSubscription<List<UserNotification>>? _sub;
 
   @override
   void initState() {
     super.initState();
-    _msgs = _buildMessages();
-    DriverAlertsService.instance.setUnreadCount(_unread);
-    _languageListener = () {
-      if (!mounted) return;
-      final readState = {for (final msg in _msgs) msg.id: msg.read};
-      setState(() {
-        _msgs = _buildMessages(readState: readState);
-        if (_selectedMsg != null) {
-          final selected = _msgs.where((m) => m.id == _selectedMsg!.id);
-          _selectedMsg = selected.isEmpty ? null : selected.first;
-        }
-        DriverAlertsService.instance.setUnreadCount(_unread);
-      });
-    };
-    LanguageProvider.instance.addListener(_languageListener);
+    _session.addListener(_ensureSubscription);
+    _ensureSubscription();
   }
 
   @override
   void dispose() {
-    LanguageProvider.instance.removeListener(_languageListener);
+    _session.removeListener(_ensureSubscription);
+    _sub?.cancel();
     _replyCtrl.dispose();
     super.dispose();
   }
 
-  List<_Message> _buildMessages({Map<int, bool> readState = const {}}) {
-    bool isRead(int id, bool fallback) => readState[id] ?? fallback;
-    return [
-      _Message(
-        id: 1,
-        type: 'parent',
-        read: isRead(1, false),
-        sender: AppStrings.t('seed_sarah_johnson_sender'),
-        avatar: '👩',
-        msg: AppStrings.t('seed_sarah_johnson_message'),
-        time: '07:05 AM',
-        color: AppTheme.parentAccent,
-      ),
-      _Message(
-        id: 2,
-        type: 'admin',
-        read: isRead(2, false),
-        sender: AppStrings.t('seed_transport_admin_sender'),
-        avatar: '🏢',
-        msg: AppStrings.t('seed_transport_admin_message'),
-        time: '06:45 AM',
-        color: AppTheme.driverAccent,
-      ),
-      _Message(
-        id: 3,
-        type: 'parent',
-        read: isRead(3, true),
-        sender: AppStrings.t('seed_david_martinez_sender'),
-        avatar: '👨',
-        msg: AppStrings.t('seed_david_martinez_message'),
-        time: 'Yesterday',
-        color: AppTheme.parentAccent,
-      ),
-      _Message(
-        id: 4,
-        type: 'system',
-        read: isRead(4, true),
-        sender: AppStrings.t('seed_system_alert_sender'),
-        avatar: '⚙️',
-        msg: AppStrings.t('seed_system_alert_message'),
-        time: 'Yesterday',
-        color: AppTheme.success,
-      ),
-      _Message(
-        id: 5,
-        type: 'admin',
-        read: isRead(5, true),
-        sender: AppStrings.t('seed_transport_admin_sender'),
-        avatar: '🏢',
-        msg: AppStrings.t('seed_transport_admin_reminder_message'),
-        time: 'Mon, Feb 23',
-        color: AppTheme.driverAccent,
-      ),
-      _Message(
-        id: 6,
-        type: 'parent',
-        read: isRead(6, true),
-        sender: AppStrings.t('seed_emily_wilson_sender'),
-        avatar: '👩',
-        msg: AppStrings.t('seed_emily_wilson_message'),
-        time: 'Mon, Feb 23',
-        color: AppTheme.parentAccent,
-      ),
-    ];
+  /// (Re)subscribes to this driver's real inbox whenever the signed-in uid
+  /// changes — including the first time it becomes available, since the
+  /// session may still be loading when this screen opens.
+  void _ensureSubscription() {
+    final uid = _session.uid;
+    if (uid == _subUid) return;
+    _subUid = uid;
+    _sub?.cancel();
+    _sub = null;
+    if (uid == null) {
+      setState(() => _notifications = const []);
+      return;
+    }
+    _sub = MessagingRepository.instance.watchNotifications(uid).listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _notifications = list;
+        if (_selectedMsg != null) {
+          final match = list.where((m) => m.id == _selectedMsg!.id);
+          _selectedMsg = match.isEmpty ? null : match.first;
+        }
+      });
+      DriverAlertsService.instance.setUnreadCount(
+        list.where((m) => !m.read).length,
+      );
+    });
   }
 
-  int get _unread => _msgs.where((m) => !m.read).length;
+  int get _unread => _notifications.where((m) => !m.read).length;
 
-  List<_Message> get _filtered => _msgs.where((m) {
-    return switch (_activeTab) {
-      'Parents' => m.type == 'parent',
-      'Admin' => m.type == 'admin',
-      'System' => m.type == 'system',
-      _ => true,
-    };
-  }).toList();
+  List<UserNotification> get _filtered => _notifications.where((m) {
+        return switch (_activeTab) {
+          'Parents' => _tabFor(m.type) == 'Parents',
+          'Admin' => _tabFor(m.type) == 'Admin',
+          'System' => _tabFor(m.type) == 'System',
+          _ => true,
+        };
+      }).toList();
 
-  void _openMsg(_Message msg) {
+  void _openMsg(UserNotification msg) {
+    setState(() => _selectedMsg = msg);
+    if (msg.read) return;
+    final uid = _session.uid;
+    if (uid == null) return;
+    // Optimistic — the live inbox stream confirms within a frame or two.
     setState(() {
-      final i = _msgs.indexWhere((m) => m.id == msg.id);
-      _msgs[i] = _msgs[i].copyWith(read: true);
-      _selectedMsg = _msgs[i];
+      _notifications = _notifications
+          .map((m) => m.id == msg.id ? m.copyWith(read: true) : m)
+          .toList();
     });
-    // Reflect this read state in the global notification history
-    final hist = NotificationService.instance.history.value;
-    NotificationService.instance.history.value = hist
-        .map((n) => n.id == msg.id ? n.copyWith(read: true) : n)
-        .toList();
+    MessagingRepository.instance.markRead(uid, msg.id).catchError((e) {
+      debugPrint('markRead failed: $e');
+    });
     DriverAlertsService.instance.setUnreadCount(_unread);
+  }
+
+  Future<void> _markAllRead() async {
+    final uid = _session.uid;
+    setState(() {
+      _notifications =
+          _notifications.map((m) => m.copyWith(read: true)).toList();
+    });
+    DriverAlertsService.instance.setUnreadCount(0);
+    if (uid == null) return;
+    try {
+      await MessagingRepository.instance.markAllRead(uid);
+    } catch (e) {
+      debugPrint('markAllRead failed: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: LanguageProvider.instance,
-      builder: (context, _) {
-        // Detail view
-        if (_selectedMsg != null) {
-          return _DetailView(
-            msg: _selectedMsg!,
-            replyCtrl: _replyCtrl,
-            onBack: () => setState(() {
-              _selectedMsg = null;
-              _replyCtrl.clear();
-            }),
-          );
-        }
+    if (_selectedMsg != null) {
+      return _DetailView(
+        msg: _selectedMsg!,
+        replyCtrl: _replyCtrl,
+        onBack: () => setState(() {
+          _selectedMsg = null;
+          _replyCtrl.clear();
+        }),
+      );
+    }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 100),
-          child: Column(
-            children: [
-              // ── Header ───────────────────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppTheme.driverCyan.withValues(alpha: 0.2),
-                      Colors.transparent,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 100),
+      child: Column(
+        children: [
+          // ── Header ───────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppTheme.driverCyan.withValues(alpha: 0.2),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        AppStrings.t('messages'),
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (_unread > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$_unread',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Text(
-                            AppStrings.t('messages'),
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
+                // Mark all read — compact icon button, only shown when there are unreads
+                if (_unread > 0) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: _markAllRead,
+                    child: Tooltip(
+                      message: AppStrings.t('mark_all_read'),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppTheme.driverAccent.withValues(
+                            alpha: 0.15,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.driverAccent.withValues(
+                              alpha: 0.3,
                             ),
                           ),
-                          if (_unread > 0) ...[
-                            const SizedBox(width: 8),
+                        ),
+                        child: Icon(
+                          Icons.done_all_rounded,
+                          color: AppTheme.driverAccent,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 6),
+                ValueListenableBuilder(
+                  valueListenable:
+                      MissedBusService.instance.driverIncomingRequests,
+                  builder: (_, list, _) {
+                    final count = list.length;
+                    return GestureDetector(
+                      onTap: () => context.push('/driver/pickup-requests'),
+                      child: Tooltip(
+                        message: AppStrings.t('mark_all_read'),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
+                                horizontal: 12,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.error,
+                                color: count > 0
+                                    ? AppTheme.error.withValues(alpha: 0.15)
+                                    : context.cardBgElevated,
                                 borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '$_unread',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
+                                border: Border.all(
+                                  color: count > 0
+                                      ? AppTheme.error.withValues(
+                                          alpha: 0.4,
+                                        )
+                                      : context.surfaceBorder,
                                 ),
                               ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.directions_bus_rounded,
+                                    color: count > 0
+                                        ? AppTheme.error
+                                        : context.textTertiary,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    AppStrings.t('pickups'),
+                                    style: TextStyle(
+                                      color: count > 0
+                                          ? AppTheme.error
+                                          : context.textTertiary,
+                                      fontSize: 12,
+                                      fontWeight: count > 0
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            if (count > 0)
+                              Positioned(
+                                top: -4,
+                                right: -4,
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    // Mark all read — compact icon button, only shown when there are unreads
-                    if (_unread > 0) ...[
-                      const SizedBox(width: 6),
-                      GestureDetector(
-                        onTap: () => setState(() {
-                          _msgs = _msgs
-                              .map((m) => m.copyWith(read: true))
-                              .toList();
-                          // Mark global history as read as well
-                          NotificationService.instance.markAllRead();
-                          DriverAlertsService.instance.setUnreadCount(0);
-                        }),
-                        child: Tooltip(
-                          message: AppStrings.t('mark_all_read'),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                // Tabs
+                Row(
+                  children: {
+                    'All': AppStrings.t('all'),
+                    'Parents': AppStrings.t('parents_tab'),
+                    'Admin': AppStrings.t('admin_tab'),
+                    'System': AppStrings.t('system_tab'),
+                  }.entries.map((e) {
+                    final tab = e.key;
+                    final label = e.value;
+                    final active = _activeTab == tab;
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _activeTab = tab),
                           child: Container(
-                            width: 34,
-                            height: 34,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
-                              color: AppTheme.driverAccent.withValues(
-                                alpha: 0.15,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
+                              color: active
+                                  ? AppTheme.driverCyan.withValues(
+                                      alpha: 0.15,
+                                    )
+                                  : context.cardBgElevated,
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: AppTheme.driverAccent.withValues(
-                                  alpha: 0.3,
-                                ),
+                                color: active
+                                    ? AppTheme.driverCyan.withValues(
+                                        alpha: 0.4,
+                                      )
+                                    : context.surfaceBorder,
                               ),
                             ),
-                            child: Icon(
-                              Icons.done_all_rounded,
-                              color: AppTheme.driverAccent,
-                              size: 16,
+                            child: Center(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  color: active
+                                      ? AppTheme.driverAccent
+                                      : context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: active
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ],
-                    const SizedBox(width: 6),
-                    ValueListenableBuilder(
-                      valueListenable:
-                          MissedBusService.instance.driverIncomingRequests,
-                      builder: (_, list, _) {
-                        final count = list.length;
-                        return GestureDetector(
-                          onTap: () => context.push('/driver/pickup-requests'),
-                          child: Tooltip(
-                            message: AppStrings.t('mark_all_read'),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: count > 0
-                                        ? AppTheme.error.withValues(alpha: 0.15)
-                                        : context.cardBgElevated,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: count > 0
-                                          ? AppTheme.error.withValues(
-                                              alpha: 0.4,
-                                            )
-                                          : context.surfaceBorder,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.directions_bus_rounded,
-                                        color: count > 0
-                                            ? AppTheme.error
-                                            : context.textTertiary,
-                                        size: 14,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        AppStrings.t('pickups'),
-                                        style: TextStyle(
-                                          color: count > 0
-                                              ? AppTheme.error
-                                              : context.textTertiary,
-                                          fontSize: 12,
-                                          fontWeight: count > 0
-                                              ? FontWeight.w700
-                                              : FontWeight.w400,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (count > 0)
-                                  Positioned(
-                                    top: -4,
-                                    right: -4,
-                                    child: Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: const BoxDecoration(
-                                        color: AppTheme.error,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          '$count',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
-              ),
+                const SizedBox(height: 14),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    // Tabs
-                    Row(
-                      children:
-                          {
-                            'All': AppStrings.t('all'),
-                            'Parents': AppStrings.t('parents_tab'),
-                            'Admin': AppStrings.t('admin_tab'),
-                            'System': AppStrings.t('system_tab'),
-                          }.entries.map((e) {
-                            final tab = e.key;
-                            final label = e.value;
-                            final active = _activeTab == tab;
-                            return Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _activeTab = tab),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: active
-                                          ? AppTheme.driverCyan.withValues(
-                                              alpha: 0.15,
-                                            )
-                                          : context.cardBgElevated,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: active
-                                            ? AppTheme.driverCyan.withValues(
-                                                alpha: 0.4,
-                                              )
-                                            : context.surfaceBorder,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        label,
-                                        style: TextStyle(
-                                          color: active
-                                              ? AppTheme.driverAccent
-                                              : context.textTertiary,
-                                          fontSize: 12,
-                                          fontWeight: active
-                                              ? FontWeight.w700
-                                              : FontWeight.w400,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                // Message list
+                if (_notifications.isEmpty && _session.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.driverCyan,
+                      ),
                     ),
-                    const SizedBox(height: 14),
-
-                    // Message list
-                    ..._filtered.map(
-                      (msg) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: RepaintBoundary(
-                          child: GestureDetector(
-                            onTap: () => _openMsg(msg),
-                            child: AnimatedOpacity(
-                              opacity: msg.read ? 0.7 : 1.0,
-                              duration: const Duration(milliseconds: 200),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Stack(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: context.cardBg,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: context.surfaceBorder,
-                                        ),
+                  )
+                else if (_filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 48),
+                    child: Center(
+                      child: Text(
+                        'No messages here yet.',
+                        style: TextStyle(color: context.textTertiary),
+                      ),
+                    ),
+                  )
+                else
+                  ..._filtered.map((msg) {
+                    final (icon, color) = _appearanceFor(msg.type);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: RepaintBoundary(
+                        child: GestureDetector(
+                          onTap: () => _openMsg(msg),
+                          child: AnimatedOpacity(
+                            opacity: msg.read ? 0.7 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: context.cardBg,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: context.surfaceBorder,
                                       ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              color: msg.color.withValues(
-                                                alpha: 0.12,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              border: Border.all(
-                                                color: msg.color.withValues(
-                                                  alpha: 0.25,
-                                                ),
-                                              ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: color.withValues(
+                                              alpha: 0.12,
                                             ),
-                                            child: Center(
-                                              child: Text(
-                                                msg.avatar,
-                                                style: const TextStyle(
-                                                  fontSize: 22,
-                                                ),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: color.withValues(
+                                                alpha: 0.25,
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        msg.sender,
-                                                        style: TextStyle(
-                                                          color: context
-                                                              .textPrimary,
-                                                          fontSize: 13,
-                                                          fontWeight: msg.read
-                                                              ? FontWeight.w500
-                                                              : FontWeight.w700,
-                                                        ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      msg.time,
+                                          child: Center(
+                                            child: Text(
+                                              icon,
+                                              style: const TextStyle(
+                                                fontSize: 22,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      msg.title.isEmpty
+                                                          ? 'Notification'
+                                                          : msg.title,
                                                       style: TextStyle(
                                                         color: context
-                                                            .textTertiary,
-                                                        fontSize: 11,
+                                                            .textPrimary,
+                                                        fontSize: 13,
+                                                        fontWeight: msg.read
+                                                            ? FontWeight.w500
+                                                            : FontWeight.w700,
                                                       ),
+                                                      overflow: TextOverflow
+                                                          .ellipsis,
                                                     ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  msg.msg,
-                                                  style: TextStyle(
-                                                    color:
-                                                        context.textSecondary,
-                                                    fontSize: 12,
-                                                    height: 1.4,
                                                   ),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  Text(
+                                                    _timeLabel(msg.createdAt),
+                                                    style: TextStyle(
+                                                      color:
+                                                          context.textTertiary,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                msg.body,
+                                                style: TextStyle(
+                                                  color:
+                                                      context.textSecondary,
+                                                  fontSize: 12,
+                                                  height: 1.4,
                                                 ),
-                                              ],
+                                                maxLines: 2,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (!msg.read) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            margin: const EdgeInsets.only(
+                                              top: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              shape: BoxShape.circle,
                                             ),
                                           ),
-                                          if (!msg.read) ...[
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              margin: const EdgeInsets.only(
-                                                top: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: msg.color,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                          ],
                                         ],
+                                      ],
+                                    ),
+                                  ),
+                                  if (!msg.read)
+                                    Positioned(
+                                      left: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 3,
+                                        color: color,
                                       ),
                                     ),
-                                    if (!msg.read)
-                                      Positioned(
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 3,
-                                          color: msg.color,
-                                        ),
-                                      ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                    );
+                  }),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
 class _DetailView extends StatelessWidget {
-  final _Message msg;
+  final UserNotification msg;
   final TextEditingController replyCtrl;
   final VoidCallback onBack;
 
@@ -559,6 +590,9 @@ class _DetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final (icon, color) = _appearanceFor(msg.type);
+    final tab = _tabFor(msg.type);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -584,7 +618,7 @@ class _DetailView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        msg.sender,
+                        msg.title.isEmpty ? 'Notification' : msg.title,
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 18,
@@ -592,11 +626,11 @@ class _DetailView extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${AppStrings.t(msg.type == 'parent'
+                        '${AppStrings.t(tab == 'Parents'
                             ? 'parents_tab'
-                            : msg.type == 'admin'
+                            : tab == 'Admin'
                             ? 'admin_tab'
-                            : 'system_tab')} · ${msg.time}',
+                            : 'system_tab')} · ${_timeLabel(msg.createdAt)}',
                         style: TextStyle(
                           color: context.textSecondary,
                           fontSize: 12,
@@ -609,15 +643,15 @@ class _DetailView extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: msg.color.withValues(alpha: 0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: msg.color.withValues(alpha: 0.25),
+                      color: color.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Center(
                     child: Text(
-                      msg.avatar,
+                      icon,
                       style: const TextStyle(fontSize: 22),
                     ),
                   ),
@@ -630,12 +664,15 @@ class _DetailView extends StatelessWidget {
             child: Column(
               children: [
                 GlassCard(
+                  // This detail view's scroll body is essentially just this
+                  // card (plus the reply card below, for a parent message).
+                  enableBlur: false,
                   padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        msg.msg,
+                        msg.body,
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 15,
@@ -644,7 +681,7 @@ class _DetailView extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        '${AppStrings.t('received')}: ${msg.time}',
+                        '${AppStrings.t('received')}: ${_timeLabel(msg.createdAt)}',
                         style: TextStyle(
                           color: context.textTertiary,
                           fontSize: 12,
@@ -653,9 +690,10 @@ class _DetailView extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (msg.type == 'parent') ...[
+                if (tab == 'Parents') ...[
                   const SizedBox(height: 12),
                   GlassCard(
+                    enableBlur: false,
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,6 +739,24 @@ class _DetailView extends StatelessWidget {
                               ),
                             ),
                             contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // TODO(messaging): `UserNotification` carries no
+                        // sender/parent uid, only a title and body, so there
+                        // is no `recipientId` to hand `MessagingRepository
+                        // .sendMessage`. Wiring a real reply needs either the
+                        // notification payload to carry the sender's uid, or
+                        // this button to open the real chat thread for that
+                        // family instead of replying in place. Left as a
+                        // no-op (just closes the message) rather than a
+                        // dead-end network call.
+                        Text(
+                          'Replying here is not wired up yet — this closes '
+                          'the message without sending anything.',
+                          style: TextStyle(
+                            color: context.textTertiary,
+                            fontSize: 11,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -753,32 +809,3 @@ Widget _backBtn(BuildContext context) => Container(
     ),
   ),
 );
-
-class _Message {
-  final int id;
-  final String type, sender, avatar, msg, time;
-  final Color color;
-  final bool read;
-
-  const _Message({
-    required this.id,
-    required this.type,
-    required this.sender,
-    required this.avatar,
-    required this.msg,
-    required this.time,
-    required this.color,
-    required this.read,
-  });
-
-  _Message copyWith({bool? read}) => _Message(
-    id: id,
-    type: type,
-    sender: sender,
-    avatar: avatar,
-    msg: msg,
-    time: time,
-    color: color,
-    read: read ?? this.read,
-  );
-}

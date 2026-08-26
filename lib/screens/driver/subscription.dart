@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/language_provider.dart';
+import '../../app/subscription_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -26,7 +27,13 @@ class DriverSubscriptionScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildActivePlan(context),
+                    // Rebuilds whenever the shared plan changes elsewhere in
+                    // the app (e.g. the parent/student subscription screen),
+                    // so the badge below never disagrees with the real state.
+                    ListenableBuilder(
+                      listenable: SubscriptionProvider.instance,
+                      builder: (context, _) => _buildActivePlan(context),
+                    ),
                     const SizedBox(height: 24),
                     Text(
                       'UPGRADE YOUR PLAN',
@@ -38,30 +45,51 @@ class DriverSubscriptionScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildPlanCard(
-                      context,
-                      title: 'Standard Driver',
-                      price: 'Rs. 500/mo',
-                      features: [
-                        'Basic route management',
-                        'Student attendance',
-                        'Daily trip history',
-                      ],
-                      isCurrent: true,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPlanCard(
-                      context,
-                      title: 'Pro Driver',
-                      price: 'Rs. 1,200/mo',
-                      features: [
-                        'Advanced performance analytics',
-                        'Priority pickup requests',
-                        'Detailed student feedback',
-                        'Fuel consumption tracker',
-                      ],
-                      isCurrent: false,
-                      accentColor: AppTheme.driverCyan,
+                    // `isCurrent` used to be a hardcoded true/false pair —
+                    // whatever the real plan was, "Standard Driver" always
+                    // claimed to be it. There is no driver-specific tier
+                    // inside `SubscriptionProvider` (it models the
+                    // family/free/trial/premium plans parents and students
+                    // choose), so this maps its two ends onto these two
+                    // driver tiers: `premium`/`family` reads as the paid
+                    // "Pro" tier, everything else as "Standard".
+                    ListenableBuilder(
+                      listenable: SubscriptionProvider.instance,
+                      builder: (context, _) {
+                        final isPro = const {
+                          'premium',
+                          'family',
+                        }.contains(SubscriptionProvider.instance.plan);
+                        return Column(
+                          children: [
+                            _buildPlanCard(
+                              context,
+                              title: 'Standard Driver',
+                              price: 'Rs. 500/mo',
+                              features: const [
+                                'Basic route management',
+                                'Student attendance',
+                                'Daily trip history',
+                              ],
+                              isCurrent: !isPro,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildPlanCard(
+                              context,
+                              title: 'Pro Driver',
+                              price: 'Rs. 1,200/mo',
+                              features: const [
+                                'Advanced performance analytics',
+                                'Priority pickup requests',
+                                'Detailed student feedback',
+                                'Fuel consumption tracker',
+                              ],
+                              isCurrent: isPro,
+                              accentColor: AppTheme.driverCyan,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -102,7 +130,7 @@ class DriverSubscriptionScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Standard Plan',
+                      '${SubscriptionProvider.instance.planDisplayName} Plan',
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 18,
@@ -154,6 +182,11 @@ class DriverSubscriptionScreen extends StatelessWidget {
     Color accentColor = Colors.grey,
   }) {
     return GlassCard(
+      // Two of these render side by side as the bulk of this page's scroll
+      // content, so the blur would be recomposited on every scroll frame for
+      // no benefit over the flat card below — unlike the single, mostly
+      // static plan summary above, which keeps its blur.
+      enableBlur: false,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +264,7 @@ class DriverSubscriptionScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accentColor,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangle_Border(
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -249,7 +282,3 @@ class DriverSubscriptionScreen extends StatelessWidget {
 }
 
 // No local extension needed, using theme/app_theme.dart instead.
-
-class RoundedRectangle_Border extends RoundedRectangleBorder {
-  const RoundedRectangle_Border({super.borderRadius, super.side});
-}

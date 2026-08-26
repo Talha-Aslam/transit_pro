@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// `route_data.dart`'s StopData/RouteData have their own StopStatus enum,
+// distinct from transit_core's — hide the latter rather than prefix every
+// reference in this file.
+import 'package:transit_core/transit_core.dart' hide StopStatus;
 import 'geofence_service.dart';
+import 'location_permissions.dart';
 import '../models/route_data.dart';
 
 /// Singleton service that drives bus position along a route.
@@ -15,21 +19,32 @@ class TrackingService {
   static final TrackingService instance = TrackingService._();
 
   // ── Public state ──────────────────────────────────────────────────────────
-  final busPosition = ValueNotifier<LatLng>(const LatLng(31.5204, 74.3587));
+  final busPosition = ValueNotifier<GeoCoord>(const GeoCoord(31.5204, 74.3587));
   final busHeading = ValueNotifier<double>(0);
   final speed = ValueNotifier<int>(35);
   final etaMinutes = ValueNotifier<int>(8);
   final isLive = ValueNotifier<bool>(false);
   final isSimulating = ValueNotifier<bool>(false);
 
+  /// Bumped only when a stop's [StopStatus] actually transitions — never on
+  /// every 150 ms tick. The map layer listens to this (not the 6.7 Hz
+  /// position ticks) to know when to touch the 6 static stop annotations,
+  /// which only need redrawing a handful of times per route, not 6.7×/sec.
+  final stopStatusRevision = ValueNotifier<int>(0);
+
   /// Helper to check if any form of tracking is active.
   ValueNotifier<bool> get isMoving => isSimulating;
 
   RouteData? _route;
-  RouteData get route {
-    _route ??= MockRouteBuilder.buildMorningRoute();
-    return _route!;
-  }
+
+  /// Null until a real trip is running. This used to fall back to
+  /// [MockRouteBuilder.buildMorningRoute] the instant anything asked for a
+  /// route, which is why a brand-new account's Track tab could show a full
+  /// "Route Progress" timeline and a moving bus before any driver had ever
+  /// started anything — every screen that reads this must now handle null as
+  /// "no ride is happening right now", not fall back to a placeholder route
+  /// of its own.
+  RouteData? get route => _route;
 
   /// Expose the current waypoint index so the route screen can build
   /// the "completed" polyline segment accurately.
@@ -55,7 +70,12 @@ class TrackingService {
     _startSimulation();
   }
 
-  /// Call from widget dispose.
+  /// Call from widget dispose, or when a real trip actually ends.
+  ///
+  /// Clears [_route] (not just the timers) so [route] goes back to null —
+  /// otherwise a screen that reads it after the ride ends would keep showing
+  /// the last trip's stops and polyline forever, which is exactly the kind
+  /// of stale-mock-data bug this null contract exists to prevent.
   void stop() {
     _simTimer?.cancel();
     _simTimer = null;
@@ -64,6 +84,8 @@ class TrackingService {
     isSimulating.value = false;
     isLive.value = false;
     _paused = false;
+    _route = null;
+    _waypointIndex = 0;
   }
 
   /// Freeze all position updates without losing route progress.
@@ -107,7 +129,7 @@ class TrackingService {
       _simTimer = null;
       isSimulating.value = false;
 
-      final ok = await _ensureLocationPermission();
+      final ok = await ensureLocationPermission();
       if (!ok) return;
 
       isLive.value = true;
@@ -118,7 +140,7 @@ class TrackingService {
               distanceFilter: 10,
             ),
           ).listen((pos) {
-            busPosition.value = LatLng(pos.latitude, pos.longitude);
+            busPosition.value = GeoCoord(pos.latitude, pos.longitude);
             busHeading.value = pos.heading;
             speed.value = pos.speed.round().clamp(0, 120);
           });
@@ -128,13 +150,20 @@ class TrackingService {
   // ── Simulation ────────────────────────────────────────────────────────────
 
   void _startSimulation() {
+    final r = _route;
+    if (r == null) return;
     isSimulating.value = true;
-    final pts = route.polylinePoints;
+    final pts = r.polylinePoints;
     if (pts.isEmpty) return;
 
     _simTimer?.cancel();
     // 150 ms ticks → smooth 6–7 fps movement across ~82 waypoints
     _simTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+      if (_route == null) {
+        _simTimer?.cancel();
+        _simTimer = null;
+        return;
+      }
       if (_waypointIndex >= pts.length - 1) {
         _waypointIndex = 0; // loop
         _resetStopStatuses();
@@ -158,36 +187,48 @@ class TrackingService {
     });
   }
 
-  void _updateStopStatuses(LatLng busPos) {
-    for (final stop in route.stops) {
+  void _updateStopStatuses(GeoCoord busPos) {
+    final r = _route;
+    if (r == null) return;
+    var changed = false;
+    for (final stop in r.stops) {
       final dist = _distanceBetween(busPos, stop.location);
       if (dist < 150 && stop.status == StopStatus.upcoming) {
         stop.status = StopStatus.current;
+        changed = true;
       } else if (dist < 150 && stop.status == StopStatus.current) {
         // already current, keep it
       } else if (stop.status == StopStatus.current && dist > 200) {
         stop.status = StopStatus.completed;
+        changed = true;
       }
     }
+    if (changed) stopStatusRevision.value++;
   }
 
   void _resetStopStatuses() {
-    for (int i = 0; i < route.stops.length; i++) {
-      final s = route.stops[i];
+    final r = _route;
+    if (r == null) return;
+    for (int i = 0; i < r.stops.length; i++) {
+      final s = r.stops[i];
       if (i < 3) {
         s.status = StopStatus.completed;
       } else if (i == 3) {
         s.status = StopStatus.current;
-      } else if (i == route.stops.length - 1) {
+      } else if (i == r.stops.length - 1) {
         s.status = StopStatus.destination;
       } else {
         s.status = StopStatus.upcoming;
       }
     }
+    stopStatusRevision.value++;
   }
 
   void _updateEta() {
-    final pts = route.polylinePoints;
+    final r = _route;
+    if (r == null) return;
+    final pts = r.polylinePoints;
+    if (pts.isEmpty) return;
     final remaining = pts.length - _waypointIndex;
     final totalEta = (remaining / pts.length * 15).round().clamp(1, 15);
     etaMinutes.value = totalEta;
@@ -195,19 +236,14 @@ class TrackingService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  double _distanceBetween(LatLng a, LatLng b) {
-    return Geolocator.distanceBetween(
-      a.latitude,
-      a.longitude,
-      b.latitude,
-      b.longitude,
-    );
+  double _distanceBetween(GeoCoord a, GeoCoord b) {
+    return Geolocator.distanceBetween(a.lat, a.lng, b.lat, b.lng);
   }
 
-  double _bearing(LatLng from, LatLng to) {
-    final dLon = _toRad(to.longitude - from.longitude);
-    final lat1 = _toRad(from.latitude);
-    final lat2 = _toRad(to.latitude);
+  double _bearing(GeoCoord from, GeoCoord to) {
+    final dLon = _toRad(to.lng - from.lng);
+    final lat1 = _toRad(from.lat);
+    final lat2 = _toRad(to.lat);
     final y = sin(dLon) * cos(lat2);
     final x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
     return (atan2(y, x) * 180 / pi + 360) % 360;
@@ -215,28 +251,18 @@ class TrackingService {
 
   double _toRad(double deg) => deg * pi / 180;
 
-  Future<bool> _ensureLocationPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
-
-    LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied) return false;
-    }
-    if (perm == LocationPermission.deniedForever) return false;
-    return true;
-  }
-
   /// Advance to the next stop manually (for driver "Mark Stop Done").
   void markCurrentStopDone() {
-    final current = route.currentStop;
+    final r = _route;
+    if (r == null) return;
+    final current = r.currentStop;
     if (current != null) {
       current.status = StopStatus.completed;
-      final next = route.nextStop;
+      final next = r.nextStop;
       if (next != null) {
         next.status = StopStatus.current;
       }
+      stopStatusRevision.value++;
     }
   }
 }

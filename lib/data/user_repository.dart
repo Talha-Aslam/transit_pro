@@ -140,4 +140,140 @@ class UserRepository {
 
   Future<void> setLocationSharing(String driverId, bool enabled) =>
       updateDriver(driverId, {'locationSharing': enabled});
+
+  /// Replaces a driver's bookable rounds.
+  ///
+  /// `bookedSeats` travels with each round, so callers must pass rounds they
+  /// read from the live driver document rather than rebuilding them from a form
+  /// — otherwise editing a start time would reset every seat count to zero and
+  /// silently un-book every family on it. The driver schedule editor reads,
+  /// mutates and writes back for exactly this reason.
+  Future<void> replaceSchedules(
+    String driverId,
+    List<DriverSchedule> schedules,
+  ) =>
+      updateDriver(driverId, {
+        'schedules': schedules.map((s) => s.toMap()).toList(),
+      });
+
+  /// Replaces a driver's service areas, keeping the query mirror in step.
+  ///
+  /// `serviceSchools` is the normalised list Firestore matches against; writing
+  /// the display list without it would leave a driver invisible to search while
+  /// looking correctly configured in their own profile — the worst kind of bug,
+  /// because the driver has no way to see it. Derived here from the same input,
+  /// in one write, so the two cannot diverge.
+  Future<void> replaceServiceAreas(
+    String driverId, {
+    required List<ServiceArea> areas,
+    double? radiusKm,
+    GeoCoord? baseLocation,
+    int? missedBusFarePaisa,
+  }) =>
+      updateDriver(driverId, {
+        'serviceAreas': areas.map((a) => a.toMap()).toList(),
+        'serviceSchools': areas
+            .map((a) => a.normalizedName)
+            .where((n) => n.isNotEmpty)
+            .toList(),
+        'serviceRadiusKm': ?radiusKm,
+        'baseLocation': ?baseLocation?.toMap(),
+        'missedBusFarePaisa': ?missedBusFarePaisa,
+      });
+
+  /// A driver's compliance documents. Rules allow a driver to `create` a new
+  /// attempt at any time but forbid them touching `status`/`verifiedBy` on an
+  /// existing one — so a re-upload after rejection is a brand new document,
+  /// not an edit of the old one, and this stream can hold several per
+  /// [DocumentType] over time. Callers pick the latest by `uploadedAt`.
+  Stream<List<DriverDocument>> watchDriverDocuments(String driverId) =>
+      Db.documents
+          .where('driverId', isEqualTo: driverId)
+          .snapshots()
+          .docsList;
+
+  Future<void> submitDriverDocument(DriverDocument document) async {
+    final ref = await Db.documents.add(document);
+    await ref.update({'uploadedAt': Db.now});
+  }
+
+  /// A driver's own roster — everyone whose ride request they accepted.
+  ///
+  /// Separate from [watchStudentsOnRoute]: that answers "who is on this
+  /// admin-assigned route", which is empty for a driver who signed themselves up
+  /// and runs their own rounds. This is the roster that actually exists in the
+  /// pilot.
+  Stream<List<Student>> watchRoster(String driverId) => Db.students
+      .where('driverId', isEqualTo: driverId)
+      .snapshots()
+      .docsList;
+
+  // ── Driver discovery ──────────────────────────────────────────────────────
+
+  /// Every driver who says they serve [school].
+  ///
+  /// One `arrayContains` on the normalised name — served by Firestore's
+  /// automatic single-field index, so this needs no composite index and cannot
+  /// break the way the `payments` queries did. Everything else worth filtering
+  /// on (seats free, distance, not suspended) is applied by
+  /// [rankDriversForStudent] in memory, because each of those would otherwise
+  /// cost another composite index, and `serviceRadiusKm` is not expressible as a
+  /// Firestore filter at all without a geohash scheme this pilot does not need.
+  Stream<List<Driver>> watchDriversServing(String school) {
+    final key = ServiceArea.normalize(school);
+    if (key.isEmpty) return Stream.value(const []);
+    return Db.drivers
+        .where('serviceSchools', arrayContains: key)
+        .snapshots()
+        .docsList;
+  }
+
+  Future<List<Driver>> fetchDriversServing(String school) async {
+    final key = ServiceArea.normalize(school);
+    if (key.isEmpty) return const [];
+    final snap =
+        await Db.drivers.where('serviceSchools', arrayContains: key).get();
+    return snap.docs.map((d) => d.data()).toList();
+  }
+
+  /// Turns raw candidates into ranked, explained matches for one child.
+  ///
+  /// Pure and synchronous so the ranking can be reasoned about (and changed)
+  /// without touching Firestore. Drops nobody for being full — a driver who
+  /// serves the school but has no seat today is still the most useful thing on
+  /// the screen next week, and hiding them makes the list look emptier than the
+  /// city really is. [DriverMatch.hasOpenSeats] lets the UI grey them out
+  /// instead.
+  ///
+  /// Suspended drivers *are* dropped: that is an admin decision about safety,
+  /// not a preference for the parent to weigh.
+  List<DriverMatch> rankDriversForStudent({
+    required List<Driver> candidates,
+    required Student student,
+  }) {
+    final matches = <DriverMatch>[];
+    final from = student.pickupLocation;
+
+    for (final d in candidates) {
+      if (d.status == DriverStatus.suspended) continue;
+      if (!d.coversLocation(from)) continue;
+
+      final matched = d.serviceAreas
+          .where((a) => a.normalizedName == ServiceArea.normalize(student.school))
+          .toList();
+
+      matches.add(
+        DriverMatch(
+          driver: d,
+          distanceKm: d.distanceKmFrom(from),
+          matchedAreas: matched,
+          openSchedules:
+              d.orderedSchedules.where((s) => s.hasSpace).toList(),
+        ),
+      );
+    }
+
+    matches.sort((a, b) => b.score.compareTo(a.score));
+    return matches;
+  }
 }

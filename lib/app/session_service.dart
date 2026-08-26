@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../data/fleet_repository.dart';
+import '../data/payment_repository.dart';
+import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
+import 'notification_service.dart';
 
 /// Where the signed-in user stands, from the router's point of view.
 enum SessionState {
@@ -81,6 +84,51 @@ class SessionService extends ChangeNotifier {
   /// Driver role — everyone assigned to the route this driver runs. Backs the
   /// passenger roster and the "N students" figure on the dashboard.
   final routeStudents = ValueNotifier<List<Student>>([]);
+
+  /// Driver role — everyone whose ride request this driver accepted.
+  ///
+  /// Kept separate from [routeStudents]: that list comes from an admin-assigned
+  /// route, which a self-signed-up driver running their own rounds does not
+  /// have. In the pilot this is the roster that actually has people in it.
+  final roster = ValueNotifier<List<Student>>([]);
+
+  /// Seat requests involving the signed-in user — incoming for a driver,
+  /// outgoing for a parent or student. One notifier for both because a given
+  /// account is only ever on one side of it.
+  final rideRequests = ValueNotifier<List<RideRequest>>([]);
+
+  /// Fee records for whichever side of the transaction this account is on: a
+  /// parent's bills, a student's own bills, or a driver's receipts. Newest month
+  /// first.
+  final payments = ValueNotifier<List<Payment>>([]);
+
+  /// One child's fees, for a parent looking at a specific child. A parent's
+  /// `payments` list spans every child, and a fee screen showing another child's
+  /// bill under the selected child's name is worse than showing nothing.
+  List<Payment> paymentsForStudent(String studentId) =>
+      payments.value.where((p) => p.studentId == studentId).toList();
+
+  /// Requests still waiting on the driver. The badge count on their dashboard.
+  List<RideRequest> get pendingRideRequests =>
+      rideRequests.value.where((r) => r.isPending).toList();
+
+  List<RideRequest> get acceptedRideRequests =>
+      rideRequests.value.where((r) => r.isAccepted).toList();
+
+  /// The live request for one child, whatever its state — so the parent's
+  /// search results can show "Awaiting reply" on a driver they already asked
+  /// instead of offering the button again.
+  RideRequest? requestFor({required String studentId, required String driverId}) {
+    final id = RideRequest.idFor(driverId: driverId, studentId: studentId);
+    for (final r in rideRequests.value) {
+      if (r.id == id) return r;
+    }
+    return null;
+  }
+
+  /// The rounds the signed-in driver offers, in reading order. Empty for any
+  /// other role.
+  List<DriverSchedule> get mySchedules => driver.value?.orderedSchedules ?? const [];
 
   /// Lookup caches for documents referenced by id.
   ///
@@ -173,6 +221,11 @@ class SessionService extends ChangeNotifier {
     _uid = uid;
     _setState(SessionState.loading);
 
+    // Hooked here rather than at each of the four `start()` call sites in
+    // AuthService, so a new sign-in path cannot forget it and leave the user with
+    // an empty notification list.
+    NotificationService.instance.bindToUser(uid);
+
     _subs.add(
       UserRepository.instance.watchUser(uid).listen(
         _onUser,
@@ -214,6 +267,10 @@ class SessionService extends ChangeNotifier {
     selectedChildIndex.removeListener(_onSelectedChildChanged);
     _subscribedRole = null;
 
+    // Notifications are per-account. Leaving them would show one family's alerts
+    // to the next person signing in on a shared phone.
+    NotificationService.instance.unbind();
+
     user.value = null;
     children.value = [];
     student.value = null;
@@ -221,6 +278,9 @@ class SessionService extends ChangeNotifier {
     bus.value = null;
     route.value = null;
     routeStudents.value = [];
+    roster.value = [];
+    rideRequests.value = [];
+    payments.value = [];
     selectedChildIndex.value = 0;
 
     // Caches are per-account. Keeping them would leak one family's bus and
@@ -299,6 +359,8 @@ class SessionService extends ChangeNotifier {
           }, onError: (Object e) => debugPrint('children stream: $e')),
         );
         selectedChildIndex.addListener(_onSelectedChildChanged);
+        _watchOutgoingRequests(uid);
+        _watchPayments(PaymentRepository.instance.watchForParent(uid));
 
       case UserRole.student:
         _subs.add(
@@ -309,6 +371,8 @@ class SessionService extends ChangeNotifier {
             _resolveReferences();
           }, onError: (Object e) => debugPrint('student stream: $e')),
         );
+        _watchOutgoingRequests(uid);
+        _watchPayments(PaymentRepository.instance.watchForStudent(uid));
 
       case UserRole.driver:
         _subs.add(
@@ -318,14 +382,71 @@ class SessionService extends ChangeNotifier {
             // record — the admin app assigns the bus to a route.
             _followVehicle(d?.busId, d?.routeId ?? bus.value?.routeId);
             _backfillForRole();
+            // Seat counts live inside the driver document, so every accept or
+            // release arrives on this stream. Republishing the request list here
+            // is what makes "2 seats left" on a parent's screen and the driver's
+            // own roster move at the same time.
+            notifyListeners();
           }, onError: (Object e) => debugPrint('driver stream: $e')),
         );
+
+        // The inbox. All statuses, not just pending — see
+        // RideRequestRepository.watchForDriver.
+        _subs.add(
+          RideRequestRepository.instance.watchForDriver(uid).listen((list) {
+            rideRequests.value = list;
+            _backfillForRole();
+            notifyListeners();
+          }, onError: (Object e) => debugPrint('driver requests stream: $e')),
+        );
+
+        _subs.add(
+          UserRepository.instance.watchRoster(uid).listen((list) {
+            roster.value = list;
+            _backfillForRole();
+          }, onError: (Object e) => debugPrint('roster stream: $e')),
+        );
+
+        _watchPayments(PaymentRepository.instance.watchForDriver(uid));
 
       case UserRole.admin:
         // The admin surface is the separate transit_admin app; nothing to
         // subscribe to here.
         break;
     }
+  }
+
+  /// Family side of [rideRequests] — everything this account has asked for.
+  ///
+  /// A driver's seat counts are read straight off their own document, so a
+  /// parent watching an accepted request also needs the driver record it points
+  /// at; [_resolveReferences] picks those up from `student.driverId`.
+  void _watchOutgoingRequests(String uid) {
+    _subs.add(
+      RideRequestRepository.instance.watchForRequester(uid).listen((list) {
+        rideRequests.value = list;
+        _backfillForRole();
+        notifyListeners();
+      }, onError: (Object e) => debugPrint('ride requests stream: $e')),
+    );
+  }
+
+  /// Fee records, from whichever query suits the role.
+  ///
+  /// The stream is passed in rather than the role, because the three
+  /// `PaymentRepository` methods differ only in which field they filter on and
+  /// this handler is identical for all of them. A `paymentsError` is not tracked
+  /// separately: an unreadable fee list is a per-screen problem, and the fee
+  /// screens render their own error state from the notifier staying empty rather
+  /// than the whole session going into [SessionState.error].
+  void _watchPayments(Stream<List<Payment>> stream) {
+    _subs.add(
+      stream.listen((list) {
+        payments.value = list;
+        _backfillForRole();
+        notifyListeners();
+      }, onError: (Object e) => debugPrint('payments stream: $e')),
+    );
   }
 
   void _onSelectedChildChanged() {
@@ -397,16 +518,21 @@ class SessionService extends ChangeNotifier {
     final routeIds = <String>{};
     final driverIds = <String>{};
 
-    void collect(String? busId, String? routeId) {
+    void collect(String? busId, String? routeId, String? driverId) {
       if (busId != null && busId.isNotEmpty) busIds.add(busId);
       if (routeId != null && routeId.isNotEmpty) routeIds.add(routeId);
+      // The direct driver link, set when a ride request is accepted. Before
+      // this existed a driver was only reachable through their bus, so a family
+      // matched to a self-signed-up driver with no admin-assigned route saw
+      // "No driver" on every screen even though the booking was live.
+      if (driverId != null && driverId.isNotEmpty) driverIds.add(driverId);
     }
 
     for (final c in children.value) {
-      collect(c.busId, c.routeId);
+      collect(c.busId, c.routeId, c.driverId);
     }
     final s = student.value;
-    if (s != null) collect(s.busId, s.routeId);
+    if (s != null) collect(s.busId, s.routeId, s.driverId);
 
     final pendingBuses = busIds.difference(busesById.value.keys.toSet());
     final pendingRoutes = routeIds.difference(routesById.value.keys.toSet());

@@ -21,6 +21,10 @@ class TermsScreen extends StatelessWidget {
     if (match != null) {
       return 'Section ${match.group(1)}';
     }
+    // The intro paragraph (index 1) has no leading digit, so it would
+    // otherwise fall through to 'Section 2' and collide with the real
+    // "2. Privacy" section below it.
+    if (index == 1) return 'Introduction';
     return 'Section ${index + 1}';
   }
 
@@ -124,6 +128,10 @@ class TermsScreen extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GlassCard(
+                    // Built inside List.generate — one card per terms
+                    // section, so this is a repeated-item list, not a
+                    // one-off card.
+                    enableBlur: false,
                     padding: const EdgeInsets.all(16),
                     borderRadius: 20,
                     child: Column(

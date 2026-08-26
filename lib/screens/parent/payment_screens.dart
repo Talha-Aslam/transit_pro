@@ -75,6 +75,13 @@ class PaymentMethodScreen extends StatefulWidget {
 }
 
 class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
+  /// The fee screens push here with an empty amount when nothing is
+  /// currently due — "Payment Methods" rather than "Pay Now". There is no
+  /// real bill behind that visit, so the amount/month summary and the three
+  /// method cards below switch to an informational mode: no navigation into
+  /// a flow that would ask someone to pay Rs.0 for no stated month.
+  bool get _hasBill => widget.amount.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +95,20 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
   }
 
   void _onLangChanged() => setState(() {});
+
+  void _openMethod(VoidCallback push) {
+    if (!_hasBill) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No fee is due right now — you can pay as soon as one is issued.',
+          ),
+        ),
+      );
+      return;
+    }
+    push();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +132,9 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Amount summary
+                      // Amount summary — or, with no bill outstanding, a
+                      // plain "nothing due" notice instead of "Rs." with a
+                      // blank amount and month.
                       GlassCard(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
@@ -125,72 +148,120 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                           alpha: 0.3,
                         ),
                         padding: const EdgeInsets.all(18),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                gradient: AppTheme.studentGradient,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  '💳',
-                                  style: TextStyle(fontSize: 22),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        child: _hasBill
+                            ? Row(
                                 children: [
-                                  Text(
-                                    AppStrings.t('amount_due'),
-                                    style: TextStyle(
-                                      color: context.textSecondary,
-                                      fontSize: 12,
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      gradient: AppTheme.studentGradient,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        '💳',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
                                     ),
                                   ),
-                                  ShaderMask(
-                                    shaderCallback: (b) => AppTheme
-                                        .studentGradient
-                                        .createShader(b),
-                                    child: Text(
-                                      widget.amount,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w800,
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppStrings.t('amount_due'),
+                                          style: TextStyle(
+                                            color: context.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        ShaderMask(
+                                          shaderCallback: (b) => AppTheme
+                                              .studentGradient
+                                              .createShader(b),
+                                          child: Text(
+                                            widget.amount,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 26,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        AppStrings.t('month_lbl'),
+                                        style: TextStyle(
+                                          color: context.textTertiary,
+                                          fontSize: 11,
+                                        ),
                                       ),
+                                      Text(
+                                        widget.month,
+                                        style: TextStyle(
+                                          color: context.textPrimary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      gradient: AppTheme.studentGradient,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        '✅',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Nothing due right now',
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'You can still review the payment '
+                                          'methods below for when a fee is '
+                                          'issued.',
+                                          style: TextStyle(
+                                            color: context.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  AppStrings.t('month_lbl'),
-                                  style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Text(
-                                  widget.month,
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: 24),
 
@@ -212,13 +283,13 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                         accentColor: AppTheme.success,
                         badgeLabel: AppStrings.t('requires_approval'),
                         badgeColor: AppTheme.warning,
-                        onTap: () => context.push(
+                        onTap: () => _openMethod(() => context.push(
                           '/parent/payment/cash',
                           extra: {
                             'amount': widget.amount,
                             'month': widget.month,
                           },
-                        ),
+                        )),
                       ),
                       const SizedBox(height: 12),
 
@@ -230,7 +301,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                         accentColor: AppTheme.info,
                         badgeLabel: 'JazzCash · EasyPaisa',
                         badgeColor: AppTheme.info,
-                        onTap: () {
+                        onTap: () => _openMethod(() {
                           // Pick the first child's driver for demo; real app
                           // shows a child selector if multiple children exist
                           final busNumber = children.isNotEmpty
@@ -253,7 +324,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                                   .toList(),
                             },
                           );
-                        },
+                        }),
                       ),
                       const SizedBox(height: 12),
 
@@ -265,13 +336,13 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                         accentColor: AppTheme.parentPurple,
                         badgeLabel: 'Visa · Mastercard',
                         badgeColor: AppTheme.parentPurple,
-                        onTap: () => context.push(
+                        onTap: () => _openMethod(() => context.push(
                           '/parent/payment/card',
                           extra: {
                             'amount': widget.amount,
                             'month': widget.month,
                           },
-                        ),
+                        )),
                       ),
 
                       const SizedBox(height: 24),

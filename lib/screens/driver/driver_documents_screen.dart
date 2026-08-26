@@ -1,29 +1,49 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:transit_core/transit_core.dart';
+
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
+import '../../data/user_repository.dart';
+import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
-// ─── Document status ──────────────────────────────────────────────────────────
-enum DocStatus { notUploaded, pending, verified, rejected }
-
-// ─── Mutable document model ───────────────────────────────────────────────────
-class _DocModel {
-  final String icon;
-  final String title;
-  final String hint;
-  DocStatus status;
-  String? filePath;
-  String? fileName;
-
-  _DocModel({
-    required this.icon,
-    required this.title,
-    required this.hint,
-    this.status = DocStatus.notUploaded,
-  });
-}
+const _kDocMeta = <DocumentType, (String icon, String title, String hint)>{
+  DocumentType.drivingLicense: (
+    '🪪',
+    'Driving License',
+    'Front & back photo of your driving license',
+  ),
+  DocumentType.vehicleRegistration: (
+    '🚌',
+    'Vehicle Registration',
+    'Photo of vehicle registration certificate',
+  ),
+  DocumentType.insuranceCertificate: (
+    '🛡️',
+    'Insurance Certificate',
+    'Upload your current insurance document',
+  ),
+  DocumentType.routePermit: (
+    '📋',
+    'Route Permit',
+    'Photo of the route permit issued by authority',
+  ),
+  DocumentType.medicalFitness: (
+    '🩺',
+    'Medical Fitness Certificate',
+    'Medical fitness certificate from a registered doctor',
+  ),
+  DocumentType.schoolContract: (
+    '🏫',
+    'School Contract',
+    'Signed contract document from the school',
+  ),
+};
 
 class DriverDocumentsScreen extends StatefulWidget {
   const DriverDocumentsScreen({super.key});
@@ -34,51 +54,32 @@ class DriverDocumentsScreen extends StatefulWidget {
 
 class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
   final _picker = ImagePicker();
+  final _repo = UserRepository.instance;
 
-  late final List<_DocModel> _docs;
+  /// Every document this driver has ever submitted, across every re-upload
+  /// attempt — a driver can only `create` new rows, never edit an old one's
+  /// status (see `firestore.rules`), so this can hold several per type.
+  List<DriverDocument> _all = [];
+  bool _loaded = false;
+  final _uploading = <DocumentType>{};
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_rebuild);
-    _docs = [
-      _DocModel(
-        icon: '🪪',
-        title: 'Driving License',
-        hint: 'Front & back photo of your driving license',
-        status: DocStatus.verified,
-      ),
-      _DocModel(
-        icon: '🚌',
-        title: 'Vehicle Registration',
-        hint: 'Photo of vehicle registration certificate',
-        status: DocStatus.verified,
-      ),
-      _DocModel(
-        icon: '🛡️',
-        title: 'Insurance Certificate',
-        hint: 'Upload your current insurance document',
-        status: DocStatus.notUploaded,
-      ),
-      _DocModel(
-        icon: '📋',
-        title: 'Route Permit',
-        hint: 'Photo of the route permit issued by authority',
-        status: DocStatus.verified,
-      ),
-      _DocModel(
-        icon: '🩺',
-        title: 'Medical Fitness Certificate',
-        hint: 'Medical fitness certificate from a registered doctor',
-        status: DocStatus.notUploaded,
-      ),
-      _DocModel(
-        icon: '🏫',
-        title: 'School Contract',
-        hint: 'Signed contract document from the school',
-        status: DocStatus.notUploaded,
-      ),
-    ];
+    final driverId = SessionService.instance.uid;
+    if (driverId != null) {
+      _repo.watchDriverDocuments(driverId).listen(
+        (docs) {
+          if (!mounted) return;
+          setState(() {
+            _all = docs;
+            _loaded = true;
+          });
+        },
+        onError: (Object e) => debugPrint('driver documents stream: $e'),
+      );
+    }
   }
 
   @override
@@ -89,48 +90,90 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
 
   void _rebuild() => setState(() {});
 
-  bool get _isEligible => _docs.every((d) => d.status == DocStatus.verified);
+  /// The most recent submission per type — an old rejected/replaced attempt
+  /// must not shadow whatever the driver uploaded after it.
+  DriverDocument? _latest(DocumentType type) {
+    DriverDocument? best;
+    for (final d in _all) {
+      if (d.type != type) continue;
+      if (best == null ||
+          (d.uploadedAt ?? DateTime(0)).isAfter(best.uploadedAt ?? DateTime(0))) {
+        best = d;
+      }
+    }
+    return best;
+  }
 
-  int get _verifiedCount =>
-      _docs.where((d) => d.status == DocStatus.verified).length;
+  bool get _isApproved => SessionService.instance.driver.value?.isApproved ?? false;
 
-  int get _pendingCount =>
-      _docs.where((d) => d.status == DocStatus.pending).length;
-
-  int get _missingCount => _docs
-      .where(
-        (d) =>
-            d.status == DocStatus.notUploaded || d.status == DocStatus.rejected,
-      )
+  int get _verifiedCount => _kDocMeta.keys
+      .where((t) => _latest(t)?.status == DocumentStatus.verified)
       .length;
 
-  Future<void> _pickFile(_DocModel doc) async {
+  int get _pendingCount => _kDocMeta.keys
+      .where((t) => _latest(t)?.status == DocumentStatus.pending)
+      .length;
+
+  int get _missingCount => _kDocMeta.keys
+      .where((t) {
+        final d = _latest(t);
+        return d == null || d.status == DocumentStatus.rejected;
+      })
+      .length;
+
+  Future<void> _pickFile(DocumentType type) async {
+    final meta = _kDocMeta[type]!;
     final choice = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _PickerSheet(docTitle: doc.title),
+      builder: (_) => _PickerSheet(docTitle: meta.$2),
     );
     if (choice == null) return;
 
     final picked = await _picker.pickImage(source: choice, imageQuality: 85);
     if (picked == null) return;
 
-    setState(() {
-      doc.filePath = picked.path;
-      doc.fileName = picked.name;
-      doc.status = DocStatus.pending;
-    });
+    final driverId = SessionService.instance.uid;
+    if (driverId == null) return;
 
-    if (mounted) {
-      _showSnack('${doc.title} uploaded — awaiting admin verification.');
+    setState(() => _uploading.add(type));
+    try {
+      if (!CloudinaryService.instance.isConfigured) {
+        throw const UploadException(
+          'File upload is not configured for this app yet.',
+        );
+      }
+      final result = await CloudinaryService.instance.uploadDriverDocument(
+        File(picked.path),
+        driverId,
+        type.name,
+      );
+      await _repo.submitDriverDocument(
+        DriverDocument(
+          id: '',
+          driverId: driverId,
+          type: type,
+          status: DocumentStatus.pending,
+          fileUrl: result.secureUrl,
+          publicId: result.publicId,
+          fileName: picked.name,
+        ),
+      );
+      if (mounted) {
+        _showSnack('${meta.$2} uploaded — awaiting admin verification.');
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Upload failed: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _uploading.remove(type));
     }
   }
 
-  void _showSnack(String msg) {
+  void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg, style: const TextStyle(color: Colors.white)),
-        backgroundColor: AppTheme.driverCyan,
+        backgroundColor: isError ? AppTheme.error : AppTheme.driverCyan,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -194,78 +237,95 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
               ),
 
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  child: Column(
-                    children: [
-                      // ── Eligibility banner ────────────────────────────────
-                      _EligibilityBanner(
-                        isEligible: _isEligible,
-                        missingCount: _missingCount,
-                        pendingCount: _pendingCount,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // ── Summary card ──────────────────────────────────────
-                      GlassCard(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.driverCyan.withValues(alpha: 0.15),
-                            AppTheme.driverTeal.withValues(alpha: 0.05),
-                          ],
-                        ),
-                        borderColor: AppTheme.driverCyan.withValues(alpha: 0.3),
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: !_loaded
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        child: Column(
                           children: [
-                            _SummaryPill(
-                              icon: '✅',
-                              value: '$_verifiedCount',
-                              label: 'Verified',
-                              color: AppTheme.successLight,
+                            // ── Eligibility banner ─────────────────────────
+                            // Driven by the real, admin-set account status —
+                            // not by whether every document individually
+                            // shows "verified" here, since an admin's review
+                            // process is the actual source of truth.
+                            _EligibilityBanner(
+                              isApproved: _isApproved,
+                              missingCount: _missingCount,
+                              pendingCount: _pendingCount,
                             ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: context.cardBgElevated,
+                            const SizedBox(height: 12),
+
+                            // ── Summary card ────────────────────────────────
+                            GlassCard(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppTheme.driverCyan.withValues(alpha: 0.15),
+                                  AppTheme.driverTeal.withValues(alpha: 0.05),
+                                ],
+                              ),
+                              borderColor: AppTheme.driverCyan.withValues(
+                                alpha: 0.3,
+                              ),
+                              padding: const EdgeInsets.all(20),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _SummaryPill(
+                                    icon: '✅',
+                                    value: '$_verifiedCount',
+                                    label: 'Verified',
+                                    color: AppTheme.successLight,
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 40,
+                                    color: context.cardBgElevated,
+                                  ),
+                                  _SummaryPill(
+                                    icon: '🕐',
+                                    value: '$_pendingCount',
+                                    label: 'Pending',
+                                    color: AppTheme.warningLight,
+                                  ),
+                                  Container(
+                                    width: 1,
+                                    height: 40,
+                                    color: context.cardBgElevated,
+                                  ),
+                                  _SummaryPill(
+                                    icon: '📤',
+                                    value: '$_missingCount',
+                                    label: 'Upload',
+                                    color: AppTheme.driverAccent,
+                                  ),
+                                ],
+                              ),
                             ),
-                            _SummaryPill(
-                              icon: '🕐',
-                              value: '$_pendingCount',
-                              label: 'Pending',
-                              color: AppTheme.warningLight,
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: context.cardBgElevated,
-                            ),
-                            _SummaryPill(
-                              icon: '📤',
-                              value: '$_missingCount',
-                              label: 'Upload',
-                              color: AppTheme.driverAccent,
-                            ),
+                            const SizedBox(height: 16),
+
+                            // ── Document cards ──────────────────────────────
+                            ..._kDocMeta.entries.map((entry) {
+                              final type = entry.key;
+                              final meta = entry.value;
+                              final doc = _latest(type);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _DocCard(
+                                  icon: meta.$1,
+                                  title: meta.$2,
+                                  hint: meta.$3,
+                                  status: doc?.status ?? DocumentStatus.notUploaded,
+                                  fileName: doc?.fileName,
+                                  uploading: _uploading.contains(type),
+                                  rejectionReason: doc?.rejectionReason,
+                                  onUpload: () => _pickFile(type),
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // ── Document cards ────────────────────────────────────
-                      ...List.generate(_docs.length, (i) {
-                        final doc = _docs[i];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _DocCard(
-                            doc: doc,
-                            onUpload: () => _pickFile(doc),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),
@@ -277,12 +337,12 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
 
 // ─── Eligibility Banner ───────────────────────────────────────────────────────
 class _EligibilityBanner extends StatelessWidget {
-  final bool isEligible;
+  final bool isApproved;
   final int missingCount;
   final int pendingCount;
 
   const _EligibilityBanner({
-    required this.isEligible,
+    required this.isApproved,
     required this.missingCount,
     required this.pendingCount,
   });
@@ -296,13 +356,13 @@ class _EligibilityBanner extends StatelessWidget {
     final String title;
     final String subtitle;
 
-    if (isEligible) {
+    if (isApproved) {
       bg = AppTheme.success.withValues(alpha: 0.12);
       border = AppTheme.success.withValues(alpha: 0.4);
       iconBg = AppTheme.success.withValues(alpha: 0.2);
       icon = '✅';
       title = 'Eligible for Rides';
-      subtitle = 'All documents verified. You are cleared to accept rides.';
+      subtitle = 'Your account is verified. You are cleared to accept rides.';
     } else if (missingCount > 0) {
       bg = AppTheme.error.withValues(alpha: 0.1);
       border = AppTheme.error.withValues(alpha: 0.35);
@@ -317,8 +377,9 @@ class _EligibilityBanner extends StatelessWidget {
       iconBg = AppTheme.warning.withValues(alpha: 0.15);
       icon = '🕐';
       title = 'Verification Pending';
-      subtitle =
-          '$pendingCount document${pendingCount > 1 ? 's are' : ' is'} under review by admin.';
+      subtitle = pendingCount > 0
+          ? '$pendingCount document${pendingCount > 1 ? 's are' : ' is'} under review by admin.'
+          : 'Your account is awaiting admin verification.';
     }
 
     return Container(
@@ -367,14 +428,33 @@ class _EligibilityBanner extends StatelessWidget {
 
 // ─── Document Card ────────────────────────────────────────────────────────────
 class _DocCard extends StatelessWidget {
-  final _DocModel doc;
+  final String icon;
+  final String title;
+  final String hint;
+  final DocumentStatus status;
+  final String? fileName;
+  final bool uploading;
+  final String? rejectionReason;
   final VoidCallback onUpload;
 
-  const _DocCard({required this.doc, required this.onUpload});
+  const _DocCard({
+    required this.icon,
+    required this.title,
+    required this.hint,
+    required this.status,
+    required this.fileName,
+    required this.uploading,
+    required this.rejectionReason,
+    required this.onUpload,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      // Built once per document via a fixed-length map — a repeated list
+      // item, so the blur pass would otherwise repeat for every visible card
+      // on every scroll frame.
+      enableBlur: false,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,7 +470,7 @@ class _DocCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
-                  child: Text(doc.icon, style: const TextStyle(fontSize: 22)),
+                  child: Text(icon, style: const TextStyle(fontSize: 22)),
                 ),
               ),
               const SizedBox(width: 14),
@@ -399,7 +479,7 @@ class _DocCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      doc.title,
+                      title,
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 14,
@@ -408,7 +488,7 @@ class _DocCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      doc.hint,
+                      hint,
                       style: TextStyle(
                         color: context.textTertiary,
                         fontSize: 11,
@@ -420,23 +500,32 @@ class _DocCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              _StatusBadge(status: doc.status),
+              _StatusBadge(status: status),
             ],
           ),
 
           // State-specific content
-          if (doc.status == DocStatus.notUploaded) ...[
+          if (uploading) ...[
+            const SizedBox(height: 12),
+            const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ] else if (status == DocumentStatus.notUploaded) ...[
             const SizedBox(height: 12),
             _UploadButton(onTap: onUpload),
-          ] else if (doc.status == DocStatus.pending) ...[
+          ] else if (status == DocumentStatus.pending) ...[
             const SizedBox(height: 12),
             _PendingPreview(
-              fileName: doc.fileName ?? 'Document',
+              fileName: fileName ?? 'Document',
               onReupload: onUpload,
             ),
-          ] else if (doc.status == DocStatus.rejected) ...[
+          ] else if (status == DocumentStatus.rejected) ...[
             const SizedBox(height: 12),
-            _RejectedRow(onReupload: onUpload),
+            _RejectedRow(reason: rejectionReason, onReupload: onUpload),
           ],
         ],
       ),
@@ -547,8 +636,9 @@ class _PendingPreview extends StatelessWidget {
 
 // ─── Rejected row ─────────────────────────────────────────────────────────────
 class _RejectedRow extends StatelessWidget {
+  final String? reason;
   final VoidCallback onReupload;
-  const _RejectedRow({required this.onReupload});
+  const _RejectedRow({required this.reason, required this.onReupload});
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +655,9 @@ class _RejectedRow extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Document rejected — please re-upload.',
+              reason == null || reason!.isEmpty
+                  ? 'Document rejected — please re-upload.'
+                  : 'Rejected: $reason',
               style: TextStyle(color: AppTheme.errorLight, fontSize: 11),
             ),
           ),
@@ -595,7 +687,7 @@ class _RejectedRow extends StatelessWidget {
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 class _StatusBadge extends StatelessWidget {
-  final DocStatus status;
+  final DocumentStatus status;
   const _StatusBadge({required this.status});
 
   @override
@@ -607,28 +699,28 @@ class _StatusBadge extends StatelessWidget {
     final IconData icon;
 
     switch (status) {
-      case DocStatus.verified:
+      case DocumentStatus.verified:
         bg = AppTheme.success.withValues(alpha: 0.15);
         border = AppTheme.success.withValues(alpha: 0.3);
         textColor = AppTheme.successLight;
         label = 'Verified';
         icon = Icons.verified_rounded;
         break;
-      case DocStatus.pending:
+      case DocumentStatus.pending:
         bg = AppTheme.warning.withValues(alpha: 0.15);
         border = AppTheme.warning.withValues(alpha: 0.3);
         textColor = AppTheme.warningLight;
         label = 'Pending';
         icon = Icons.hourglass_top_rounded;
         break;
-      case DocStatus.rejected:
+      case DocumentStatus.rejected:
         bg = AppTheme.error.withValues(alpha: 0.15);
         border = AppTheme.error.withValues(alpha: 0.3);
         textColor = AppTheme.errorLight;
         label = 'Rejected';
         icon = Icons.cancel_rounded;
         break;
-      case DocStatus.notUploaded:
+      case DocumentStatus.notUploaded:
         bg = context.cardBgElevated;
         border = context.surfaceBorder;
         textColor = context.textTertiary;

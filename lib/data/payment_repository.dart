@@ -12,24 +12,48 @@ class PaymentRepository {
   PaymentRepository._();
   static final PaymentRepository instance = PaymentRepository._();
 
+  /// Newest month first. Sorted here rather than by Firestore — see the note on
+  /// [watchForParent].
+  static List<Payment> _newestFirst(List<Payment> list) {
+    final sorted = [...list];
+    sorted.sort((a, b) => b.monthKey.compareTo(a.monthKey));
+    return sorted;
+  }
+
+  /// Every fee record for one family.
+  ///
+  /// ## Why there is no `orderBy`
+  ///
+  /// These three queries used `.orderBy('monthKey', descending: true)` alongside
+  /// their equality filter, which Firestore cannot serve without a composite
+  /// index — and each one needs its own. That failed in production as
+  /// `FAILED_PRECONDITION` the first time a real parent account loaded its fees,
+  /// while working perfectly in development, because indexes here are created by
+  /// hand through a console link rather than deployed from
+  /// `firestore.indexes.json`.
+  ///
+  /// A single equality filter is served by Firestore's automatic index, so
+  /// sorting in memory removes that failure mode entirely. `monthKey` is
+  /// `YYYY-MM`, which sorts correctly as a string, and a family has at most a
+  /// couple of dozen of these — the ordering was never the expensive part.
   Stream<List<Payment>> watchForParent(String parentId) => Db.payments
       .where('parentId', isEqualTo: parentId)
-      .orderBy('monthKey', descending: true)
       .snapshots()
-      .docsList;
+      .docsList
+      .map(_newestFirst);
 
   Stream<List<Payment>> watchForStudent(String studentId) => Db.payments
       .where('studentId', isEqualTo: studentId)
-      .orderBy('monthKey', descending: true)
       .snapshots()
-      .docsList;
+      .docsList
+      .map(_newestFirst);
 
   /// What a driver is owed — drives the driver's payment-history screen.
   Stream<List<Payment>> watchForDriver(String driverId) => Db.payments
       .where('driverId', isEqualTo: driverId)
-      .orderBy('monthKey', descending: true)
       .snapshots()
-      .docsList;
+      .docsList
+      .map(_newestFirst);
 
   Future<Payment?> fetchForMonth(String studentId, String monthKey) async {
     final snap = await Db.payments

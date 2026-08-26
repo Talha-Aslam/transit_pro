@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:transit_core/transit_core.dart';
+import '../../app/session_service.dart';
+import '../../app/student_data_service.dart';
+import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../app/language_provider.dart';
@@ -15,6 +19,13 @@ class _StudentAttendanceState extends State<StudentAttendance>
   late AnimationController _pulseCtrl;
   bool _isScanning = false;
 
+  /// This student's attendance records across trips, used to derive today's
+  /// check-in cards and the "missed days" stat. Empty until the fetch below
+  /// completes — a brand-new student with no history correctly shows nothing
+  /// rather than the prototype's invented 42/98%/1.
+  List<AttendanceRecord> _records = const [];
+  int _missedDaysThisMonth = 0;
+
   @override
   void initState() {
     super.initState();
@@ -23,6 +34,85 @@ class _StudentAttendanceState extends State<StudentAttendance>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
+    _loadAttendance();
+  }
+
+  Future<void> _loadAttendance() async {
+    final studentId = SessionService.instance.student.value?.id;
+    if (studentId == null || studentId.isEmpty) return;
+    try {
+      final records = await TripRepository.instance.fetchAttendanceForStudent(
+        studentId,
+      );
+      if (!mounted) return;
+      final now = DateTime.now();
+      setState(() {
+        _records = records;
+        _missedDaysThisMonth = records
+            .where(
+              (r) =>
+                  r.status == AttendanceStatus.absent &&
+                  r.markedAt != null &&
+                  r.markedAt!.year == now.year &&
+                  r.markedAt!.month == now.month,
+            )
+            .length;
+      });
+    } catch (e) {
+      debugPrint('attendance load failed: $e');
+    }
+  }
+
+  /// The most recent record marked today in the requested half of the day, or
+  /// null when nothing has been marked yet — the card then shows "Pending".
+  AttendanceRecord? _latestToday({required bool morning}) {
+    final today = DateTime.now();
+    AttendanceRecord? best;
+    for (final r in _records) {
+      final t = r.markedAt;
+      if (t == null) continue;
+      if (t.year != today.year || t.month != today.month || t.day != today.day) {
+        continue;
+      }
+      if ((t.hour < 12) != morning) continue;
+      if (best == null || t.isAfter(best.markedAt!)) best = r;
+    }
+    return best;
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${dt.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// Builds one check-in card from a real attendance record.
+  ///
+  /// The attendance model records one boarded/absent verdict per trip (a
+  /// whole morning or afternoon run), not a separate scan for each leg of it.
+  /// So the same morning record backs both "Morning Pickup" and "School
+  /// Arrival" here, and the same afternoon record backs "Afternoon Pickup"
+  /// and "Home Drop-off" — an honest simplification given what the backend
+  /// actually tracks, rather than four independent (and currently
+  /// non-existent) scan events.
+  _CheckinCard _checkinCard({
+    required AttendanceRecord? record,
+    required String type,
+    required String icon,
+    required Color color,
+    required String location,
+  }) {
+    final absent = record?.status == AttendanceStatus.absent;
+    final boarded = record?.status == AttendanceStatus.boarded;
+    return _CheckinCard(
+      type: type,
+      time: _formatTime(record?.markedAt),
+      location: location,
+      icon: icon,
+      color: absent ? AppTheme.error : (boarded ? color : Colors.grey),
+      status: absent ? 'Absent' : (boarded ? 'Checked In' : 'Pending'),
+    );
   }
 
   @override
@@ -45,6 +135,16 @@ class _StudentAttendanceState extends State<StudentAttendance>
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<StudentInfo>(
+      valueListenable: StudentDataService.instance.studentInfo,
+      builder: (context, student, _) => _buildBody(context, student),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, StudentInfo student) {
+    final morningRecord = _latestToday(morning: true);
+    final afternoonRecord = _latestToday(morning: false);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -109,7 +209,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Noorulain',
+                              student.name.isEmpty ? '—' : student.name,
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 16,
@@ -117,7 +217,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                               ),
                             ),
                             Text(
-                              'ID: STU-2024-042',
+                              'ID: ${student.studentId.isEmpty ? '—' : student.studentId}',
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -132,6 +232,11 @@ class _StudentAttendanceState extends State<StudentAttendance>
                   const SizedBox(height: 24),
 
                   // QR code placeholder
+                  //
+                  // `_QRPattern()` is passed as `child:` rather than built
+                  // inside `builder:` — it never depends on the pulse glow, so
+                  // it must not be reconstructed (and its CustomPaint
+                  // re-laid-out) on every animation tick.
                   AnimatedBuilder(
                     animation: _pulseCtrl,
                     builder: (ctx, child) {
@@ -147,7 +252,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                           boxShadow: _isScanning
                               ? [
                                   BoxShadow(
-                                    color: AppTheme.studentAmber.withValues(alpha: 
+                                    color: AppTheme.studentAmber.withValues(alpha:
                                       glow,
                                     ),
                                     blurRadius: 30,
@@ -158,10 +263,11 @@ class _StudentAttendanceState extends State<StudentAttendance>
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: _QRPattern(),
+                          child: child,
                         ),
                       );
                     },
+                    child: _QRPattern(),
                   ),
                   const SizedBox(height: 16),
 
@@ -179,27 +285,29 @@ class _StudentAttendanceState extends State<StudentAttendance>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '🚌 Bus #42',
+                          '🚌 ${student.busNumber.isEmpty ? 'No bus assigned' : student.busNumber}',
                           style: TextStyle(
                             color: context.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Container(
-                          width: 1,
-                          height: 14,
-                          margin: const EdgeInsets.symmetric(horizontal: 12),
-                          color: context.surfaceBorder,
-                        ),
-                        Text(
-                          '📍 Route A',
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                        if (student.route.isNotEmpty) ...[
+                          Container(
+                            width: 1,
+                            height: 14,
+                            margin: const EdgeInsets.symmetric(horizontal: 12),
+                            color: context.surfaceBorder,
                           ),
-                        ),
+                          Text(
+                            '📍 ${student.route}',
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -268,40 +376,36 @@ class _StudentAttendanceState extends State<StudentAttendance>
                     ),
                   ),
                 ),
-                _CheckinCard(
+                _checkinCard(
+                  record: morningRecord,
                   type: 'Morning Pickup',
-                  time: '07:22 AM',
-                  location: 'Pine Road Stop',
                   icon: '🌅',
                   color: AppTheme.studentAmber,
-                  status: 'Checked In',
+                  location: student.stop.isEmpty ? '—' : student.stop,
                 ),
                 const SizedBox(height: 10),
-                _CheckinCard(
+                _checkinCard(
+                  record: morningRecord,
                   type: 'School Arrival',
-                  time: '07:35 AM',
-                  location: 'Lincoln Elementary',
                   icon: '🏫',
                   color: AppTheme.success,
-                  status: 'Checked In',
+                  location: student.school.isEmpty ? '—' : student.school,
                 ),
                 const SizedBox(height: 10),
-                _CheckinCard(
+                _checkinCard(
+                  record: afternoonRecord,
                   type: 'Afternoon Pickup',
-                  time: '--:--',
-                  location: 'Lincoln Elementary',
                   icon: '🌤️',
-                  color: Colors.grey,
-                  status: 'Pending',
+                  color: AppTheme.info,
+                  location: student.school.isEmpty ? '—' : student.school,
                 ),
                 const SizedBox(height: 10),
-                _CheckinCard(
+                _checkinCard(
+                  record: afternoonRecord,
                   type: 'Home Drop-off',
-                  time: '--:--',
-                  location: 'Pine Road Stop',
                   icon: '🏠',
-                  color: Colors.grey,
-                  status: 'Pending',
+                  color: AppTheme.studentAmber,
+                  location: student.stop.isEmpty ? '—' : student.stop,
                 ),
               ],
             ),
@@ -328,18 +432,26 @@ class _StudentAttendanceState extends State<StudentAttendance>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _Stat(
-                        val: '42',
-                        label: AppStrings.t('total_checkins'),
-                        color: AppTheme.studentAmber,
+                      ValueListenableBuilder<int>(
+                        valueListenable:
+                            StudentDataService.instance.totalRides,
+                        builder: (_, rides, _) => _Stat(
+                          val: '$rides',
+                          label: AppStrings.t('total_checkins'),
+                          color: AppTheme.studentAmber,
+                        ),
+                      ),
+                      ValueListenableBuilder<int>(
+                        valueListenable:
+                            StudentDataService.instance.onTimeRate,
+                        builder: (_, rate, _) => _Stat(
+                          val: '$rate%',
+                          label: 'Attendance\nRate',
+                          color: AppTheme.success,
+                        ),
                       ),
                       _Stat(
-                        val: '98%',
-                        label: 'Attendance\nRate',
-                        color: AppTheme.success,
-                      ),
-                      _Stat(
-                        val: '1',
+                        val: '$_missedDaysThisMonth',
                         label: 'Missed\nDays',
                         color: AppTheme.error,
                       ),
@@ -440,6 +552,10 @@ class _CheckinCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = status == 'Checked In';
     return GlassCard(
+      // One of four rendered per build (statically, not a real list, but the
+      // same repeated-small-card shape) — a live blur per card is wasted GPU
+      // work on a card this size.
+      enableBlur: false,
       gradient: done
           ? LinearGradient(
               colors: [color.withValues(alpha: 0.08), color.withValues(alpha: 0.02)],

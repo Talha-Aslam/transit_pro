@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
+import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
+import '../../app/tracking_service.dart';
+import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/find_driver_banner.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/payment_presentation.dart';
 
 class StudentDashboard extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -15,6 +22,65 @@ class StudentDashboard extends StatefulWidget {
 }
 
 class _StudentDashboardState extends State<StudentDashboard> {
+  /// Real check-in/absent history, replacing the two hardcoded "Oak Street
+  /// stop" / "Arrived at school" rows this screen used to show
+  /// unconditionally. Empty until the fetch below completes — a brand-new
+  /// account then correctly shows no attendance activity rather than an
+  /// invented one.
+  List<AttendanceRecord> _attendanceRecords = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendance();
+  }
+
+  Future<void> _loadAttendance() async {
+    final studentId = SessionService.instance.student.value?.id;
+    if (studentId == null || studentId.isEmpty) return;
+    try {
+      final records = await TripRepository.instance.fetchAttendanceForStudent(
+        studentId,
+      );
+      if (!mounted) return;
+      setState(() => _attendanceRecords = records);
+    } catch (e) {
+      debugPrint('dashboard attendance load failed: $e');
+    }
+  }
+
+  bool _isPast(TimeOfDay t) {
+    final now = TimeOfDay.now();
+    return (now.hour * 60 + now.minute) >= (t.hour * 60 + t.minute);
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '';
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${dt.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// The most recent boarded/absent verdicts, newest first — mirrors
+  /// `student_attendance.dart`'s honest simplification: the backend records
+  /// one verdict per trip, not separate pickup/school-arrival scans.
+  List<Widget> _attendanceActivityRows() {
+    final marked = _attendanceRecords.where((r) => r.markedAt != null).toList()
+      ..sort((a, b) => b.markedAt!.compareTo(a.markedAt!));
+    return marked
+        .take(2)
+        .map(
+          (r) => _ActivityRow(
+            icon: r.status == AttendanceStatus.absent ? '❌' : '✅',
+            msg: r.status == AttendanceStatus.absent
+                ? 'Marked absent'
+                : 'Checked in for pickup',
+            time: _formatTime(r.markedAt),
+          ),
+        )
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
@@ -79,7 +145,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         ValueListenableBuilder<StudentInfo>(
                           valueListenable:
                               StudentDataService.instance.studentInfo,
-                          builder: (_, info, __) => Text(
+                          builder: (_, info, _) => Text(
                             info.name,
                             style: TextStyle(
                               color: context.textPrimary,
@@ -200,41 +266,85 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             children: [
                               Row(
                                 children: [
-                                  ValueListenableBuilder<StudentInfo>(
-                                    valueListenable: StudentDataService
-                                        .instance
-                                        .studentInfo,
-                                    builder: (_, info, _) {
-                                      final assignment = [
-                                        info.busNumber,
-                                        info.route,
-                                      ].where((s) => s.isNotEmpty).join(' · ');
-                                      return Text(
-                                        assignment.isEmpty
-                                            ? 'No bus assigned yet'
-                                            : assignment,
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
+                                  Expanded(
+                                    child: ValueListenableBuilder<StudentInfo>(
+                                      valueListenable: StudentDataService
+                                          .instance
+                                          .studentInfo,
+                                      builder: (_, info, _) {
+                                        final assignment =
+                                            [info.busNumber, info.route]
+                                                .where((s) => s.isNotEmpty)
+                                                .join(' · ');
+                                        return Text(
+                                          assignment.isEmpty
+                                              ? 'No bus assigned yet'
+                                              : assignment,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // `route` is null until a driver actually
+                                  // starts a trip — this used to show
+                                  // "On Route" unconditionally, even for a
+                                  // brand-new account with no driver at all.
+                                  TrackingService.instance.route == null
+                                      ? StatusBadge(
+                                          label: 'Not on route',
+                                          color: AppTheme.warning,
+                                        )
+                                      : StatusBadge(
+                                          label: '● On Route',
+                                          color: AppTheme.success,
                                         ),
-                                      );
-                                    },
-                                  ),
-                                  const Spacer(),
-                                  StatusBadge(
-                                    label: '● On Route',
-                                    color: AppTheme.success,
-                                  ),
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                'Arriving in 8 min · Pine Road Stop',
-                                style: TextStyle(
-                                  color: context.textSecondary,
-                                  fontSize: 12,
-                                ),
+                              ValueListenableBuilder<int>(
+                                valueListenable:
+                                    TrackingService.instance.etaMinutes,
+                                builder: (_, eta, _) {
+                                  final route = TrackingService.instance.route;
+                                  // `etaMinutes` keeps whatever value the last
+                                  // live trip left it at — without this
+                                  // guard, "Arriving in X min" kept showing
+                                  // for an account with no bus assigned at
+                                  // all, since eta is never reset to a
+                                  // not-applicable state on its own.
+                                  if (route == null) {
+                                    return Text(
+                                      'Route not started yet',
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }
+                                  final stopName = route.currentStop?.name;
+                                  final stopLabel =
+                                      (stopName != null && stopName.isNotEmpty)
+                                      ? stopName
+                                      : StudentDataService
+                                            .instance
+                                            .studentInfo
+                                            .value
+                                            .stop;
+                                  return Text(
+                                    'Arriving in $eta min'
+                                    '${stopLabel.isEmpty ? '' : ' · $stopLabel'}',
+                                    style: TextStyle(
+                                      color: context.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -274,44 +384,88 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    ShaderMask(
-                                      shaderCallback: (b) =>
-                                          const LinearGradient(
-                                            colors: [
-                                              Color(0xFFFBBF24),
-                                              Color(0xFFF59E0B),
-                                            ],
-                                          ).createShader(b),
-                                      child: Text(
-                                        '8 min',
+                                ValueListenableBuilder<int>(
+                                  valueListenable:
+                                      TrackingService.instance.etaMinutes,
+                                  // `etaMinutes` holds whatever the last live
+                                  // trip left it at — it is never reset just
+                                  // because there is no active route, so this
+                                  // must be gated the same way as the header
+                                  // "Arriving in X min" line above.
+                                  builder: (_, eta, _) {
+                                    final route =
+                                        TrackingService.instance.route;
+                                    if (route == null) {
+                                      return Text(
+                                        'Not started yet',
                                         style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.w800,
+                                          color: context.textSecondary,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      AppStrings.t('to_school'),
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
+                                      );
+                                    }
+                                    return Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        ShaderMask(
+                                          shaderCallback: (b) =>
+                                              const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFFBBF24),
+                                                  Color(0xFFF59E0B),
+                                                ],
+                                              ).createShader(b),
+                                          child: Text(
+                                            '$eta min',
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          AppStrings.t('to_school'),
+                                          style: TextStyle(
+                                            color: context.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                                Text(
-                                  '📍 Currently at Pine Road Stop',
-                                  style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 12,
-                                  ),
+                                Builder(
+                                  builder: (_) {
+                                    final route =
+                                        TrackingService.instance.route;
+                                    if (route == null) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final stopName = route.currentStop?.name;
+                                    final stopLabel =
+                                        (stopName != null &&
+                                            stopName.isNotEmpty)
+                                        ? stopName
+                                        : StudentDataService
+                                              .instance
+                                              .studentInfo
+                                              .value
+                                              .stop;
+                                    return Text(
+                                      stopLabel.isEmpty
+                                          ? ''
+                                          : '📍 Currently at $stopLabel',
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -340,6 +494,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  // ── Driver matching ───────────────────────────
+                  const FindDriverBanner(
+                    accent: AppTheme.studentAmber,
+                    searchRoute: '/student/find-drivers',
+                  ),
 
                   // ── Missed Bus quick action ────────────────────
                   GestureDetector(
@@ -451,26 +611,79 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        _ScheduleItem(
-                          icon: '🌅',
-                          label: 'Pickup',
-                          time: '07:15 AM',
-                          status: 'Done',
-                          color: AppTheme.success,
-                        ),
-                        _ScheduleItem(
-                          icon: '🏫',
-                          label: 'At School',
-                          time: '07:45 AM',
-                          status: 'Done',
-                          color: AppTheme.success,
-                        ),
-                        _ScheduleItem(
-                          icon: '🌇',
-                          label: 'Drop Off',
-                          time: '03:30 PM',
-                          status: 'Upcoming',
-                          color: AppTheme.warning,
+                        ValueListenableBuilder<StudentInfo>(
+                          valueListenable:
+                              StudentDataService.instance.studentInfo,
+                          builder: (_, info, _) {
+                            // `DriverDataService.timingSlots` defaults to a
+                            // fixed 7:15/etc. schedule whenever no driver
+                            // document has loaded — which is exactly the
+                            // case for a brand-new student with no bus
+                            // assigned yet. Gate on the same "assigned"
+                            // signal the header badge above already uses,
+                            // rather than trust that notifier's default.
+                            final hasBus =
+                                info.busNumber.isNotEmpty ||
+                                info.route.isNotEmpty;
+                            if (!hasBus) {
+                              return Text(
+                                "Your driver hasn't set a schedule yet.",
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 13,
+                                ),
+                              );
+                            }
+                            return ValueListenableBuilder<DriverTimingSlots>(
+                              valueListenable:
+                                  DriverDataService.instance.timingSlots,
+                              builder: (_, slots, _) => Column(
+                                children: [
+                                  _ScheduleItem(
+                                    icon: '🌅',
+                                    label: 'Pickup',
+                                    time: formatTimeOfDay(
+                                      slots.morningPickupFromHome,
+                                    ),
+                                    status: _isPast(slots.morningPickupFromHome)
+                                        ? 'Done'
+                                        : 'Upcoming',
+                                    color: _isPast(slots.morningPickupFromHome)
+                                        ? AppTheme.success
+                                        : AppTheme.warning,
+                                  ),
+                                  _ScheduleItem(
+                                    icon: '🏫',
+                                    label: 'At School',
+                                    time: formatTimeOfDay(
+                                      slots.morningDropoffAtSchool,
+                                    ),
+                                    status:
+                                        _isPast(slots.morningDropoffAtSchool)
+                                        ? 'Done'
+                                        : 'Upcoming',
+                                    color: _isPast(slots.morningDropoffAtSchool)
+                                        ? AppTheme.success
+                                        : AppTheme.warning,
+                                  ),
+                                  _ScheduleItem(
+                                    icon: '🌇',
+                                    label: 'Drop Off',
+                                    time: formatTimeOfDay(
+                                      slots.afternoonDropoffAtHome,
+                                    ),
+                                    status:
+                                        _isPast(slots.afternoonDropoffAtHome)
+                                        ? 'Done'
+                                        : 'Upcoming',
+                                    color: _isPast(slots.afternoonDropoffAtHome)
+                                        ? AppTheme.success
+                                        : AppTheme.warning,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -489,7 +702,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     children: [
                       ValueListenableBuilder<int>(
                         valueListenable: StudentDataService.instance.totalRides,
-                        builder: (_, rides, __) => _StatCard(
+                        builder: (_, rides, _) => _StatCard(
                           icon: '🚌',
                           label: AppStrings.t('total_rides'),
                           value: '$rides',
@@ -498,7 +711,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ),
                       ValueListenableBuilder<int>(
                         valueListenable: StudentDataService.instance.onTimeRate,
-                        builder: (_, rate, __) => _StatCard(
+                        builder: (_, rate, _) => _StatCard(
                           icon: '⏱️',
                           label: 'On-Time',
                           value: '$rate%',
@@ -507,7 +720,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ),
                       ValueListenableBuilder<int>(
                         valueListenable: StudentDataService.instance.safeRides,
-                        builder: (_, safe, __) => _StatCard(
+                        builder: (_, safe, _) => _StatCard(
                           icon: '🛡️',
                           label: AppStrings.t('safe_rides'),
                           value: '$safe',
@@ -516,7 +729,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ),
                       ValueListenableBuilder<String>(
                         valueListenable: StudentDataService.instance.feesPaid,
-                        builder: (_, fees, __) => _StatCard(
+                        builder: (_, fees, _) => _StatCard(
                           icon: '💰',
                           label: 'Fees Paid',
                           value: fees,
@@ -575,20 +788,53 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        _ActivityRow(
-                          icon: '✅',
-                          msg: 'Checked in at Oak Street stop',
-                          time: '07:18 AM',
-                        ),
-                        _ActivityRow(
-                          icon: '🏫',
-                          msg: 'Arrived at school',
-                          time: '07:42 AM',
-                        ),
-                        _ActivityRow(
-                          icon: '💰',
-                          msg: 'Feb fee paid successfully',
-                          time: 'Yesterday',
+                        // The fee row is real: SessionService.payments is
+                        // already a live, populated notifier for this
+                        // student — no new fetch needed.
+                        ValueListenableBuilder<List<Payment>>(
+                          valueListenable: SessionService.instance.payments,
+                          builder: (_, payments, _) {
+                            final paid =
+                                payments
+                                    .where(
+                                      (p) => p.status == PaymentStatus.paid,
+                                    )
+                                    .toList()
+                                  ..sort(
+                                    (a, b) =>
+                                        (b.confirmedAt ??
+                                                b.paidAt ??
+                                                DateTime(0))
+                                            .compareTo(
+                                              a.confirmedAt ??
+                                                  a.paidAt ??
+                                                  DateTime(0),
+                                            ),
+                                  );
+                            final rows = _attendanceActivityRows();
+                            if (paid.isNotEmpty) {
+                              final latest = paid.first;
+                              final when = latest.confirmedAt ?? latest.paidAt;
+                              rows.add(
+                                _ActivityRow(
+                                  icon: '💰',
+                                  msg:
+                                      '${monthLabel(latest.monthKey)} fee paid successfully',
+                                  time: when == null ? '' : dayLabel(when),
+                                ),
+                              );
+                            }
+                            if (rows.isEmpty) {
+                              return Text(
+                                'No recent activity yet',
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 13,
+                                ),
+                              );
+                            }
+                            return Column(children: rows);
+                          },
                         ),
                       ],
                     ),

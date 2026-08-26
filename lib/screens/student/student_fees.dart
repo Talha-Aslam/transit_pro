@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+
+import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
-import '../../app/language_provider.dart';
-import 'package:go_router/go_router.dart';
+import '../../widgets/payment_presentation.dart';
 
 class StudentFees extends StatefulWidget {
   const StudentFees({super.key});
@@ -11,70 +15,8 @@ class StudentFees extends StatefulWidget {
 }
 
 class _StudentFeesState extends State<StudentFees> {
+  /// Key into [paymentFilters] — 'All' | 'Paid' | 'Pending' | 'Overdue'.
   String _filter = 'All';
-
-  List<_PaymentData> get _payments => [
-    _PaymentData(
-      'November 2024',
-      'Rs.2,500',
-      'Paid',
-      '15 Nov',
-      AppTheme.success,
-    ),
-    _PaymentData(
-      'October 2024',
-      'Rs.2,500',
-      'Paid',
-      '14 Oct',
-      AppTheme.success,
-    ),
-    _PaymentData(
-      'September 2024',
-      'Rs.2,500',
-      'Paid',
-      '12 Sep',
-      AppTheme.success,
-    ),
-    _PaymentData('August 2024', 'Rs.2,500', 'Paid', '10 Aug', AppTheme.success),
-    _PaymentData(
-      'December 2024',
-      'Rs.2,500',
-      'Pending',
-      'Due: 15 Dec',
-      AppTheme.warning,
-    ),
-    _PaymentData(
-      'July 2024',
-      'Rs.2,500',
-      'Overdue',
-      'Due: 28 Jul',
-      AppTheme.error,
-    ),
-  ];
-
-  int _amountToInt(String amount) {
-    final digits = amount.replaceAll(RegExp(r'[^0-9]'), '');
-    return int.tryParse(digits) ?? 0;
-  }
-
-  int _sumByStatus(List<_PaymentData> items, String status) {
-    return items
-        .where((p) => p.status == status)
-        .fold(0, (sum, p) => sum + _amountToInt(p.amount));
-  }
-
-  String _formatRs(int amount) {
-    final s = amount.toString();
-    final buf = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      buf.write(s[i]);
-      final remaining = s.length - i - 1;
-      if (remaining > 0 && remaining % 3 == 0) {
-        buf.write(',');
-      }
-    }
-    return 'Rs.${buf.toString()}';
-  }
 
   @override
   void initState() {
@@ -92,12 +34,40 @@ class _StudentFeesState extends State<StudentFees> {
 
   @override
   Widget build(BuildContext context) {
-    final payments = _payments;
-    final paidTotal = _sumByStatus(payments, 'Paid');
-    final pendingTotal = _sumByStatus(payments, 'Pending');
-    final overdueTotal = _sumByStatus(payments, 'Overdue');
-    final totalFee = paidTotal + pendingTotal + overdueTotal;
-    final outstandingFee = pendingTotal;
+    // Two listenables, for two different reasons. The payments notifier carries
+    // the rows; the session itself carries whether we are still *waiting* for
+    // them. Without the outer listener a student whose fee list is genuinely
+    // empty would sit on the spinner forever, because loading → ready never
+    // touches `payments` and so never rebuilds on its own.
+    return ListenableBuilder(
+      listenable: SessionService.instance,
+      builder: (context, _) => ValueListenableBuilder<List<Payment>>(
+        // For the student role `SessionService.payments` is already the
+        // `watchForStudent(uid)` query, so these are this student's own bills —
+        // no further scoping by studentId is needed here.
+        valueListenable: SessionService.instance.payments,
+        builder: (context, payments, _) => _buildBody(context, payments),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, List<Payment> payments) {
+    final totals = PaymentTotals.of(payments);
+    final paidTotal = totals.paid;
+    final pendingTotal = totals.pending;
+    final totalFee = totals.billed;
+
+    // `outstanding` is pending + overdue. The old code used `pendingTotal`
+    // alone, so a month dropped out of the balance the instant it went overdue —
+    // exactly when it most needs to be shown. `totals.overdue` therefore has no
+    // pill of its own in this three-pill layout; it lives inside this figure.
+    final outstandingFee = totals.outstanding;
+
+    // Drives both the due badge and the Pay-now button: overdue first, then
+    // earliest due date.
+    final due = nextDuePayment(payments);
+
+    final loading = payments.isEmpty && SessionService.instance.isLoading;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -129,6 +99,12 @@ class _StudentFeesState extends State<StudentFees> {
           const SizedBox(height: 16),
 
           // ── Balance card ──────────────────────────────
+          //
+          // Always shown, even for a brand-new account with no fee records
+          // yet — this is the payment-method entry point, not just a "money
+          // is owed" banner, so it must survive an empty `payments` list.
+          // Only the button's label and the amount shown depend on whether
+          // anything is actually due.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GlassCard(
@@ -166,7 +142,11 @@ class _StudentFeesState extends State<StudentFees> {
                             Text(
                               AppStrings.t('outstanding_balance_s'),
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                // Was a translucent white, which is
+                                // effectively invisible on the light theme's
+                                // pale card. The theme extension picks the
+                                // right ink for either mode.
+                                color: context.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -175,7 +155,7 @@ class _StudentFeesState extends State<StudentFees> {
                               shaderCallback: (b) =>
                                   AppTheme.studentGradient.createShader(b),
                               child: Text(
-                                _formatRs(outstandingFee),
+                                paisaToDisplay(outstandingFee),
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 28,
@@ -186,20 +166,31 @@ class _StudentFeesState extends State<StudentFees> {
                           ],
                         ),
                       ),
-                      StatusBadge(
-                        label: 'Due: Dec 15',
-                        color: AppTheme.warning,
-                      ),
+                      // Only when something is actually due — a fabricated
+                      // "Due: Dec 15" used to show even with nothing owing.
+                      if (due?.dueDate != null)
+                        StatusBadge(
+                          label: 'Due: ${dayLabel(due!.dueDate)}',
+                          color: paymentStatusColor(due.status),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  // Pay now button
+                  // Pay now / Payment methods button — see the doc comment
+                  // above for why this no longer depends on `due != null`.
                   GestureDetector(
                     onTap: () => context.push(
                       '/parent/payment',
-                      extra: {
-                        'amount': _formatRs(outstandingFee),
-                        'month': 'December 2024',
+                      // Same String-keyed contract PaymentMethodScreen
+                      // already reads; `paymentId` rides along so the flow
+                      // can settle this exact document. An empty amount is
+                      // how `PaymentMethodScreen` knows nothing is due.
+                      extra: <String, dynamic>{
+                        'amount': due == null
+                            ? ''
+                            : paisaToDisplay(due.amountPaisa),
+                        'month': due == null ? '' : monthLabel(due.monthKey),
+                        if (due != null) 'paymentId': due.id,
                       },
                     ),
                     child: Container(
@@ -220,7 +211,7 @@ class _StudentFeesState extends State<StudentFees> {
                       ),
                       child: Center(
                         child: Text(
-                          AppStrings.t('pay_now'),
+                          due == null ? 'Payment Methods' : AppStrings.t('pay_now'),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 15,
@@ -236,229 +227,167 @@ class _StudentFeesState extends State<StudentFees> {
           ),
           const SizedBox(height: 16),
 
-          // ── Summary stats ─────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _StatPill(
-                  icon: '✅',
-                  label: AppStrings.t('paid'),
-                  value: _formatRs(paidTotal),
-                  color: AppTheme.success,
-                ),
-                const SizedBox(width: 10),
-                _StatPill(
-                  icon: '⏳',
-                  label: AppStrings.t('pending'),
-                  value: _formatRs(pendingTotal),
-                  color: AppTheme.warning,
-                ),
-                const SizedBox(width: 10),
-                _StatPill(
-                  icon: '📅',
-                  label: AppStrings.t('total'),
-                  value: _formatRs(totalFee),
-                  color: AppTheme.info,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Filter chips ──────────────────────────────
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+          // Nothing billed yet (or nothing read yet): the stat pills and the
+          // filters would all be zeroes, so show one honest empty state
+          // instead of a screenful of Rs.0 below the balance card.
+          if (payments.isEmpty)
+            PaymentListState(
+              loading: loading,
+              emptyMessage:
+                  'No fee records yet. These appear once your transport fee is issued.',
+              accent: AppTheme.studentAmber,
+            )
+          else ...[
+            // ── Summary stats ─────────────────────────────
+            Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              children:
-                  {
-                    'All': AppStrings.t('all'),
-                    'Paid': AppStrings.t('paid'),
-                    'Pending': AppStrings.t('pending'),
-                    'Overdue': AppStrings.t('overdue'),
-                  }.entries.map((e) {
-                    final f = e.key;
-                    final label = e.value;
-                    final sel = f == _filter;
-                    return GestureDetector(
-                      onTap: () => setState(() => _filter = f),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: sel ? AppTheme.studentGradient : null,
-                          color: sel ? null : context.cardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: sel
-                              ? null
-                              : Border.all(color: context.cardBgElevated),
-                        ),
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            color: sel ? Colors.white : context.textSecondary,
-                            fontSize: 12,
-                            fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // ── Payment history ───────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-            child: Text(
-              AppStrings.t('payment_history'),
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          ..._buildPayments(),
-          const SizedBox(height: 16),
-
-          // ── Fee breakdown ─────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GlassCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        AppStrings.t('total'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      ShaderMask(
-                        shaderCallback: (b) =>
-                            AppTheme.studentGradient.createShader(b),
-                        child: Text(
-                          _formatRs(totalFee),
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
+                  _StatPill(
+                    icon: '✅',
+                    label: AppStrings.t('paid'),
+                    value: paisaToDisplay(paidTotal),
+                    color: AppTheme.success,
+                  ),
+                  const SizedBox(width: 10),
+                  _StatPill(
+                    icon: '⏳',
+                    label: AppStrings.t('pending'),
+                    value: paisaToDisplay(pendingTotal),
+                    color: AppTheme.warning,
+                  ),
+                  const SizedBox(width: 10),
+                  _StatPill(
+                    icon: '📅',
+                    label: AppStrings.t('total'),
+                    value: paisaToDisplay(totalFee),
+                    color: AppTheme.info,
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 16),
+
+            // ── Filter chips ──────────────────────────────
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: paymentFilters.keys.map((f) {
+                  final label = AppStrings.t(f.toLowerCase());
+                  final sel = f == _filter;
+                  return GestureDetector(
+                    onTap: () => setState(() => _filter = f),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: sel ? AppTheme.studentGradient : null,
+                        color: sel ? null : context.cardBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: sel
+                            ? null
+                            : Border.all(color: context.cardBgElevated),
+                      ),
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: sel ? Colors.white : context.textSecondary,
+                          fontSize: 12,
+                          fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Payment history ───────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text(
+                AppStrings.t('payment_history'),
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _buildPayments(payments),
+            const SizedBox(height: 16),
+
+            // ── Fee breakdown ─────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GlassCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          AppStrings.t('total'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        ShaderMask(
+                          shaderCallback: (b) =>
+                              AppTheme.studentGradient.createShader(b),
+                          child: Text(
+                            paisaToDisplay(totalFee),
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  List<Widget> _buildPayments() {
-    final payments = _payments;
+  Widget _buildPayments(List<Payment> payments) {
+    final filtered = applyPaymentFilter(payments, paymentFilters[_filter]);
 
-    final filtered = _filter == 'All'
-        ? payments
-        : payments.where((p) => p.status == _filter).toList();
+    if (filtered.isEmpty) {
+      return PaymentListState(
+        emptyMessage: 'No ${AppStrings.t(_filter.toLowerCase())} fees to show.',
+        accent: AppTheme.studentAmber,
+      );
+    }
 
-    return filtered
-        .map(
-          (p) => Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: GlassCard(
-              gradient: LinearGradient(
-                colors: [
-                  p.color.withValues(alpha: 0.06),
-                  p.color.withValues(alpha: 0.02),
-                ],
-              ),
-              borderColor: p.color.withValues(alpha: 0.12),
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: p.color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        p.status == 'Paid' ? '✅' : '⏳',
-                        style: const TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.month,
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          p.date,
-                          style: TextStyle(
-                            color: context.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        p.amount,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      StatusBadge(label: p.status, color: p.color),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        )
-        .toList();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          for (final p in filtered) PaymentRow(payment: p),
+        ],
+      ),
+    );
   }
 }
 
 // ── Models & Widgets ────────────────────────────────────────────────────
-
-class _PaymentData {
-  final String month, amount, status, date;
-  final Color color;
-  _PaymentData(this.month, this.amount, this.status, this.date, this.color);
-}
 
 class _StatPill extends StatelessWidget {
   final String icon, label, value;

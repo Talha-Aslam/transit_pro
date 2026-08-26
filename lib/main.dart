@@ -7,7 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+// Only MapboxOptions is needed here; `hide` avoids colliding with
+// geolocator's own Position/LocationSettings types (both packages export
+// same-named classes with unrelated shapes).
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
+    hide Position, LocationSettings;
+import 'package:transit_core/transit_core.dart';
 
 import 'app/auth_service.dart';
 import 'app/geofence_service.dart';
@@ -51,7 +56,7 @@ Future<void> busTrackingBackground() async {
 
   Geolocator.getPositionStream(locationSettings: locationSettings).listen(
     (Position position) {
-      final busPos = LatLng(position.latitude, position.longitude);
+      final busPos = GeoCoord(position.latitude, position.longitude);
       GeofenceService.instance.evaluate(busPos, route.stops);
     },
     onError: (_) {}, // silently ignore permission / hardware errors
@@ -65,6 +70,10 @@ Future<void> busTrackingBackground() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Must happen before any MapWidget is built. A missing token isn't a crash
+  // here — the native side just fails to load tiles later — so this is safe
+  // to call unconditionally even with an empty AppConfig.mapboxAccessToken.
+  MapboxOptions.setAccessToken(AppConfig.mapboxAccessToken);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Initialise notifications for the foreground (UI) process.
@@ -112,10 +121,12 @@ class TransportKidApp extends StatefulWidget {
   State<TransportKidApp> createState() => _TransportKidAppState();
 }
 
-class _TransportKidAppState extends State<TransportKidApp> {
+class _TransportKidAppState extends State<TransportKidApp>
+    with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    ThemeProvider.instance.attachTicker(this);
     ThemeProvider.instance.addListener(_onThemeChanged);
   }
 
@@ -140,6 +151,8 @@ class _TransportKidAppState extends State<TransportKidApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Fires only on a real toggle now (see ThemeProvider's own doc comment)
+    // — cheap, unlike the per-frame rebuild this used to trigger.
     return ListenableBuilder(
       listenable: ThemeProvider.instance,
       builder: (context, _) => MaterialApp.router(
@@ -149,6 +162,14 @@ class _TransportKidAppState extends State<TransportKidApp> {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeProvider.instance.mode,
         routerConfig: appRouter,
+        // Publishes the animated blend value below the Router, scoped so
+        // only widgets that actually read a theme colour rebuild on each
+        // tick — see `ThemeBlendScope`'s doc comment for why this replaced
+        // rebuilding the whole app on every animation frame.
+        builder: (context, child) => ThemeBlendScope(
+          notifier: ThemeProvider.instance.blendAnimation,
+          child: child!,
+        ),
       ),
     );
   }

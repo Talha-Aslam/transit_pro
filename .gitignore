@@ -22,6 +22,14 @@ migrate_working_dir/
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
 #.vscode/
+# ...except launch.json specifically carries the Mapbox public token as a
+# --dart-define, so it must stay out of git even though the folder doesn't.
+.vscode/launch.json
+
+# Secrets — never commit real tokens. .env.example is a template only.
+.env
+.env.*
+!.env.example
 
 # Flutter/Dart/Pub related
 **/doc/api/

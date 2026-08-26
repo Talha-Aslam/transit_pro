@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:transit_core/transit_core.dart';
 import '../models/route_data.dart';
 
 /// Geofence alert type.
@@ -38,13 +38,13 @@ class GeofenceService {
   final _firedDeparted = <String>{};
 
   /// Check bus position against all stops and emit alerts.
-  void evaluate(LatLng busPos, List<StopData> stops) {
+  void evaluate(GeoCoord busPos, List<StopData> stops) {
     for (final stop in stops) {
       final dist = Geolocator.distanceBetween(
-        busPos.latitude,
-        busPos.longitude,
-        stop.location.latitude,
-        stop.location.longitude,
+        busPos.lat,
+        busPos.lng,
+        stop.location.lat,
+        stop.location.lng,
       );
 
       final key = stop.name;

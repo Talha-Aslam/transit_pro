@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../data/payment_repository.dart';
@@ -23,6 +26,12 @@ class StudentInfo {
   String driverName;
   String driverPhone;
 
+  /// The driver's uid — not a display name, see [driverName] for that.
+  /// Needed to query that driver's active trip (`TripRepository
+  /// .watchActiveTripForDriver`); kept separate from the legacy
+  /// `driverName`/`driverPhone` fields rather than overloading either.
+  String driverId;
+
   StudentInfo({
     this.name = '',
     this.studentId = '',
@@ -33,6 +42,7 @@ class StudentInfo {
     this.stop = '',
     this.driverName = '',
     this.driverPhone = '',
+    this.driverId = '',
   });
 
   StudentInfo copyWith({
@@ -45,6 +55,7 @@ class StudentInfo {
     String? stop,
     String? driverName,
     String? driverPhone,
+    String? driverId,
   }) => StudentInfo(
     name: name ?? this.name,
     studentId: studentId ?? this.studentId,
@@ -55,6 +66,7 @@ class StudentInfo {
     stop: stop ?? this.stop,
     driverName: driverName ?? this.driverName,
     driverPhone: driverPhone ?? this.driverPhone,
+    driverId: driverId ?? this.driverId,
   );
 }
 
@@ -82,8 +94,18 @@ class StudentDataService {
   }
   static final StudentDataService instance = StudentDataService._();
 
+  /// Notification toggles stay device-local, same as
+  /// `ParentDataService.paymentReminders` — this is a per-phone notification
+  /// preference, not data any other account needs to read.
+  static const _notificationPrefsKey = 'student_notification_prefs';
+
   final studentInfo = ValueNotifier<StudentInfo>(StudentInfo());
   final guardianInfo = ValueNotifier<GuardianInfo>(GuardianInfo());
+
+  /// Keys: `'busAlerts'`, `'arrivalAlerts'`, `'delayAlerts'`. Missing keys
+  /// default to whatever the caller passes as `fallback` in
+  /// [notificationPref] — they were never toggled off, not necessarily off.
+  final notificationPrefs = ValueNotifier<Map<String, bool>>({});
 
   /// Ride statistics, derived from completed trips on this student's route and
   /// their own attendance records.
@@ -93,6 +115,12 @@ class StudentDataService {
   final totalRides = ValueNotifier<int>(0);
   final onTimeRate = ValueNotifier<int>(0);
   final safeRides = ValueNotifier<int>(0);
+
+  /// Boarded rides whose `markedAt` falls within the current calendar week
+  /// (Monday 00:00 through now). Backs the "This Week" summary on
+  /// `student_schedule.dart`, replacing what used to be a count derived from
+  /// the mock `buildParentTripHistoryEntries` helper.
+  final completedRidesThisWeek = ValueNotifier<int>(0);
 
   /// Total confirmed payments, in whole rupees, formatted for display.
   final feesPaid = ValueNotifier<String>('');
@@ -113,6 +141,7 @@ class StudentDataService {
       totalRides.value = 0;
       onTimeRate.value = 0;
       safeRides.value = 0;
+      completedRidesThisWeek.value = 0;
       feesPaid.value = '';
       _statsForRouteId = null;
       _guardianForParentId = null;
@@ -123,7 +152,11 @@ class StudentDataService {
 
     final bus = session.bus.value;
     final route = session.route.value;
-    final driver = session.driverFor(bus?.driverId);
+    // Admin-assigned bus first, falling back to the student's own direct
+    // `driverId` — the pilot path, where a self-signed-up driver accepted
+    // this student's ride request without any `Bus` document existing.
+    final driverId = bus?.driverId ?? student?.driverId ?? '';
+    final driver = session.driverFor(driverId);
 
     studentInfo.value = StudentInfo(
       name: user.name,
@@ -135,6 +168,7 @@ class StudentDataService {
       stop: student == null ? '' : (session.stopNameFor(student) ?? ''),
       driverName: driver?.name ?? '',
       driverPhone: driver?.phone ?? '',
+      driverId: driverId,
     );
 
     _loadGuardian(student?.parentId);
@@ -172,6 +206,7 @@ class StudentDataService {
       totalRides.value = 0;
       onTimeRate.value = 0;
       safeRides.value = 0;
+      completedRidesThisWeek.value = 0;
       _statsForRouteId = null;
       _updateFees(student?.id);
       return;
@@ -194,6 +229,25 @@ class StudentDataService {
       safeRides.value = boarded;
       onTimeRate.value =
           records.isEmpty ? 0 : ((boarded / records.length) * 100).round();
+
+      // Monday 00:00 of the current week through now. `markedAt` is null for
+      // a record that was written but never actually marked (shouldn't
+      // happen for a `boarded` status, but guarded anyway rather than
+      // trusting it).
+      final now = DateTime.now();
+      final startOfWeek = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
+      completedRidesThisWeek.value = records
+          .where(
+            (r) =>
+                r.status == AttendanceStatus.boarded &&
+                r.markedAt != null &&
+                !r.markedAt!.isBefore(startOfWeek),
+          )
+          .length;
     } catch (e) {
       debugPrint('student stats failed: $e');
     }
@@ -242,4 +296,33 @@ class StudentDataService {
   void updateGuardianInfo(GuardianInfo info) {
     guardianInfo.value = info;
   }
+
+  // ── Notification preferences (device-local) ────────────────────────────────
+
+  Future<void> loadNotificationPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_notificationPrefsKey);
+    if (raw == null || raw.isEmpty) {
+      notificationPrefs.value = {};
+      return;
+    }
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      notificationPrefs.value = decoded.map((k, v) => MapEntry(k, v == true));
+    } catch (_) {
+      notificationPrefs.value = {};
+    }
+  }
+
+  Future<void> setNotificationPref(String key, bool enabled) async {
+    final updated = Map<String, bool>.from(notificationPrefs.value);
+    updated[key] = enabled;
+    notificationPrefs.value = updated;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_notificationPrefsKey, jsonEncode(updated));
+  }
+
+  bool notificationPref(String key, {bool fallback = true}) =>
+      notificationPrefs.value[key] ?? fallback;
 }

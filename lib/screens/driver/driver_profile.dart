@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/driver_data_service.dart';
-import '../../app/driver_trip_metrics.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
+import '../../app/tracking_service.dart';
+import '../../data/rating_repository.dart';
+import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
@@ -27,8 +32,59 @@ class DriverProfile extends StatefulWidget {
 
 class _DriverProfileState extends State<DriverProfile> {
   final _svc = DriverDataService.instance;
-  final double _rating = 4.8;
 
+  /// Real average and count from `ratings/{driverId}_*_*`, replacing the
+  /// `4.8` / `(128 ratings)` literals that showed for every driver regardless
+  /// of whether anyone had ever rated them.
+  double? _avgRating;
+  int _ratingCount = 0;
+  String? _ratingSubUid;
+  StreamSubscription<List<DriverRating>>? _ratingSub;
+
+  /// Real completed-trip count from `TripRepository`, replacing the
+  /// hardcoded `DriverTripMetrics.totalTrips` (136) every driver used to see
+  /// regardless of how many trips they had actually run.
+  int _completedTripCount = 0;
+  String? _tripCountSubUid;
+  StreamSubscription<List<Trip>>? _tripCountSub;
+
+  /// Kept alongside the count so the status chip can tell "completed a trip
+  /// today" apart from "completed one three weeks ago".
+  List<Trip> _trips = const [];
+
+  /// Whether a real trip is currently running — mirrors
+  /// `driver_dashboard.dart`'s `_routeStarted`, which is the fix that
+  /// replaced this screen's hardcoded "Active - On Route" chip.
+  bool _routeStarted = false;
+
+  /// `Not Started` / `On Route` / `Completed` for today, derived from real
+  /// tracking + trip state rather than a permanently-green "Active - On
+  /// Route" chip every driver used to see regardless of whether they had
+  /// started anything.
+  String get _statusLabel {
+    if (_routeStarted) return AppStrings.t('active_on_route');
+    final today = Trip.dateKeyFor(DateTime.now());
+    final completedToday = _trips.any(
+      (t) => t.dateKey == today && t.status == TripStatus.completed,
+    );
+    return completedToday ? 'Completed' : 'Not Started';
+  }
+
+  Color get _statusColor {
+    if (_routeStarted) return AppTheme.success;
+    final today = Trip.dateKeyFor(DateTime.now());
+    final completedToday = _trips.any(
+      (t) => t.dateKey == today && t.status == TripStatus.completed,
+    );
+    return completedToday ? AppTheme.info : AppTheme.warning;
+  }
+
+  /// Local-only: `Driver` (the shared `transit_core` model every app —
+  /// parent, student, admin — reads) has no `parentAlerts`/`routeReminders`
+  /// fields, unlike `locationSharing`, which is a real column on that
+  /// document. Adding them would mean migrating the shared model rather than
+  /// this screen, so these two stay session-local rather than silently
+  /// pretending to persist.
   bool _parentAlerts = true;
   bool _routeReminders = true;
 
@@ -39,18 +95,134 @@ class _DriverProfileState extends State<DriverProfile> {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
     _svc.locationSharing.addListener(_onLocationSharingChanged);
+    // The two service rows summarise live Firestore state (seats free, requests
+    // waiting), so they have to follow the streams rather than showing whatever
+    // was true when the screen opened.
+    SessionService.instance.driver.addListener(_onLangChanged);
+    SessionService.instance.rideRequests.addListener(_onLangChanged);
+    SessionService.instance.addListener(_ensureRatingSubscription);
+    SessionService.instance.addListener(_ensureTripCountSubscription);
+    _ensureRatingSubscription();
+    _ensureTripCountSubscription();
+    _routeStarted = TrackingService.instance.route != null;
+    TrackingService.instance.isSimulating.addListener(_onTrackingChanged);
+    TrackingService.instance.isLive.addListener(_onTrackingChanged);
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
     _svc.locationSharing.removeListener(_onLocationSharingChanged);
+    SessionService.instance.driver.removeListener(_onLangChanged);
+    SessionService.instance.rideRequests.removeListener(_onLangChanged);
+    SessionService.instance.removeListener(_ensureRatingSubscription);
+    SessionService.instance.removeListener(_ensureTripCountSubscription);
+    TrackingService.instance.isSimulating.removeListener(_onTrackingChanged);
+    TrackingService.instance.isLive.removeListener(_onTrackingChanged);
+    _ratingSub?.cancel();
+    _tripCountSub?.cancel();
     super.dispose();
+  }
+
+  void _onTrackingChanged() {
+    final started = TrackingService.instance.route != null;
+    if (started != _routeStarted && mounted) {
+      setState(() => _routeStarted = started);
+    }
+  }
+
+  /// (Re)subscribes to this driver's real ratings whenever the signed-in uid
+  /// changes — including the first time it becomes available.
+  void _ensureRatingSubscription() {
+    final uid = SessionService.instance.uid;
+    if (uid == _ratingSubUid) return;
+    _ratingSubUid = uid;
+    _ratingSub?.cancel();
+    _ratingSub = null;
+    if (uid == null) {
+      setState(() {
+        _avgRating = null;
+        _ratingCount = 0;
+      });
+      return;
+    }
+    _ratingSub =
+        RatingRepository.instance.watchForDriver(uid).listen((ratings) {
+      if (!mounted) return;
+      setState(() {
+        _ratingCount = ratings.length;
+        _avgRating = ratings.isEmpty
+            ? null
+            : ratings.map((r) => r.rating).reduce((a, b) => a + b) /
+                ratings.length;
+      });
+    });
+  }
+
+  /// (Re)subscribes to this driver's real trips whenever the signed-in uid
+  /// changes — including the first time it becomes available.
+  void _ensureTripCountSubscription() {
+    final uid = SessionService.instance.uid;
+    if (uid == _tripCountSubUid) return;
+    _tripCountSubUid = uid;
+    _tripCountSub?.cancel();
+    _tripCountSub = null;
+    if (uid == null) {
+      setState(() {
+        _completedTripCount = 0;
+        _trips = const [];
+      });
+      return;
+    }
+    _tripCountSub =
+        TripRepository.instance.watchTripsForDriver(uid).listen((trips) {
+      if (!mounted) return;
+      setState(() {
+        _trips = trips;
+        _completedTripCount =
+            trips.where((t) => t.status == TripStatus.completed).length;
+      });
+    });
   }
 
   void _onLangChanged() => setState(() {});
 
   void _onLocationSharingChanged() => setState(() {});
+
+  /// Subtitle for the "My Service" row.
+  ///
+  /// Names the gap rather than saying "configure" when either half is missing:
+  /// a driver with no listed school or no round is invisible to every parent
+  /// while their profile otherwise looks finished, and this row is the only place
+  /// they would notice.
+  String _serviceSummary() {
+    final driver = SessionService.instance.driver.value;
+    if (driver == null) return 'Loading…';
+
+    final areas = driver.serviceAreas.length;
+    final rounds = driver.schedules.length;
+    if (areas == 0 && rounds == 0) {
+      return 'Not set up — parents cannot find you yet';
+    }
+    if (areas == 0) return 'Add a school so parents can find you';
+    if (rounds == 0) return 'Add a round so families can book a seat';
+
+    return '$areas destination${areas == 1 ? '' : 's'} · '
+        '$rounds round${rounds == 1 ? '' : 's'} · '
+        '${driver.totalAvailableSeats} of ${driver.totalSeatsOffered} seats free';
+  }
+
+  String _requestsSummary() {
+    final session = SessionService.instance;
+    final pending = session.pendingRideRequests.length;
+    final booked = session.acceptedRideRequests.length;
+    if (pending > 0) {
+      return '$pending waiting on your reply';
+    }
+    return booked == 0
+        ? 'No students booked yet'
+        : '$booked student${booked == 1 ? '' : 's'} on your roster';
+  }
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -67,6 +239,12 @@ class _DriverProfileState extends State<DriverProfile> {
     }
   }
 
+  // Email/Bus Number/Route/Total Students are intentionally not editable
+  // here — `updateDriverInfo` never wrote any of them back (email needs a
+  // Firebase Auth re-auth flow this pass doesn't cover; the other three are
+  // derived from the bus/route assignment and the real roster, not
+  // hand-typed). Bus Number/Route show read-only elsewhere on this screen;
+  // Total Students gets its own real-count-plus-manual-offline widget.
   void _editDriverInfo() {
     final info = _svc.driverInfo.value;
     showModalBottomSheet(
@@ -77,25 +255,17 @@ class _DriverProfileState extends State<DriverProfile> {
         title: AppStrings.t('edit_info'),
         fields: [
           _FieldDef(AppStrings.t('full_name'), info.name),
-          _FieldDef(AppStrings.t('email'), info.email),
           _FieldDef(AppStrings.t('mobile_lbl'), info.phone),
           _FieldDef(AppStrings.t('license_no_lbl'), info.license),
           _FieldDef(AppStrings.t('experience_lbl'), info.experience),
-          _FieldDef(AppStrings.t('bus_number_lbl'), info.busNumber),
-          _FieldDef(AppStrings.t('route_lbl'), info.route),
-          _FieldDef(AppStrings.t('total_students_lbl'), info.totalStudents),
         ],
         accentColor: AppTheme.driverCyan,
         onSave: (v) => _svc.updateDriverInfo(
           info.copyWith(
             name: v[0],
-            email: v[1],
-            phone: v[2],
-            license: v[3],
-            experience: v[4],
-            busNumber: v[5],
-            route: v[6],
-            totalStudents: v[7],
+            phone: v[1],
+            license: v[2],
+            experience: v[3],
           ),
         ),
       ),
@@ -222,7 +392,7 @@ class _DriverProfileState extends State<DriverProfile> {
                               '⭐',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: i < _rating.floor()
+                                color: i < (_avgRating ?? 0).floor()
                                     ? Colors.white
                                     : context.textTertiary,
                               ),
@@ -231,7 +401,9 @@ class _DriverProfileState extends State<DriverProfile> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '$_rating',
+                          _avgRating == null
+                              ? '—'
+                              : _avgRating!.toStringAsFixed(1),
                           style: const TextStyle(
                             color: AppTheme.warningLight,
                             fontSize: 14,
@@ -240,7 +412,9 @@ class _DriverProfileState extends State<DriverProfile> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '(128 ratings)',
+                          _ratingCount == 0
+                              ? 'No ratings yet'
+                              : '($_ratingCount rating${_ratingCount == 1 ? '' : 's'})',
                           style: TextStyle(
                             color: context.textTertiary,
                             fontSize: 12,
@@ -258,10 +432,10 @@ class _DriverProfileState extends State<DriverProfile> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppTheme.success.withValues(alpha: 0.15),
+                            color: _statusColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: AppTheme.success.withValues(alpha: 0.3),
+                              color: _statusColor.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -270,16 +444,16 @@ class _DriverProfileState extends State<DriverProfile> {
                               Container(
                                 width: 6,
                                 height: 6,
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.success,
+                                decoration: BoxDecoration(
+                                  color: _statusColor,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                AppStrings.t('active_on_route'),
-                                style: const TextStyle(
-                                  color: AppTheme.successLight,
+                                _statusLabel,
+                                style: TextStyle(
+                                  color: _statusColor,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -382,7 +556,9 @@ class _DriverProfileState extends State<DriverProfile> {
                                     child: _InfoCard(
                                       icon: '🚌',
                                       label: AppStrings.t('bus_number_lbl'),
-                                      value: info.busNumber,
+                                      value: info.busNumber.isEmpty
+                                          ? 'Not assigned yet'
+                                          : info.busNumber,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -407,10 +583,11 @@ class _DriverProfileState extends State<DriverProfile> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: _InfoCard(
-                                      icon: '👥',
-                                      label: AppStrings.t('total_students_lbl'),
-                                      value: info.totalStudents,
+                                    child: _TotalStudentsCard(
+                                      autoCount: info.autoStudentCount,
+                                      manualCount: info.manualStudentCount,
+                                      onChanged: (v) =>
+                                          _svc.setManualStudentCount(v),
                                     ),
                                   ),
                                 ],
@@ -470,6 +647,18 @@ class _DriverProfileState extends State<DriverProfile> {
                       child: Column(
                         children: [
                           _MenuItem(
+                            icon: '🗺️',
+                            label: 'My Service',
+                            desc: _serviceSummary(),
+                            onTap: () => context.push('/driver/service'),
+                          ),
+                          _MenuItem(
+                            icon: '📬',
+                            label: 'Seat Requests',
+                            desc: _requestsSummary(),
+                            onTap: () => context.push('/driver/ride-requests'),
+                          ),
+                          _MenuItem(
                             icon: '💳',
                             label: AppStrings.t('payment_history'),
                             desc: 'Monthly payment records',
@@ -479,8 +668,7 @@ class _DriverProfileState extends State<DriverProfile> {
                           _MenuItem(
                             icon: '📋',
                             label: AppStrings.t('trip_history'),
-                            desc:
-                                '${DriverTripMetrics.totalTrips} trips completed',
+                            desc: '$_completedTripCount trips completed',
                             onTap: () => context.push('/driver/trips'),
                           ),
                           _MenuItem(
@@ -657,6 +845,122 @@ class _PrefRow extends StatelessWidget {
             activeColor: AppTheme.driverCyan,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The driver's own view of "Total Students": real in-app roster count plus
+/// a manual +/- for riders who aren't registered in the app (a driver's own
+/// kid, a cash-paying family outside the platform). Parents/students only
+/// ever see the combined total elsewhere — this breakdown is driver-only.
+class _TotalStudentsCard extends StatelessWidget {
+  final int autoCount;
+  final int manualCount;
+  final ValueChanged<int> onChanged;
+
+  const _TotalStudentsCard({
+    required this.autoCount,
+    required this.manualCount,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.cardBgElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('👥', style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 3),
+          Text(
+            AppStrings.t('total_students_lbl'),
+            style: TextStyle(
+              color: context.textTertiary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${autoCount + manualCount} total',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$autoCount in-app',
+            style: TextStyle(color: context.textTertiary, fontSize: 9),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '+$manualCount offline',
+                style: TextStyle(color: context.textTertiary, fontSize: 9),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _StepperBtn(
+                    icon: Icons.remove,
+                    onTap: manualCount > 0
+                        ? () => onChanged(manualCount - 1)
+                        : null,
+                  ),
+                  const SizedBox(width: 4),
+                  _StepperBtn(
+                    icon: Icons.add,
+                    onTap: () => onChanged(manualCount + 1),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _StepperBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppTheme.driverCyan.withValues(alpha: 0.15)
+              : context.cardBg,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 12,
+          color: enabled ? AppTheme.driverCyan : context.textTertiary,
+        ),
       ),
     );
   }

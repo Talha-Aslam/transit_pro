@@ -96,6 +96,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                   child: Column(
                     children: [
                       GlassCard(
+                        enableBlur: false,
                         padding: const EdgeInsets.all(14),
                         child: Row(
                           children: [
@@ -150,6 +151,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                       const SizedBox(height: 14),
 
                       GlassCard(
+                        enableBlur: false,
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: _languages.asMap().entries.map((e) {

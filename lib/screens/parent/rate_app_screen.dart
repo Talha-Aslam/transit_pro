@@ -107,6 +107,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                           children: [
                             const SizedBox(height: 10),
                             GlassCard(
+                              enableBlur: false,
                               padding: const EdgeInsets.all(24),
                               child: Column(
                                 children: [
@@ -182,6 +183,7 @@ class _RateAppScreenState extends State<RateAppScreen> {
                             const SizedBox(height: 14),
 
                             GlassCard(
+                              enableBlur: false,
                               padding: const EdgeInsets.all(18),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
