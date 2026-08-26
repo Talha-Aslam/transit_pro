@@ -202,6 +202,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   child: Column(
                     children: [
                       GlassCard(
+                        enableBlur: false,
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,6 +237,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       const SizedBox(height: 16),
 
                       GlassCard(
+                        enableBlur: false,
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           children: [
@@ -310,6 +312,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
                       // Strength checklist
                       GlassCard(
+                        enableBlur: false,
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

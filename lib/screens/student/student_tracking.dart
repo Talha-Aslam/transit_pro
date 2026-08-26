@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+
 import '../../app/language_provider.dart';
-import '../../app/tracking_service.dart';
-import '../../models/route_data.dart';
+import '../../app/session_service.dart';
+import '../../app/student_data_service.dart';
+import '../../data/trip_repository.dart';
+import '../../map/route_map_view.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -15,123 +20,113 @@ class StudentTracking extends StatefulWidget {
 }
 
 class _StudentTrackingState extends State<StudentTracking> {
-  final _tracking = TrackingService.instance;
+  /// The live `trips/{tripId}` document for this student's driver, or null
+  /// when nothing is running. This — not a mock route started unconditionally
+  /// in `initState` — is what used to make "Route Progress" and a moving bus
+  /// show up on a brand-new account before any driver had ever started
+  /// anything.
+  Trip? _activeTrip;
+  StreamSubscription<Trip?>? _tripSub;
+  String? _watchedDriverId;
 
-  GoogleMapController? _mapController;
-  String? _mapStyle;
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  /// This student's own row on the active trip's attendance manifest — the
+  /// only per-stop detail this account is both allowed to read
+  /// (`firestore.rules`'s `ownsStudent` check) and should see; every other
+  /// rider's pickup point is another family's information.
+  AttendanceRecord? _myAttendance;
+  StreamSubscription<AttendanceRecord?>? _attendanceSub;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-
-    rootBundle.loadString('assets/map_style.json').then((style) {
-      _mapStyle = style;
-      if (mounted) setState(() {});
-    });
-
-    if (!_tracking.isMoving.value) {
-      final route = MockRouteBuilder.buildMorningRoute();
-      _tracking.start(route);
-    }
-
-    _tracking.busPosition.addListener(_onBusPositionChanged);
-    _buildMapOverlays();
   }
 
   void _onLangChanged() => setState(() {});
 
-  void _onBusPositionChanged() {
-    _buildMapOverlays();
-    setState(() {});
+  /// Called from [build] whenever the student's assigned driver might have
+  /// changed. Cheap no-op when it hasn't.
+  void _ensureWatching(String? driverId) {
+    if (driverId == _watchedDriverId) return;
+    _watchedDriverId = driverId;
+
+    _tripSub?.cancel();
+    _tripSub = null;
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    _activeTrip = null;
+    _myAttendance = null;
+
+    if (driverId == null || driverId.isEmpty) return;
+    _tripSub = TripRepository.instance
+        .watchActiveTripForDriver(driverId)
+        .listen(_onActiveTripChanged);
   }
 
-  void _buildMapOverlays() {
-    final route = _tracking.route;
-    final busPos = _tracking.busPosition.value;
+  void _onActiveTripChanged(Trip? trip) {
+    if (!mounted) return;
+    setState(() => _activeTrip = trip);
 
-    final markers = <Marker>{};
-
-    // Student's stop highlighted
-    const studentStopName = 'Pine Road';
-
-    for (final stop in route.stops) {
-      final isStudentStop = stop.name == studentStopName;
-      markers.add(
-        Marker(
-          markerId: MarkerId(stop.name),
-          position: stop.location,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isStudentStop
-                ? BitmapDescriptor.hueYellow
-                : switch (stop.status) {
-                    StopStatus.completed => BitmapDescriptor.hueGreen,
-                    StopStatus.current => BitmapDescriptor.hueViolet,
-                    StopStatus.upcoming => BitmapDescriptor.hueAzure,
-                    StopStatus.destination => BitmapDescriptor.hueOrange,
-                  },
-          ),
-          infoWindow: InfoWindow(
-            title: isStudentStop ? '📍 ${stop.name} (Your Stop)' : stop.name,
-            snippet: stop.scheduledTime,
-          ),
-        ),
-      );
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    final studentId = SessionService.instance.uid;
+    if (trip == null || studentId == null) {
+      setState(() => _myAttendance = null);
+      return;
     }
+    _attendanceSub = TripRepository.instance
+        .watchAttendanceForStudent(trip.id, studentId)
+        .listen((record) {
+      if (!mounted) return;
+      setState(() => _myAttendance = record);
+    });
+  }
 
-    markers.add(
-      Marker(
-        markerId: const MarkerId('bus'),
-        position: busPos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-        rotation: _tracking.busHeading.value,
-        anchor: const Offset(0.5, 0.5),
-        infoWindow: const InfoWindow(title: '🚌 Bus #42'),
-        zIndexInt: 10,
-      ),
-    );
+  String _relativeStart(DateTime? startedAt) {
+    if (startedAt == null) return '—';
+    final mins = DateTime.now().difference(startedAt).inMinutes;
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return '$mins min ago';
+    final hours = mins ~/ 60;
+    return '$hours hr ago';
+  }
 
-    final polylines = <Polyline>{
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: route.polylinePoints,
-        color: const Color(0xFFF59E0B),
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ),
-    };
-
-    final completedIdx = route.polylinePoints.indexWhere(
-      (p) => p.latitude == busPos.latitude && p.longitude == busPos.longitude,
-    );
-    if (completedIdx > 0) {
-      polylines.add(
-        Polyline(
-          polylineId: const PolylineId('completed'),
-          points: route.polylinePoints.sublist(0, completedIdx + 1),
-          color: const Color(0xFF10B981),
-          width: 5,
-        ),
-      );
+  String _attendanceLabel(AttendanceRecord? record) {
+    switch (record?.status) {
+      case AttendanceStatus.boarded:
+        return 'Picked up';
+      case AttendanceStatus.absent:
+        return 'Absent';
+      case AttendanceStatus.pending:
+      case null:
+        return 'Pending';
     }
-
-    _markers = markers;
-    _polylines = polylines;
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
-    _tracking.busPosition.removeListener(_onBusPositionChanged);
-    _tracking.stop();
-    _mapController?.dispose();
+    _tripSub?.cancel();
+    _attendanceSub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<StudentInfo>(
+      valueListenable: StudentDataService.instance.studentInfo,
+      builder: (context, studentInfo, _) => _buildBody(context, studentInfo),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, StudentInfo studentInfo) {
+    _ensureWatching(studentInfo.driverId.isEmpty ? null : studentInfo.driverId);
+    final trip = _activeTrip;
+    final stopLabel = studentInfo.stop.isEmpty ? 'your stop' : studentInfo.stop;
+    final schoolLabel = studentInfo.school.isEmpty
+        ? 'School'
+        : studentInfo.school;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
       child: Column(
@@ -141,8 +136,13 @@ class _StudentTrackingState extends State<StudentTracking> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                // ── Google Map ─────────────────────────────────
+                // ── Live map ─────────────────────────────────────
                 GlassCard(
+                  // The map is opaque and fills the card completely, so the
+                  // blur layer behind it is never visible — pure wasted GPU
+                  // work on what is also this screen's largest, continuously
+                  // live-updating element.
+                  enableBlur: false,
                   padding: EdgeInsets.zero,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
@@ -150,31 +150,23 @@ class _StudentTrackingState extends State<StudentTracking> {
                       height: 220,
                       child: Stack(
                         children: [
-                          GoogleMap(
-                            initialCameraPosition: CameraPosition(
-                              target: _tracking.busPosition.value,
-                              zoom: 13.5,
-                            ),
-                            style: _mapStyle,
-                            markers: _markers,
-                            polylines: _polylines,
-                            myLocationEnabled: false,
-                            zoomControlsEnabled: false,
-                            mapToolbarEnabled: false,
-                            compassEnabled: false,
-                            trafficEnabled: true,
-                            onMapCreated: (controller) {
-                              _mapController = controller;
-                            },
+                          RouteMapView(
+                            height: 220,
+                            highlightedStopName: studentInfo.stop,
                           ),
                           // Status overlay
                           Positioned(
                             top: 12,
                             right: 12,
-                            child: StatusBadge(
-                              label: '● LIVE',
-                              color: AppTheme.success,
-                            ),
+                            child: trip == null
+                                ? StatusBadge(
+                                    label: 'Not started',
+                                    color: AppTheme.warning,
+                                  )
+                                : const StatusBadge(
+                                    label: '● LIVE',
+                                    color: AppTheme.success,
+                                  ),
                           ),
                           Positioned(
                             bottom: 12,
@@ -189,10 +181,37 @@ class _StudentTrackingState extends State<StudentTracking> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                '📍 Pine Road → School',
+                                '📍 $stopLabel → $schoolLabel',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Expands to a fullscreen, pannable/zoomable map —
+                          // this 220px preview stays gesture-locked so it
+                          // doesn't fight the page's own scroll.
+                          Positioned(
+                            bottom: 12,
+                            right: 12,
+                            child: GestureDetector(
+                              onTap: () => context.push(
+                                '/student/track/map',
+                                extra: {
+                                  'highlightedStopName': studentInfo.stop,
+                                },
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.6),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.fullscreen,
+                                  color: Colors.white70,
+                                  size: 18,
                                 ),
                               ),
                             ),
@@ -206,6 +225,7 @@ class _StudentTrackingState extends State<StudentTracking> {
 
                 // ── Bus status ──────────────────────────────────
                 GlassCard(
+                  enableBlur: false,
                   gradient: LinearGradient(
                     colors: [
                       AppTheme.success.withValues(alpha: 0.12),
@@ -232,17 +252,25 @@ class _StudentTrackingState extends State<StudentTracking> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              '${_tracking.route.busNumber} · Route A',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                            Builder(builder: (_) {
+                              final assignment = [
+                                studentInfo.busNumber,
+                                studentInfo.route,
+                              ].where((s) => s.isNotEmpty).join(' · ');
+                              return Text(
+                                assignment.isEmpty
+                                    ? 'No bus assigned yet'
+                                    : assignment,
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              );
+                            }),
                             const SizedBox(height: 3),
                             Text(
-                              'Driver: ${_tracking.route.driverName}',
+                              'Driver: ${studentInfo.driverName.isEmpty ? "N/A" : studentInfo.driverName}',
                               style: TextStyle(
                                 color: context.textSecondary,
                                 fontSize: 12,
@@ -251,91 +279,124 @@ class _StudentTrackingState extends State<StudentTracking> {
                           ],
                         ),
                       ),
-                      StatusBadge(label: 'On Time', color: AppTheme.success),
+                      StatusBadge(
+                        label: trip == null ? 'Waiting for driver' : 'On Time',
+                        color: trip == null ? AppTheme.warning : AppTheme.success,
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // ── ETA info ────────────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      ValueListenableBuilder<int>(
-                        valueListenable: _tracking.etaMinutes,
-                        builder: (_, eta, _) => _ETAInfo(
+                if (trip == null)
+                  GlassCard(
+                    enableBlur: false,
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        const Text('🚏', style: TextStyle(fontSize: 28)),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Your driver hasn't started the route yet",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "You'll see live progress here once the route "
+                          'begins.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.textTertiary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else ...[
+                  // ── Trip info ────────────────────────────────
+                  GlassCard(
+                    enableBlur: false,
+                    padding: const EdgeInsets.all(18),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _ETAInfo(
                           icon: '⏱️',
-                          label: 'ETA',
-                          value: '$eta min',
+                          label: 'Started',
+                          value: _relativeStart(trip.startedAt),
                           color: AppTheme.studentAmber,
                         ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: context.surfaceBorder,
-                      ),
-                      _ETAInfo(
-                        icon: '📏',
-                        label: AppStrings.t('distance'),
-                        value: '2.4 km',
-                        color: AppTheme.info,
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: context.surfaceBorder,
-                      ),
-                      _ETAInfo(
-                        icon: '🚏',
-                        label: AppStrings.t('stops_left'),
-                        value:
-                            '${_tracking.route.stops.where((s) => s.status == StopStatus.upcoming || s.status == StopStatus.destination).length}',
-                        color: AppTheme.purple,
-                      ),
-                    ],
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: context.surfaceBorder,
+                        ),
+                        _ETAInfo(
+                          icon: '🧍',
+                          label: 'Your status',
+                          value: _attendanceLabel(_myAttendance),
+                          color: AppTheme.purple,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-                // ── Route progress ──────────────────────────────
-                GlassCard(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.t('route_progress'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                  // ── Route progress ──────────────────────────────
+                  //
+                  // Just this student's own leg — every other rider's pickup
+                  // point is information this account has no business
+                  // seeing (and Firestore's rules agree: a student can only
+                  // read their own attendance document).
+                  GlassCard(
+                    enableBlur: false,
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.t('route_progress'),
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      ..._tracking.route.stops.map(
-                        (stop) => _StopItem(
-                          name: stop.name == 'Pine Road'
-                              ? '${stop.name} (Your Stop)'
-                              : stop.name,
-                          time: stop.scheduledTime,
-                          status: switch (stop.status) {
-                            StopStatus.completed => 'passed',
-                            StopStatus.current => 'current',
-                            _ => 'upcoming',
-                          },
-                          color: switch (stop.status) {
-                            StopStatus.completed => AppTheme.success,
-                            StopStatus.current => AppTheme.studentAmber,
-                            _ => Colors.white24,
-                          },
-                        ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        Builder(builder: (_) {
+                          final boarded =
+                              _myAttendance?.status == AttendanceStatus.boarded;
+                          return Column(
+                            children: [
+                              _StopItem(
+                                name: '$stopLabel (Your Stop)',
+                                time: '',
+                                status: boarded ? 'passed' : 'current',
+                                color: boarded
+                                    ? AppTheme.success
+                                    : AppTheme.studentAmber,
+                              ),
+                              _StopItem(
+                                name: schoolLabel,
+                                time: '',
+                                status: boarded ? 'current' : 'upcoming',
+                                color: boarded
+                                    ? AppTheme.studentAmber
+                                    : Colors.white24,
+                              ),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -460,14 +521,6 @@ class _StopItem extends StatelessWidget {
                       : null,
                 ),
               ),
-              if (status != 'upcoming' || name != 'Lincoln Elementary')
-                Container(
-                  width: 2,
-                  height: 24,
-                  color: isPassed
-                      ? AppTheme.success.withValues(alpha: 0.4)
-                      : context.surfaceBorder,
-                ),
             ],
           ),
           const SizedBox(width: 14),

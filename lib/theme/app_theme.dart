@@ -1,34 +1,70 @@
 import 'package:flutter/material.dart';
+import 'theme_provider.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  BuildContext helpers – use these in screens so every colour follows the
 //  current light / dark mode automatically.
+//
+//  Every colour below is a `Color.lerp`/`BoxDecoration.lerp` driven by
+//  `ThemeProvider.instance.blend` (0 = light, 1 = dark) rather than a hard
+//  switch on a boolean — toggling used to snap every colour in the app
+//  instantly, because none of this reads `ThemeData.colorScheme` (which is
+//  the only thing Flutter's own built-in theme animation smooths). Blending
+//  the actual constants here is what makes the transition feel like a fade
+//  rather than a cut.
 // ─────────────────────────────────────────────────────────────────────────────
 extension AppColors on BuildContext {
-  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+  /// Still a plain boolean for the handful of things that genuinely can't
+  /// blend — swapping an icon or an image asset, not a colour.
+  bool get isDark => ThemeProvider.instance.isDark;
+
+  double get _themeBlend => ThemeBlendScope.of(this);
 
   // Background decoration
-  BoxDecoration get scaffoldBg =>
-      isDark ? AppTheme.bgDecoration : AppTheme.lightBgDecoration;
+  BoxDecoration get scaffoldBg => BoxDecoration.lerp(
+        AppTheme.lightBgDecoration,
+        AppTheme.bgDecoration,
+        _themeBlend,
+      )!;
 
   // Text
-  Color get textPrimary => isDark ? Colors.white : const Color(0xFF1E293B);
-  Color get textSecondary => isDark ? Colors.white70 : const Color(0xFF64748B);
-  Color get textTertiary => isDark ? Colors.white38 : const Color(0xFF94A3B8);
-  Color get textHint => isDark ? Colors.white24 : const Color(0xFFCBD5E1);
+  Color get textPrimary =>
+      Color.lerp(const Color(0xFF1E293B), Colors.white, _themeBlend)!;
+  Color get textSecondary =>
+      Color.lerp(const Color(0xFF64748B), Colors.white70, _themeBlend)!;
+  Color get textTertiary =>
+      Color.lerp(const Color(0xFF94A3B8), Colors.white38, _themeBlend)!;
+  Color get textHint =>
+      Color.lerp(const Color(0xFFCBD5E1), Colors.white24, _themeBlend)!;
 
   // Surfaces / cards
-  Color get cardBg => isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white;
-  Color get cardBgElevated =>
-      isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFF1F5F9);
-  Color get surfaceBorder =>
-      isDark ? Colors.white.withValues(alpha: 0.10) : const Color(0xFFE2E8F0);
+  Color get cardBg => Color.lerp(
+        Colors.white,
+        Colors.white.withValues(alpha: 0.06),
+        _themeBlend,
+      )!;
+  Color get cardBgElevated => Color.lerp(
+        const Color(0xFFF1F5F9),
+        Colors.white.withValues(alpha: 0.10),
+        _themeBlend,
+      )!;
+  Color get surfaceBorder => Color.lerp(
+        const Color(0xFFE2E8F0),
+        Colors.white.withValues(alpha: 0.10),
+        _themeBlend,
+      )!;
 
   // Inputs
-  Color get inputFill =>
-      isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF1F5F9);
-  Color get inputBorder =>
-      isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);
+  Color get inputFill => Color.lerp(
+        const Color(0xFFF1F5F9),
+        Colors.white.withValues(alpha: 0.05),
+        _themeBlend,
+      )!;
+  Color get inputBorder => Color.lerp(
+        const Color(0xFFE2E8F0),
+        Colors.white.withValues(alpha: 0.12),
+        _themeBlend,
+      )!;
 }
 
 class AppTheme {

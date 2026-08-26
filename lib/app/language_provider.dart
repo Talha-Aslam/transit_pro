@@ -150,12 +150,11 @@ class AppStrings {
     'schedule': 'Schedule',
     'morning_pickup': 'MORNING PICKUP',
     'evening_drop': 'EVENING DROP',
-    'route_a_timetable': 'Route A Timetable',
+    'route_a_timetable': 'Route Timetable',
     'stop': 'STOP',
     'morning': 'MORNING',
     'evening': 'EVENING',
     'upcoming_holidays': 'Upcoming Holidays',
-    'oak_street_stop': 'Oak Street Stop',
     'active': 'Active',
     'completed_check': 'Completed',
     'upcoming_clock': 'Upcoming',
@@ -616,7 +615,7 @@ class AppStrings {
     'privacy_lbl': 'Privacy',
     'terms_lbl': 'Terms of Service',
     'terms_content':
-        'Welcome to TransportKid.\n\nThese Terms of Service govern your use of the app. By using TransportKid you agree to the collection and use of information in accordance with these terms.\n\n1. Use of Service\nYou may use the app for arranging and tracking student transport.\n\n2. Privacy\nWe collect basic details required to provide the service. See Privacy Policy for details.\n\n3. Liability\nTransportKid is not responsible for third-party actions.\n\nFor full terms visit the school administration.',
+        'Welcome to TransportKid.\n\nThese Terms of Service govern your use of the app. By using TransportKid you agree to the collection and use of information in accordance with these terms.\n\n1. Use of Service\nYou may use the app for arranging and tracking student transport.\n\n2. Privacy\nWe collect basic details required to provide the service. See Privacy Policy for details.\n\n3. Liability\nTransportKid is not responsible for third-party actions.',
     'log_out_text': 'Log Out',
 
     // FAQ
@@ -867,12 +866,11 @@ class AppStrings {
     'schedule': 'شیڈول',
     'morning_pickup': 'صبح کا پک اپ',
     'evening_drop': 'شام کا ڈراپ',
-    'route_a_timetable': 'روٹ اے ٹائم ٹیبل',
+    'route_a_timetable': 'روٹ ٹائم ٹیبل',
     'stop': 'اسٹاپ',
     'morning': 'صبح',
     'evening': 'شام',
     'upcoming_holidays': 'آئندہ تعطیلات',
-    'oak_street_stop': 'اوک اسٹریٹ اسٹاپ',
     'active': 'فعال',
     'completed_check': 'مکمل',
     'upcoming_clock': 'آئندہ',
@@ -1314,7 +1312,7 @@ class AppStrings {
     'privacy_lbl': 'رازداری',
     'terms_lbl': 'شرائط و ضوابط',
     'terms_content':
-        'TransportKid میں خوش آمدید۔\n\nیہ شرائط آپ کی ایپ کے استعمال کو منظم کرتی ہیں۔ اس ایپ کو استعمال کر کے آپ معلومات کے حصول اور استعمال سے متفق ہوتے ہیں جیسا کہ پالیسی میں درج ہے۔\n\n1. سروس کا استعمال\nآپ اسٹوڈنٹ ٹرانسپورٹ کی درخواست اور ٹریکنگ کے لیے ایپ استعمال کر سکتے ہیں۔\n\n2. رازداری\nہم بنیادی تفصیلات جمع کرتے ہیں جو سروس فراہم کرنے کے لیے ضروری ہیں۔ مزید تفصیل پرائیویسی پالیسی میں موجود ہے۔\n\n3. ذمہ داری\nTransportKid کسی تیسری پارٹی کے عمل کا ذمہ دار نہیں۔\n\nمزید معلومات کے لیے اسکول انتظامیہ سے رابطہ کریں۔',
+        'TransportKid میں خوش آمدید۔\n\nیہ شرائط آپ کی ایپ کے استعمال کو منظم کرتی ہیں۔ اس ایپ کو استعمال کر کے آپ معلومات کے حصول اور استعمال سے متفق ہوتے ہیں جیسا کہ پالیسی میں درج ہے۔\n\n1. سروس کا استعمال\nآپ اسٹوڈنٹ ٹرانسپورٹ کی درخواست اور ٹریکنگ کے لیے ایپ استعمال کر سکتے ہیں۔\n\n2. رازداری\nہم بنیادی تفصیلات جمع کرتے ہیں جو سروس فراہم کرنے کے لیے ضروری ہیں۔ مزید تفصیل پرائیویسی پالیسی میں موجود ہے۔\n\n3. ذمہ داری\nTransportKid کسی تیسری پارٹی کے عمل کا ذمہ دار نہیں۔',
     'log_out_text': 'لاگ آؤٹ',
 
     // FAQ

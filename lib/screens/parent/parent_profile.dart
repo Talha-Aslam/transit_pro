@@ -2,15 +2,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:transit_core/transit_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/subscription_provider.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
+import '../../widgets/profile_form_fields.dart' show FieldLabel, MapPointField;
 
 class ParentProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -29,23 +32,23 @@ class ParentProfile extends StatefulWidget {
 class _ParentProfileState extends State<ParentProfile> {
   final _svc = ParentDataService.instance;
 
-  bool _boardingAlert = true;
-  bool _arrivalAlert = true;
-  bool _delayAlert = true;
-
   void _onSubscriptionChanged() => setState(() {});
+  void _onNotificationPrefsChanged() => setState(() {});
 
   @override
   void initState() {
     super.initState();
     SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
     LanguageProvider.instance.addListener(_onLangChanged);
+    _svc.notificationPrefs.addListener(_onNotificationPrefsChanged);
+    _svc.loadNotificationPrefs();
   }
 
   @override
   void dispose() {
     SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _svc.notificationPrefs.removeListener(_onNotificationPrefsChanged);
     super.dispose();
   }
 
@@ -460,6 +463,7 @@ class _ParentProfileState extends State<ParentProfile> {
                       children: [
                         // ── Children section ──────────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           gradient: LinearGradient(
                             colors: [
                               AppTheme.parentPurple.withValues(alpha: 0.1),
@@ -561,6 +565,7 @@ class _ParentProfileState extends State<ParentProfile> {
 
                         // ── Notification preferences ──────────────────────
                         GlassCard(
+                          enableBlur: false,
                           padding: const EdgeInsets.all(18),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -578,25 +583,25 @@ class _ParentProfileState extends State<ParentProfile> {
                               _PrefRow(
                                 label: AppStrings.t('boarding_alerts'),
                                 desc: AppStrings.t('boarding_alerts_desc'),
-                                value: _boardingAlert,
+                                value: _svc.notificationPrefFor('boarding'),
                                 onChanged: (v) =>
-                                    setState(() => _boardingAlert = v),
+                                    _svc.setNotificationPref('boarding', v),
                               ),
                               _divider(context),
                               _PrefRow(
                                 label: AppStrings.t('arrival_notifs'),
                                 desc: AppStrings.t('arrival_notifs_desc'),
-                                value: _arrivalAlert,
+                                value: _svc.notificationPrefFor('arrival'),
                                 onChanged: (v) =>
-                                    setState(() => _arrivalAlert = v),
+                                    _svc.setNotificationPref('arrival', v),
                               ),
                               _divider(context),
                               _PrefRow(
                                 label: AppStrings.t('delay_alerts'),
                                 desc: AppStrings.t('delay_alerts_desc'),
-                                value: _delayAlert,
+                                value: _svc.notificationPrefFor('delay'),
                                 onChanged: (v) =>
-                                    setState(() => _delayAlert = v),
+                                    _svc.setNotificationPref('delay', v),
                               ),
                             ],
                           ),
@@ -605,6 +610,7 @@ class _ParentProfileState extends State<ParentProfile> {
 
                         // ── Transport support ───────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           padding: EdgeInsets.zero,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,6 +647,7 @@ class _ParentProfileState extends State<ParentProfile> {
 
                         // ── Menu items ────────────────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           child: Column(
                             children: [
                               _MenuItem(
@@ -700,6 +707,7 @@ class _ParentProfileState extends State<ParentProfile> {
 
                         // ── Theme ─────────────────────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
@@ -1417,30 +1425,6 @@ class _EditSheetState extends State<_EditSheet> {
 
 // ─────────────────────────────────────────────────────────── custom child sheet
 
-class _BusOption {
-  final String busNumber;
-  final String driver;
-  final String route;
-  final String? phone;
-  final int seatCapacity;
-  final List<String> schools;
-  final bool verified;
-  final double rating;
-  final int totalTrips;
-
-  const _BusOption(
-    this.busNumber,
-    this.driver,
-    this.route, {
-    this.phone,
-    this.seatCapacity = 20,
-    this.schools = const [],
-    this.verified = false,
-    this.rating = 0.0,
-    this.totalTrips = 0,
-  });
-}
-
 class _ChildFlowSheet extends StatefulWidget {
   final String title;
   final ChildInfo initialChild;
@@ -1465,9 +1449,40 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
 
   String? _instituteType;
   String? _instituteName;
-  _BusOption? _selectedBus;
 
-  Future<void> _showDriverPreview(_BusOption bus) async {
+  // Where the child is collected from / dropped off. Pre-filled below from
+  // `widget.initialChild.pickup`/`.dropoff` — see `ParentDataService._rebuild`
+  // for where those come from on the `Student` document.
+  GeoCoord? _pickup;
+  GeoCoord? _dropoff;
+
+  // Real driver picked from the list below, replacing what used to be a
+  // hardcoded `_BusOption` the parent could "select" even though it matched
+  // nothing in Firestore. See the comment above the StreamBuilder further
+  // down for what this selection does and doesn't do.
+  Driver? _selectedDriver;
+
+  /// Which of `_selectedDriver`'s rounds this child rides — `Student
+  /// .scheduleId`. Only meaningful (and only shown) when the driver runs
+  /// more than one; reset to null on a driver change since another driver's
+  /// round ids don't apply to a new selection.
+  String? _scheduleId;
+
+  // Cached so a new Firestore listener isn't opened on every rebuild this
+  // sheet does (e.g. every keystroke in the location field re-triggers
+  // build() via its listener) — only recreated when the institute changes.
+  Stream<List<Driver>>? _driversStream;
+  String? _driversStreamInstitute;
+
+  Stream<List<Driver>> _driversStreamFor(String institute) {
+    if (_driversStreamInstitute != institute) {
+      _driversStreamInstitute = institute;
+      _driversStream = UserRepository.instance.watchDriversServing(institute);
+    }
+    return _driversStream!;
+  }
+
+  Future<void> _showDriverPreview(Driver driver) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -1532,7 +1547,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            bus.driver,
+                            driver.name.isEmpty
+                                ? 'Unnamed driver'
+                                : driver.name,
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 15,
@@ -1560,7 +1577,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            bus.phone ?? 'Contact not available',
+                            driver.phone.isNotEmpty
+                                ? driver.phone
+                                : 'Contact not available',
                             style: TextStyle(
                               color: context.textPrimary,
                               fontSize: 14,
@@ -1572,13 +1591,15 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               Icon(
                                 Icons.verified,
                                 size: 16,
-                                color: bus.verified
+                                color: driver.isApproved
                                     ? AppTheme.parentAccent
                                     : context.textHint,
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                bus.verified ? 'Verified' : 'Not verified',
+                                driver.isApproved
+                                    ? 'Verified'
+                                    : 'Not verified',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -1592,7 +1613,11 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                '${bus.seatCapacity} seats',
+                                // Sum of seats offered across the driver's
+                                // rounds — Driver has no single "vehicle
+                                // capacity" field (see DriverSchedule for
+                                // why seats are per-round, not per-vehicle).
+                                '${driver.totalSeatsOffered} seats',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -1615,7 +1640,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              bus.rating.toStringAsFixed(1),
+                              driver.ratingCount == 0
+                                  ? 'New'
+                                  : driver.rating.toStringAsFixed(1),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontWeight: FontWeight.w700,
@@ -1625,7 +1652,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${bus.totalTrips} trips',
+                          '${driver.ratingCount} rating${driver.ratingCount == 1 ? '' : 's'}',
                           style: TextStyle(
                             color: context.textSecondary,
                             fontSize: 12,
@@ -1636,7 +1663,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (bus.schools.isNotEmpty) ...[
+                if (driver.serviceAreas.isNotEmpty) ...[
                   Text(
                     'Serves',
                     style: TextStyle(
@@ -1649,7 +1676,8 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
-                    children: bus.schools
+                    children: driver.serviceAreas
+                        .map((a) => a.name)
                         .map(
                           (s) => Container(
                             padding: const EdgeInsets.symmetric(
@@ -1740,12 +1768,19 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
 
     if (confirmed == true) {
       setState(() {
-        _selectedBus = bus;
+        if (_selectedDriver?.id != driver.id) _scheduleId = null;
+        _selectedDriver = driver;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Selected ${bus.busNumber} — ${bus.driver}')),
-      );
-      // Show confirmation popup that the request has been sent to the driver
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Selected ${driver.name}')));
+      // This is still only a preview, same as before: picking a driver here
+      // doesn't book a seat or link the student to them in Firestore (the
+      // real booking path is Find Drivers -> request a seat, which reserves
+      // a specific round via RideMatchService.requestSeat and notifies the
+      // driver for real). Rebuilding this picker on top of that flow is
+      // beyond this pass — the fix here is only that the driver shown and
+      // selected is now a real Firestore record instead of an invented one.
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1766,7 +1801,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
             ],
           ),
           content: Text(
-            'Your request has been sent to ${bus.driver}. They will respond shortly.',
+            'Your request has been sent to ${driver.name}. They will respond shortly.',
             style: TextStyle(color: context.textSecondary),
           ),
           actions: [
@@ -1789,42 +1824,6 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     'University': ['University of Lahore', 'FAST NUCES', 'LUMS', 'UET'],
   };
 
-  final List<_BusOption> _allBuses = [
-    _BusOption(
-      'Bus #42',
-      'Mike T.',
-      'Route A (Morning/Evening)',
-      phone: '+1 555-0123',
-      seatCapacity: 24,
-      schools: ['Lincoln Elementary', 'Springfield High'],
-      verified: true,
-      rating: 4.7,
-      totalTrips: 1240,
-    ),
-    _BusOption(
-      'Bus #15',
-      'Ali H.',
-      'Route B (Express)',
-      phone: '+92 300-555-015',
-      seatCapacity: 18,
-      schools: ['Punjab College'],
-      verified: false,
-      rating: 4.1,
-      totalTrips: 480,
-    ),
-    _BusOption(
-      'Bus #09',
-      'John D.',
-      'Route C (University Line)',
-      phone: '+44 20 7946 0009',
-      seatCapacity: 30,
-      schools: ['University of Lahore', 'FAST NUCES'],
-      verified: true,
-      rating: 4.9,
-      totalTrips: 2035,
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -1832,6 +1831,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     _gradeCtrl = TextEditingController(text: widget.initialChild.grade);
     _locationCtrl = TextEditingController(text: widget.initialChild.stop)
       ..addListener(() => setState(() {})); // To trigger bus list visibility
+    _pickup = widget.initialChild.pickup;
+    _dropoff = widget.initialChild.dropoff;
+    _scheduleId = widget.initialChild.scheduleId;
 
     if (widget.initialChild.school.isNotEmpty) {
       for (final entry in _institutes.entries) {
@@ -1847,12 +1849,16 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
       }
     }
 
-    if (widget.initialChild.busNumber.isNotEmpty) {
-      try {
-        _selectedBus = _allBuses.firstWhere(
-          (b) => b.busNumber == widget.initialChild.busNumber,
-        );
-      } catch (_) {}
+    // `initialChild.driver` holds a real driver uid when it was assigned
+    // through the ride-request flow (see ParentDataService._rebuild) — fetch
+    // it so an existing selection shows as selected rather than starting
+    // blank every time this sheet reopens.
+    if (widget.initialChild.driver.isNotEmpty) {
+      UserRepository.instance.fetchDriver(widget.initialChild.driver).then((
+        d,
+      ) {
+        if (mounted && d != null) setState(() => _selectedDriver = d);
+      });
     }
   }
 
@@ -1867,13 +1873,26 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   void _save() {
     widget.onSave(
       ChildInfo(
+        // Without the id, `ParentDataService.updateChild` has nothing to
+        // target in Firestore and silently skips the write (see its
+        // `if (child.id.isEmpty) return;` guard) — so this has to travel
+        // through untouched, same as `busNumber`/`route` below.
+        id: widget.initialChild.id,
         name: _nameCtrl.text.trim(),
         grade: _gradeCtrl.text.trim(),
         school: _instituteName ?? widget.initialChild.school,
-        busNumber: _selectedBus?.busNumber ?? widget.initialChild.busNumber,
-        route: _selectedBus?.route ?? widget.initialChild.route,
+        // Picking a driver in this sheet is a preview only (see
+        // _showDriverPreview) — it doesn't book a seat or assign a bus/route,
+        // so those stay whatever they already were. Only the driver id
+        // (now a real one, not an invented display name) is carried through.
+        busNumber: widget.initialChild.busNumber,
+        route: widget.initialChild.route,
         stop: _locationCtrl.text.trim(),
-        driver: _selectedBus?.driver ?? widget.initialChild.driver,
+        driver: _selectedDriver?.id ?? widget.initialChild.driver,
+        photoUrl: widget.initialChild.photoUrl,
+        pickup: _pickup,
+        dropoff: _dropoff,
+        scheduleId: _scheduleId,
       ),
     );
     Navigator.pop(context);
@@ -2127,7 +2146,8 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               onChanged: (val) {
                                 setState(() {
                                   _instituteName = val;
-                                  _selectedBus = null;
+                                  _selectedDriver = null;
+                                  _scheduleId = null;
                                 });
                               },
                             ),
@@ -2215,12 +2235,30 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    const FieldLabel('PICKUP LOCATION (OPTIONAL)'),
+                    const SizedBox(height: 6),
+                    MapPointField(
+                      placeholder: 'Tap to pin where the van collects them',
+                      value: _pickup,
+                      accentColor: widget.accentColor,
+                      onPicked: (p) => setState(() => _pickup = p),
+                    ),
+                    const SizedBox(height: 12),
+                    const FieldLabel('DROP-OFF LOCATION (OPTIONAL)'),
+                    const SizedBox(height: 6),
+                    MapPointField(
+                      placeholder: 'Tap to pin where the van drops them off',
+                      value: _dropoff,
+                      accentColor: widget.accentColor,
+                      onPicked: (p) => setState(() => _dropoff = p),
+                    ),
 
                     if (showBuses) ...[
                       const Divider(),
                       const SizedBox(height: 10),
                       Text(
-                        "Available Buses for this Route",
+                        "Drivers Serving This Institute",
                         style: TextStyle(
                           color: context.textPrimary,
                           fontSize: 14,
@@ -2228,63 +2266,181 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      ..._allBuses.map((bus) {
-                        final isSelected = _selectedBus == bus;
-                        return GestureDetector(
-                          onTap: () => _showDriverPreview(bus),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? widget.accentColor.withValues(alpha: 0.15)
-                                  : context.isDark
-                                  ? AppTheme.bgDarkBlue
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? widget.accentColor
-                                    : context.inputBorder,
-                                width: isSelected ? 2 : 1,
+                      // Real drivers from Firestore, scoped to the selected
+                      // institute — this used to be a hardcoded list of three
+                      // invented buses/drivers a parent could "select" even
+                      // though nothing behind them existed. See
+                      // _showDriverPreview for what picking one here does (a
+                      // preview only, not a booking).
+                      StreamBuilder<List<Driver>>(
+                        stream: _driversStreamFor(_instituteName!),
+                        builder: (context, snap) {
+                          if (!snap.hasData) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                            );
+                          }
+                          final drivers = snap.data!;
+                          if (drivers.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                'No drivers currently list "$_instituteName" '
+                                'as a stop yet.',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            );
+                          }
+                          return Column(
+                            children: drivers.map((driver) {
+                              final isSelected =
+                                  _selectedDriver?.id == driver.id;
+                              return GestureDetector(
+                                onTap: () => _showDriverPreview(driver),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? widget.accentColor.withValues(
+                                            alpha: 0.15,
+                                          )
+                                        : context.isDark
+                                        ? AppTheme.bgDarkBlue
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? widget.accentColor
+                                          : context.inputBorder,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        "${bus.busNumber} • ${bus.route}",
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              driver.name.isEmpty
+                                                  ? 'Unnamed driver'
+                                                  : driver.name,
+                                              style: TextStyle(
+                                                color: context.textPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              driver.isApproved
+                                                  ? 'Verified driver'
+                                                  : 'Verification pending',
+                                              style: TextStyle(
+                                                color: context.textSecondary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "Driver: ${bus.driver}",
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 12,
+                                      if (isSelected)
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: widget.accentColor,
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
-                                if (isSelected)
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: widget.accentColor,
-                                  ),
-                              ],
-                            ),
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                      // ── Round picker ───────────────────────────────────
+                      // Only meaningful when the assigned driver actually
+                      // runs more than one round — with zero or one, there is
+                      // nothing to choose, so `Student.scheduleId` stays
+                      // whatever it already was (usually the driver's only
+                      // round, assigned at accept time).
+                      if (_selectedDriver != null &&
+                          _selectedDriver!.orderedSchedules.length > 1) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          'Which round does this child ride?',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                      }),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _selectedDriver!.orderedSchedules.map((
+                            s,
+                          ) {
+                            final selected = _scheduleId == s.id;
+                            final label = s.label.isEmpty
+                                ? s.timeRange
+                                : '${s.label} (${s.timeRange})';
+                            return GestureDetector(
+                              onTap: () =>
+                                  setState(() => _scheduleId = s.id),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? widget.accentColor.withValues(
+                                          alpha: 0.15,
+                                        )
+                                      : context.isDark
+                                      ? AppTheme.bgDarkBlue
+                                      : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: selected
+                                        ? widget.accentColor
+                                        : context.inputBorder,
+                                  ),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? widget.accentColor
+                                        : context.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
                     ],
                   ],
                 ),

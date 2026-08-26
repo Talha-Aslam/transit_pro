@@ -103,6 +103,18 @@ class _LoginScreenState extends State<LoginScreen> {
         _loading = false;
         _error = e.message;
       });
+    } catch (e) {
+      // `AuthService.signIn` now has its own catch-all, but this call is
+      // fire-and-forget from the button (nothing awaits it), so a second
+      // line of defence here costs nothing: without it, any exception type
+      // this doesn't already know about would leave `_loading` stuck `true`
+      // forever — the button silently swaps its label for a spinner and
+      // never swaps back, which reads as "the button disappeared".
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Something went wrong. Please try again.';
+      });
     }
   }
 
@@ -142,6 +154,13 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _loading = false;
         _error = e.message;
+      });
+    } catch (e) {
+      // Same defence-in-depth as `_login` above.
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Something went wrong. Please try again.';
       });
     }
   }

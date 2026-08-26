@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../app/language_provider.dart';
-import '../../app/student_data_service.dart';
 import '../../app/parent_data_service.dart';
+import '../../app/session_service.dart';
+import '../../app/student_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import 'student_driver_chat.dart';
@@ -20,24 +21,60 @@ class _StudentDriverDetailsScreenState
     extends State<StudentDriverDetailsScreen> {
   double _selectedRating = 5.0;
 
+  /// Whether this student has ever completed a ride with their currently
+  /// assigned driver — gates whether the rating card renders at all. See
+  /// `ParentDataService.hasRiddenWithDriver`.
+  bool _hasRidden = false;
+
+  /// Built once from `widget.student`, which is always this student's own
+  /// profile (never another child's — this screen has no child switcher).
+  /// `StudentInfo` doesn't carry the real Firestore student id (only the
+  /// human-readable `studentId` number), so [id] comes from the live
+  /// session instead — it's what `TripRepository.fetchAttendanceForStudent`
+  /// needs. `driver` is `widget.student.driverId` (the driver's real id),
+  /// not `driverName` — `ParentDataService`'s `_driverKey`/weekly gate and
+  /// the completed-ride check both key off a real driver id.
+  late final ChildInfo _child = ChildInfo(
+    id: SessionService.instance.student.value?.id ?? '',
+    name: widget.student.name,
+    grade: widget.student.grade,
+    school: widget.student.school,
+    busNumber: widget.student.busNumber,
+    route: widget.student.route,
+    stop: widget.student.stop,
+    driver: widget.student.driverId,
+  );
+
   @override
   void initState() {
     super.initState();
-    final child = ChildInfo(
-      name: widget.student.name,
-      grade: widget.student.grade,
-      school: widget.student.school,
-      busNumber: widget.student.busNumber,
-      route: widget.student.route,
-      stop: widget.student.stop,
-      driver: widget.student.driverName,
-    );
-    final existing = ParentDataService.instance.driverRatingFor(child);
+    ParentDataService.instance.driverRatings.addListener(_onRatingChanged);
+    // `ParentDataService` only auto-loads ratings for a parent session; a
+    // student rater needs this explicit call, same as the parent screen's.
+    ParentDataService.instance.loadDriverRatings();
+    final existing = ParentDataService.instance.driverRatingFor(_child);
     if (existing != null) _selectedRating = existing.rating;
+    _loadHasRidden();
+  }
+
+  @override
+  void dispose() {
+    ParentDataService.instance.driverRatings.removeListener(_onRatingChanged);
+    super.dispose();
+  }
+
+  void _onRatingChanged() => setState(() {});
+
+  Future<void> _loadHasRidden() async {
+    final ridden = await ParentDataService.instance.hasRiddenWithDriver(_child);
+    if (mounted) setState(() => _hasRidden = ridden);
   }
 
   @override
   Widget build(BuildContext context) {
+    final driverRating = ParentDataService.instance.driverRatingFor(_child);
+    final canRate =
+        _hasRidden && ParentDataService.instance.canRateDriver(_child);
     return Scaffold(
       body: Container(
         decoration: context.scaffoldBg,
@@ -183,134 +220,147 @@ class _StudentDriverDetailsScreenState
                       label: 'Transport Number',
                       value: widget.student.busNumber,
                     ),
-                    _InfoTile(
-                      width: (MediaQuery.of(context).size.width - 56) / 2,
-                      icon: '👥',
-                      label: 'Total Seats',
-                      value: '28',
-                    ),
+                    // No real "total seats" value is available from
+                    // `StudentInfo`/session data on this screen — the tile
+                    // used to show a fabricated '28' here, which is worse
+                    // than not showing it at all.
                   ],
                 ),
-                const SizedBox(height: 16),
+                if (_hasRidden) ...[
+                  const SizedBox(height: 16),
 
-                // Rating card (centered)
-                GlassCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Weekly Driver Rating',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                  // Rating card (centered)
+                  GlassCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Weekly Driver Rating',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Rate your driver once per week based on punctuality, safety, and service.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 13,
+                        const SizedBox(height: 8),
+                        Text(
+                          'Rate your driver once per week based on punctuality, safety, and service.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Last rating: 1.0/5',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(5, (i) {
-                          final idx = i + 1;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: IconButton(
-                              onPressed: () => setState(() {
-                                _selectedRating = idx.toDouble();
-                              }),
-                              icon: Icon(
-                                Icons.star,
-                                color: idx <= _selectedRating
-                                    ? Colors.amber
-                                    : context.surfaceBorder,
-                                size: 32,
-                              ),
+                        if (driverRating != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Last rating: ${driverRating.rating.toStringAsFixed(1)}/5',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontWeight: FontWeight.w700,
                             ),
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 14),
-                      // Submit weekly rating button inside card
-                      SizedBox(
-                        width: double.infinity,
-                        child: GestureDetector(
-                          onTap: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-                            final child = ChildInfo(
-                              name: widget.student.name,
-                              grade: widget.student.grade,
-                              school: widget.student.school,
-                              busNumber: widget.student.busNumber,
-                              route: widget.student.route,
-                              stop: widget.student.stop,
-                              driver: widget.student.driverName,
-                            );
-
-                            if (!ParentDataService.instance.canRateDriver(
-                              child,
-                            )) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(AppStrings.t('already_rated')),
-                                ),
-                              );
-                              return;
-                            }
-
-                            await ParentDataService.instance.rateDriverForChild(
-                              child,
-                              _selectedRating,
-                            );
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Rating submitted: ${_selectedRating.toStringAsFixed(1)}/5',
+                          ),
+                        ],
+                        if (!canRate) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            AppStrings.t('already_rated'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (i) {
+                            final idx = i + 1;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12.0),
+                              child: IconButton(
+                                onPressed: canRate
+                                    ? () => setState(() {
+                                        _selectedRating = idx.toDouble();
+                                      })
+                                    : null,
+                                icon: Icon(
+                                  Icons.star,
+                                  color: !canRate
+                                      ? context.textHint
+                                      : idx <= _selectedRating
+                                      ? Colors.amber
+                                      : context.surfaceBorder,
+                                  size: 32,
                                 ),
                               ),
                             );
-                            setState(() {});
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.parentGradient,
-                              borderRadius: BorderRadius.circular(28),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Submit Weekly Rating',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
+                          }),
+                        ),
+                        const SizedBox(height: 14),
+                        // Submit weekly rating button inside card
+                        SizedBox(
+                          width: double.infinity,
+                          child: GestureDetector(
+                            onTap: !canRate
+                                ? null
+                                : () async {
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+
+                                    await ParentDataService.instance
+                                        .rateDriverForChild(
+                                          _child,
+                                          _selectedRating,
+                                        );
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Rating submitted: ${_selectedRating.toStringAsFixed(1)}/5',
+                                        ),
+                                      ),
+                                    );
+                                    setState(() {});
+                                  },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                gradient: canRate
+                                    ? AppTheme.parentGradient
+                                    : LinearGradient(
+                                        colors: [
+                                          context.surfaceBorder,
+                                          context.surfaceBorder,
+                                        ],
+                                      ),
+                                borderRadius: BorderRadius.circular(28),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  canRate
+                                      ? 'Submit Weekly Rating'
+                                      : 'Rating Submitted This Week',
+                                  style: TextStyle(
+                                    color: canRate
+                                        ? Colors.white
+                                        : context.textSecondary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 14),
 
                 GestureDetector(
@@ -371,6 +421,9 @@ class _InfoTile extends StatelessWidget {
     return SizedBox(
       width: width,
       child: GlassCard(
+        // Rendered 6 times side by side in the info grid above — a
+        // repeated-item card, not a one-off.
+        enableBlur: false,
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

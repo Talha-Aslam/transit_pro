@@ -174,6 +174,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       const SizedBox(height: 10),
 
                       GlassCard(
+                        enableBlur: false,
                         padding: EdgeInsets.zero,
                         child: Column(
                           children: _faqs.asMap().entries.map((e) {
@@ -250,6 +251,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       const SizedBox(height: 20),
 
                       GlassCard(
+                        enableBlur: false,
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,6 +347,7 @@ class _ContactCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: GlassCard(
+        enableBlur: false,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
         child: Column(
           children: [

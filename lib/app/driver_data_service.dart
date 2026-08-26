@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:transit_core/transit_core.dart';
 
 import '../data/user_repository.dart';
 import 'session_service.dart';
@@ -17,7 +18,17 @@ class DriverInfo {
   String experience;
   String busNumber;
   String route;
-  String totalStudents;
+
+  /// Real in-app roster count — students/parents actually registered to this
+  /// driver (`SessionService.roster`/`.routeStudents`, merged and
+  /// de-duplicated the same way `driver_booked_students_screen.dart` does).
+  int autoStudentCount;
+
+  /// Riders the driver added by hand for kids who aren't in the app — see
+  /// `Driver.manualStudentCount`.
+  int manualStudentCount;
+
+  int get totalStudentCount => autoStudentCount + manualStudentCount;
 
   DriverInfo({
     this.name = '',
@@ -27,7 +38,8 @@ class DriverInfo {
     this.experience = '',
     this.busNumber = '',
     this.route = '',
-    this.totalStudents = '',
+    this.autoStudentCount = 0,
+    this.manualStudentCount = 0,
   });
 
   DriverInfo copyWith({
@@ -38,7 +50,8 @@ class DriverInfo {
     String? experience,
     String? busNumber,
     String? route,
-    String? totalStudents,
+    int? autoStudentCount,
+    int? manualStudentCount,
   }) => DriverInfo(
     name: name ?? this.name,
     email: email ?? this.email,
@@ -47,7 +60,8 @@ class DriverInfo {
     experience: experience ?? this.experience,
     busNumber: busNumber ?? this.busNumber,
     route: route ?? this.route,
-    totalStudents: totalStudents ?? this.totalStudents,
+    autoStudentCount: autoStudentCount ?? this.autoStudentCount,
+    manualStudentCount: manualStudentCount ?? this.manualStudentCount,
   );
 }
 
@@ -166,13 +180,25 @@ class DriverDataService {
     final driver = session.driver.value;
     final bus = session.bus.value;
     final route = session.route.value;
-    final students = session.routeStudents.value;
 
     if (user == null) {
       driverInfo.value = DriverInfo();
       locationSharing.value = true;
       timingSlots.value = const DriverTimingSlots();
       return;
+    }
+
+    // Merges the driver's own accepted-seat-request roster with any
+    // admin-assigned route roster, de-duplicated by id — same rule
+    // `driver_booked_students_screen.dart`'s `_roster` getter uses. Using
+    // `routeStudents` alone (the old behaviour) undercounts a self-signup
+    // driver with no admin route to zero even when they have real bookings.
+    final merged = <String, Student>{};
+    for (final s in session.roster.value) {
+      merged[s.id] = s;
+    }
+    for (final s in session.routeStudents.value) {
+      merged.putIfAbsent(s.id, () => s);
     }
 
     driverInfo.value = DriverInfo(
@@ -185,9 +211,8 @@ class DriverDataService {
           : '',
       busNumber: bus?.busNumber ?? '',
       route: route?.name ?? '',
-      // Empty until an admin puts this driver on a route. Showing "0 Students"
-      // for an unassigned driver reads as a real, empty route.
-      totalStudents: route == null ? '' : '${students.length} Students',
+      autoStudentCount: merged.length,
+      manualStudentCount: driver?.manualStudentCount ?? 0,
     );
 
     if (driver != null) {
@@ -219,6 +244,20 @@ class DriverDataService {
       'phone': info.phone,
       'licenseNumber': info.license,
       'experienceYears': _yearsFrom(info.experience),
+    });
+  }
+
+  /// The +/- offline-student control on the driver profile. Never negative —
+  /// a driver un-clicking below zero would otherwise silently subtract from
+  /// the real, auto-counted roster instead of just zeroing out their own
+  /// manual add-on.
+  Future<void> setManualStudentCount(int value) async {
+    final uid = SessionService.instance.uid;
+    final clamped = value < 0 ? 0 : value;
+    driverInfo.value = driverInfo.value.copyWith(manualStudentCount: clamped);
+    if (uid == null) return;
+    await UserRepository.instance.updateDriver(uid, {
+      'manualStudentCount': clamped,
     });
   }
 

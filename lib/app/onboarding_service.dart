@@ -86,6 +86,13 @@ class OnboardingService {
               grade: child.grade.trim(),
               school: child.school.trim(),
               instituteType: child.grade.trim(),
+              studentIdNumber: child.studentIdNumber.trim(),
+              // Derived from the document id, so it inherits that id's
+              // uniqueness rather than needing a collision check — which a
+              // batched write could not perform anyway. This is what lets a
+              // driver tell two children with the same name apart.
+              publicCode: Student.publicCodeFor(ref.id),
+              pickupLocation: child.pickupLocation,
             ),
           );
         }
@@ -105,6 +112,7 @@ class OnboardingService {
             school: draft.school.trim(),
             instituteType: draft.instituteType.trim(),
             studentIdNumber: draft.studentIdNumber.trim(),
+            publicCode: Student.publicCodeFor(uid),
             photoUrl: draft.photoUrl,
             pickupLocation: draft.pickupLocation,
             dropoffLocation: draft.dropoffLocation,
@@ -140,6 +148,14 @@ class OnboardingService {
             // Self-signup never grants driving privileges. An admin flips this
             // in transit_admin after checking the licence and ID.
             status: DriverStatus.pendingVerification,
+            serviceAreas: draft.serviceAreas,
+            serviceRadiusKm: draft.serviceRadiusKm,
+            baseLocation: draft.baseLocation,
+            // Written with whatever `bookedSeats` the draft carries, which for a
+            // new driver is zero on every round. `Driver.toMap()` also emits the
+            // derived `serviceSchools` mirror, which is what parent-side search
+            // actually queries.
+            schedules: draft.schedules,
           ),
           SetOptions(merge: true),
         );

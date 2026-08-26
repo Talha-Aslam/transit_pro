@@ -24,15 +24,12 @@ class _StudentProfileState extends State<StudentProfile> {
   final _svc = StudentDataService.instance;
   bool _studentCardExpanded = false;
 
-  bool _busAlerts = true;
-  bool _arrivalAlerts = true;
-  bool _delayAlerts = false;
-
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
     SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
+    _svc.loadNotificationPrefs();
   }
 
   @override
@@ -60,6 +57,10 @@ class _StudentProfileState extends State<StudentProfile> {
     }
   }
 
+  // Bus Number / Route / Bus Stop are intentionally not editable here — they
+  // are derived from the driver/route assignment (`session.bus`/`.route`),
+  // not something a student hand-types, and `updateStudentInfo` never wrote
+  // them back anyway. They're shown read-only in the Student ID card above.
   void _editStudentInfo() {
     final info = _svc.studentInfo.value;
     _showEditSheet(
@@ -69,9 +70,6 @@ class _StudentProfileState extends State<StudentProfile> {
         _FieldDef('Student ID', info.studentId),
         _FieldDef(AppStrings.t('grade'), info.grade),
         _FieldDef(AppStrings.t('school'), info.school),
-        _FieldDef(AppStrings.t('bus_number_lbl'), info.busNumber),
-        _FieldDef(AppStrings.t('route_lbl'), info.route),
-        _FieldDef(AppStrings.t('bus_stop'), info.stop),
       ],
       onSave: (v) => _svc.updateStudentInfo(
         info.copyWith(
@@ -79,9 +77,6 @@ class _StudentProfileState extends State<StudentProfile> {
           studentId: v[1],
           grade: v[2],
           school: v[3],
-          busNumber: v[4],
-          route: v[5],
-          stop: v[6],
         ),
       ),
     );
@@ -327,11 +322,14 @@ class _StudentProfileState extends State<StudentProfile> {
                             height: 36,
                             color: context.cardBgElevated,
                           ),
-                          _QuickStat(
-                            icon: '⏱️',
-                            value: '98%',
-                            label: AppStrings.t('on_time'),
-                            color: AppTheme.success,
+                          ValueListenableBuilder<int>(
+                            valueListenable: _svc.onTimeRate,
+                            builder: (context, rate, _) => _QuickStat(
+                              icon: '⏱️',
+                              value: '$rate%',
+                              label: AppStrings.t('on_time'),
+                              color: AppTheme.success,
+                            ),
                           ),
                         ],
                       ),
@@ -486,7 +484,9 @@ class _StudentProfileState extends State<StudentProfile> {
                                                 label: AppStrings.t(
                                                   'bus_number_lbl',
                                                 ),
-                                                value: student.busNumber,
+                                                value: student.busNumber.isEmpty
+                                                    ? 'Driver is not selected yet.'
+                                                    : student.busNumber,
                                               ),
                                               _DetailRow(
                                                 icon: '🛣️',
@@ -635,134 +635,155 @@ class _StudentProfileState extends State<StudentProfile> {
                   const SizedBox(height: 16),
 
                   // ── Notification preferences ───────────────────────────
+                  // Persisted via StudentDataService/SharedPreferences (see
+                  // ParentDataService.paymentReminders for the same pattern)
+                  // rather than local-only State fields that reset on every
+                  // screen rebuild.
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GlassCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'NOTIFICATION PREFERENCES',
-                            style: TextStyle(
-                              color: context.textTertiary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    child: ValueListenableBuilder<Map<String, bool>>(
+                      valueListenable: _svc.notificationPrefs,
+                      builder: (context, prefs, _) {
+                        final busAlerts = prefs['busAlerts'] ?? true;
+                        final arrivalAlerts = prefs['arrivalAlerts'] ?? true;
+                        final delayAlerts = prefs['delayAlerts'] ?? false;
+                        return GlassCard(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                          const SizedBox(height: 12),
-
-                          // Boarding / Bus alerts
-                          Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      AppStrings.t('boarding_alerts'),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      AppStrings.t('boarding_alerts_desc'),
-                                      style: TextStyle(
-                                        color: context.textTertiary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                'NOTIFICATION PREFERENCES',
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              AppSwitch(
-                                value: _busAlerts,
-                                activeColor: AppTheme.studentAmber,
-                                onChanged: (v) =>
-                                    setState(() => _busAlerts = v),
+                              const SizedBox(height: 12),
+
+                              // Boarding / Bus alerts
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppStrings.t('boarding_alerts'),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          AppStrings.t('boarding_alerts_desc'),
+                                          style: TextStyle(
+                                            color: context.textTertiary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  AppSwitch(
+                                    value: busAlerts,
+                                    activeColor: AppTheme.studentAmber,
+                                    onChanged: (v) => _svc.setNotificationPref(
+                                      'busAlerts',
+                                      v,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Arrival notifications
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppStrings.t('arrival_notifs'),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          AppStrings.t('arrival_notifs_desc'),
+                                          style: TextStyle(
+                                            color: context.textTertiary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  AppSwitch(
+                                    value: arrivalAlerts,
+                                    activeColor: AppTheme.studentAmber,
+                                    onChanged: (v) => _svc.setNotificationPref(
+                                      'arrivalAlerts',
+                                      v,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Delay alerts
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          AppStrings.t('delay_alerts'),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          AppStrings.t('delay_alerts_desc'),
+                                          style: TextStyle(
+                                            color: context.textTertiary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  AppSwitch(
+                                    value: delayAlerts,
+                                    activeColor: AppTheme.studentAmber,
+                                    onChanged: (v) => _svc.setNotificationPref(
+                                      'delayAlerts',
+                                      v,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-
-                          // Arrival notifications
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      AppStrings.t('arrival_notifs'),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      AppStrings.t('arrival_notifs_desc'),
-                                      style: TextStyle(
-                                        color: context.textTertiary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              AppSwitch(
-                                value: _arrivalAlerts,
-                                activeColor: AppTheme.studentAmber,
-                                onChanged: (v) =>
-                                    setState(() => _arrivalAlerts = v),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Delay alerts
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      AppStrings.t('delay_alerts'),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      AppStrings.t('delay_alerts_desc'),
-                                      style: TextStyle(
-                                        color: context.textTertiary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              AppSwitch(
-                                value: _delayAlerts,
-                                activeColor: AppTheme.studentAmber,
-                                onChanged: (v) =>
-                                    setState(() => _delayAlerts = v),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
 

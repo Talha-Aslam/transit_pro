@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 
@@ -75,8 +74,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final _schoolCtrl = TextEditingController();
   bool _schoolIsCustom = false;
   String? _instituteType;
-  LatLng? _pickup;
-  LatLng? _dropoff;
+  GeoCoord? _pickup;
+  GeoCoord? _dropoff;
 
   // Driver
   final _licenseCtrl = TextEditingController();
@@ -86,6 +85,21 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   String? _vehicleType;
   File? _licensePhoto;
   File? _idCardPhoto;
+
+  /// Where this driver runs, and the rounds families can book.
+  ///
+  /// Both are required for a driver (see `ProfileRequirements`) because without
+  /// them the account is complete but invisible: no parent search can ever
+  /// return a driver who has named no institution, and no seat can be requested
+  /// on a driver who has defined no round. Collecting them at sign-up rather
+  /// than "later, from your profile" is the difference between a driver who gets
+  /// requests and one who waits indefinitely wondering why nobody calls.
+  final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+  final List<RoundFormData> _rounds = [
+    RoundFormData.fresh(ordinal: 1),
+  ];
+  double _serviceRadiusKm = 5;
+  GeoCoord? _baseLocation;
 
   @override
   void initState() {
@@ -193,6 +207,12 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     _experienceCtrl.dispose();
     _vehicleCtrl.dispose();
     _seatCapacityCtrl.dispose();
+    for (final area in _serviceAreas) {
+      area.dispose();
+    }
+    for (final round in _rounds) {
+      round.dispose();
+    }
     for (final child in _children) {
       child.dispose();
     }
@@ -213,25 +233,31 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             name: c.nameCtrl.text,
             grade: c.grade ?? '',
             school: c.schoolCtrl.text,
+            studentIdNumber: c.studentIdCtrl.text,
+            pickupLocation: c.pickup,
           ),
         )
         .toList(),
     studentIdNumber: _studentIdCtrl.text,
     instituteType: _instituteType ?? '',
     school: _schoolCtrl.text,
-    pickupLocation: _toGeo(_pickup),
-    dropoffLocation: _toGeo(_dropoff),
+    pickupLocation: _pickup,
+    dropoffLocation: _dropoff,
     licenseNumber: _licenseCtrl.text,
     experienceYears: int.tryParse(_experienceCtrl.text.trim()) ?? 0,
     vehicleNumber: _vehicleCtrl.text,
     vehicleType: _vehicleType ?? '',
     seatCapacity: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+    serviceAreas: _serviceAreas
+        .where((a) => !a.isBlank)
+        .map((a) => a.toModel())
+        .toList(),
+    serviceRadiusKm: _serviceRadiusKm,
+    baseLocation: _baseLocation,
+    schedules: _rounds.map((r) => r.toModel()).toList(),
     licensePhoto: _licensePhoto,
     idCardPhoto: _idCardPhoto,
   );
-
-  static GeoCoord? _toGeo(LatLng? p) =>
-      p == null ? null : GeoCoord(p.latitude, p.longitude);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -406,16 +432,32 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                     SafeArea(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
+                        // Otherwise every scroll gesture that starts while a
+                        // field is focused has to fight the keyboard's own
+                        // resize animation on top of the scroll physics.
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 20),
-                            _buildHeader(),
+                            // Each wrapped in its own `RepaintBoundary`: this
+                            // page is one big non-virtualized `Column`, so
+                            // without boundaries a blinking cursor in any
+                            // field — or the header's own avatar rebuild —
+                            // forces Flutter to repaint the *entire* page's
+                            // picture every ~500ms it's focused, which is
+                            // what made scrolling feel slow. The repeated
+                            // form cards (`ChildCard`,
+                            // `ServiceAreaCard`, `RoundCard`) each carry the
+                            // same boundary internally.
+                            RepaintBoundary(child: _buildHeader()),
                             const SizedBox(height: 24),
-                            if (_roleMissing)
-                              _buildRoleMissingCard()
-                            else
-                              _buildForm(),
+                            RepaintBoundary(
+                              child: _roleMissing
+                                  ? _buildRoleMissingCard()
+                                  : _buildForm(),
+                            ),
                             const SizedBox(height: 20),
                             Center(
                               child: TextButton(
@@ -494,6 +536,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             ? Image.network(
                 photo,
                 fit: BoxFit.cover,
+                cacheWidth: 156,
+                cacheHeight: 156,
                 errorBuilder: (_, _, _) => _avatarFallback(),
               )
             : _avatarFallback(),
@@ -501,20 +545,28 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
+  // Listens to _nameCtrl directly so the fallback initial stays live as the
+  // user types without requiring a setState() — and therefore a rebuild — of
+  // the entire screen on every keystroke.
   Widget _avatarFallback() {
-    final name = _nameCtrl.text.trim();
-    final initial = name.isEmpty ? '?' : name[0].toUpperCase();
-    return Container(
-      color: context.cardBgElevated,
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: context.textPrimary,
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _nameCtrl,
+      builder: (context, _) {
+        final name = _nameCtrl.text.trim();
+        final initial = name.isEmpty ? '?' : name[0].toUpperCase();
+        return Container(
+          color: context.cardBgElevated,
+          alignment: Alignment.center,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -553,6 +605,11 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Widget _buildForm() {
     return GlassCard(
+      // This card *is* the page's scroll content (it can run to a dozen+
+      // fields, cards and sections for a driver), so it repaints — and would
+      // re-blur — on every scroll frame. The translucent fill/border already
+      // reads as "glass" without paying for a live BackdropFilter here.
+      enableBlur: false,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,7 +618,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
-            onChanged: (_) => setState(() {}),
             style: TextStyle(color: context.textPrimary, fontSize: 15),
             decoration: InputDecoration(
               hintText: AppStrings.t('enter_full_name'),
@@ -605,7 +661,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           TextField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
-            onChanged: (_) => setState(() {}),
             style: TextStyle(color: context.textPrimary, fontSize: 15),
             decoration: InputDecoration(hintText: AppStrings.t('enter_phone')),
           ),
@@ -664,6 +719,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   List<Widget> _parentFields() => [
     ..._children.asMap().entries.map(
       (e) => ChildCard(
+        key: ValueKey(e.value),
         index: e.key,
         data: e.value,
         canRemove: _children.length > 1,
@@ -723,7 +779,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _studentIdCtrl,
-                onChanged: (_) => setState(() {}),
                 style: TextStyle(color: context.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
                   hintText: AppStrings.t('student_id_hint'),
@@ -765,6 +820,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     MapPointField(
       placeholder: 'Select pickup on map',
       value: _pickup,
+      accentColor: AppTheme.studentAmber,
       onPicked: (p) => setState(() => _pickup = p),
     ),
     const SizedBox(height: 12),
@@ -773,6 +829,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     MapPointField(
       placeholder: 'Select dropoff on map',
       value: _dropoff,
+      accentColor: AppTheme.studentAmber,
       onPicked: (p) => setState(() => _dropoff = p),
     ),
     const SizedBox(height: 20),
@@ -783,7 +840,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     const SizedBox(height: 8),
     TextField(
       controller: _licenseCtrl,
-      onChanged: (_) => setState(() {}),
       style: TextStyle(color: context.textPrimary, fontSize: 15),
       decoration: InputDecoration(hintText: AppStrings.t('enter_license_hint')),
     ),
@@ -829,7 +885,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: _vehicleCtrl,
-                onChanged: (_) => setState(() {}),
                 style: TextStyle(color: context.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
                   hintText: AppStrings.t('vehicle_number_hint'),
@@ -862,7 +917,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     TextField(
       controller: _seatCapacityCtrl,
       keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
       style: TextStyle(color: context.textPrimary, fontSize: 15),
       decoration: const InputDecoration(
         hintText: 'Enter seat capacity',
@@ -879,10 +933,204 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     TextField(
       controller: _experienceCtrl,
       keyboardType: TextInputType.number,
-      onChanged: (_) => setState(() {}),
       style: TextStyle(color: context.textPrimary, fontSize: 15),
       decoration: InputDecoration(hintText: AppStrings.t('experience_hint')),
     ),
+    const SizedBox(height: 24),
+    ..._serviceSection(),
+    const SizedBox(height: 24),
+    ..._roundsSection(),
     const SizedBox(height: 20),
   ];
+
+  /// "Where do you drive?" — the institutions this driver serves, plus how far
+  /// they will travel to collect a student.
+  List<Widget> _serviceSection() => [
+    _sectionHeading(
+      'Where do you drive?',
+      'Parents find you by their child\'s school, so list every institution you '
+          'already run to.',
+    ),
+    const SizedBox(height: 14),
+    ..._serviceAreas.asMap().entries.map(
+      (e) => ServiceAreaCard(
+        key: ValueKey(e.value),
+        index: e.key,
+        data: e.value,
+        canRemove: _serviceAreas.length > 1,
+        onRemove: () => setState(() {
+          _serviceAreas[e.key].dispose();
+          _serviceAreas.removeAt(e.key);
+        }),
+        onChanged: () => setState(() {}),
+        accentColor: AppTheme.driverCyan,
+      ),
+    ),
+    _addRowButton(
+      label: 'Add another destination',
+      onTap: () => setState(() => _serviceAreas.add(ServiceAreaFormData())),
+    ),
+    const SizedBox(height: 18),
+    const FieldLabel('YOUR STARTING POINT (OPTIONAL)'),
+    const SizedBox(height: 8),
+    MapPointField(
+      placeholder: 'Tap to pin where you start your day',
+      value: _baseLocation,
+      accentColor: AppTheme.driverCyan,
+      onPicked: (p) => setState(() => _baseLocation = p),
+    ),
+    const SizedBox(height: 16),
+    // A local widget so dragging the slider only repaints this small subtree
+    // instead of rebuilding (and re-blurring) the entire form on every frame.
+    _RadiusSlider(
+      initialValue: _serviceRadiusKm,
+      accentColor: AppTheme.driverCyan,
+      // Just keeps the field in sync for `_draft` at submit time — no
+      // setState here, so the drag never touches the rest of the form.
+      onChanged: (v) => _serviceRadiusKm = v,
+    ),
+  ];
+
+  /// "Your rounds" — the bookable trips, each with its own seat count.
+  List<Widget> _roundsSection() => [
+    _sectionHeading(
+      'Your rounds',
+      'Add one round per trip you run. A 6:30 group and a 7:30 group are two '
+          'rounds, and each gets its own seats — so a 12-seater offers 12 seats '
+          'on both.',
+    ),
+    const SizedBox(height: 14),
+    ..._rounds.asMap().entries.map(
+      (e) => RoundCard(
+        key: ValueKey(e.value),
+        index: e.key,
+        data: e.value,
+        canRemove: _rounds.length > 1,
+        onRemove: () => setState(() {
+          _rounds[e.key].dispose();
+          _rounds.removeAt(e.key);
+        }),
+        onChanged: () => setState(() {}),
+        accentColor: AppTheme.driverCyan,
+      ),
+    ),
+    _addRowButton(
+      label: 'Add another round',
+      onTap: () => setState(() {
+        _rounds.add(
+          RoundFormData.fresh(
+            ordinal: _rounds.length + 1,
+            // Pre-fill from the vehicle capacity: the overwhelmingly common case
+            // is every round offering the whole vehicle, and typing the same
+            // number repeatedly is how a driver ends up with one round set to 1.
+            seats: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+          ),
+        );
+      }),
+    ),
+  ];
+
+  Widget _sectionHeading(String title, String subtitle) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(height: 1, color: context.surfaceBorder),
+      const SizedBox(height: 16),
+      Text(
+        title,
+        style: TextStyle(
+          color: context.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        subtitle,
+        style: TextStyle(color: context.textSecondary, fontSize: 12),
+      ),
+    ],
+  );
+
+  Widget _addRowButton({required String label, required VoidCallback onTap}) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: AppTheme.driverCyan.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.add_circle_outline,
+                color: AppTheme.driverCyan,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppTheme.driverCyan,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+/// Owns its own drag value so continuous slider updates never rebuild
+/// [ProfileCompletionScreen]'s much larger, blur-backed form.
+class _RadiusSlider extends StatefulWidget {
+  final double initialValue;
+  final Color accentColor;
+  final ValueChanged<double> onChanged;
+
+  const _RadiusSlider({
+    required this.initialValue,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  @override
+  State<_RadiusSlider> createState() => _RadiusSliderState();
+}
+
+class _RadiusSliderState extends State<_RadiusSlider> {
+  late double _value = widget.initialValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FieldLabel('HOW FAR WILL YOU TRAVEL? — ${_value.round()} KM'),
+        Slider(
+          value: _value,
+          min: 1,
+          max: 30,
+          divisions: 29,
+          activeColor: widget.accentColor,
+          label: '${_value.round()} km',
+          onChanged: (v) {
+            setState(() => _value = v);
+            widget.onChanged(v);
+          },
+        ),
+        Text(
+          'Families further than this from your starting point will not see '
+          'you. Leave it wide if you are flexible.',
+          style: TextStyle(color: context.textTertiary, fontSize: 11),
+        ),
+      ],
+    );
+  }
 }

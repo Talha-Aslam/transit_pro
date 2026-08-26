@@ -1,12 +1,15 @@
-import 'dart:ui';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
-import '../../app/tracking_service.dart';
 import '../../app/geofence_service.dart';
 import '../../app/notification_service.dart';
-import '../../models/route_data.dart';
+import '../../data/trip_repository.dart';
+import '../../map/route_map_view.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -19,46 +22,34 @@ class ParentTracking extends StatefulWidget {
 }
 
 class _ParentTrackingState extends State<ParentTracking> {
-  final _tracking = TrackingService.instance;
   final _geofence = GeofenceService.instance;
   final _notifSvc = NotificationService.instance;
 
-  GoogleMapController? _mapController;
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
-  String? _mapStyle;
+  /// The live `trips/{tripId}` document for the selected child's driver, or
+  /// null when nothing is running. This is what decides whether the Route
+  /// Progress card and stats row render at all. It used to start a mock
+  /// route unconditionally in `initState`, which is why a brand-new account
+  /// with no driver could still see a full "Route Progress" timeline moving
+  /// on its own.
+  Trip? _activeTrip;
+  StreamSubscription<Trip?>? _tripSub;
+  String? _watchedDriverId;
+
+  /// This child's own row on the active trip's attendance manifest — the
+  /// only per-stop detail a parent is both allowed to read (see
+  /// `firestore.rules`'s `ownsStudent` check) and should see: every other
+  /// child's pickup point is another family's information, not this one's.
+  AttendanceRecord? _myAttendance;
+  StreamSubscription<AttendanceRecord?>? _attendanceSub;
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _tracking.busPosition.addListener(_onBusPositionChanged);
     _geofence.alerts.addListener(_onGeofenceAlert);
-
-    // Start simulation if not running (Ensures _tracking.route is initialized)
-    if (!_tracking.isMoving.value) {
-      final route = MockRouteBuilder.buildMorningRoute();
-      _tracking.start(route);
-    }
-
-    // Initial overlays (Needs _tracking.route)
-    _buildMapOverlays(ParentDataService.instance.currentChild);
-
-    // Load map style
-    DefaultAssetBundle.of(context).loadString('assets/map_style.json').then((
-      s,
-    ) {
-      if (mounted) setState(() => _mapStyle = s);
-    });
   }
 
   void _onLangChanged() => setState(() {});
-
-  void _onBusPositionChanged() {
-    _buildMapOverlays(ParentDataService.instance.currentChild);
-    _geofence.evaluate(_tracking.busPosition.value, _tracking.route.stops);
-    if (mounted) setState(() {});
-  }
 
   void _onGeofenceAlert() {
     final alerts = _geofence.alerts.value;
@@ -67,88 +58,74 @@ class _ParentTrackingState extends State<ParentTracking> {
     }
   }
 
-  void _buildMapOverlays(ChildInfo? child) {
-    final route = _tracking.route;
-    final busPos = _tracking.busPosition.value;
-    final studentStopName = child?.stop ?? '';
+  /// Called from [build] every time the selected child (and therefore their
+  /// driver) might have changed. Cheap no-op when it hasn't — only resets
+  /// the trip/attendance subscriptions on an actual change.
+  void _ensureWatching(ChildInfo? child) {
+    final driverId = child?.driver;
+    if (driverId == _watchedDriverId) return;
+    _watchedDriverId = driverId;
 
-    // Markers
-    final markers = <Marker>{};
-    for (final stop in route.stops) {
-      final isStudentStop = stop.name == studentStopName;
-      markers.add(
-        Marker(
-          markerId: MarkerId(stop.name),
-          position: stop.location,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isStudentStop
-                ? BitmapDescriptor.hueYellow
-                : switch (stop.status) {
-                    StopStatus.completed => BitmapDescriptor.hueGreen,
-                    StopStatus.current => BitmapDescriptor.hueViolet,
-                    StopStatus.upcoming => BitmapDescriptor.hueAzure,
-                    StopStatus.destination => BitmapDescriptor.hueOrange,
-                  },
-          ),
-          infoWindow: InfoWindow(
-            title: isStudentStop ? '📍 ${stop.name} (Stop)' : stop.name,
-            snippet: stop.scheduledTime,
-          ),
-        ),
-      );
+    _tripSub?.cancel();
+    _tripSub = null;
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    _activeTrip = null;
+    _myAttendance = null;
+
+    if (driverId == null || driverId.isEmpty) return;
+    _tripSub = TripRepository.instance
+        .watchActiveTripForDriver(driverId)
+        .listen((trip) => _onActiveTripChanged(trip, child!.id));
+  }
+
+  void _onActiveTripChanged(Trip? trip, String childId) {
+    if (!mounted) return;
+    setState(() => _activeTrip = trip);
+
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    if (trip == null) {
+      setState(() => _myAttendance = null);
+      return;
     }
-
-    // Bus marker (Yellow/Amber per student system)
-    markers.add(
-      Marker(
-        markerId: const MarkerId('bus'),
-        position: busPos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-        rotation: _tracking.busHeading.value,
-        anchor: const Offset(0.5, 0.5),
-        infoWindow: InfoWindow(title: '🚌 ${route.busNumber}'),
-        zIndexInt: 10,
-      ),
-    );
-
-    // Polylines
-    final polylines = <Polyline>{
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: route.polylinePoints,
-        color: AppTheme.studentAmber.withValues(alpha: 0.3),
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ),
-    };
-
-    final completedIdx = route.polylinePoints.indexWhere(
-      (p) => p.latitude == busPos.latitude && p.longitude == busPos.longitude,
-    );
-    if (completedIdx > 0) {
-      polylines.add(
-        Polyline(
-          polylineId: const PolylineId('completed'),
-          points: route.polylinePoints.sublist(0, completedIdx + 1),
-          color: AppTheme.success,
-          width: 5,
-        ),
-      );
-    }
-
-    _markers = markers;
-    _polylines = polylines;
+    _attendanceSub = TripRepository.instance
+        .watchAttendanceForStudent(trip.id, childId)
+        .listen((record) {
+      if (!mounted) return;
+      setState(() => _myAttendance = record);
+    });
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
-    _tracking.busPosition.removeListener(_onBusPositionChanged);
     _geofence.alerts.removeListener(_onGeofenceAlert);
-    _tracking.stop();
+    _tripSub?.cancel();
+    _attendanceSub?.cancel();
     _geofence.reset();
-    _mapController?.dispose();
     super.dispose();
+  }
+
+  String _relativeStart(DateTime? startedAt) {
+    if (startedAt == null) return '—';
+    final mins = DateTime.now().difference(startedAt).inMinutes;
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return '$mins min ago';
+    final hours = mins ~/ 60;
+    return '$hours hr ago';
+  }
+
+  String _attendanceLabel(AttendanceRecord? record) {
+    switch (record?.status) {
+      case AttendanceStatus.boarded:
+        return 'Picked up';
+      case AttendanceStatus.absent:
+        return 'Absent';
+      case AttendanceStatus.pending:
+      case null:
+        return 'Pending';
+    }
   }
 
   @override
@@ -162,6 +139,8 @@ class _ParentTrackingState extends State<ParentTracking> {
           valueListenable: svc.selectedChildIndex,
           builder: (context, selIdx, _) {
             final child = svc.currentChild;
+            _ensureWatching(child);
+            final trip = _activeTrip;
 
             return SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 100),
@@ -174,7 +153,6 @@ class _ParentTrackingState extends State<ParentTracking> {
                     children: children,
                     onChildSelected: (idx) {
                       svc.selectedChildIndex.value = idx;
-                      _buildMapOverlays(svc.currentChild);
                     },
                   ),
 
@@ -182,8 +160,9 @@ class _ParentTrackingState extends State<ParentTracking> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
-                        // ── Google Map ─────────────────────────────────
+                        // ── Live map ─────────────────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           padding: EdgeInsets.zero,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
@@ -191,27 +170,22 @@ class _ParentTrackingState extends State<ParentTracking> {
                               height: 220,
                               child: Stack(
                                 children: [
-                                  GoogleMap(
-                                    initialCameraPosition: CameraPosition(
-                                      target: _tracking.busPosition.value,
-                                      zoom: 13.5,
-                                    ),
-                                    style: _mapStyle,
-                                    markers: _markers,
-                                    polylines: _polylines,
-                                    myLocationEnabled: false,
-                                    zoomControlsEnabled: false,
-                                    mapToolbarEnabled: false,
-                                    compassEnabled: false,
-                                    trafficEnabled: true,
-                                    onMapCreated: (controller) {
-                                      _mapController = controller;
-                                    },
+                                  RouteMapView(
+                                    height: 220,
+                                    highlightedStopName: child?.stop,
                                   ),
                                   Positioned(
                                     top: 12,
                                     right: 12,
-                                    child: _LiveBadge(tracking: _tracking),
+                                    child: trip == null
+                                        ? StatusBadge(
+                                            label: 'Not started',
+                                            color: AppTheme.warning,
+                                          )
+                                        : const StatusBadge(
+                                            label: '● LIVE',
+                                            color: AppTheme.success,
+                                          ),
                                   ),
                                   Positioned(
                                     bottom: 12,
@@ -228,7 +202,9 @@ class _ParentTrackingState extends State<ParentTracking> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        '📍 ${child?.route ?? "Route A"}',
+                                        child?.route.isNotEmpty == true
+                                            ? '📍 ${child!.route}'
+                                            : '📍 No route assigned',
                                         style: TextStyle(
                                           color: Colors.white.withValues(
                                             alpha: 0.9,
@@ -238,30 +214,33 @@ class _ParentTrackingState extends State<ParentTracking> {
                                       ),
                                     ),
                                   ),
+                                  // Expands to a fullscreen, pannable/
+                                  // zoomable map — this 220px preview stays
+                                  // gesture-locked so it doesn't fight the
+                                  // page's own scroll (see `RouteMapView`'s
+                                  // `interactive` doc comment).
                                   Positioned(
                                     bottom: 12,
                                     right: 12,
                                     child: GestureDetector(
-                                      onTap: _tracking.toggleLive,
-                                      child: ValueListenableBuilder<bool>(
-                                        valueListenable: _tracking.isLive,
-                                        builder: (_, live, _) => Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.6,
-                                            ),
-                                            shape: BoxShape.circle,
+                                      onTap: () => context.push(
+                                        '/parent/track/map',
+                                        extra: {
+                                          'highlightedStopName': child?.stop,
+                                        },
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.6,
                                           ),
-                                          child: Icon(
-                                            live
-                                                ? Icons.gps_fixed
-                                                : Icons.gps_off,
-                                            color: live
-                                                ? AppTheme.success
-                                                : Colors.white70,
-                                            size: 16,
-                                          ),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.fullscreen,
+                                          color: Colors.white70,
+                                          size: 18,
                                         ),
                                       ),
                                     ),
@@ -275,6 +254,7 @@ class _ParentTrackingState extends State<ParentTracking> {
 
                         // ── Bus status ──────────────────────────────────
                         GlassCard(
+                          enableBlur: false,
                           gradient: LinearGradient(
                             colors: [
                               AppTheme.success.withValues(alpha: 0.12),
@@ -335,99 +315,141 @@ class _ParentTrackingState extends State<ParentTracking> {
                                   ],
                                 ),
                               ),
+                              // No trip running has nothing to compare a
+                              // live ETA against, so it gets its own honest
+                              // label instead of an "On Time" that was
+                              // previously shown even before a driver had
+                              // started anything.
                               StatusBadge(
-                                label: AppStrings.t('on_time'),
-                                color: AppTheme.success,
+                                label: trip == null
+                                    ? 'Waiting for driver'
+                                    : AppStrings.t('on_time'),
+                                color: trip == null
+                                    ? AppTheme.warning
+                                    : AppTheme.success,
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: 12),
 
-                        // ── Stat Row ────────────────────────────────────
-                        GlassCard(
-                          padding: const EdgeInsets.all(18),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              ValueListenableBuilder<int>(
-                                valueListenable: _tracking.speed,
-                                builder: (_, spd, _) => _StatChip(
-                                  icon: '⚡',
-                                  label: AppStrings.t('speed'),
-                                  value: '$spd km/h',
-                                  color: AppTheme.info,
+                        if (trip == null)
+                          GlassCard(
+                            enableBlur: false,
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                const Text('🚏', style: TextStyle(fontSize: 28)),
+                                const SizedBox(height: 10),
+                                Text(
+                                  "Your driver hasn't started the route yet",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 40,
-                                color: context.surfaceBorder,
-                              ),
-                              ValueListenableBuilder<int>(
-                                valueListenable: _tracking.etaMinutes,
-                                builder: (_, eta, _) => _StatChip(
+                                const SizedBox(height: 4),
+                                Text(
+                                  "You'll see live progress here once the "
+                                  'route begins.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: context.textTertiary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else ...[
+                          // ── Trip stat row ────────────────────────────
+                          GlassCard(
+                            enableBlur: false,
+                            padding: const EdgeInsets.all(18),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _StatChip(
                                   icon: '⏱️',
-                                  label: 'ETA',
-                                  value: '$eta min',
+                                  label: 'Started',
+                                  value: _relativeStart(trip.startedAt),
                                   color: AppTheme.studentAmber,
                                 ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 40,
-                                color: context.surfaceBorder,
-                              ),
-                              _StatChip(
-                                icon: '🚏',
-                                label: AppStrings.t('stops_left'),
-                                value:
-                                    '${_tracking.route.stops.where((s) => s.status == StopStatus.upcoming || s.status == StopStatus.destination).length}',
-                                color: AppTheme.purple,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Route progress ──────────────────────────────
-                        GlassCard(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 18,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppStrings.t('route_progress'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
+                                Container(
+                                  width: 1,
+                                  height: 40,
+                                  color: context.surfaceBorder,
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              ..._tracking.route.stops.asMap().entries.map((
-                                entry,
-                              ) {
-                                final idx = entry.key;
-                                final stop = entry.value;
-                                final isLast =
-                                    idx == _tracking.route.stops.length - 1;
-                                final isYourStop = stop.name == child?.stop;
-
-                                return _StopTimelineItem(
-                                  name: stop.name,
-                                  time: stop.scheduledTime,
-                                  status: stop.status,
-                                  isLast: isLast,
-                                  isYourStop: isYourStop,
-                                );
-                              }),
-                            ],
+                                _StatChip(
+                                  icon: '🧍',
+                                  label: 'Your status',
+                                  value: _attendanceLabel(_myAttendance),
+                                  color: AppTheme.purple,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+
+                          // ── Route progress ────────────────────────────
+                          //
+                          // Just this child's own leg — every other
+                          // family's pickup point is information this
+                          // account has no business seeing, and Firestore's
+                          // rules agree (a parent can only read their own
+                          // child's attendance document).
+                          GlassCard(
+                            enableBlur: false,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 18,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  AppStrings.t('route_progress'),
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Builder(builder: (_) {
+                                  final boarded = _myAttendance?.status ==
+                                      AttendanceStatus.boarded;
+                                  return Column(
+                                    children: [
+                                      _StopTimelineItem(
+                                        name: child?.stop.isNotEmpty == true
+                                            ? child!.stop
+                                            : 'Your stop',
+                                        time: '',
+                                        isDone: boarded,
+                                        isCurrent: !boarded,
+                                        isLast: false,
+                                        isYourStop: true,
+                                      ),
+                                      _StopTimelineItem(
+                                        name: child?.school.isNotEmpty == true
+                                            ? child!.school
+                                            : 'School',
+                                        time: '',
+                                        isDone: false,
+                                        isCurrent: boarded,
+                                        isLast: true,
+                                        isYourStop: false,
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -504,7 +526,7 @@ class _Header extends StatelessWidget {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: children.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, idx) {
                   final isSelected = children[idx].name == child?.name;
                   return GestureDetector(
@@ -582,22 +604,23 @@ class _StatChip extends StatelessWidget {
 
 class _StopTimelineItem extends StatelessWidget {
   final String name, time;
-  final StopStatus status;
+  final bool isDone;
+  final bool isCurrent;
   final bool isLast;
   final bool isYourStop;
 
   const _StopTimelineItem({
     required this.name,
     required this.time,
-    required this.status,
+    required this.isDone,
+    required this.isCurrent,
     required this.isLast,
     required this.isYourStop,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isCompleted = status == StopStatus.completed;
-    final bool isCurrent = status == StopStatus.current;
+    final bool isCompleted = isDone;
     final bool isPastOrCurrent = isCompleted || isCurrent;
 
     return IntrinsicHeight(
@@ -690,45 +713,3 @@ class _StopTimelineItem extends StatelessWidget {
   }
 }
 
-class _LiveBadge extends StatelessWidget {
-  final TrackingService tracking;
-  const _LiveBadge({required this.tracking});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: tracking.isSimulating,
-      builder: (_, sim, _) => ValueListenableBuilder<bool>(
-        valueListenable: tracking.isLive,
-        builder: (_, live, _) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: AppTheme.success,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.success.withValues(alpha: 0.6),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              live ? 'GPS' : (sim ? 'LIVE' : ''),
-              style: const TextStyle(
-                color: AppTheme.successLight,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

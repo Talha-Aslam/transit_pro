@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/theme_provider.dart';
 
 /// A glassmorphism card with BackdropFilter blur.
 class GlassCard extends StatelessWidget {
@@ -34,42 +35,53 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Blended, not a hard `isDark` switch — this card is used on nearly
+    // every screen, so a snap here would undercut the app-wide smooth
+    // theme transition even with every other colour blending correctly.
+    // Reads through `ThemeBlendScope` (not `ThemeProvider.instance.blend`
+    // directly) so *this* widget is what Flutter marks dirty on each
+    // animation tick, rather than relying on some ancestor rebuilding the
+    // whole tree around it.
+    final blend = ThemeBlendScope.of(context);
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: gradient == null
             ? (backgroundColor ??
-                  (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white))
+                  Color.lerp(
+                    Colors.white,
+                    Colors.white.withValues(alpha: 0.06),
+                    blend,
+                  ))
             : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
           color:
               borderColor ??
-              (isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : const Color(0xFFE2E8F0)),
+              Color.lerp(
+                const Color(0xFFE2E8F0),
+                Colors.white.withValues(alpha: 0.10),
+                blend,
+              )!,
           width: borderWidth,
         ),
         boxShadow:
             boxShadow ??
-            (isDark
-                ? null
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]),
+            [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04 * (1 - blend)),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
       ),
       child: child,
     );
 
     Widget card = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: enableBlur
+      child: (enableBlur && !ThemeProvider.instance.isAnimating)
           ? BackdropFilter(
               filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
               child: content,
@@ -99,6 +111,7 @@ class AppSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final blend = ThemeBlendScope.of(context);
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: AnimatedContainer(
@@ -109,13 +122,17 @@ class AppSwitch extends StatelessWidget {
           borderRadius: BorderRadius.circular(13),
           color: value
               ? activeColor
-              : (Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : const Color(0xFFE2E8F0)),
+              : Color.lerp(
+                  const Color(0xFFE2E8F0),
+                  Colors.white.withValues(alpha: 0.12),
+                  blend,
+                ),
           border: Border.all(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withValues(alpha: 0.1)
-                : const Color(0xFFCBD5E1),
+            color: Color.lerp(
+              const Color(0xFFCBD5E1),
+              Colors.white.withValues(alpha: 0.1),
+              blend,
+            )!,
           ),
         ),
         child: Stack(
@@ -219,12 +236,17 @@ class GradientButton extends StatelessWidget {
     return GestureDetector(
       onTap: isLoading || disabled ? null : onTap,
       child: Opacity(
-        opacity: disabled ? 0.45 : 1.0,
+        // Loading used to swap the gradient for a 10%-white fill, which on
+        // the light theme reads as a near-invisible box with a white spinner
+        // on a near-white surface — a stuck loading state looked exactly
+        // like the button had disappeared. Keeping the gradient (just
+        // dimmed) means it's always visibly "this button, doing something"
+        // in both themes.
+        opacity: disabled ? 0.45 : (isLoading ? 0.7 : 1.0),
         child: Container(
           height: height,
           decoration: BoxDecoration(
-            gradient: isLoading ? null : gradient,
-            color: isLoading ? Colors.white.withValues(alpha: 0.1) : null,
+            gradient: gradient,
             borderRadius: BorderRadius.circular(14),
             boxShadow: (!isLoading && !disabled && glowColor != null)
                 ? [

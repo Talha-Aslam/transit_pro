@@ -9,7 +9,7 @@
 **Status:** UI-complete prototype moving into backend implementation.
 **Document purpose:** single source of truth. Any developer or AI session should be able to read this and continue work without re-explaining the project.
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-18 — see [`IMPLEMENTATION.md`](IMPLEMENTATION.md) for current task status.
 
 ---
 
@@ -114,7 +114,19 @@ Each app is registered as its own **Firebase App** inside the shared project —
 | CRUD routes / buses / drivers | ❌ | ❌ | ❌ | ✅ |
 | Emergency SOS | receive | receive | trigger | receive + manage |
 
-> ⚠️ **Security note:** role is currently chosen by the client (`AuthService.saveRole()` from the login URL) and stored in `SharedPreferences`. Any user can select any role. **Before the pilot, role must live in Firestore and be enforced by security rules.** See §9.
+> ✅ **Fixed 2026-08-12.** Role lives in `users/{uid}` in Firestore, is written
+> once at sign-up, and `firestore.rules` blocks the client from ever changing it
+> (`unchanged('role')`). `/login/:role` is a hint about which form to show, never
+> an authorisation — opening `/login/driver` as a registered parent still lands in
+> the parent app. The old `SharedPreferences` role is a cache for cold-start
+> routing only.
+>
+> ⚠️ One caveat added 2026-08-18: a **driver** may now write `driverId`,
+> `scheduleId` and `busId` onto another user's `students/{id}` document — but only
+> those three fields, and only when an accepted `ride_requests/{uid}_{studentId}`
+> document proves the family asked for them. The field allow-list is the boundary;
+> without it, any write permission on a student record would also let a driver
+> rename the child or clear an admin's transport suspension.
 
 ---
 
@@ -227,11 +239,29 @@ Firestore persistence · FCM push · cross-device tracking · real auth + role e
 
 ### 🗑️ Dead code — decide: route or delete
 
-`driver_search_screen.dart` (807 LOC, has a latent `int.parse('2.3')` crash) · `emergency_alerts_screen.dart` · `complaint_submission_screen.dart` · `pickup_dropoff_confirmation_screen.dart` · `student_attendance.dart` (534 LOC) · `_NotifSheet` in student profile · `/driver/subscription` (routed, unlinked)
+~~`driver_search_screen.dart`~~ **deleted 2026-08-18** — unreferenced, superseded by
+`find_drivers_screen.dart`, and carrying the `int.parse('2.3')` crash noted here.
+
+Still undecided: `emergency_alerts_screen.dart` · `complaint_submission_screen.dart` · `pickup_dropoff_confirmation_screen.dart` · `student_attendance.dart` (534 LOC) · `_NotifSheet` in student profile · `/driver/subscription` (routed, unlinked)
 
 ---
 
 ## 7. Screen Documentation
+
+> ⚠️ **This section is stale below the "Shared entry flow" table.** It describes
+> the app as it was before the 2026-08-12 auth rewrite and the 2026-08-18 driver
+> matching work — several rows say "fake auth" or "creates no account" for flows
+> that are now real. Rows touched since have been corrected inline; treat anything
+> unmarked as a description of the prototype, and
+> [`IMPLEMENTATION.md`](IMPLEMENTATION.md) as the truth about current status.
+
+### New screens (2026-08-18)
+
+| Screen | Route | What it does | Data |
+|---|---|---|---|
+| `DriverRideRequestsScreen` | `/driver/ride-requests` | Seat-request inbox — accept, decline, release; live per-round seat counts | ✅ Firestore `ride_requests`, transactional accept |
+| `DriverServiceScreen` | `/driver/service` | Edit service areas, travel radius, base location and rounds | ✅ Firestore `drivers/{uid}` |
+| `FindDriversScreen` | `/parent/find-drivers`, `/student/find-drivers` | Ranked driver recommendations for a child's school + send request | ✅ Firestore, live seat counts |
 
 ### Shared entry flow
 
@@ -252,8 +282,8 @@ Firestore persistence · FCM push · cross-device tracking · real auth + role e
 | `ParentDashboard` | tab 0 | Child selector, live ETA, missed-bus CTA, stats | Mixed — children real, ETA/schedule/alerts hardcoded |
 | `ParentTracking` | tab 1 | Live map + stop timeline | `TrackingService` (simulated; GPS toggle available) |
 | `ParentSchedule` | tab 2 | Weekly timetable, holidays | **100% static literals** — doesn't even read the child |
-| `ParentNotifications` | tab 3 | Inbox with filters | `NotificationService` (7 seeded mocks) |
-| `StudentFees` *(in `parent_fees.dart`)* | tab 4 | Balance, history, Pay Now | Hardcoded except `isMonthPaid()` |
+| `ParentNotifications` | tab 3 | Inbox with filters | ✅ Firestore `notifications/{uid}/items` (2026-08-18) |
+| `StudentFees` *(in `parent_fees.dart`)* | tab 4 | Balance, history, Pay Now | ✅ Firestore `payments`, scoped to the selected child (2026-08-18) |
 | `ParentProfile` | tab 5 | 2,327 LOC hub — children CRUD, prefs, menu | `ParentDataService` |
 | `DriverDetailsScreen` | `/parent/driver-details` | Driver info + weekly rating | ✅ **Persists rating to disk** |
 | `DriverChatScreen` | `/parent/driver-chat` | Chat with driver | ⚠️ Echo bot |
@@ -275,8 +305,8 @@ Firestore persistence · FCM push · cross-device tracking · real auth + role e
 | `StudentDashboard` | tab 0 | Bus status, ETA, quick actions | Name + stats real; ETA/schedule hardcoded |
 | `StudentTracking` | tab 1 | **Most real student screen** — live map | `TrackingService`; distance "2.4 km" faked |
 | `StudentSchedule` | tab 2 | Timings, editable via `showTimePicker` | University branch writes to shared service; school branch is local-only |
-| `StudentNotifications` | tab 3 + `/student/notifications` | Inbox | `NotificationService` |
-| `StudentFees` | tab 4 | Fees | Hardcoded; Pay Now enters the **parent** payment flow |
+| `StudentNotifications` | tab 3 + `/student/notifications` | Inbox | ✅ Firestore `notifications/{uid}/items` (2026-08-18) |
+| `StudentFees` | tab 4 | Fees | ✅ Firestore `payments` (2026-08-18); Pay Now still enters the **parent** payment flow |
 | `StudentProfile` | tab 5 | 1,380 LOC hub | `StudentDataService` |
 | `MissedBusScreen` | `/student/missed-bus` | **Best-built student feature** — 4-state machine | `MissedBusService` |
 | `StudentTripHistoryScreen` | `/student/trips` | Trip log | Real filtering |
@@ -295,13 +325,13 @@ Firestore persistence · FCM push · cross-device tracking · real auth + role e
 | `DriverBookedStudentsScreen` | tab 1 | Passenger roster + chat sheet | 14 hardcoded passengers |
 | `DriverAttendance` | tab 2 | Mark boarded/absent, bulk alert | 14 hardcoded students; toggles not persisted |
 | `DriverRoute` | tab 3 | **Live map + stop timeline** | `TrackingService` — simulation starts on tab open, resets on leave |
-| `DriverNotifications` | tab 4 | Message inbox | Read state real; ⚠️ reply is a stub |
+| `DriverNotifications` | tab 4 | Message inbox | ✅ Firestore inbox (2026-08-18); ⚠️ reply is still a stub |
 | `DriverProfile` | tab 5 | Profile hub | `DriverDataService` |
 | `DriverPickupRequestsScreen` | `/driver/pickup-requests` | Accept/decline missed-bus | ✅ Genuinely dynamic |
 | `DriverDocumentsScreen` | `/driver/documents` | 6 compliance docs | ⚠️ File never uploaded |
 | `DriverTripHistoryScreen` | `/driver/trips` | Trip log | ⚠️ Filters fake (`take(2)`/`take(6)`); ÷0 → `NaN%` |
 | `DriverPerformanceScreen` | `/driver/performance` | Scorecard | 100% static, zero interactivity |
-| `DriverPaymentHistoryScreen` | `/driver/payment-history` | Payments received | Static |
+| `DriverPaymentHistoryScreen` | `/driver/payment-history` | Payments received | ✅ Firestore `payments` (2026-08-18); names the student, not the payer — a driver cannot read `users/{uid}` |
 | `DriverSubscriptionScreen` | `/driver/subscription` | Plans | 🗑️ Unreachable; Upgrade is `() {}` |
 
 ---
@@ -318,9 +348,20 @@ users/{uid}
 
 students/{studentId}
   name, grade, school, instituteType
-  parentId → users/{uid}          routeId → routes/{id}
-  stopId   → stops/{id}           busId   → buses/{id}
-  studentIdNumber, subscriptionStatus, isTransportSuspended
+  parentId   → users/{uid}        routeId    → routes/{id}
+  stopId     → stops/{id}         busId      → buses/{id}
+  driverId   → drivers/{uid}      scheduleId → a DriverSchedule.id
+                                  ↑ the DIRECT link, set when a ride request is
+                                    accepted. A self-signed-up driver has no
+                                    admin-assigned route to go through, so
+                                    `students where driverId == uid` *is* the
+                                    roster.
+  studentIdNumber                 the school's own roll number, optional
+  publicCode                      'TP-4KD91C' — derived from this document id,
+                                  so it inherits its uniqueness. Exists because
+                                  two parents can both register a "Jack Jones"
+  pickupLocation, dropoffLocation: {lat, lng}
+  subscriptionStatus, isTransportSuspended
   consecutiveAbsences: int
 
 drivers/{uid}
@@ -328,6 +369,25 @@ drivers/{uid}
   busId → buses/{id}
   rating: double, ratingCount: int, reliabilityScore: double
   status, locationSharing: bool
+
+  serviceAreas: [{ name, instituteType, location: {lat,lng} }]
+  serviceSchools: string[]        ← lowercased mirror of serviceAreas[].name.
+                                    The ONLY thing parent search queries
+                                    (arrayContains). Derived in Driver.toMap()
+                                    so it cannot drift from the display names
+  serviceRadiusKm: double
+  baseLocation: {lat, lng}
+  schedules: [{                  ← the bookable rounds
+    id, label,
+    direction: 'pickup'|'dropoff',
+    startTime: 'HH:mm', endTime: 'HH:mm',
+    totalSeats: int, bookedSeats: int,
+    weekdays: int[]              ← empty means every day
+  }]
+                                    Seats are per ROUND, not per vehicle: a
+                                    12-seater running a 6:30 group and a 7:30
+                                    group offers 12 seats twice. bookedSeats is
+                                    only ever moved by a Firestore transaction
 
 buses/{busId}
   plateNumber, busNumber, capacity
@@ -361,6 +421,15 @@ missedBusRequests/{requestId}
   currentStopId, destinationStopId
   status: 'searching'|'accepted'|'declined'|'noDrivers'|'cancelled'
   assignedDriverId, assignedBusId, etaMinutes, createdAt
+
+ride_requests/{driverId}_{studentId}     ← id is COMPOSITE, deliberately
+  requesterId                            parent's uid, or a student's own
+  studentId, driverId, scheduleId
+  status: 'pending'|'accepted'|'rejected'|'cancelled'
+  studentName, studentGrade, school, driverName, scheduleLabel
+                                         ← display snapshots, never joined on
+  pickupLocation: {lat, lng}
+  note, responseNote, createdAt, respondedAt
 
 chats/{chatId}                  participants: [uid, uid], lastMessage, updatedAt
 chats/{chatId}/messages/{msgId} senderId, text, sentAt, readBy[]

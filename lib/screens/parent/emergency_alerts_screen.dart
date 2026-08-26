@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
+import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 
 class EmergencyAlertsScreen extends StatefulWidget {
@@ -13,77 +14,42 @@ class EmergencyAlertsScreen extends StatefulWidget {
 
 class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
   final _notifSvc = NotificationService.instance;
-  late List<_EmergencyAlert> _alerts;
+
+  /// `AppNotification.id` values the user has tapped "Mark Resolved" on this
+  /// session. Needed alongside `n.read`: [NotificationService.markRead] can
+  /// only persist a read flag for notifications with a Firestore document
+  /// behind them (`docId != null`); a device-local alert (e.g. a geofence
+  /// "approaching" alert, see [NotificationService.fromGeofence]) has nowhere
+  /// to persist to, so it's tracked here instead so it still visibly moves to
+  /// "Resolved" for the rest of this session.
+  final Set<int> _locallyResolvedIds = {};
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _alerts = _mockAlerts();
+    _notifSvc.history.addListener(_onHistoryChanged);
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _notifSvc.history.removeListener(_onHistoryChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+  void _onHistoryChanged() => setState(() {});
 
-  List<_EmergencyAlert> _mockAlerts() {
-    return [
-      _EmergencyAlert(
-        id: '1',
-        type: 'breakdown',
-        title: 'Vehicle Breakdown',
-        description: 'Bus has a mechanical issue',
-        icon: '⚙️',
-        color: AppTheme.warning,
-        timestamp: 'Today at 2:30 PM',
-        isActive: true,
-        actionRequired: true,
-      ),
-      _EmergencyAlert(
-        id: '2',
-        type: 'route_change',
-        title: 'Route Change',
-        description: 'Route diverted due to traffic on main road',
-        icon: '🛣️',
-        color: AppTheme.info,
-        timestamp: 'Today at 1:45 PM',
-        isActive: true,
-        actionRequired: false,
-      ),
-      _EmergencyAlert(
-        id: '3',
-        type: 'delay',
-        title: 'Significant Delay',
-        description: 'Estimated delay: 25 minutes',
-        icon: '⏱️',
-        color: Color(0xFFEA580C),
-        timestamp: 'Today at 12:15 PM',
-        isActive: false,
-        actionRequired: false,
-      ),
-      _EmergencyAlert(
-        id: '4',
-        type: 'accident',
-        title: 'Accident Reported',
-        description: 'Minor accident nearby, police informed',
-        icon: '🚨',
-        color: AppTheme.error,
-        timestamp: 'Yesterday at 3:20 PM',
-        isActive: false,
-        actionRequired: true,
-      ),
-    ];
-  }
+  bool _isResolved(AppNotification n) =>
+      n.read || _locallyResolvedIds.contains(n.id);
 
-  void _markAsResolved(String id) {
-    setState(() {
-      final alert = _alerts.firstWhere((a) => a.id == id);
-      alert.isActive = false;
-    });
+  void _markAsResolved(AppNotification n) {
+    setState(() => _locallyResolvedIds.add(n.id));
+    // Best-effort: persists for a remote (Firestore-backed) alert; a no-op
+    // for a local one, which is why the local set above is the source of
+    // truth for the UI split.
+    _notifSvc.markRead(n);
 
     _notifSvc.show(
       title: '✅ Alert Resolved',
@@ -105,8 +71,22 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeAlerts = _alerts.where((a) => a.isActive);
-    final resolvedAlerts = _alerts.where((a) => !a.isActive);
+    // Real alert-type notifications from the same inbox
+    // parent_notifications.dart streams, filtered to the 'alert' bucket the
+    // service already classifies boarding/delay/emergency events into (see
+    // NotificationService._uiTypeFor) — no more invented breakdown/route
+    // change/accident entries.
+    final alerts = _notifSvc.history.value
+        .where((n) => n.type == 'alert')
+        .toList();
+    final activeAlerts = alerts.where((n) => !_isResolved(n)).toList();
+    final resolvedAlerts = alerts.where(_isResolved).toList();
+    final driverName = ParentDataService.instance.selectedChild?.driver
+                .trim()
+                .isNotEmpty ==
+            true
+        ? ParentDataService.instance.selectedChild!.driver.trim()
+        : 'Driver';
 
     return Scaffold(
       body: Container(
@@ -190,8 +170,8 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _AlertCard(
                               alert: alert,
-                              onResolve: () => _markAsResolved(alert.id),
-                              onContact: () => _contactDriver('Driver Name'),
+                              onResolve: () => _markAsResolved(alert),
+                              onContact: () => _contactDriver(driverName),
                             ),
                           );
                         }),
@@ -255,7 +235,7 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          alert.timestamp,
+                                          '${alert.date} · ${alert.time}',
                                           style: TextStyle(
                                             color: context.textTertiary,
                                             fontSize: 11,
@@ -318,7 +298,7 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _AlertCard extends StatelessWidget {
-  final _EmergencyAlert alert;
+  final AppNotification alert;
   final VoidCallback onResolve;
   final VoidCallback onContact;
 
@@ -367,7 +347,7 @@ class _AlertCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      alert.description,
+                      alert.message,
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 12,
@@ -375,7 +355,7 @@ class _AlertCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      alert.timestamp,
+                      '${alert.date} · ${alert.time}',
                       style: TextStyle(
                         color: context.textTertiary,
                         fontSize: 11,
@@ -389,39 +369,42 @@ class _AlertCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              if (alert.actionRequired)
-                Expanded(
-                  child: GestureDetector(
-                    onTap: onContact,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: alert.color,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.phone_rounded,
+              // Every real alert offers both actions now — `AppNotification`
+              // carries no "action required" flag the way the old mock data
+              // did, and a parent may reasonably want to reach the driver
+              // about any alert, not just a subset of them.
+              Expanded(
+                child: GestureDetector(
+                  onTap: onContact,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: alert.color,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(
+                          Icons.phone_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Contact Driver',
+                          style: TextStyle(
                             color: Colors.white,
-                            size: 16,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Contact Driver',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              if (alert.actionRequired) const SizedBox(width: 10),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
                   onTap: onResolve,
@@ -621,32 +604,4 @@ class _ContactDriverSheetState extends State<_ContactDriverSheet> {
       ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Data Model
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _EmergencyAlert {
-  final String id;
-  final String type;
-  final String title;
-  final String description;
-  final String icon;
-  final Color color;
-  final String timestamp;
-  bool isActive;
-  final bool actionRequired;
-
-  _EmergencyAlert({
-    required this.id,
-    required this.type,
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.color,
-    required this.timestamp,
-    required this.isActive,
-    required this.actionRequired,
-  });
 }

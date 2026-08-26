@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -166,6 +168,14 @@ class AuthService {
     final user = cred.user;
     if (user == null) throw const AuthException('Account creation failed.');
 
+    // Held for the whole write. Without this, `SessionService.start` below
+    // opens a listener on a document that does not exist yet, its first
+    // snapshot reports `needsProfile`, and the router's guard reacts to that
+    // by yanking this still-in-flight signup over to `/complete-profile`
+    // before `provision()` below ever gets to write the real document —
+    // exactly the protection `ProfileCompletionScreen` already gives its own
+    // writes (see its `provisioning = true` before committing).
+    SessionService.instance.provisioning = true;
     try {
       await user.updateDisplayName(draft.name.trim());
       await SessionService.instance.start(user.uid);
@@ -190,8 +200,15 @@ class AuthService {
     } catch (e) {
       await signOut();
       throw AuthException('Could not finish creating your account. Please try again.');
+    } finally {
+      SessionService.instance.provisioning = false;
     }
   }
+
+  /// How long a single network round trip inside sign-in gets before this
+  /// gives up and says so, rather than leaving the caller's loading spinner
+  /// running against a Firestore retry cycle that may never surface an error.
+  static const _authTimeout = Duration(seconds: 20);
 
   /// Signs in and returns the profile. The caller must route by
   /// [AppUser.role] — **not** by whichever role the login URL named.
@@ -200,24 +217,29 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final cred = await _auth
+          .signInWithEmailAndPassword(email: email.trim(), password: password)
+          .timeout(_authTimeout);
 
       final user = cred.user;
       if (user == null) throw const AuthException('Sign-in failed.');
 
-      final profile = await UserRepository.instance.fetchUser(user.uid);
+      final profile = await UserRepository.instance
+          .fetchUser(user.uid)
+          .timeout(_authTimeout);
       if (profile == null) {
-        await _auth.signOut();
+        // Full signOut(), not the raw `_auth.signOut()` this used to call —
+        // that left `cachedRole` on disk untouched, so a stale role from an
+        // earlier account on this device could still be read back by the
+        // router's `auth.cachedRole ?? 'parent'` fallback on a later sign-in.
+        await signOut();
         throw const AuthException(
           'This account has no profile. Please contact your administrator.',
         );
       }
 
       if (!profile.isActive) {
-        await _auth.signOut();
+        await signOut();
         throw const AuthException(
           'This account has been deactivated. Please contact your administrator.',
         );
@@ -235,8 +257,26 @@ class AuthService {
       // this clause the raw exception would propagate straight out of this
       // method uncaught, since only FirebaseAuthException is handled above,
       // and login_screen only knows how to catch AuthException.
-      await _auth.signOut();
+      await signOut();
       throw AuthException(_messageForFirestore(e));
+    } on TimeoutException {
+      await signOut();
+      throw const AuthException(
+        'Taking too long to sign in — check your connection and try again.',
+      );
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      // Anything else — a parsing error, a plugin exception out of
+      // `SessionService.start`, anything not covered above — used to escape
+      // this method uncaught. `login_screen._login()` only catches
+      // `AuthException`, and nothing awaits its fire-and-forget call from the
+      // button, so an uncaught throw here left `_loading` stuck `true`
+      // forever: the button silently swaps its label for a spinner and never
+      // swaps back, which reads as "the button disappeared".
+      debugPrint('Sign-in failed: $e');
+      await signOut();
+      throw const AuthException('Sign-in failed. Please try again.');
     }
   }
 
@@ -269,13 +309,16 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final cred = await _auth.signInWithCredential(credential);
+      final cred =
+          await _auth.signInWithCredential(credential).timeout(_authTimeout);
       final user = cred.user;
       if (user == null) throw const AuthException('Google sign-in failed.');
 
       await SessionService.instance.start(user.uid);
 
-      var profile = await UserRepository.instance.fetchUser(user.uid);
+      var profile = await UserRepository.instance
+          .fetchUser(user.uid)
+          .timeout(_authTimeout);
 
       if (profile == null) {
         // First Google sign-in for this account. Persist the base record now
@@ -288,7 +331,7 @@ class AuthService {
           email: user.email ?? googleUser.email,
           photoUrl: user.photoURL ?? googleUser.photoUrl,
         );
-        await UserRepository.instance.createUser(profile);
+        await UserRepository.instance.createUser(profile).timeout(_authTimeout);
       }
 
       if (!profile.profileComplete) {
@@ -298,6 +341,20 @@ class AuthService {
         _currentUser = profile;
         await _cacheRole(profile.role);
         return GoogleNeedsProfile(profile);
+      }
+
+      // This account already has a committed role, and it isn't the one this
+      // login screen is for — e.g. signing in on `/login/driver` with a
+      // Google account that finished onboarding as a Student. Landing them in
+      // the Student app anyway is "correct" by the stored role, but silent:
+      // from their side they picked Driver and ended up somewhere else with
+      // no explanation. Refuse plainly instead.
+      if (profile.role != role) {
+        await signOut();
+        throw AuthException(
+          'This Google account is registered as a ${profile.role.name}. '
+          'Please use the ${profile.role.name} login instead.',
+        );
       }
 
       if (!profile.isActive) {
@@ -329,6 +386,11 @@ class AuthService {
       // through onboarding.
       await signOut();
       throw AuthException(_messageForFirestore(e));
+    } on TimeoutException {
+      await signOut();
+      throw const AuthException(
+        'Taking too long to sign in — check your connection and try again.',
+      );
     } on AuthException {
       rethrow;
     } catch (e) {
@@ -498,7 +560,14 @@ class AuthService {
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':
-        return 'Incorrect email or password.';
+        // `firebase_auth` no longer exposes `fetchSignInMethodsForEmail`
+        // (removed upstream for enumeration-protection reasons), so a
+        // Google-only account failing here is indistinguishable at the SDK
+        // level from a genuinely wrong password — both surface as
+        // `invalid-credential`. The added hint costs nothing for a real typo
+        // and answers the actual question for a Google-registered user.
+        return 'Incorrect email or password. If you signed up with Google, '
+            "use the 'Continue with Google' button below instead.";
       case 'email-already-in-use':
         return 'An account already exists for this email.';
       case 'weak-password':

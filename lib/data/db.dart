@@ -69,6 +69,15 @@ class Db {
             toFirestore: (value, _) => value.toMap(),
           );
 
+  /// `ride_requests/{driverId}_{studentId}` — see [RideRequest] for why the id
+  /// is composite rather than auto-generated.
+  static CollectionReference<RideRequest> get rideRequests =>
+      fs.collection('ride_requests').withConverter<RideRequest>(
+            fromFirestore: (snap, _) =>
+                RideRequest.fromMap(snap.id, snap.data() ?? {}),
+            toFirestore: (value, _) => value.toMap(),
+          );
+
   static CollectionReference<MissedBusRequest> get missedBusRequests =>
       fs.collection('missedBusRequests').withConverter<MissedBusRequest>(
             fromFirestore: (snap, _) =>

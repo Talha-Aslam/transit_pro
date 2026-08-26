@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
+import '../widgets/theme_mode_switch.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -181,345 +182,409 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 42, 20, 24),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight - 66,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            // Header badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: context.isDark
-                                    ? AppTheme.purple.withValues(alpha: 0.18)
-                                    : Colors.white.withValues(alpha: 0.95),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: context.isDark
-                                      ? AppTheme.purple.withValues(alpha: 0.45)
-                                      : AppTheme.purple.withValues(alpha: 0.35),
-                                  width: 1.5,
-                                ),
-                                boxShadow: context.isDark
-                                    ? null
-                                    : [
-                                        BoxShadow(
-                                          color: AppTheme.purple.withValues(alpha: 
-                                            0.12,
-                                          ),
-                                          blurRadius: 16,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                              ),
-                              child: AnimatedBuilder(
-                                animation: _rainbowCtrl,
-                                builder: (context, child) {
-                                  // Hue offset rotates full 360° per loop.
-                                  // At t=0 and t=1 hue%360 is identical → no seam.
-                                  final offset = _rainbowCtrl.value * 360;
-                                  Color hue(double base) => HSVColor.fromAHSV(
-                                    1.0,
-                                    (base + offset) % 360,
-                                    1.0,
-                                    1.0,
-                                  ).toColor();
-                                  return ShaderMask(
-                                    blendMode: BlendMode.srcIn,
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      colors: [
-                                        hue(0), // red → yellow → ...
-                                        hue(40),
-                                        hue(80),
-                                        hue(160),
-                                        hue(220),
-                                        hue(280),
-                                      ],
-                                    ).createShader(bounds),
-                                    child: child,
-                                  );
-                                },
-                                child: Text(
-                                  AppStrings.t('welcome_banner'),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 65),
-                            Text(
-                              AppStrings.t('select_role'),
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 20,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
+                  // Simple width-based scaling rather than fixed breakpoints —
+                  // shrinks a little on narrow phones (iPhone SE-class, small
+                  // Android devices) and caps the column width on tablets/large
+                  // phones instead of stretching every card edge-to-edge.
+                  final width = constraints.maxWidth;
+                  final isCompact = width < 360;
+                  final maxContentWidth = width > 480 ? 480.0 : width;
+                  final roleIconSize = isCompact ? 52.0 : 62.0;
+                  final cardGap = isCompact ? 18.0 : 25.0;
 
-                            // Role cards
-                            ..._roles.map((role) {
-                              final isSelected = _selected == role.id;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 25),
-                                child: GestureDetector(
-                                  onTap: () => _selectRole(role.id),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.all(14),
+                  return Padding(
+                    // Top padding clears the theme toggle pinned in the
+                    // corner above (its own height + SafeArea margin, plus a
+                    // visual gap) — fixed rather than scaled with
+                    // `isCompact` since the toggle itself is a fixed size
+                    // regardless of screen width.
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                    child: Center(
+                      // Screen must never scroll — instead of stretching to
+                      // fill the viewport (which risked overflow on short
+                      // screens) or scrolling, the whole card scales down
+                      // uniformly to fit the available height when its
+                      // natural size doesn't, and centers at natural size
+                      // otherwise. `BoxFit.scaleDown` never enlarges past
+                      // 1.0, so this can't blow the layout up on tall
+                      // screens either.
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: SizedBox(
+                          width: maxContentWidth,
+                          child: IntrinsicHeight(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                // Header badge. The theme toggle lives in its
+                                // own corner via a `Positioned` in the outer
+                                // Stack (see below), well clear of this badge —
+                                // sharing one row with it (an earlier attempt)
+                                // meant either the badge had to shrink to avoid
+                                // the button, or a wide badge could reach far
+                                // enough right to overlap it. Keeping them in
+                                // separate layers with real vertical distance
+                                // between them removes the overlap risk
+                                // entirely, on any screen width.
+                                Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 14,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? context.surfaceBorder
-                                          : context.cardBg,
+                                      color: context.isDark
+                                          ? AppTheme.purple.withValues(
+                                              alpha: 0.18,
+                                            )
+                                          : Colors.white.withValues(
+                                              alpha: 0.95,
+                                            ),
                                       borderRadius: BorderRadius.circular(24),
                                       border: Border.all(
-                                        color: isSelected
-                                            ? role.accent
-                                            : context.surfaceBorder,
-                                        width: isSelected ? 1.5 : 1,
+                                        color: context.isDark
+                                            ? AppTheme.purple.withValues(
+                                                alpha: 0.45,
+                                              )
+                                            : AppTheme.purple.withValues(
+                                                alpha: 0.35,
+                                              ),
+                                        width: 1.5,
                                       ),
-                                      boxShadow: isSelected
-                                          ? [
+                                      boxShadow: context.isDark
+                                          ? null
+                                          : [
                                               BoxShadow(
-                                                color: role.glowColor
-                                                    .withValues(alpha: 0.3),
-                                                blurRadius: 30,
-                                                offset: const Offset(0, 8),
+                                                color: AppTheme.purple
+                                                    .withValues(alpha: 0.12),
+                                                blurRadius: 16,
+                                                offset: const Offset(0, 4),
                                               ),
-                                            ]
-                                          : null,
+                                            ],
                                     ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
+                                    child: AnimatedBuilder(
+                                      animation: _rainbowCtrl,
+                                      builder: (context, child) {
+                                        // Hue offset rotates full 360° per
+                                        // loop. At t=0 and t=1 hue%360 is
+                                        // identical → no seam.
+                                        final offset = _rainbowCtrl.value * 360;
+                                        Color hue(double base) =>
+                                            HSVColor.fromAHSV(
+                                              1.0,
+                                              (base + offset) % 360,
+                                              1.0,
+                                              1.0,
+                                            ).toColor();
+                                        return ShaderMask(
+                                          blendMode: BlendMode.srcIn,
+                                          shaderCallback: (bounds) =>
+                                              LinearGradient(
+                                                colors: [
+                                                  hue(0), // red → yellow → ...
+                                                  hue(40),
+                                                  hue(80),
+                                                  hue(160),
+                                                  hue(220),
+                                                  hue(280),
+                                                ],
+                                              ).createShader(bounds),
+                                          child: child,
+                                        );
+                                      },
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          AppStrings.t('welcome_banner'),
+                                          maxLines: 1,
+                                          softWrap: false,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: isCompact ? 16 : 28),
+                                Text(
+                                  AppStrings.t('select_role'),
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: isCompact ? 18 : 20,
+                                  ),
+                                ),
+                                SizedBox(height: isCompact ? 16 : 24),
 
-                                      children: [
-                                        // Icon
-                                        Container(
-                                          width: 62,
-                                          height: 62,
-                                          decoration: BoxDecoration(
-                                            gradient: role.gradient,
-                                            borderRadius: BorderRadius.circular(
-                                              18,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: role.glowColor
-                                                    .withValues(alpha: 
-                                                      context.isDark
-                                                          ? 0.45
-                                                          : 0.30,
-                                                    ),
-                                                blurRadius: 20,
-                                                offset: const Offset(0, 6),
-                                              ),
-                                            ],
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              18,
-                                            ),
-                                            child: Image.asset(
-                                              role.icon,
-                                              width: 62,
-                                              height: 62,
-                                              fit: BoxFit.cover,
-                                              filterQuality: FilterQuality.high,
-                                            ),
-                                          ),
+                                // Role cards
+                                ..._roles.map((role) {
+                                  final isSelected = _selected == role.id;
+                                  return Padding(
+                                    padding: EdgeInsets.only(bottom: cardGap),
+                                    child: GestureDetector(
+                                      onTap: () => _selectRole(role.id),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 200,
                                         ),
-                                        const SizedBox(width: 14),
-                                        // Info
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                AppStrings.t(
-                                                  '${role.id}_label',
-                                                ),
-                                                style: TextStyle(
-                                                  color: context.textPrimary,
-                                                  fontSize: 17,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                AppStrings.t('${role.id}_desc'),
-                                                style: TextStyle(
-                                                  color: context.textSecondary,
-                                                  fontSize: 12.5,
-                                                  height: 1.4,
-                                                ),
-                                              ),
-                                            ],
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? context.surfaceBorder
+                                              : context.cardBg,
+                                          borderRadius: BorderRadius.circular(
+                                            24,
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        // Radio
-                                        AnimatedContainer(
-                                          duration: const Duration(
-                                            milliseconds: 200,
-                                          ),
-                                          width: 26,
-                                          height: 26,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            gradient: isSelected
-                                                ? role.gradient
-                                                : null,
+                                          border: Border.all(
                                             color: isSelected
-                                                ? null
-                                                : context.isDark
-                                                ? Colors.white.withValues(alpha: 0.08)
-                                                : const Color(0xFFE2E8F0),
-                                            border: Border.all(
-                                              color: isSelected
-                                                  ? role.accent
-                                                  : context.isDark
-                                                  ? Colors.white.withValues(alpha: 
-                                                      0.2,
-                                                    )
-                                                  : const Color(0xFFCBD5E1),
-                                              width: 2,
-                                            ),
+                                                ? role.accent
+                                                : context.surfaceBorder,
+                                            width: isSelected ? 1.5 : 1,
                                           ),
-                                          child: isSelected
-                                              ? const Center(
-                                                  child: Text(
-                                                    '✓',
+                                          boxShadow: isSelected
+                                              ? [
+                                                  BoxShadow(
+                                                    color: role.glowColor
+                                                        .withValues(alpha: 0.3),
+                                                    blurRadius: 30,
+                                                    offset: const Offset(0, 8),
+                                                  ),
+                                                ]
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+
+                                          children: [
+                                            // Icon
+                                            Container(
+                                              width: roleIconSize,
+                                              height: roleIconSize,
+                                              decoration: BoxDecoration(
+                                                gradient: role.gradient,
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: role.glowColor
+                                                        .withValues(
+                                                          alpha: context.isDark
+                                                              ? 0.45
+                                                              : 0.30,
+                                                        ),
+                                                    blurRadius: 20,
+                                                    offset: const Offset(0, 6),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(18),
+                                                child: Image.asset(
+                                                  role.icon,
+                                                  width: roleIconSize,
+                                                  height: roleIconSize,
+                                                  fit: BoxFit.cover,
+                                                  filterQuality:
+                                                      FilterQuality.high,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 14),
+                                            // Info
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    AppStrings.t(
+                                                      '${role.id}_label',
+                                                    ),
                                                     style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 13,
+                                                      color:
+                                                          context.textPrimary,
+                                                      fontSize: 17,
                                                       fontWeight:
                                                           FontWeight.w700,
                                                     ),
                                                   ),
-                                                )
-                                              : null,
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    AppStrings.t(
+                                                      '${role.id}_desc',
+                                                    ),
+                                                    style: TextStyle(
+                                                      color:
+                                                          context.textSecondary,
+                                                      fontSize: 12.5,
+                                                      height: 1.4,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            // Radio
+                                            AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 200,
+                                              ),
+                                              width: 26,
+                                              height: 26,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                gradient: isSelected
+                                                    ? role.gradient
+                                                    : null,
+                                                color: isSelected
+                                                    ? null
+                                                    : context.isDark
+                                                    ? Colors.white.withValues(
+                                                        alpha: 0.08,
+                                                      )
+                                                    : const Color(0xFFE2E8F0),
+                                                border: Border.all(
+                                                  color: isSelected
+                                                      ? role.accent
+                                                      : context.isDark
+                                                      ? Colors.white.withValues(
+                                                          alpha: 0.2,
+                                                        )
+                                                      : const Color(0xFFCBD5E1),
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: isSelected
+                                                  ? const Center(
+                                                      child: Text(
+                                                        '✓',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                          ],
                                         ),
-                                      ],
+                                      ),
+                                    ),
+                                  );
+                                }),
+
+                                // ── Language toggle ──────────────────────────
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    14,
+                                    12,
+                                    14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.cardBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: context.surfaceBorder,
                                     ),
                                   ),
-                                ),
-                              );
-                            }),
-
-                            // ── Language toggle ──────────────────────────
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(
-                                12,
-                                14,
-                                12,
-                                14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: context.cardBg,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: context.surfaceBorder,
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                  child: Column(
                                     children: [
-                                      Icon(
-                                        Icons.language_rounded,
-                                        size: 13,
-                                        color: context.textTertiary,
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.language_rounded,
+                                            size: 13,
+                                            color: context.textTertiary,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'Language · زبان',
+                                            style: TextStyle(
+                                              color: context.textTertiary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.4,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 5),
-                                      Text(
-                                        'Language · زبان',
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        children: [
+                                          _LangChip(
+                                            label: '🇬🇧  English',
+                                            selected: !LanguageProvider
+                                                .instance
+                                                .isUrdu,
+                                            onTap: () => LanguageProvider
+                                                .instance
+                                                .setLanguage('English'),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _LangChip(
+                                            label: 'اردو  🇵🇰',
+                                            selected: LanguageProvider
+                                                .instance
+                                                .isUrdu,
+                                            onTap: () => LanguageProvider
+                                                .instance
+                                                .setLanguage('Urdu'),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      AppStrings.t('no_account'),
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => context.go('/signup'),
+                                      child: Text(
+                                        AppStrings.t('sign_up'),
                                         style: TextStyle(
-                                          color: context.textTertiary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 0.4,
+                                          color: AppTheme.parentAccent,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      _LangChip(
-                                        label: '🇬🇧  English',
-                                        selected:
-                                            !LanguageProvider.instance.isUrdu,
-                                        onTap: () => LanguageProvider.instance
-                                            .setLanguage('English'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _LangChip(
-                                        label: 'اردو  🇵🇰',
-                                        selected:
-                                            LanguageProvider.instance.isUrdu,
-                                        onTap: () => LanguageProvider.instance
-                                            .setLanguage('Urdu'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // Push footer to bottom
-                            const Spacer(),
-
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
                                 Text(
-                                  AppStrings.t('no_account'),
+                                  AppStrings.t('data_secure'),
                                   style: TextStyle(
                                     color: context.textTertiary,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => context.go('/signup'),
-                                  child: Text(
-                                    AppStrings.t('sign_up'),
-                                    style: TextStyle(
-                                      color: AppTheme.parentAccent,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            Text(
-                              AppStrings.t('data_secure'),
-                              style: TextStyle(
-                                color: context.textTertiary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -527,30 +592,17 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen>
                 },
               ),
             ),
-            // Theme toggle button on top of everything
-            Positioned(
+            // Theme toggle, pinned to its own corner — kept well clear of
+            // the welcome badge below (see the scroll content's top
+            // padding) so a wide badge can never reach far enough right to
+            // overlap it, on any screen width.
+            const Positioned(
               top: 0,
               right: 0,
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: IconButton(
-                    icon: Icon(
-                      context.isDark
-                          ? Icons.light_mode_rounded
-                          : Icons.dark_mode_rounded,
-                      color: context.isDark ? Colors.amber : Colors.indigo,
-                    ),
-                    onPressed: () {
-                      ThemeProvider.instance.toggle();
-                    },
-                    style: IconButton.styleFrom(
-                      backgroundColor: context.isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : Colors.black.withValues(alpha: 0.05),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                  ),
+                  padding: EdgeInsets.all(16.0),
+                  child: ThemeModeSwitch(),
                 ),
               ),
             ),

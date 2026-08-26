@@ -1,6 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../../app/notification_service.dart';
+import 'package:transit_core/transit_core.dart';
+
+import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
+import '../../app/notification_service.dart';
+import '../../app/session_service.dart';
+import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -54,41 +61,170 @@ class DriverAttendance extends StatefulWidget {
   State<DriverAttendance> createState() => _DriverAttendanceState();
 }
 
+/// `🎓` for a college or university rider, `🧒` for a school child — mirrors
+/// the convention already used on the booked-students roster.
+String _avatarFor(Student student) {
+  final type = student.instituteType.toLowerCase();
+  if (type.contains('university') || type.contains('college')) return '🎓';
+  return '🧒';
+}
+
 class _DriverAttendanceState extends State<DriverAttendance> {
   final _notifSvc = NotificationService.instance;
-  late List<_Student> _students;
+  final _session = SessionService.instance;
+
   String _search = '';
   String _filter = 'all';
+
+  /// Everything the roster is derived from, merged into one listenable —
+  /// same reasoning as `driver_booked_students_screen.dart`: the roster and
+  /// route-student notifiers publish by assignment rather than calling
+  /// `notifyListeners`, so they have to be listened to directly.
+  late final Listenable _rosterListenable;
+
+  /// The trip **Start Route** creates. Attendance is a subcollection of a
+  /// trip, so there is nothing to mark until one is in progress.
+  Trip? _activeTrip;
+  String? _tripSubUid;
+  StreamSubscription<Trip?>? _tripSub;
+  StreamSubscription<List<AttendanceRecord>>? _attendanceSub;
+  Map<String, AttendanceStatus> _attendanceByStudent = const {};
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _students = List.from(_initialStudents);
+    _rosterListenable = Listenable.merge([
+      _session,
+      _session.driver,
+      _session.roster,
+      _session.routeStudents,
+    ]);
+    _rosterListenable.addListener(_onLangChanged);
+    _ensureTripSubscription();
   }
 
   void _onLangChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    _ensureTripSubscription();
+  }
+
+  /// (Re)subscribes to the driver's active trip whenever the signed-in uid
+  /// changes — including the very first time it becomes available, since the
+  /// session may still be loading when `initState` runs.
+  void _ensureTripSubscription() {
+    final uid = _session.uid;
+    if (uid == _tripSubUid) return;
+    _tripSubUid = uid;
+    _tripSub?.cancel();
+    _tripSub = null;
+    if (uid == null) {
+      _onActiveTrip(null);
+      return;
+    }
+    _tripSub =
+        TripRepository.instance.watchActiveTripForDriver(uid).listen(_onActiveTrip);
+  }
+
+  void _onActiveTrip(Trip? trip) {
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    if (!mounted) {
+      _activeTrip = trip;
+      return;
+    }
+    setState(() {
+      _activeTrip = trip;
+      _attendanceByStudent = const {};
+    });
+    if (trip != null) {
+      _attendanceSub =
+          TripRepository.instance.watchAttendance(trip.id).listen((records) {
+        if (!mounted) return;
+        setState(() {
+          _attendanceByStudent = {
+            for (final r in records) r.studentId: r.status,
+          };
+        });
+      });
+    }
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _rosterListenable.removeListener(_onLangChanged);
+    _tripSub?.cancel();
+    _attendanceSub?.cancel();
     super.dispose();
   }
 
-  void _toggleStatus(int id) {
+  // ── Data ──────────────────────────────────────────────────────────────────
+
+  /// The two roster sources, merged and de-duplicated by student id — the same
+  /// rule `driver_booked_students_screen.dart` uses: the direct roster (an
+  /// accepted ride request) wins over an admin-assigned route student.
+  List<Student> get _roster {
+    final merged = <String, Student>{};
+    for (final s in _session.roster.value) {
+      merged[s.id] = s;
+    }
+    for (final s in _session.routeStudents.value) {
+      merged.putIfAbsent(s.id, () => s);
+    }
+    final list = merged.values.toList();
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  }
+
+  /// A student with no attendance row yet reads as not-yet-boarded — the
+  /// two-state boarded/absent toggle this screen has always shown, now backed
+  /// by the real three-state `AttendanceStatus` a trip actually stores.
+  bool _isBoarded(Student s) =>
+      _attendanceByStudent[s.id] == AttendanceStatus.boarded;
+
+  /// The round a student rides, for grouping — there is no free-text "stop
+  /// name" on the real student record, so this groups by the driver's round
+  /// instead, exactly what the booked-students roster already does.
+  String _groupLabelFor(Student s) {
+    final id = s.scheduleId;
+    if (id == null || id.isEmpty) return 'Unassigned round';
+    final round = _session.driver.value?.scheduleById(id);
+    return (round == null || round.label.isEmpty) ? 'Unassigned round' : round.label;
+  }
+
+  Future<void> _toggleStatus(Student student) async {
+    final trip = _activeTrip;
+    if (trip == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Start your route to record attendance.'),
+        ),
+      );
+      return;
+    }
+    final next =
+        _isBoarded(student) ? AttendanceStatus.absent : AttendanceStatus.boarded;
+    // Optimistic: the live `watchAttendance` stream confirms within a frame or
+    // two, and a tap should not visibly wait on a round trip first.
     setState(() {
-      final i = _students.indexWhere((s) => s.id == id);
-      final next = _students[i].status == 'boarded' ? 'absent' : 'boarded';
-      _students[i] = _students[i].copyWith(status: next);
+      _attendanceByStudent = {..._attendanceByStudent, student.id: next};
     });
+    try {
+      await TripRepository.instance.markAttendance(
+        tripId: trip.id,
+        studentId: student.id,
+        status: next,
+        markedBy: _session.uid ?? '',
+      );
+    } catch (e) {
+      debugPrint('markAttendance failed: $e');
+    }
   }
 
   Future<void> _showBulkAlertOptions() async {
-    final presentStudents = _students
-        .where((s) => s.status == 'boarded')
-        .toList();
+    final presentStudents = _roster.where(_isBoarded).toList();
     if (presentStudents.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -206,9 +342,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     _BulkAlertOption opt, {
     String? customMessage,
   }) async {
-    final presentStudents = _students
-        .where((s) => s.status == 'boarded')
-        .toList();
+    final presentStudents = _roster.where(_isBoarded).toList();
     if (presentStudents.isEmpty) return;
 
     for (final student in presentStudents) {
@@ -237,20 +371,41 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     );
   }
 
-  int get _boarded => _students.where((s) => s.status == 'boarded').length;
-  int get _absent => _students.where((s) => s.status == 'absent').length;
-
-  List<_Student> get _filtered => _students.where((s) {
-    final matchSearch =
-        s.name.toLowerCase().contains(_search.toLowerCase()) ||
-        s.stop.toLowerCase().contains(_search.toLowerCase());
-    final matchFilter = _filter == 'all' || s.status == _filter;
-    return matchSearch && matchFilter;
-  }).toList();
-
   @override
   Widget build(BuildContext context) {
-    final stops = _filtered.map((s) => s.stop).toSet().toList();
+    // Computed once per build rather than re-derived (and re-filtered) on
+    // every access — the roster merge and the boarded/absent counts used to
+    // be separate getters called several times each, redoing the same work on
+    // every keystroke in the search box.
+    final roster = _roster;
+    final query = _search.trim().toLowerCase();
+
+    var boardedCount = 0;
+    for (final s in roster) {
+      if (_isBoarded(s)) boardedCount++;
+    }
+    final absentCount = roster.length - boardedCount;
+
+    final filtered = roster.where((s) {
+      final matchSearch = query.isEmpty ||
+          s.name.toLowerCase().contains(query) ||
+          s.grade.toLowerCase().contains(query) ||
+          s.school.toLowerCase().contains(query);
+      final boarded = _isBoarded(s);
+      final matchFilter = switch (_filter) {
+        'boarded' => boarded,
+        'absent' => !boarded,
+        _ => true,
+      };
+      return matchSearch && matchFilter;
+    }).toList();
+
+    // Grouped by round in a single pass, rather than re-filtering the full
+    // list once per group as the old per-stop rendering did.
+    final grouped = <String, List<Student>>{};
+    for (final s in filtered) {
+      grouped.putIfAbsent(_groupLabelFor(s), () => []).add(s);
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -282,12 +437,22 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    Text(
-                      'Morning Run · Bus #42',
-                      style: TextStyle(
-                        color: context.textSecondary,
-                        fontSize: 13,
-                      ),
+                    ValueListenableBuilder<DriverInfo>(
+                      valueListenable: DriverDataService.instance.driverInfo,
+                      builder: (_, info, _) {
+                        final assignment = [info.busNumber, info.route]
+                            .where((s) => s.isNotEmpty)
+                            .join(' · ');
+                        return Text(
+                          assignment.isEmpty
+                              ? 'No vehicle assigned yet'
+                              : assignment,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -306,15 +471,15 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                     _SummaryCard(
                       icon: '✅',
                       label: AppStrings.t('boarded'),
-                      value: _boarded,
+                      value: boardedCount,
                       color: AppTheme.success,
                     ),
                     const SizedBox(width: 10),
                     const SizedBox(width: 10),
                     _SummaryCard(
-                      icon: '\u274c',
+                      icon: '❌',
                       label: AppStrings.t('absent'),
-                      value: _absent,
+                      value: absentCount,
                       color: AppTheme.error,
                     ),
                   ],
@@ -340,7 +505,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                             ),
                           ),
                           Text(
-                            '$_boarded/${_students.length} ${AppStrings.t('students').toLowerCase()}',
+                            '$boardedCount/${roster.length} ${AppStrings.t('students').toLowerCase()}',
                             style: const TextStyle(
                               color: AppTheme.driverAccent,
                               fontSize: 13,
@@ -353,7 +518,9 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: _boarded / _students.length,
+                          value: roster.isEmpty
+                              ? 0
+                              : boardedCount / roster.length,
                           backgroundColor: context.cardBgElevated,
                           valueColor: const AlwaysStoppedAnimation(
                             AppTheme.success,
@@ -365,6 +532,44 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                   ),
                 ),
                 const SizedBox(height: 12),
+
+                if (_activeTrip == null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppTheme.warning.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            color: AppTheme.warning,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'No route in progress. Start your route to '
+                              'record and save attendance.',
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 SizedBox(
                   width: double.infinity,
@@ -490,16 +695,25 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _filterBtn('all', 'All (${_students.length})'),
-                      _filterBtn('boarded', '✅ $_boarded'),
-                      _filterBtn('absent', '❌ $_absent'),
+                      _filterBtn('all', 'All (${roster.length})'),
+                      _filterBtn('boarded', '✅ $boardedCount'),
+                      _filterBtn('absent', '❌ $absentCount'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // ── Student list grouped by stop ──────────────────────────
-                if (_filtered.isEmpty)
+                // ── Student list grouped by round ──────────────────────────
+                if (roster.isEmpty && _session.isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.driverCyan,
+                      ),
+                    ),
+                  )
+                else if (filtered.isEmpty)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40),
@@ -519,10 +733,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                     ),
                   )
                 else
-                  ...stops.map((stop) {
-                    final stopStudents = _filtered
-                        .where((s) => s.stop == stop)
-                        .toList();
+                  ...grouped.entries.map((entry) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -531,7 +742,7 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                           child: Row(
                             children: [
                               Text(
-                                '📍 $stop',
+                                '🚌 ${entry.key}',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -548,12 +759,13 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                             ],
                           ),
                         ),
-                        ...stopStudents.map(
+                        ...entry.value.map(
                           (student) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: _StudentCard(
                               student: student,
-                              onToggle: () => _toggleStatus(student.id),
+                              boarded: _isBoarded(student),
+                              onToggle: () => _toggleStatus(student),
                             ),
                           ),
                         ),
@@ -651,13 +863,20 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _StudentCard extends StatelessWidget {
-  final _Student student;
+  final Student student;
+  final bool boarded;
   final VoidCallback onToggle;
-  const _StudentCard({required this.student, required this.onToggle});
+  const _StudentCard({
+    required this.student,
+    required this.boarded,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cfg = _statusConfig[student.status]!;
+    final cfg = boarded
+        ? const _StatusConfig(color: AppTheme.success, icon: '✅', label: 'Boarded')
+        : const _StatusConfig(color: AppTheme.error, icon: '❌', label: 'Absent');
     return GlassCard(
       enableBlur: false,
       padding: const EdgeInsets.all(14),
@@ -671,7 +890,7 @@ class _StudentCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
-              child: Text(student.avatar, style: const TextStyle(fontSize: 22)),
+              child: Text(_avatarFor(student), style: const TextStyle(fontSize: 22)),
             ),
           ),
           const SizedBox(width: 12),
@@ -680,7 +899,7 @@ class _StudentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  student.name,
+                  student.name.isEmpty ? 'Unnamed student' : student.name,
                   style: TextStyle(
                     color: context.textPrimary,
                     fontSize: 14,
@@ -689,7 +908,12 @@ class _StudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${student.grade} · ${student.parentPhone}',
+                  [
+                    if (student.grade.isNotEmpty) student.grade,
+                    if (student.school.isNotEmpty) student.school,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.textTertiary, fontSize: 12),
                 ),
               ],
@@ -729,164 +953,3 @@ class _StatusConfig {
     required this.label,
   });
 }
-
-const _statusConfig = {
-  'boarded': _StatusConfig(
-    color: AppTheme.success,
-    icon: '✅',
-    label: 'Boarded',
-  ),
-  'absent': _StatusConfig(color: AppTheme.error, icon: '❌', label: 'Absent'),
-};
-
-class _Student {
-  final int id;
-  final String name, grade, stop, status, avatar, parentPhone;
-  const _Student({
-    required this.id,
-    required this.name,
-    required this.grade,
-    required this.stop,
-    required this.status,
-    required this.avatar,
-    required this.parentPhone,
-  });
-  _Student copyWith({String? status}) => _Student(
-    id: id,
-    name: name,
-    grade: grade,
-    stop: stop,
-    status: status ?? this.status,
-    avatar: avatar,
-    parentPhone: parentPhone,
-  );
-}
-
-const _initialStudents = [
-  _Student(
-    id: 1,
-    name: 'Emma Johnson',
-    grade: 'Grade 5',
-    stop: 'Oak Street',
-    status: 'boarded',
-    avatar: '👧',
-    parentPhone: '+1 555-0101',
-  ),
-  _Student(
-    id: 2,
-    name: 'Liam Williams',
-    grade: 'Grade 3',
-    stop: 'Oak Street',
-    status: 'boarded',
-    avatar: '👦',
-    parentPhone: '+1 555-0102',
-  ),
-  _Student(
-    id: 3,
-    name: 'Olivia Davis',
-    grade: 'Grade 4',
-    stop: 'Maple Avenue',
-    status: 'boarded',
-    avatar: '👧',
-    parentPhone: '+1 555-0103',
-  ),
-  _Student(
-    id: 4,
-    name: 'Noah Brown',
-    grade: 'Grade 6',
-    stop: 'Maple Avenue',
-    status: 'boarded',
-    avatar: '👦',
-    parentPhone: '+1 555-0104',
-  ),
-  _Student(
-    id: 5,
-    name: 'Ava Martinez',
-    grade: 'Grade 2',
-    stop: 'Pine Road',
-    status: 'boarded',
-    avatar: '👧',
-    parentPhone: '+1 555-0105',
-  ),
-  _Student(
-    id: 6,
-    name: 'William Wilson',
-    grade: 'Grade 5',
-    stop: 'Pine Road',
-    status: 'boarded',
-    avatar: '👦',
-    parentPhone: '+1 555-0106',
-  ),
-  _Student(
-    id: 7,
-    name: 'Sophia Anderson',
-    grade: 'Grade 3',
-    stop: 'Cedar Blvd',
-    status: 'absent',
-    avatar: '👧',
-    parentPhone: '+1 555-0107',
-  ),
-  _Student(
-    id: 8,
-    name: 'James Taylor',
-    grade: 'Grade 4',
-    stop: 'Cedar Blvd',
-    status: 'absent',
-    avatar: '👦',
-    parentPhone: '+1 555-0108',
-  ),
-  _Student(
-    id: 9,
-    name: 'Isabella Thomas',
-    grade: 'Grade 6',
-    stop: 'Cedar Blvd',
-    status: 'absent',
-    avatar: '👧',
-    parentPhone: '+1 555-0109',
-  ),
-  _Student(
-    id: 10,
-    name: 'Benjamin Jackson',
-    grade: 'Grade 2',
-    stop: 'Cedar Blvd',
-    status: 'absent',
-    avatar: '👦',
-    parentPhone: '+1 555-0110',
-  ),
-  _Student(
-    id: 11,
-    name: 'Mia White',
-    grade: 'Grade 5',
-    stop: 'Oak Street',
-    status: 'boarded',
-    avatar: '👧',
-    parentPhone: '+1 555-0111',
-  ),
-  _Student(
-    id: 12,
-    name: 'Lucas Harris',
-    grade: 'Grade 3',
-    stop: 'Maple Avenue',
-    status: 'boarded',
-    avatar: '👦',
-    parentPhone: '+1 555-0112',
-  ),
-  _Student(
-    id: 13,
-    name: 'Ali Khan',
-    grade: 'Undergraduate',
-    stop: 'University of Lahore',
-    status: 'boarded',
-    avatar: '🎓',
-    parentPhone: '+92 300 7001001',
-  ),
-  _Student(
-    id: 14,
-    name: 'Zara Ahmed',
-    grade: 'Undergraduate',
-    stop: 'LUMS',
-    status: 'absent',
-    avatar: '🎓',
-    parentPhone: '+92 300 7001002',
-  ),
-];

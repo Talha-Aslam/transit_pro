@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
+
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -17,34 +21,45 @@ class EmergencyContactsScreen extends StatefulWidget {
 }
 
 class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
-  final List<_Contact> _contacts = [
-    _Contact(
-      name: 'Sarah Johnson',
-      relation: 'Mother',
-      phone: '+92 300 1234567',
-    ),
-    _Contact(
-      name: 'Ahmed Johnson',
-      relation: 'Father',
-      phone: '+92 321 7654321',
-    ),
-  ];
+  // Backed by AppUser.emergencyContacts on the account's own users/{uid}
+  // document — synced through SessionService, not device-local storage. A
+  // brand-new account has an empty list here until the user adds one.
+  List<EmergencyContact> _contacts = [];
 
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
+    SessionService.instance.user.addListener(_onUserChanged);
+    _contacts = SessionService.instance.user.value?.emergencyContacts ?? [];
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    SessionService.instance.user.removeListener(_onUserChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
 
-  void _showAddSheet({_Contact? existing, int? index}) {
+  void _onUserChanged() {
+    if (!mounted) return;
+    setState(() {
+      _contacts = SessionService.instance.user.value?.emergencyContacts ?? [];
+    });
+  }
+
+  Future<void> _persist(List<EmergencyContact> contacts) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+    setState(() => _contacts = contacts);
+    await UserRepository.instance.updateUser(uid, {
+      'emergencyContacts': contacts.map((c) => c.toMap()).toList(),
+    });
+  }
+
+  void _showAddSheet({EmergencyContact? existing, int? index}) {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
     final relCtrl = TextEditingController(text: existing?.relation ?? '');
     final phoneCtrl = TextEditingController(text: existing?.phone ?? '');
@@ -134,18 +149,18 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                         final rel = relCtrl.text.trim();
                         final phone = phoneCtrl.text.trim();
                         if (name.isEmpty || phone.isEmpty) return;
-                        setState(() {
-                          final c = _Contact(
-                            name: name,
-                            relation: rel,
-                            phone: phone,
-                          );
-                          if (existing != null && index != null) {
-                            _contacts[index] = c;
-                          } else {
-                            _contacts.add(c);
-                          }
-                        });
+                        final c = EmergencyContact(
+                          name: name,
+                          relation: rel,
+                          phone: phone,
+                        );
+                        final updated = List<EmergencyContact>.from(_contacts);
+                        if (existing != null && index != null) {
+                          updated[index] = c;
+                        } else {
+                          updated.add(c);
+                        }
+                        _persist(updated);
                         Navigator.pop(context);
                       },
                       child: Container(
@@ -231,7 +246,9 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           ),
           TextButton(
             onPressed: () {
-              setState(() => _contacts.removeAt(index));
+              final updated = List<EmergencyContact>.from(_contacts)
+                ..removeAt(index);
+              _persist(updated);
               Navigator.pop(context);
             },
             child: Text(
@@ -349,6 +366,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: GlassCard(
+                              enableBlur: false,
                               padding: const EdgeInsets.all(16),
                               child: Row(
                                 children: [
@@ -421,7 +439,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.info.withValues(alpha: 
+                                            color: AppTheme.info.withValues(alpha:
                                               0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(
@@ -444,7 +462,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.error.withValues(alpha: 
+                                            color: AppTheme.error.withValues(alpha:
                                               0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(
@@ -475,13 +493,4 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       ),
     );
   }
-}
-
-class _Contact {
-  final String name, relation, phone;
-  const _Contact({
-    required this.name,
-    required this.relation,
-    required this.phone,
-  });
 }

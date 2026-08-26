@@ -55,6 +55,20 @@ class _ParentNotificationsState extends State<ParentNotifications> {
     }
   }
 
+  /// The distinct date labels actually present in [_filtered], in the order
+  /// they appear. `history` is already newest-first (see
+  /// `NotificationService._publish`), so this naturally comes out as "Today",
+  /// then "Yesterday", then whatever older labels `_dateLabel` produced —
+  /// without hardcoding a literal date that goes stale (and silently drops
+  /// anything older than it) the moment the calendar moves on.
+  List<String> get _dateGroups {
+    final seen = <String>[];
+    for (final n in _filtered) {
+      if (!seen.contains(n.date)) seen.add(n.date);
+    }
+    return seen;
+  }
+
   @override
   Widget build(BuildContext context) {
     final unread = _svc.unreadCount;
@@ -208,7 +222,7 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                   const SizedBox(height: 14),
 
                   // Grouped by date
-                  for (final date in ['Today', 'Yesterday', 'Mon, Feb 23']) ...[
+                  for (final date in _dateGroups) ...[
                     Builder(
                       builder: (context) {
                         final group = _filtered
@@ -244,6 +258,12 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                       widget.onUnreadChanged?.call(
                                         _svc.unreadCount,
                                       );
+                                      // Persist the read flag — the local
+                                      // mutation above is only an optimistic
+                                      // UI update; without this a remote
+                                      // notification comes back unread on the
+                                      // next Firestore snapshot.
+                                      _svc.markRead(n);
                                     },
                                   ),
                                 ),

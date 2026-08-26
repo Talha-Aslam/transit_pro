@@ -32,6 +32,10 @@ import '../screens/student/student_trip_history_screen.dart';
 import '../screens/student/terms_screen.dart';
 import '../screens/student/student_notifications.dart';
 import '../screens/driver/driver_pickup_requests_screen.dart';
+import '../screens/driver/driver_ride_requests_screen.dart';
+import '../screens/driver/driver_service_screen.dart';
+import '../screens/parent/find_drivers_screen.dart';
+import '../screens/live_map_screen.dart';
 import '../screens/driver/subscription.dart';
 import '../screens/parent/parent_missed_bus_screen.dart';
 import '../screens/parent/payment_screens.dart';
@@ -118,14 +122,24 @@ String? _guard(BuildContext context, GoRouterState state) {
     return location == _onboardingRoute ? null : _onboardingRoute;
   }
 
-  // Onboarding is finished — nobody should be able to walk back into it.
+  // Onboarding is finished — nobody should be able to walk back into it. Not
+  // `session.needsProfile` above means the profile is loaded and complete, so
+  // `session.user.value` is the authoritative source here — `auth.cachedRole`
+  // is only a same-device SharedPreferences guess that can go stale (e.g. it
+  // survives a failed sign-in on a *different* account until the next
+  // successful one overwrites it) and is now just the last-resort fallback
+  // for the sliver of a frame before that value has arrived.
   if (location == _onboardingRoute) {
-    return AuthService.routeForRole(auth.cachedRole ?? 'parent');
+    return AuthService.routeForRole(
+      session.user.value?.role.name ?? auth.cachedRole ?? 'parent',
+    );
   }
 
   // Already signed in with a working session but sitting on an auth screen →
-  // jump to their own home. The role comes from the cached Firestore value, so
-  // a parent can never be routed into the driver app by editing the URL.
+  // jump to their own home. The role comes from the live Firestore profile,
+  // so a parent can never be routed into the driver app by editing the URL —
+  // see the comment above for why that source is preferred over
+  // `auth.cachedRole` here too.
   //
   // Requiring `isReady` (not just "signedIn is true") matters:
   // `AuthService.signOut` tears down the Firestore session *before* ending the
@@ -137,7 +151,9 @@ String? _guard(BuildContext context, GoRouterState state) {
   // of leaving them on the login screen to see why it failed.
   if (session.isReady &&
       (location.startsWith('/login/') || location == '/signup')) {
-    return AuthService.routeForRole(auth.cachedRole ?? 'parent');
+    return AuthService.routeForRole(
+      session.user.value?.role.name ?? auth.cachedRole ?? 'parent',
+    );
   }
 
   return null;
@@ -201,6 +217,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/parent/driver-details',
       builder: (context, state) => const DriverDetailsScreen(),
+    ),
+    GoRoute(
+      path: '/parent/find-drivers',
+      builder: (context, state) => const FindDriversScreen(),
+    ),
+    // The same screen, themed for the student shell. Students book their own
+    // seat exactly as a parent books their child's, so duplicating the screen
+    // per role would mean maintaining the matchmaking UI twice.
+    GoRoute(
+      path: '/student/find-drivers',
+      builder: (context, state) =>
+          const FindDriversScreen(accent: AppTheme.studentAmber),
     ),
     GoRoute(
       path: '/parent/driver-chat',
@@ -377,13 +405,46 @@ final appRouter = GoRouter(
       path: '/student/notifications',
       builder: (context, state) => const StudentNotifications(),
     ),
+    // One-off missed-bus pickups, distinct from the ongoing seat arrangement
+    // below — the two look similar on screen but are different commitments.
     GoRoute(
       path: '/driver/pickup-requests',
       builder: (context, state) => const DriverPickupRequestsScreen(),
     ),
     GoRoute(
+      path: '/driver/ride-requests',
+      builder: (context, state) => const DriverRideRequestsScreen(),
+    ),
+    GoRoute(
+      path: '/driver/service',
+      builder: (context, state) => const DriverServiceScreen(),
+    ),
+    GoRoute(
       path: '/parent/missed-bus',
       builder: (context, state) => const ParentMissedBusScreen(),
+    ),
+    // Fullscreen, interactive live-tracking map — a bigger window onto
+    // whichever tracking session is already running, opened from the
+    // parent/student Track tab's inline (non-interactive) map preview.
+    GoRoute(
+      path: '/parent/track/map',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        return LiveMapScreen(
+          accentColor: AppTheme.parentPurple,
+          highlightedStopName: extra['highlightedStopName'] as String?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/student/track/map',
+      builder: (context, state) {
+        final extra = (state.extra as Map<String, dynamic>?) ?? {};
+        return LiveMapScreen(
+          accentColor: AppTheme.studentAmber,
+          highlightedStopName: extra['highlightedStopName'] as String?,
+        );
+      },
     ),
   ],
 );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -16,12 +18,40 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   final _svc = ParentDataService.instance;
   double _selectedRating = 5.0;
 
+  /// The assigned driver's real record, fetched by id (`child.driver` holds
+  /// the driver's uid — see ParentDataService._rebuild). Feeds the contact
+  /// number/experience/seats tile that used to come from a hardcoded map
+  /// keyed by bus number.
+  Driver? _driver;
+
+  /// Whether this child has ever completed a ride with their currently
+  /// assigned driver — resolved once (this screen doesn't react to a child
+  /// switch happening while it's open), and gates whether the rating card
+  /// renders at all. See `ParentDataService.hasRiddenWithDriver`.
+  bool _hasRidden = false;
+
   @override
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
     _svc.driverRatings.addListener(_onRatingChanged);
     _svc.loadDriverRatings();
+    _loadDriver();
+    _loadHasRidden();
+  }
+
+  Future<void> _loadDriver() async {
+    final child = _svc.selectedChild;
+    if (child == null || child.driver.isEmpty) return;
+    final driver = await UserRepository.instance.fetchDriver(child.driver);
+    if (mounted) setState(() => _driver = driver);
+  }
+
+  Future<void> _loadHasRidden() async {
+    final child = _svc.selectedChild;
+    if (child == null) return;
+    final ridden = await _svc.hasRiddenWithDriver(child);
+    if (mounted) setState(() => _hasRidden = ridden);
   }
 
   @override
@@ -60,11 +90,11 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
         : '—';
     final stop = child?.stop.isNotEmpty == true ? child!.stop : '—';
     final meta = _driverInfoMetaFor(
-      driverName: driverName,
+      driver: _driver,
       transportNumber: busNumber,
     );
     final driverRating = child == null ? null : _svc.driverRatingFor(child);
-    final canRate = child != null && _svc.canRateDriver(child);
+    final canRate = child != null && _hasRidden && _svc.canRateDriver(child);
 
     return Scaffold(
       body: Container(
@@ -136,6 +166,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                   child: Column(
                     children: [
                       GlassCard(
+                        enableBlur: false,
                         gradient: LinearGradient(
                           colors: [
                             AppTheme.parentPurple.withValues(alpha: 0.16),
@@ -246,131 +277,139 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      GlassCard(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Weekly Driver Rating',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              canRate
-                                  ? 'Rate your driver once per week based on punctuality, safety, and service.'
-                                  : 'You already rated this driver for this week.',
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 12,
-                                height: 1.4,
-                              ),
-                            ),
-                            if (driverRating != null) ...[
-                              const SizedBox(height: 10),
+                      if (_hasRidden && child != null) ...[
+                        const SizedBox(height: 16),
+                        GlassCard(
+                          enableBlur: false,
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                'Last rating: ${driverRating.rating.toStringAsFixed(1)}/5',
+                                'Weekly Driver Rating',
                                 style: TextStyle(
                                   color: context.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                            ],
-                            const SizedBox(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: List.generate(5, (index) {
-                                final starValue = index + 1;
-                                final active = starValue <= _selectedRating;
-                                return GestureDetector(
+                              const SizedBox(height: 8),
+                              Text(
+                                canRate
+                                    ? 'Rate your driver once per week based on punctuality, safety, and service.'
+                                    : 'You already rated this driver for this week.',
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (driverRating != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Last rating: ${driverRating.rating.toStringAsFixed(1)}/5',
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 14),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: List.generate(5, (index) {
+                                  final starValue = index + 1;
+                                  final active = starValue <= _selectedRating;
+                                  return GestureDetector(
+                                    onTap: canRate
+                                        ? () => setState(
+                                            () => _selectedRating = starValue
+                                                .toDouble(),
+                                          )
+                                        : null,
+                                    child: Icon(
+                                      active
+                                          ? Icons.star_rounded
+                                          : Icons.star_border_rounded,
+                                      color: canRate
+                                          ? Colors.amber
+                                          : context.textHint,
+                                      size: 30,
+                                    ),
+                                  );
+                                }),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                child: GestureDetector(
                                   onTap: canRate
-                                      ? () => setState(
-                                          () => _selectedRating = starValue
-                                              .toDouble(),
-                                        )
+                                      ? () => _submitWeeklyRating(child)
                                       : null,
-                                  child: Icon(
-                                    active
-                                        ? Icons.star_rounded
-                                        : Icons.star_border_rounded,
-                                    color: canRate
-                                        ? Colors.amber
-                                        : context.textHint,
-                                    size: 30,
-                                  ),
-                                );
-                              }),
-                            ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              child: GestureDetector(
-                                onTap: canRate
-                                    ? () => _submitWeeklyRating(child)
-                                    : null,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: canRate
-                                        ? AppTheme.parentGradient
-                                        : LinearGradient(
-                                            colors: [
-                                              context.surfaceBorder,
-                                              context.surfaceBorder,
-                                            ],
-                                          ),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      canRate
-                                          ? 'Submit Weekly Rating'
-                                          : 'Rating Submitted This Week',
-                                      style: TextStyle(
-                                        color: canRate
-                                            ? Colors.white
-                                            : context.textSecondary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: canRate
+                                          ? AppTheme.parentGradient
+                                          : LinearGradient(
+                                              colors: [
+                                                context.surfaceBorder,
+                                                context.surfaceBorder,
+                                              ],
+                                            ),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        canRate
+                                            ? 'Submit Weekly Rating'
+                                            : 'Rating Submitted This Week',
+                                        style: TextStyle(
+                                          color: canRate
+                                              ? Colors.white
+                                              : context.textSecondary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () => context.push('/parent/driver-chat'),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.parentGradient,
-                            borderRadius: BorderRadius.circular(16),
+                            ],
                           ),
-                          child: Center(
-                            child: Text(
-                              AppStrings.t('driver_chat'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                        ),
+                      ],
+                      // Hidden with no driver assigned yet — there is
+                      // nobody on the other end of this chat.
+                      if (child != null && child.driver.trim().isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: () => context.push('/parent/driver-chat'),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.parentGradient,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Center(
+                              child: Text(
+                                AppStrings.t('driver_chat'),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -397,6 +436,7 @@ class _InfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
+      enableBlur: false,
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,30 +482,32 @@ class _DriverInfoMeta {
   });
 }
 
+/// Built from the real driver record when it's loaded; a hardcoded map keyed
+/// by bus number used to stand in for this, which showed the same fabricated
+/// phone/experience/seat-count for every driver on that bus regardless of who
+/// actually held it.
 _DriverInfoMeta _driverInfoMetaFor({
-  required String driverName,
+  required Driver? driver,
   required String transportNumber,
 }) {
-  const known = {
-    'Bus #42': _DriverInfoMeta(
-      contactNumber: '+92 300 1234567',
-      experience: '8 years',
-      transportNumber: 'Bus #42',
-      totalSeats: '28',
-    ),
-    'Bus #15': _DriverInfoMeta(
-      contactNumber: '+92 321 7654321',
-      experience: '5 years',
-      transportNumber: 'Bus #15',
-      totalSeats: '22',
-    ),
-  };
-
-  return known[transportNumber] ??
-      _DriverInfoMeta(
-        contactNumber: '+92 300 0000000',
-        experience: '4 years',
-        transportNumber: transportNumber == '—' ? 'N/A' : transportNumber,
-        totalSeats: '24',
-      );
+  final resolvedTransport = transportNumber == '—' ? 'N/A' : transportNumber;
+  if (driver == null) {
+    return _DriverInfoMeta(
+      contactNumber: '—',
+      experience: '—',
+      transportNumber: resolvedTransport,
+      totalSeats: '—',
+    );
+  }
+  return _DriverInfoMeta(
+    contactNumber: driver.phone.isNotEmpty ? driver.phone : '—',
+    experience: driver.experienceYears > 0
+        ? '${driver.experienceYears} year${driver.experienceYears == 1 ? '' : 's'}'
+        : '—',
+    transportNumber: resolvedTransport,
+    // Driver has no single "vehicle capacity" field — seats live per round
+    // on DriverSchedule — so this sums seats offered across every round the
+    // driver runs as the closest real proxy for "total seats".
+    totalSeats: '${driver.totalSeatsOffered}',
+  );
 }

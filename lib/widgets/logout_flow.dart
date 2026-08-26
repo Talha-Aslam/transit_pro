@@ -60,28 +60,17 @@ Future<void> confirmAndSignOut(
   if (confirmed != true) return;
   if (!context.mounted) return;
 
-  // Block interaction while the session tears down. Cancelling Firestore
-  // listeners and revoking the Google grant are both awaited, and a second tap
-  // during that window would run the whole thing twice.
-  showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => const Center(child: CircularProgressIndicator()),
-  );
-
+  // Leave the signed-in screens first, *then* tear the session down.
+  // `AuthService.signOut()` cancels every Firestore listener and revokes the
+  // Google grant — real network round trips — and awaiting that under a
+  // blocking spinner meant the (often map- or image-heavy) screen underneath
+  // had to stay mounted and get disposed in the middle of it. That's what
+  // made logout visibly freeze every time. Navigating away first lets all of
+  // that teardown happen behind the lightweight role-select screen instead.
+  context.go('/role-select');
   try {
     await AuthService.instance.signOut();
-    if (!context.mounted) return;
-    Navigator.of(context).pop(); // dismiss the spinner
-    context.go('/role-select');
   } catch (e) {
-    if (!context.mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Could not sign out: $e'),
-        backgroundColor: AppTheme.error,
-      ),
-    );
+    debugPrint('Sign out failed: $e');
   }
 }

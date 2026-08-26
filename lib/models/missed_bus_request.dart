@@ -31,6 +31,10 @@ class MissedBusRequest {
   String? assignedDriverPhone;
   String? assignedETA;
 
+  /// `Rs.150` display string, or null when the accepting driver has not set
+  /// a fare. Paid to the driver directly — the app never moves this money.
+  String? fareDisplay;
+
   MissedBusRequest({
     required this.id,
     required this.studentName,
@@ -45,5 +49,6 @@ class MissedBusRequest {
     this.assignedBusNumber,
     this.assignedDriverPhone,
     this.assignedETA,
+    this.fareDisplay,
   });
 }

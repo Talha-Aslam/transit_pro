@@ -1,0 +1,425 @@
+rules_version = '2';
+
+// TransitPro Firestore security rules.
+//
+// These rules ARE the security model. The Firebase API keys in
+// firebase_options.dart are public by design — anyone can read them out of the
+// APK — so nothing here may rely on the client behaving well.
+//
+// Governing principle: a parent must never be able to read another family's
+// child. The pilot tracks real children's locations, so this is not a
+// theoretical concern.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+// Test with:    the Rules Playground in the Firebase console, or the emulator.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function roleIs(r) {
+      return signedIn() && userDoc().role == r;
+    }
+
+    function isAdmin() {
+      return roleIs('admin');
+    }
+
+    function isDriver() {
+      return roleIs('driver');
+    }
+
+    // True when the incoming write leaves the named field untouched.
+    function unchanged(field) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == resource.data[field];
+    }
+
+    function studentDoc(studentId) {
+      return get(/databases/$(database)/documents/students/$(studentId)).data;
+    }
+
+    // A parent owns the student; a student owns their own record.
+    function ownsStudent(studentId) {
+      let s = studentDoc(studentId);
+      return s.parentId == uid() || studentId == uid();
+    }
+
+    // The ride request proving this family asked THIS driver for a seat.
+    //
+    // The id is deterministic (`{driverId}_{studentId}`) precisely so a rule can
+    // name it. With an auto-id there would be no way to express "a driver may
+    // write this student's assignment because they were asked to", and the only
+    // alternative would be letting any driver claim any student.
+    function hasAcceptedRequestFor(studentId) {
+      let path = /databases/$(database)/documents/ride_requests/$(uid() + '_' + studentId);
+      return exists(path)
+        && get(path).data.driverId == uid()
+        && get(path).data.status == 'accepted';
+    }
+
+    // True when a write touches nothing outside the named set. Used to let a
+    // driver attach themselves to a student without being able to edit the
+    // child's name, school, parent or suspension state.
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(fields);
+    }
+
+    // ── users ───────────────────────────────────────────────────────────────
+    //
+    // The role field is the security boundary. It is set once at sign-up and
+    // can never be changed by the client — only an admin (or the console) may
+    // alter it. Without this rule a user could promote themselves to admin.
+
+    match /users/{userId} {
+      allow read: if signedIn() && (userId == uid() || isAdmin());
+
+      allow create: if signedIn()
+                    && userId == uid()
+                    && request.resource.data.role in ['parent', 'student', 'driver'];
+
+      allow update: if signedIn()
+                    && ((userId == uid() && unchanged('role') && unchanged('isActive'))
+                        || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── students ────────────────────────────────────────────────────────────
+    //
+    // Readable by the owning parent, the student themselves, any driver (they
+    // need the manifest for their route), and admins.
+
+    match /students/{studentId} {
+      allow read: if signedIn()
+                  && (resource.data.parentId == uid()
+                      || studentId == uid()
+                      || isDriver()
+                      || isAdmin());
+
+      // `studentId == uid()` covers a student registering themselves. Their
+      // record has no parent yet — an admin or an invite links one later — so
+      // `parentId` is empty and the parent clause can never match it. Without
+      // this case student self-signup is denied outright: the Firebase Auth
+      // account is created, the `users/{uid}` write succeeds, and only the
+      // `students/{uid}` write in the same onboarding batch fails, so the user
+      // lands in a completed-looking account with no student record behind it.
+      allow create: if signedIn()
+                    && (request.resource.data.parentId == uid()
+                        || studentId == uid()
+                        || isAdmin());
+
+      // Three distinct writers, deliberately kept apart:
+      //
+      // 1. The owning family — may edit their child's details, but must not
+      //    reassign the child to another parent, nor lift a transport
+      //    suspension an admin applied.
+      // 2. A student editing their own record, same restrictions.
+      // 3. A driver attaching or detaching themselves, and *only* that. The
+      //    field allow-list is the security boundary here: without it, granting
+      //    a driver any write on a student document would let them rename the
+      //    child, move them to another parent, or clear a suspension. They also
+      //    need an accepted ride request naming them, so a driver cannot claim a
+      //    student who never asked for them.
+      allow update: if signedIn()
+                    && (((resource.data.parentId == uid() || studentId == uid())
+                         && unchanged('parentId')
+                         && unchanged('isTransportSuspended'))
+                        || (isDriver()
+                            && onlyChanges(['driverId', 'scheduleId', 'busId', 'updatedAt'])
+                            && (hasAcceptedRequestFor(studentId)
+                                || resource.data.driverId == uid()))
+                        || isAdmin());
+
+      allow delete: if signedIn()
+                    && (resource.data.parentId == uid() || isAdmin());
+    }
+
+    // ── drivers ─────────────────────────────────────────────────────────────
+    //
+    // Any signed-in user may read a driver profile — parents need the name,
+    // photo and rating of the person driving their child.
+
+    match /drivers/{driverId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn() && (driverId == uid() || isAdmin());
+
+      // Drivers may edit their own details but cannot approve themselves,
+      // reassign their own bus, or inflate their own rating.
+      allow update: if signedIn()
+                    && ((driverId == uid()
+                         && unchanged('status')
+                         && unchanged('rating')
+                         && unchanged('ratingCount')
+                         && unchanged('busId')
+                         && unchanged('routeId'))
+                        || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── buses & routes ──────────────────────────────────────────────────────
+    //
+    // Routes are read-only for the mobile app; the admin app owns them.
+    //
+    // Buses are the one exception. A driver signing themselves up describes
+    // their own vehicle — plate, type, seat capacity — and there is no admin in
+    // the loop at that moment. So a driver may create and edit the bus that
+    // points at them, but never reassign it to someone else and never put it on
+    // a route: route assignment stays an admin decision, which is what stops a
+    // driver from adding themselves to a school run.
+
+    match /buses/{busId} {
+      allow read: if signedIn();
+
+      allow create: if isAdmin()
+                    || (isDriver() && request.resource.data.driverId == uid());
+
+      allow update: if isAdmin()
+                    || (resource.data.driverId == uid()
+                        && unchanged('driverId')
+                        && unchanged('routeId'));
+
+      allow delete: if isAdmin();
+    }
+
+    match /routes/{routeId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── trips & attendance ──────────────────────────────────────────────────
+
+    match /trips/{tripId} {
+      allow read: if signedIn();
+
+      // Only the assigned driver may open a trip, and only on their own id.
+      allow create: if isDriver() && request.resource.data.driverId == uid();
+
+      allow update: if signedIn()
+                    && (resource.data.driverId == uid() || isAdmin());
+
+      allow delete: if isAdmin();
+
+      match /attendance/{studentId} {
+        // Parents need their own child's record; drivers and admins need all.
+        allow read: if signedIn()
+                    && (isDriver() || isAdmin() || ownsStudent(studentId));
+
+        // Only the driver running this trip may mark attendance.
+        allow write: if signedIn()
+                     && (isAdmin()
+                         || get(/databases/$(database)/documents/trips/$(tripId))
+                              .data.driverId == uid());
+      }
+    }
+
+    // ── payments ────────────────────────────────────────────────────────────
+
+    match /payments/{paymentId} {
+      allow read: if signedIn()
+                  && (resource.data.parentId == uid()
+                      || resource.data.studentId == uid()
+                      || resource.data.driverId == uid()
+                      || isAdmin());
+
+      allow create: if signedIn()
+                    && (request.resource.data.parentId == uid() || isAdmin());
+
+      // A parent may attach a slip and mark it submitted, but must never set
+      // status to 'paid' — only the receiving driver or an admin confirms that.
+      allow update: if signedIn()
+                    && ((resource.data.parentId == uid()
+                         && unchanged('status')
+                         && unchanged('amountPaisa')
+                         && unchanged('confirmedBy'))
+                        || resource.data.driverId == uid()
+                        || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── ride requests ───────────────────────────────────────────────────────
+    //
+    // A family asking a driver for a seat. Two parties, each allowed exactly one
+    // half of the conversation, and nobody else able to read it at all — the
+    // payload names a child, their school and their pickup coordinates, so a
+    // broad read like `missedBusRequests` has would be a home-address leak.
+    //
+    // The document id must be the canonical `{driverId}_{studentId}`, and the
+    // creator must own the student. Both are load-bearing, not tidiness: the
+    // `students` update rule authorises a driver by looking up
+    // `ride_requests/{uid()}_{studentId}`, so if a family could invent an id or
+    // name a child that is not theirs, they could forge the exact document that
+    // lets a chosen driver attach themselves to someone else's child.
+
+    match /ride_requests/{requestId} {
+      allow read: if signedIn()
+                  && (resource.data.requesterId == uid()
+                      || resource.data.driverId == uid()
+                      || isAdmin());
+
+      allow create: if signedIn()
+                    && request.resource.data.requesterId == uid()
+                    && ownsStudent(request.resource.data.studentId)
+                    && requestId == request.resource.data.driverId
+                                    + '_' + request.resource.data.studentId
+                    && request.resource.data.status == 'pending';
+
+      // The family may re-ask or withdraw; the driver may answer. Neither may
+      // rewrite who the request is between, or which child it is for — those are
+      // what the id and the student rule are keyed on.
+      allow update: if signedIn()
+                    && unchanged('requesterId')
+                    && unchanged('studentId')
+                    && unchanged('driverId')
+                    && (
+                         // Family: withdraw, or re-send after a decline. Never
+                         // 'accepted' — a parent must not be able to book their
+                         // own seat and skip the driver's decision.
+                         (resource.data.requesterId == uid()
+                          && request.resource.data.status in ['pending', 'cancelled'])
+                         ||
+                         // Driver: answer it. Never back to 'pending', which
+                         // would strand a booked seat with no record of why.
+                         (resource.data.driverId == uid()
+                          && request.resource.data.status in ['accepted', 'rejected'])
+                         || isAdmin()
+                       );
+
+      allow delete: if isAdmin();
+    }
+
+    // ── missed bus requests ─────────────────────────────────────────────────
+    //
+    // Drivers must see the open queue, so reads are broad among signed-in
+    // users. The payload is deliberately low-sensitivity: a first name, a stop
+    // and a destination — no home address, no live coordinates.
+
+    match /missedBusRequests/{requestId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn() && request.resource.data.requestedBy == uid();
+
+      // The requester may cancel; a driver may accept or decline.
+      allow update: if signedIn()
+                    && (resource.data.requestedBy == uid() || isDriver() || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── notifications ───────────────────────────────────────────────────────
+    //
+    // Scoped under the recipient, so ownership is a single comparison.
+
+    match /notifications/{userId}/items/{itemId} {
+      allow read: if signedIn() && userId == uid();
+
+      // Any signed-in user may notify another — a driver alerts parents, a
+      // parent messages a driver. Deletion is the recipient's alone.
+      allow create: if signedIn();
+      allow update: if signedIn() && userId == uid();
+      allow delete: if signedIn() && userId == uid();
+    }
+
+    // ── chat ────────────────────────────────────────────────────────────────
+
+    match /chats/{chatId} {
+      allow read: if signedIn() && uid() in resource.data.participants;
+
+      allow create: if signedIn() && uid() in request.resource.data.participants;
+
+      allow update: if signedIn() && uid() in resource.data.participants;
+
+      match /messages/{messageId} {
+        function inThread() {
+          return uid() in get(/databases/$(database)/documents/chats/$(chatId))
+                            .data.participants;
+        }
+
+        allow read: if signedIn() && inThread();
+
+        // You may only send as yourself.
+        allow create: if signedIn()
+                      && inThread()
+                      && request.resource.data.senderId == uid();
+
+        // Read receipts only; message text is immutable once sent.
+        allow update: if signedIn() && inThread() && unchanged('text');
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ── ratings ─────────────────────────────────────────────────────────────
+    //
+    // The one-per-week rule is enforced by the document id
+    // (`{driverId}_{raterId}_{weekKey}`): a second rating in the same week
+    // collides with an existing document, and create is denied on existing docs.
+
+    match /ratings/{ratingId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+                    && request.resource.data.raterId == uid()
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ── driver documents ────────────────────────────────────────────────────
+
+    match /documents/{documentId} {
+      allow read: if signedIn()
+                  && (resource.data.driverId == uid() || isAdmin());
+
+      allow create: if signedIn()
+                    && request.resource.data.driverId == uid();
+
+      // A driver may replace a file but must not mark it verified.
+      allow update: if signedIn()
+                    && ((resource.data.driverId == uid()
+                         && unchanged('status')
+                         && unchanged('verifiedBy'))
+                        || isAdmin());
+
+      allow delete: if isAdmin();
+    }
+
+    // ── incidents ───────────────────────────────────────────────────────────
+
+    match /incidents/{incidentId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── audit log ───────────────────────────────────────────────────────────
+    //
+    // Append-only. Nobody may edit or erase history from a client.
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // Anything not matched above is denied.
+  }
+}

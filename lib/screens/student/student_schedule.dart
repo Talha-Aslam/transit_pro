@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/student_data_service.dart';
-import '../../models/parent_trip_history_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -223,12 +222,47 @@ class _StudentScheduleState extends State<StudentSchedule> {
     AppStrings.t('day_sat'),
   ];
 
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppStrings.t('my_schedule'),
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            AppStrings.t('pickup_dropoff_timings'),
+            style: TextStyle(color: context.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<StudentInfo>(
       valueListenable: StudentDataService.instance.studentInfo,
       builder: (context, studentInfo, _) {
         final universityStudent = _isUniversityStudent(studentInfo);
+        // Same "no bus assigned yet" signal `parent_schedule.dart` already
+        // gates on — without this, a brand-new student with no real driver
+        // saw `DriverTimingSlots()`'s hardcoded 7:15/8:00/14:30/15:15
+        // defaults as if they were a real schedule.
+        final hasBus =
+            studentInfo.busNumber.isNotEmpty || studentInfo.route.isNotEmpty;
+        if (!hasBus) {
+          return SingleChildScrollView(
+            child: _NoDriverState(header: _buildHeader(context)),
+          );
+        }
         return ValueListenableBuilder<DriverTimingSlots>(
           valueListenable: DriverDataService.instance.timingSlots,
           builder: (context, sharedSlots, _) {
@@ -238,31 +272,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppStrings.t('my_schedule'),
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          AppStrings.t('pickup_dropoff_timings'),
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildHeader(context),
                   const SizedBox(height: 16),
 
                   // ── Day selector ──────────────────────────────
@@ -347,7 +357,10 @@ class _StudentScheduleState extends State<StudentSchedule> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Route A · Bus #42',
+                                  [
+                                    studentInfo.route,
+                                    studentInfo.busNumber,
+                                  ].where((s) => s.isNotEmpty).join(' · '),
                                   style: TextStyle(
                                     color: context.textPrimary,
                                     fontSize: 15,
@@ -356,7 +369,7 @@ class _StudentScheduleState extends State<StudentSchedule> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${AppStrings.t('your_stop')}: Pine Road',
+                                  '${AppStrings.t('your_stop')}: ${studentInfo.stop}',
                                   style: TextStyle(
                                     color: AppTheme.studentAccent,
                                     fontSize: 12,
@@ -468,32 +481,45 @@ class _StudentScheduleState extends State<StudentSchedule> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: GlassCard(
                       padding: const EdgeInsets.all(18),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _WeekStat(
-                            icon: '🚌',
-                            value: buildParentTripHistoryEntries(
-                              DateTime.now(),
-                            ).where((e) => e.completed).length.toString(),
-                            label: AppStrings.t('rides_lbl'),
-                            color: AppTheme.studentAmber,
-                          ),
-                          _WeekStat(
-                            icon: '⏱️',
-                            value: '100%',
-                            label: AppStrings.t('on_time'),
-                            color: AppTheme.success,
-                          ),
-                          _WeekStat(
-                            icon: '🛡️',
-                            value: buildParentTripHistoryEntries(
-                              DateTime.now(),
-                            ).where((e) => e.completed).length.toString(),
-                            label: AppStrings.t('safe_rides'),
-                            color: AppTheme.info,
-                          ),
-                        ],
+                      child: ValueListenableBuilder<int>(
+                        valueListenable:
+                            StudentDataService.instance.completedRidesThisWeek,
+                        builder: (_, ridesThisWeek, _) {
+                          final ridesThisWeekLabel = ridesThisWeek.toString();
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _WeekStat(
+                                icon: '🚌',
+                                value: ridesThisWeekLabel,
+                                label: AppStrings.t('rides_lbl'),
+                                color: AppTheme.studentAmber,
+                              ),
+                              ValueListenableBuilder<int>(
+                                valueListenable:
+                                    StudentDataService.instance.onTimeRate,
+                                builder: (_, rate, _) => _WeekStat(
+                                  icon: '⏱️',
+                                  value: '$rate%',
+                                  label: AppStrings.t('on_time'),
+                                  color: AppTheme.success,
+                                ),
+                              ),
+                              // Same reasoning as `StudentDataService
+                              // .safeRides`: a ride with no incident recorded
+                              // against it is a safe ride, and until the
+                              // Phase 3 safety layer writes incidents, that
+                              // is every boarded ride — so this week's safe
+                              // count equals this week's completed count.
+                              _WeekStat(
+                                icon: '🛡️',
+                                value: ridesThisWeekLabel,
+                                label: AppStrings.t('safe_rides'),
+                                color: AppTheme.info,
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -503,6 +529,42 @@ class _StudentScheduleState extends State<StudentSchedule> {
           },
         );
       },
+    );
+  }
+}
+
+class _NoDriverState extends StatelessWidget {
+  final Widget header;
+  const _NoDriverState({required this.header});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GlassCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Text('🚌', style: TextStyle(fontSize: 32)),
+                const SizedBox(height: 12),
+                Text(
+                  'Please select a driver to view the schedule.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

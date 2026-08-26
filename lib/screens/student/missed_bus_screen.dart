@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart' show GeoCoord;
 import '../../app/language_provider.dart';
 import '../../app/missed_bus_service.dart';
+import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/profile_form_fields.dart';
 
 class MissedBusScreen extends StatefulWidget {
   const MissedBusScreen({super.key});
@@ -17,7 +20,10 @@ class MissedBusScreen extends StatefulWidget {
 class _MissedBusScreenState extends State<MissedBusScreen>
     with SingleTickerProviderStateMixin {
   final _service = MissedBusService.instance;
-  String? _selectedDestination;
+  GeoCoord? _currentStopCoord;
+  String? _currentStopAddress;
+  GeoCoord? _destinationCoord;
+  String? _destinationAddress;
   late AnimationController _pulseCtrl;
   late Animation<double> _pulse;
 
@@ -48,17 +54,40 @@ class _MissedBusScreenState extends State<MissedBusScreen>
 
   void _rebuild() => setState(() {});
 
-  void _submitRequest() {
-    if (_selectedDestination == null) return;
+  /// A human-readable label to persist for a picked point — the resolved
+  /// address once reverse-geocoding catches up, or the raw coordinates as an
+  /// honest fallback if the user submits before that finishes.
+  String _labelFor(GeoCoord coord, String? address) =>
+      address ??
+      '${coord.lat.toStringAsFixed(6)}, ${coord.lng.toStringAsFixed(6)}';
+
+  Future<void> _submitRequest() async {
+    final currentStopCoord = _currentStopCoord;
+    final destinationCoord = _destinationCoord;
+    if (currentStopCoord == null || destinationCoord == null) return;
     final info = StudentDataService.instance.studentInfo.value;
-    _service.raiseRequest(
-      studentName: info.name,
-      studentId: info.studentId,
-      missedBusNumber: info.busNumber,
-      assignedRoute: info.route,
-      currentStop: info.stop,
-      destination: _selectedDestination!,
-    );
+    // The document field `MissedBusRepository` queries on is the real
+    // Firestore student id, not `StudentInfo.studentId` (that's the
+    // school-issued display number).
+    final studentId = SessionService.instance.student.value?.id ?? '';
+    if (studentId.isEmpty) return;
+    try {
+      await _service.raiseRequest(
+        studentName: info.name,
+        studentId: studentId,
+        missedBusNumber: info.busNumber,
+        assignedRoute: info.route,
+        currentStop: _labelFor(currentStopCoord, _currentStopAddress),
+        destination: _labelFor(destinationCoord, _destinationAddress),
+        currentStopCoord: currentStopCoord,
+        destinationCoord: destinationCoord,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not send request: $e')));
+    }
   }
 
   @override
@@ -123,9 +152,16 @@ class _MissedBusScreenState extends State<MissedBusScreen>
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                   child: req == null
                       ? _RequestForm(
-                          selectedDestination: _selectedDestination,
-                          onDestinationChanged: (v) =>
-                              setState(() => _selectedDestination = v),
+                          currentStopCoord: _currentStopCoord,
+                          destinationCoord: _destinationCoord,
+                          onCurrentStopPicked: (p) =>
+                              setState(() => _currentStopCoord = p),
+                          onCurrentStopAddressResolved: (a) =>
+                              setState(() => _currentStopAddress = a),
+                          onDestinationPicked: (p) =>
+                              setState(() => _destinationCoord = p),
+                          onDestinationAddressResolved: (a) =>
+                              setState(() => _destinationAddress = a),
                           onSubmit: _submitRequest,
                         )
                       : _RequestStateView(
@@ -146,22 +182,28 @@ class _MissedBusScreenState extends State<MissedBusScreen>
 
 // ─── Request Form ─────────────────────────────────────────────────────────────
 class _RequestForm extends StatelessWidget {
-  final String? selectedDestination;
-  final ValueChanged<String?> onDestinationChanged;
+  final GeoCoord? currentStopCoord;
+  final GeoCoord? destinationCoord;
+  final ValueChanged<GeoCoord> onCurrentStopPicked;
+  final ValueChanged<String?> onCurrentStopAddressResolved;
+  final ValueChanged<GeoCoord> onDestinationPicked;
+  final ValueChanged<String?> onDestinationAddressResolved;
   final VoidCallback onSubmit;
 
   const _RequestForm({
-    required this.selectedDestination,
-    required this.onDestinationChanged,
+    required this.currentStopCoord,
+    required this.destinationCoord,
+    required this.onCurrentStopPicked,
+    required this.onCurrentStopAddressResolved,
+    required this.onDestinationPicked,
+    required this.onDestinationAddressResolved,
     required this.onSubmit,
   });
 
   @override
   Widget build(BuildContext context) {
     final info = StudentDataService.instance.studentInfo.value;
-    final stops = MissedBusService.routeStops
-        .where((s) => s != info.stop)
-        .toList();
+    final canSubmit = currentStopCoord != null && destinationCoord != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,7 +258,8 @@ class _RequestForm extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Current stop (read-only)
+        // Current stop — where to pick you up from right now, dropped on the
+        // map rather than trusting the stale registered stop label.
         Text(
           AppStrings.t('your_current_stop'),
           style: TextStyle(
@@ -227,27 +270,12 @@ class _RequestForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: context.cardBgElevated,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.surfaceBorder),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.location_on_rounded, color: AppTheme.error, size: 18),
-              const SizedBox(width: 10),
-              Text(
-                info.stop,
-                style: TextStyle(
-                  color: context.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+        MapPointField(
+          placeholder: 'Tap to pin where you are',
+          value: currentStopCoord,
+          accentColor: AppTheme.studentAmber,
+          onPicked: onCurrentStopPicked,
+          onAddressResolved: onCurrentStopAddressResolved,
         ),
         const SizedBox(height: 20),
 
@@ -300,65 +328,28 @@ class _RequestForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: context.inputFill,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selectedDestination != null
-                  ? AppTheme.driverCyan.withValues(alpha: 0.5)
-                  : context.inputBorder,
-            ),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedDestination,
-              hint: Text(
-                'Select your destination',
-                style: TextStyle(color: context.textHint, fontSize: 14),
-              ),
-              isExpanded: true,
-              dropdownColor: context.cardBg,
-              icon: Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: context.textSecondary,
-              ),
-              items: stops
-                  .map(
-                    (s) => DropdownMenuItem(
-                      value: s,
-                      child: Text(
-                        s,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: onDestinationChanged,
-            ),
-          ),
+        MapPointField(
+          placeholder: 'Tap to pin where you need to go',
+          value: destinationCoord,
+          accentColor: AppTheme.studentAmber,
+          onPicked: onDestinationPicked,
+          onAddressResolved: onDestinationAddressResolved,
         ),
         const SizedBox(height: 32),
 
         // Submit button
         GestureDetector(
-          onTap: selectedDestination != null ? onSubmit : null,
+          onTap: canSubmit ? onSubmit : null,
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 15),
             decoration: BoxDecoration(
-              gradient: selectedDestination != null
+              gradient: canSubmit
                   ? const LinearGradient(
                       colors: [AppTheme.error, Color(0xFFFF6B35)],
                     )
                   : null,
-              color: selectedDestination == null
-                  ? context.cardBgElevated
-                  : null,
+              color: canSubmit ? null : context.cardBgElevated,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
@@ -367,18 +358,14 @@ class _RequestForm extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.send_rounded,
-                    color: selectedDestination != null
-                        ? Colors.white
-                        : context.textTertiary,
+                    color: canSubmit ? Colors.white : context.textTertiary,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     AppStrings.t('send_pickup_request'),
                     style: TextStyle(
-                      color: selectedDestination != null
-                          ? Colors.white
-                          : context.textTertiary,
+                      color: canSubmit ? Colors.white : context.textTertiary,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
@@ -613,6 +600,13 @@ class _AcceptedView extends StatelessWidget {
                 label: 'Phone',
                 value: request.assignedDriverPhone ?? '—',
                 color: AppTheme.purple,
+              ),
+              const SizedBox(height: 12),
+              _InfoTile(
+                icon: Icons.payments_rounded,
+                label: 'Fare (pay driver directly)',
+                value: request.fareDisplay ?? 'Ask driver',
+                color: AppTheme.warning,
               ),
             ],
           ),

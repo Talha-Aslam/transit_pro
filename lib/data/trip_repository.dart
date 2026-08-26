@@ -52,6 +52,11 @@ class TripRepository {
           studentId: s.id,
           studentName: s.name,
           stopId: s.stopId,
+          // Denormalised so `fetchAttendanceForStudent`'s collection-group
+          // query can filter/sort without reading the parent trip.
+          tripId: ref.id,
+          dateKey: trip.dateKey,
+          driverId: driverId,
         ).toMap(),
       );
     }
@@ -122,6 +127,20 @@ class TripRepository {
   Stream<List<AttendanceRecord>> watchAttendance(String tripId) =>
       Db.attendance(tripId).snapshots().docsList;
 
+  /// One student's own attendance row on one trip.
+  ///
+  /// A parent/student may only read their own child's attendance document
+  /// (`firestore.rules`'s `ownsStudent(studentId)` check on
+  /// `trips/{tripId}/attendance/{studentId}`) — [watchAttendance] queries the
+  /// whole subcollection, which Firestore rejects for anyone but the trip's
+  /// driver or an admin. This is the query a family's own tracking screen
+  /// can actually run.
+  Stream<AttendanceRecord?> watchAttendanceForStudent(
+    String tripId,
+    String studentId,
+  ) =>
+      Db.attendance(tripId).doc(studentId).snapshots().map((s) => s.data());
+
   Future<void> markAttendance({
     required String tripId,
     required String studentId,
@@ -141,14 +160,26 @@ class TripRepository {
         'stopId': ?stopId,
       }, SetOptions(merge: true));
 
-  /// A student's attendance across trips — powers parent/student trip history.
+  /// A student's attendance across trips, newest first — powers
+  /// parent/student trip history.
+  ///
+  /// This used to filter with `where(FieldPath.documentId, isEqualTo:
+  /// studentId)`, which silently returned nothing: a collection-group query's
+  /// `__name__`/document-id comparison requires a *full document path*
+  /// (`trips/{tripId}/attendance/{studentId}`), not a bare id, and nothing
+  /// here ever had the full path to give it. Filtering on the real
+  /// `studentId` *field* instead — written by [startTrip] since
+  /// `AttendanceRecord` gained denormalised `studentId`/`dateKey` — is what
+  /// actually works. Needs the composite index in `firestore.indexes.json`
+  /// on the `attendance` collection group (`studentId` asc, `dateKey` desc).
   Future<List<AttendanceRecord>> fetchAttendanceForStudent(
     String studentId, {
     int limit = 50,
   }) async {
     final snap = await Db.fs
         .collectionGroup('attendance')
-        .where(FieldPath.documentId, isEqualTo: studentId)
+        .where('studentId', isEqualTo: studentId)
+        .orderBy('dateKey', descending: true)
         .limit(limit)
         .get();
     return snap.docs
