@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "231263449779",
+    "firebase_url": "https://transitpro-db-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "transitpro-db",
     "storage_bucket": "transitpro-db.firebasestorage.app"
   },
@@ -27,6 +28,14 @@
           "android_info": {
             "package_name": "com.example.transit_pro",
             "certificate_hash": "b6b255a2be883c5eb93ad8934eeab994dbefc491"
+          }
+        },
+        {
+          "client_id": "231263449779-k4lgheujqaukh1iakr0o7fcdcnmkf396.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.transit_pro",
+            "certificate_hash": "6b0a37dc123b5d93c16e392c0c08240563495f73"
           }
         },
         {
@@ -65,6 +74,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "231263449779-7m08b9dvkbrrcjr7qnsf7vju4qt38qir.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.transit_admin",
+            "certificate_hash": "6b0a37dc123b5d93c16e392c0c08240563495f73"
+          }
+        },
         {
           "client_id": "231263449779-l6fklb1bs39f0vphrgdhkksuq8m2lt2q.apps.googleusercontent.com",
           "client_type": 1,

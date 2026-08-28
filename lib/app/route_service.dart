@@ -228,14 +228,18 @@ class RouteService {
   ///
   /// [sessionToken] must be the same string across every suggest/retrieve
   /// call in one user search session (see [newSessionToken]) — the Search
-  /// Box API is billed per session, keyed on this value. Returns an empty
-  /// list with no token, a blank query, or a failed/empty lookup — never
-  /// throws.
+  /// Box API is billed per session, keyed on this value. [poiCategory] is
+  /// passed straight through as Mapbox's `poi_category` filter — a
+  /// comma-separated list of canonical category ids (e.g.
+  /// `'school,college,university'`) to narrow results to that kind of place.
+  /// Returns an empty list with no token, a blank query, or a failed/empty
+  /// lookup — never throws.
   Future<List<GeocodeResult>> searchPlaces(
     String query, {
     required String sessionToken,
     GeoCoord? near,
     int limit = 8,
+    String? poiCategory,
   }) async {
     final trimmed = query.trim();
     if (!_hasToken || trimmed.isEmpty) return [];
@@ -250,6 +254,7 @@ class RouteService {
           'country': 'pk',
           'limit': limit.toString(),
           if (near != null) 'proximity': '${near.lng},${near.lat}',
+          if (poiCategory != null) 'poi_category': poiCategory,
         },
       );
       final response = await http.get(uri);

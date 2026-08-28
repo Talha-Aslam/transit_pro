@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-08-18
+> **Last updated:** 2026-08-28
 
 ---
 
@@ -661,6 +661,57 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-08-28 (later) — hide the live ETA card for a new account with no driver yet, make its "to school"/"to home" text real
+
+Same class of bug as the schedule-chip fix just below: the parent dashboard's
+"8 min to school" / "Currently at [stop]" card (just above the "Find Driver"
+section) rendered unconditionally, even for a brand-new account with no
+driver ever accepted — a fabricated ETA with nothing behind it.
+
+Added `_isLinkedWithDriver(child)` (`child != null && child.driver.isNotEmpty`
+— the same "has an assigned driver" signal `_timingSlotsFor` already uses)
+and wrapped the entire card in `if (_isLinkedWithDriver(child)) ...[...]`
+inside the dashboard's `Column`. Nothing renders — not even a placeholder —
+until a driver is actually linked.
+
+**Also made the destination text real, not hardcoded.** It always read
+`AppStrings.t('to_school')` regardless of time of day. Added
+`_etaDestinationLabel(slots)`: compares `TimeOfDay.now()` against the linked
+driver's own `afternoonPickupFromSchool` slot (the same real per-driver
+`timingSlots` `_timingSlotsFor` reads) — before that time it's the morning
+home→school leg ("to school"), at/after it's the afternoon school→home leg
+("to home"). Added the missing `to_home` string key (English + Urdu) to
+`language_provider.dart` alongside the existing `to_school`. The ETA minutes
+figure itself was already live (`TrackingService.instance.etaMinutes` via
+`ValueListenableBuilder`) — untouched.
+
+**What this does not yet do, honestly:** there's still no real per-trip
+"direction" field anywhere in the data model (`Trip`, `RouteData`) — Phase 2
+(live tracking) hasn't started, so nothing writes real trip state yet. The
+time-of-day heuristic against the driver's own schedule is the best real
+signal available today; if/when Phase 2 lands actual trip direction, this
+should read that instead of inferring it from the clock.
+
+`flutter analyze lib/screens/parent/parent_dashboard.dart
+lib/app/language_provider.dart`: 0 issues.
+
+### 2026-08-28 — hide "Done"/"Pending" schedule badges for a new account with no active trip
+
+Parent dashboard bug: the "Today's Schedule" card's three chips (Pickup, At
+School, Drop Off) always showed a "Done"/"Pending" status badge, even for a
+brand-new account with no driver assigned yet and no trip data at all —
+fabricated status on an empty state.
+
+`_timingSlotsFor` already returned `null` in exactly that case (no driver
+assigned, or the driver record hasn't resolved yet) and the chips already used
+that to show `'—'` for the time instead of a real one — the badge just wasn't
+wired to the same check. Fixed by making `_ScheduleChip.status` nullable and
+hiding its badge `Container` entirely when null, then passing `null` from all
+three call sites when `slots == null`. The icons and labels (Pickup, At
+School, Drop Off) still render unconditionally — only the badge disappears.
+
+`flutter analyze lib/screens/parent/parent_dashboard.dart`: 0 issues.
 
 ### 2026-08-18 (map picker polish) — search bar, "my location", visible Done button
 

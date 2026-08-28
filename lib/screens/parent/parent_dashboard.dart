@@ -44,6 +44,32 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   void _onLangChanged() => setState(() {});
 
+  /// True once [child] is actually matched with a driver (`child.driver`
+  /// holds the driver's uid) -- the signal that distinguishes a real,
+  /// upcoming/in-progress trip from a brand-new account nobody has accepted
+  /// yet. The live ETA card has nothing honest to show before this is true,
+  /// so it stays hidden rather than displaying a placeholder ETA.
+  bool _isLinkedWithDriver(ChildInfo? child) =>
+      child != null && child.driver.isNotEmpty;
+
+  /// Which leg of the day the live ETA card should describe: "to school" for
+  /// the morning home→school run, "to home" once the afternoon school→home
+  /// run has started. Driven by the assigned driver's own real
+  /// `timingSlots` (the same schedule [_timingSlotsFor] already reads) --
+  /// the afternoon leg begins at `afternoonPickupFromSchool`, so anything at
+  /// or after that time is the ride home, not the ride in.
+  String _etaDestinationLabel(DriverTimingSlots? slots) {
+    if (slots == null) return AppStrings.t('to_school');
+    final now = TimeOfDay.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final afternoonStart =
+        slots.afternoonPickupFromSchool.hour * 60 +
+        slots.afternoonPickupFromSchool.minute;
+    return nowMinutes >= afternoonStart
+        ? AppStrings.t('to_home')
+        : AppStrings.t('to_school');
+  }
+
   /// Real per-driver pickup/drop-off times for [child], when the assigned
   /// driver's record has already been resolved by
   /// `SessionService._resolveReferences` (child.driver holds the driver's
@@ -384,140 +410,148 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         ),
                         const SizedBox(height: 12),
 
-                        // â”€â”€ Live ETA card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                        GlassCard(
-                          enableBlur: false,
-                          onTap: () => widget.onNavigate(1),
-                          gradient: LinearGradient(
-                            colors: [
-                              AppTheme.parentPurple.withValues(alpha: 0.2),
-                              AppTheme.parentIndigo.withValues(alpha: 0.08),
-                            ],
-                          ),
-                          borderColor: AppTheme.parentPurple.withValues(
-                            alpha: 0.25,
-                          ),
-                          padding: const EdgeInsets.all(13),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  gradient: AppTheme.parentGradient,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppTheme.parentPurple.withValues(
-                                        alpha: 0.4,
+                        // ── Live ETA card ──────────────────────────────────
+                        // Hidden entirely until `child` is actually matched
+                        // with a driver -- a new account with no ride ever
+                        // arranged has no ETA to show, real or placeholder.
+                        if (_isLinkedWithDriver(child)) ...[
+                          GlassCard(
+                            enableBlur: false,
+                            onTap: () => widget.onNavigate(1),
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.parentPurple.withValues(alpha: 0.2),
+                                AppTheme.parentIndigo.withValues(alpha: 0.08),
+                              ],
+                            ),
+                            borderColor: AppTheme.parentPurple.withValues(
+                              alpha: 0.25,
+                            ),
+                            padding: const EdgeInsets.all(13),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.parentGradient,
+                                    borderRadius: BorderRadius.circular(18),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.parentPurple.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
                                       ),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Image.asset(
+                                      'assets/images/path_transparent.gif',
+                                      width: 52,
+                                      height: 52,
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
                                     ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Image.asset(
-                                    'assets/images/path_transparent.gif',
-                                    width: 52,
-                                    height: 52,
-                                    fit: BoxFit.contain,
-                                    filterQuality: FilterQuality.high,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      child == null
-                                          ? 'N/A'
-                                          : '${child.busNumber.toUpperCase()} - ${child.route.toUpperCase()}',
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.5,
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        child == null
+                                            ? 'N/A'
+                                            : '${child.busNumber.toUpperCase()} - ${child.route.toUpperCase()}',
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.5,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.baseline,
-                                      textBaseline: TextBaseline.alphabetic,
-                                      children: [
-                                        ShaderMask(
-                                          shaderCallback: (b) =>
-                                              const LinearGradient(
-                                                colors: [
-                                                  Color(0xFFA78BFA),
-                                                  Color(0xFF60A5FA),
-                                                ],
-                                              ).createShader(b),
-                                          child: ValueListenableBuilder<int>(
-                                            valueListenable: TrackingService
-                                                .instance
-                                                .etaMinutes,
-                                            builder: (_, eta, _) => Text(
-                                              '$eta min',
-                                              style: TextStyle(
-                                                color: context.textPrimary,
-                                                fontSize: 30,
-                                                fontWeight: FontWeight.w800,
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          ShaderMask(
+                                            shaderCallback: (b) =>
+                                                const LinearGradient(
+                                                  colors: [
+                                                    Color(0xFFA78BFA),
+                                                    Color(0xFF60A5FA),
+                                                  ],
+                                                ).createShader(b),
+                                            child: ValueListenableBuilder<int>(
+                                              valueListenable: TrackingService
+                                                  .instance
+                                                  .etaMinutes,
+                                              builder: (_, eta, _) => Text(
+                                                '$eta min',
+                                                style: TextStyle(
+                                                  color: context.textPrimary,
+                                                  fontSize: 30,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          AppStrings.t('to_school'),
-                                          style: TextStyle(
-                                            color: context.textSecondary,
-                                            fontSize: 13,
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            _etaDestinationLabel(
+                                              _timingSlotsFor(child),
+                                            ),
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 13,
+                                            ),
                                           ),
+                                        ],
+                                      ),
+                                      Text(
+                                        child == null
+                                            ? ''
+                                            : '\ud83d\udccd ${AppStrings.t('currently_at')} ${child.stop}',
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                      ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.parentAccent.withValues(
+                                      alpha: 0.2,
                                     ),
-                                    Text(
-                                      child == null
-                                          ? ''
-                                          : '\ud83d\udccd ${AppStrings.t('currently_at')} ${child.stop}',
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.parentAccent.withValues(
+                                        alpha: 0.3,
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.parentAccent.withValues(
-                                    alpha: 0.2,
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: AppTheme.parentAccent.withValues(
-                                      alpha: 0.3,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 18,
                                     ),
                                   ),
                                 ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.arrow_forward_ios,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ],
 
                         // ── Driver matching ───────────────────────────────
                         const FindDriverBanner(
@@ -643,11 +677,15 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             // Real pickup/drop-off times, sourced from the
                             // assigned driver's own `timingSlots` once
                             // SessionService has resolved that driver (see
-                            // _timingSlotsFor). "Done"/"Pending" stays a
-                            // placeholder: turning it into a real boarded/
-                            // not-boarded flag needs today's attendance
-                            // record, which is part of the same trip-data gap
-                            // noted above the stats grid.
+                            // _timingSlotsFor). `slots == null` also means no
+                            // active trip yet (new account, no driver
+                            // assigned) -- the chips hide their "Done"/
+                            // "Pending" badge in that case instead of showing
+                            // a fabricated status. "Done"/"Pending" itself
+                            // stays a placeholder otherwise: turning it into a
+                            // real boarded/not-boarded flag needs today's
+                            // attendance record, which is part of the same
+                            // trip-data gap noted above the stats grid.
                             final slots = _timingSlotsFor(child);
                             return GlassCard(
                               enableBlur: false,
@@ -676,8 +714,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           decoration: BoxDecoration(
                                             color: AppTheme.parentAccent
                                                 .withValues(alpha: 0.15),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                             border: Border.all(
                                               color: AppTheme.parentAccent
                                                   .withValues(alpha: 0.3),
@@ -706,7 +745,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                             : formatTimeOfDay(
                                                 slots.morningPickupFromHome,
                                               ),
-                                        status: AppStrings.t('done'),
+                                        status: slots == null
+                                            ? null
+                                            : AppStrings.t('done'),
                                         color: AppTheme.success,
                                       ),
                                       const SizedBox(width: 8),
@@ -719,7 +760,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                             : formatTimeOfDay(
                                                 slots.morningDropoffAtSchool,
                                               ),
-                                        status: AppStrings.t('done'),
+                                        status: slots == null
+                                            ? null
+                                            : AppStrings.t('done'),
                                         color: AppTheme.success,
                                       ),
                                       const SizedBox(width: 8),
@@ -732,7 +775,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                             : formatTimeOfDay(
                                                 slots.afternoonDropoffAtHome,
                                               ),
-                                        status: AppStrings.t('pending'),
+                                        status: slots == null
+                                            ? null
+                                            : AppStrings.t('pending'),
                                         color: AppTheme.warning,
                                       ),
                                     ],
@@ -760,8 +805,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
                         // â”€â”€ Recent alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         ValueListenableBuilder<List<AppNotification>>(
-                          valueListenable:
-                              NotificationService.instance.history,
+                          valueListenable: NotificationService.instance.history,
                           builder: (context, history, _) {
                             // Sourced from NotificationService.history (the
                             // same stream parent_notifications.dart reads),
@@ -795,8 +839,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           decoration: BoxDecoration(
                                             color: AppTheme.parentAccent
                                                 .withValues(alpha: 0.15),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                             border: Border.all(
                                               color: AppTheme.parentAccent
                                                   .withValues(alpha: 0.3),
@@ -1017,7 +1062,9 @@ Future<_FamilyTripStats> _loadFamilyTripStats(List<String> childIds) async {
   }
 
   final rated = boarded.where((r) => trips[r.tripId]?.onTime != null);
-  final onTimeCount = rated.where((r) => trips[r.tripId]!.onTime == true).length;
+  final onTimeCount = rated
+      .where((r) => trips[r.tripId]!.onTime == true)
+      .length;
   final ratedCount = rated.length;
   final onTimePct = ratedCount == 0
       ? 0
@@ -1100,7 +1147,11 @@ class _StatCard extends StatelessWidget {
 }
 
 class _ScheduleChip extends StatelessWidget {
-  final String icon, label, time, status;
+  final String icon, label, time;
+  // Null for a new/empty account with no active trip yet -- there's nothing
+  // "Done" or "Pending" to report, so the badge is hidden entirely rather
+  // than showing a fabricated status.
+  final String? status;
   final Color color;
 
   const _ScheduleChip({
@@ -1144,23 +1195,25 @@ class _ScheduleChip extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: color.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
+            if (status != null) ...[
+              const SizedBox(height: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: color.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  status!,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

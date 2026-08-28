@@ -64,6 +64,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _searching = false;
   bool _locating = false;
 
+  /// The device's real GPS fix, fetched once on open — used to bias search
+  /// results (Mapbox `proximity`) toward where the user actually is rather
+  /// than wherever the pin happens to be sitting, and to show each result's
+  /// distance the way inDrive's route-entry search does. Best-effort only:
+  /// left null on denied/disabled location services, in which case results
+  /// fall back to biasing off [_selected] and no distance is shown — this
+  /// screen must stay usable without location permission.
+  GeoCoord? _userLocation;
+
   /// Search Box API session token — see [RouteService.newSessionToken].
   /// Minted on the field gaining focus or the first non-empty query
   /// (whichever happens first) and reused for every suggest/retrieve call
@@ -113,6 +122,21 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     });
 
     _searchFocus.addListener(_onSearchFocusChanged);
+    unawaited(_loadUserLocation());
+  }
+
+  Future<void> _loadUserLocation() async {
+    final allowed = await ensureLocationPermission();
+    if (!allowed || !mounted) return;
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(
+        () => _userLocation = GeoCoord(position.latitude, position.longitude),
+      );
+    } catch (_) {
+      // Best-effort — search and the map both work fine without this.
+    }
   }
 
   @override
@@ -230,16 +254,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       // plain address geocoding. Fall back to forwardGeocode only when it
       // comes back empty (no cost when the primary call already succeeded),
       // since Geocoding v6 can still do better on plain street addresses.
+      final near = _userLocation ?? _selected;
       var results = await RouteService.instance.searchPlaces(
         query,
         sessionToken: token,
-        near: _selected,
+        near: near,
       );
       if (results.isEmpty) {
-        results = await RouteService.instance.forwardGeocode(
-          query,
-          near: _selected,
-        );
+        results = await RouteService.instance.forwardGeocode(query, near: near);
       }
       if (!mounted || _searchCtrl.text != query) return;
       setState(() {
@@ -377,6 +399,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   focusNode: _searchFocus,
                   searching: _searching,
                   results: _searchResults,
+                  userLocation: _userLocation,
                   onChanged: _onSearchChanged,
                   onResultTap: _onResultSelected,
                   onClear: () {
@@ -661,12 +684,21 @@ class _CoordField extends StatelessWidget {
   }
 }
 
-/// Search field + its results dropdown, floating over the map.
+/// Search field + its results dropdown, floating over the map. The result
+/// row layout — bold title, muted address below, distance pinned to the
+/// trailing edge — mirrors the route-entry search inDrive and similar
+/// ride-hailing apps use, since parents picking a pickup/dropoff point are
+/// solving the exact same "which of these nearby places did I mean" problem.
 class _SearchBox extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool searching;
   final List<GeocodeResult> results;
+
+  /// The device's real location, when known — purely presentational here
+  /// (each result's distance is computed against it); the actual proximity
+  /// bias sent to Mapbox happens in [_MapPickerScreenState._onSearchChanged].
+  final GeoCoord? userLocation;
   final ValueChanged<String> onChanged;
   final ValueChanged<GeocodeResult> onResultTap;
   final VoidCallback onClear;
@@ -676,10 +708,27 @@ class _SearchBox extends StatelessWidget {
     required this.focusNode,
     required this.searching,
     required this.results,
+    required this.userLocation,
     required this.onChanged,
     required this.onResultTap,
     required this.onClear,
   });
+
+  /// "850 m" below a kilometre, "2.4 km" above — matches how inDrive/Google
+  /// Maps switch units, and avoids a misleadingly precise "0.2 km" for
+  /// anything genuinely nearby. Null with no known [userLocation].
+  String? _distanceLabel(GeoCoord to) {
+    final from = userLocation;
+    if (from == null) return null;
+    final meters = Geolocator.distanceBetween(
+      from.lat,
+      from.lng,
+      to.lat,
+      to.lng,
+    );
+    if (meters < 1000) return '${meters.round()} m';
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -745,23 +794,68 @@ class _SearchBox extends StatelessWidget {
                       Divider(height: 1, color: context.surfaceBorder),
                   itemBuilder: (_, i) {
                     final r = results[i];
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(
-                        Icons.place_outlined,
-                        color: context.textTertiary,
-                        size: 20,
-                      ),
-                      title: Text(
-                        r.label,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 13,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    final subtitle = r.placeFormatted ?? r.label;
+                    final title = r.name ?? r.label;
+                    final distance = _distanceLabel(r.coord);
+                    return InkWell(
                       onTap: () => onResultTap(r),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.place_outlined,
+                              color: context.textTertiary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (subtitle != title) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: context.textTertiary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (distance != null) ...[
+                              const SizedBox(width: 10),
+                              Text(
+                                distance,
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),

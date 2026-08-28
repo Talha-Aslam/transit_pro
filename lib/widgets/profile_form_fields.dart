@@ -134,16 +134,36 @@ class ThemedDropdown extends StatelessWidget {
 
 // ── School autocomplete ─────────────────────────────────────────────────────
 
-/// Searchable school picker that also accepts a name not on the list.
+/// Searchable school/campus picker backed by Mapbox's Search Box API — the
+/// same suggest→retrieve, session-tokened flow [MapPickerScreen] uses for
+/// its own search box (see `RouteService.searchPlaces`). Filters on the
+/// `education` family of POI categories so "punjab col..." surfaces actual
+/// campuses (with the branch address to disambiguate — e.g. "Airline
+/// Campus" vs "Township Campus") instead of generic address matches.
 ///
-/// The sentinel `__manual__:` option is how a user registers at a school the
-/// hardcoded list has never heard of, which for a pilot in Lahore is most of
-/// them.
-class SchoolSearchField extends StatelessWidget {
+/// [onLocationSelected] fires with the resolved campus coordinates whenever
+/// a real suggestion (not a manual entry) is picked, so a caller can drop a
+/// pin on a map or stash the point for later without a second lookup.
+///
+/// The sentinel `__manual__:` option — always pinned to the bottom of the
+/// results — is how a user registers at a school Mapbox has never heard of,
+/// same fallback the old hardcoded-list version offered. [kSchoolList] is
+/// kept as a last-resort local fallback merged in only when the live search
+/// comes back empty (no token configured, offline, or genuinely no match).
+class SchoolSearchField extends StatefulWidget {
   final TextEditingController controller;
   final bool isCustom;
   final void Function(bool) onCustomChanged;
   final Color accentColor;
+
+  /// Biases results toward this point (Mapbox's `proximity`) — pass the
+  /// family's home/city location when known so "Punjab College" resolves to
+  /// the nearby campus first.
+  final GeoCoord? near;
+
+  /// Called with the campus's coordinates when a live search result (not a
+  /// manual entry, which has no known location) is selected.
+  final ValueChanged<GeoCoord>? onLocationSelected;
 
   const SchoolSearchField({
     super.key,
@@ -151,89 +171,254 @@ class SchoolSearchField extends StatelessWidget {
     required this.isCustom,
     required this.onCustomChanged,
     this.accentColor = AppTheme.parentAccent,
+    this.near,
+    this.onLocationSelected,
   });
 
-  static const _manual = '__manual__:';
+  @override
+  State<SchoolSearchField> createState() => _SchoolSearchFieldState();
+}
+
+class _SchoolSearchFieldState extends State<SchoolSearchField> {
+  // Mapbox canonical POI category ids, confirmed against the live
+  // /list/category endpoint — 'education' alone only matches POIs tagged
+  // with that exact parent category, not its more specific children below,
+  // which is how real campuses are actually tagged.
+  static const _poiCategory =
+      'school,college,university,high_school,elementary_school,'
+      'kindergarten,community_college';
+
+  final _layerLink = LayerLink();
+  final _overlayController = OverlayPortalController();
+  final _focusNode = FocusNode();
+
+  Timer? _debounce;
+  String? _sessionToken;
+  List<GeocodeResult> _results = [];
+  bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) _overlayController.hide();
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String query) {
+    widget.controller.text = query;
+    final trimmed = query.trim();
+    _debounce?.cancel();
+
+    if (trimmed.isEmpty) {
+      _sessionToken = null;
+      setState(() {
+        _results = [];
+        _searching = false;
+      });
+      _overlayController.hide();
+      return;
+    }
+
+    _overlayController.show();
+    // First keystroke of a search opens a Search Box API session; reused for
+    // every suggest/retrieve call until the field goes back to empty, per
+    // Mapbox's per-session billing model (mirrors MapPickerScreen).
+    final token = _sessionToken ??= RouteService.newSessionToken();
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 400), () async {
+      final results = await RouteService.instance.searchPlaces(
+        trimmed,
+        sessionToken: token,
+        near: widget.near,
+        poiCategory: _poiCategory,
+      );
+      // The field may have moved on to a different query while this was in
+      // flight — never let a slow, stale response overwrite it.
+      if (!mounted || widget.controller.text.trim() != trimmed) return;
+      setState(() {
+        _results = results.isNotEmpty ? results : _localFallback(trimmed);
+        _searching = false;
+      });
+    });
+  }
+
+  /// Local, coordinate-less matches from the static list — only used when
+  /// the live API genuinely found nothing (commonly: no Mapbox token
+  /// configured on this build, or the device is offline).
+  List<GeocodeResult> _localFallback(String query) {
+    final lower = query.toLowerCase();
+    return kSchoolList
+        .where((s) => s.toLowerCase().contains(lower))
+        .map((s) => GeocodeResult(label: s, coord: const GeoCoord(0, 0)))
+        .toList();
+  }
+
+  void _selectResult(GeocodeResult result) {
+    final name = result.name ?? result.label;
+    widget.controller.text = name;
+    widget.onCustomChanged(false);
+    // The local fallback path has no real coordinate — only forward a point
+    // that actually came back from Mapbox.
+    if (result.placeFormatted != null || result.name != null) {
+      widget.onLocationSelected?.call(result.coord);
+    }
+    _overlayController.hide();
+    _focusNode.unfocus();
+    setState(() => _results = []);
+  }
+
+  void _selectManual(String typed) {
+    widget.controller.text = typed;
+    widget.onCustomChanged(true);
+    _overlayController.hide();
+    _focusNode.unfocus();
+    setState(() => _results = []);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: controller.text),
-      optionsBuilder: (textEditingValue) {
-        final query = textEditingValue.text.trim().toLowerCase();
-        if (query.isEmpty) return const Iterable<String>.empty();
-        final matches = kSchoolList
-            .where((s) => s.toLowerCase().contains(query))
-            .toList();
-        return [...matches, '$_manual${textEditingValue.text.trim()}'];
-      },
-      displayStringForOption: (option) =>
-          option.startsWith(_manual) ? '' : option,
-      onSelected: (option) {
-        if (option.startsWith(_manual)) {
-          controller.text = option.substring(_manual.length);
-          onCustomChanged(true);
-        } else {
-          controller.text = option;
-          onCustomChanged(false);
-        }
-      },
-      fieldViewBuilder: (bCtx, fieldCtrl, focusNode, onFieldSubmitted) {
-        return TextField(
-          controller: fieldCtrl,
-          focusNode: focusNode,
-          onChanged: (value) => controller.text = value,
-          style: TextStyle(color: context.textPrimary, fontSize: 15),
-          decoration: InputDecoration(
-            hintText: AppStrings.t('search_school_hint'),
-            suffixIcon: isCustom
-                ? Icon(Icons.edit_note, color: accentColor, size: 20)
-                : Icon(Icons.search, color: context.textTertiary, size: 18),
-          ),
-        );
-      },
-      optionsViewBuilder: (bCtx, onSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(12),
-            color: context.cardBgElevated,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                shrinkWrap: true,
-                children: options.map((option) {
-                  final isManual = option.startsWith(_manual);
-                  final label = isManual
-                      ? '+ Add "${option.substring(_manual.length)}" manually'
-                      : option;
-                  return InkWell(
-                    onTap: () => onSelected(option),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          color: isManual ? accentColor : context.textPrimary,
-                          fontSize: 14,
-                          fontWeight: isManual
-                              ? FontWeight.w600
-                              : FontWeight.w400,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final fieldWidth = constraints.maxWidth;
+        return CompositedTransformTarget(
+          link: _layerLink,
+          child: OverlayPortal(
+            controller: _overlayController,
+            overlayChildBuilder: (overlayCtx) => CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.bottomLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: const Offset(0, 6),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: fieldWidth,
+                  child: _buildResults(overlayCtx),
+                ),
+              ),
+            ),
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              onChanged: _onChanged,
+              onTap: () {
+                if (widget.controller.text.trim().isNotEmpty) {
+                  _overlayController.show();
+                }
+              },
+              style: TextStyle(color: context.textPrimary, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: AppStrings.t('search_school_hint'),
+                suffixIcon: _searching
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      )
+                    : (widget.isCustom
+                          ? Icon(
+                              Icons.edit_note,
+                              color: widget.accentColor,
+                              size: 20,
+                            )
+                          : Icon(
+                              Icons.search,
+                              color: context.textTertiary,
+                              size: 18,
+                            )),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildResults(BuildContext context) {
+    final query = widget.controller.text.trim();
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(12),
+      color: context.cardBgElevated,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 260),
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          shrinkWrap: true,
+          children: [
+            for (final r in _results)
+              InkWell(
+                onTap: () => _selectResult(r),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.name ?? r.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if ((r.placeFormatted ?? '').isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            r.placeFormatted!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: context.textTertiary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_results.isNotEmpty && query.isNotEmpty)
+              Divider(height: 1, color: context.surfaceBorder),
+            if (query.isNotEmpty)
+              InkWell(
+                onTap: () => _selectManual(query),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 11,
+                  ),
+                  child: Text(
+                    '+ Add "$query" manually',
+                    style: TextStyle(
+                      color: widget.accentColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -344,6 +529,13 @@ class MapPointField extends StatefulWidget {
   /// whichever role's form opened it.
   final Color accentColor;
 
+  /// Where to start the picker's pin when [value] is still unset — e.g. a
+  /// campus location just resolved by [SchoolSearchField], so the map opens
+  /// near the school instead of [MapPickerScreen]'s hardcoded Lahore-centre
+  /// default. Ignored once [value] is set; never overrides a point the user
+  /// already chose.
+  final GeoCoord? fallbackInitial;
+
   const MapPointField({
     super.key,
     required this.placeholder,
@@ -351,6 +543,7 @@ class MapPointField extends StatefulWidget {
     required this.onPicked,
     this.onAddressResolved,
     this.accentColor = AppTheme.parentPurple,
+    this.fallbackInitial,
   });
 
   @override
@@ -408,7 +601,7 @@ class _MapPointFieldState extends State<MapPointField> {
         final result = await Navigator.of(context).push<PickedLocation?>(
           MaterialPageRoute(
             builder: (_) => MapPickerScreen(
-              initial: value,
+              initial: value ?? widget.fallbackInitial,
               accentColor: widget.accentColor,
             ),
           ),

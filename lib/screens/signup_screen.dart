@@ -61,6 +61,12 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _studentGrade;
   final _studentSchoolCtrl = TextEditingController();
   bool _studentSchoolCustom = false;
+  // Populated by `SchoolSearchField.onLocationSelected` when the parent/
+  // student picks a real campus from the Mapbox-backed suggestions (never
+  // set for a manually-typed school, which has no known location). Not yet
+  // persisted to Firestore — `students/{id}` has no school-coordinate field
+  // today — but available here for a map preview or a future schema change.
+  GeoCoord? _studentSchoolLatLng;
   GeoCoord? _studentPickupLatLng;
   GeoCoord? _studentDropoffLatLng;
 
@@ -890,6 +896,8 @@ class _SignupScreenState extends State<SignupScreen> {
             onCustomChanged: (val) =>
                 setState(() => _studentSchoolCustom = val),
             accentColor: AppTheme.studentAccent,
+            onLocationSelected: (coord) =>
+                setState(() => _studentSchoolLatLng = coord),
           ),
           const SizedBox(height: 16),
           const FieldLabel('PICKUP LOCATION', important: true),
@@ -899,6 +907,7 @@ class _SignupScreenState extends State<SignupScreen> {
             value: _studentPickupLatLng,
             accentColor: AppTheme.studentAmber,
             onPicked: (p) => setState(() => _studentPickupLatLng = p),
+            fallbackInitial: _studentSchoolLatLng,
           ),
           const SizedBox(height: 12),
           const FieldLabel('DROPOFF LOCATION', important: true),
@@ -908,6 +917,7 @@ class _SignupScreenState extends State<SignupScreen> {
             value: _studentDropoffLatLng,
             accentColor: AppTheme.studentAmber,
             onPicked: (p) => setState(() => _studentDropoffLatLng = p),
+            fallbackInitial: _studentSchoolLatLng,
           ),
           const SizedBox(height: 16),
         ];
