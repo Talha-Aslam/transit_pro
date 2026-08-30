@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/driver_data_service.dart';
-import '../../app/holiday_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
@@ -31,7 +30,65 @@ class _ParentScheduleState extends State<ParentSchedule> {
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
-    _holidaysFuture = HolidayService.instance.upcomingPakistanHolidays();
+  }
+
+  /// Next-day attendance choice per child, keyed by [ChildInfo.id] so
+  /// switching children (the child switcher above) doesn't leak one child's
+  /// choice onto another's card. Local-only for now -- see
+  /// [_setTomorrowAttendance] -- so a missing entry defaults the toggle to
+  /// "Going", the common case, rather than an ambiguous unset state.
+  final Map<String, bool> _tomorrowGoing = {};
+
+  /// Id of the child whose attendance toggle is mid-submit, so only that
+  /// card's buttons disable/show a spinner -- not every child's, and not the
+  /// rest of the screen.
+  String? _submittingAttendanceFor;
+
+  /// Sends the parent's next-day attendance choice to the driver.
+  ///
+  /// **Mock for now.** There is no backend for this yet: `AttendanceRecord`
+  /// (`transit_core/lib/src/models/trip.dart`) is deliberately a different
+  /// thing -- it lives under a specific `trips/{tripId}/attendance/{studentId}`
+  /// document, written by the *driver* once a real trip is running (Phase 2,
+  /// not started, see IMPLEMENTATION.md). This is a *parent's advance notice*
+  /// for a trip that doesn't exist yet, so it needs its own home -- most
+  /// naturally a `students/{id}/nextDayAttendance/{dateKey}` document plus a
+  /// write to `NotificationService`/FCM so the driver actually sees it,
+  /// neither of which exists today. Wiring that up is a real, separate task;
+  /// this stands in for it so the UI has something to call, updates local
+  /// state optimistically, and is honest in its comments about not being
+  /// real yet -- exactly like `driver_data_service.dart`'s explicit
+  /// TODO-style notes elsewhere in this app.
+  Future<void> _setTomorrowAttendance(ChildInfo child, bool going) async {
+    setState(() {
+      _submittingAttendanceFor = child.id;
+      _tomorrowGoing[child.id] = going;
+    });
+    try {
+      // TODO(backend): replace with a real write, e.g.
+      //   await AttendanceRepository.instance.setNextDayAttendance(
+      //     studentId: child.id,
+      //     driverId: child.driver,
+      //     dateKey: Trip.dateKeyFor(DateTime.now().add(const Duration(days: 1))),
+      //     going: going,
+      //   );
+      // which should also trigger a driver-facing notification the same way
+      // `NotificationService` already pushes ride-request replies today.
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            going
+                ? "Driver notified: ${child.name.isEmpty ? 'Your child' : child.name} is attending tomorrow."
+                : "Driver notified: ${child.name.isEmpty ? 'Your child' : child.name} will not attend tomorrow.",
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _submittingAttendanceFor = null);
+    }
   }
 
   void _onLangChanged() => setState(() {});
@@ -50,6 +107,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Thursday',
     'Friday',
   ];
+
   /// Day-of-month for Mon–Fri of the *current* week, so the day selector
   /// stays in step with the header's date range below instead of always
   /// showing a fixed "Feb 23–27".
@@ -129,22 +187,19 @@ class _ParentScheduleState extends State<ParentSchedule> {
     return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
   }
 
-  static const _holidayColors = [
-    AppTheme.warning,
-    AppTheme.success,
-    AppTheme.pink,
-    AppTheme.info,
-  ];
-
-  /// Cached per-widget-lifetime so `FutureBuilder` doesn't refetch (and
-  /// briefly flash a loading state) on every rebuild this screen does — e.g.
-  /// every day-selector tap. `HolidayService` itself also caches for 6 hours
-  /// session-wide, so this is a cheap belt-and-suspenders.
-  Future<List<Holiday>>? _holidaysFuture;
-
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   /// e.g. "Feb 23–27, 2026" for the current week's Mon–Fri, computed instead
@@ -159,9 +214,6 @@ class _ParentScheduleState extends State<ParentSchedule> {
         : '${_months[friday.month - 1]} ${friday.day}';
     return '$startLabel–$endLabel, ${friday.year}';
   }
-
-  String _formatHolidayDate(DateTime d) =>
-      '${_months[d.month - 1]} ${d.day}, ${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +267,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
               context,
               children: children,
               selectedChildIndex: safeIdx,
+              child: child,
               schedule: schedule,
               sel: sel,
               hasBus: hasBus,
@@ -233,6 +286,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
     BuildContext context, {
     required List<ChildInfo> children,
     required int selectedChildIndex,
+    required ChildInfo? child,
     required List<_DaySchedule> schedule,
     required _DaySchedule sel,
     required bool hasBus,
@@ -364,7 +418,9 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
-                                    ? AppTheme.parentPurple.withValues(alpha: 0.5)
+                                    ? AppTheme.parentPurple.withValues(
+                                        alpha: 0.5,
+                                      )
                                     : Colors.transparent,
                               ),
                             ),
@@ -470,27 +526,35 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               ],
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: statusColor.withValues(alpha: 0.3),
+                          // Hidden for a new account / a day with no real
+                          // driver schedule behind it (`!hasBus`) -- `sel
+                          // .status` is derived purely from today's date
+                          // (see `_buildSchedule`), so without this guard a
+                          // brand-new family with no driver assigned yet
+                          // would still see "Completed" on every day before
+                          // today, describing a pickup that never happened.
+                          if (hasBus)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                            child: Text(
-                              statusLabel,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -588,7 +652,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               ...List.generate(stops.length, (i) {
                                 final stop = stops[i];
                                 final isDestination = i == stops.length - 1;
-                                final isMine = myStopId != null &&
+                                final isMine =
+                                    myStopId != null &&
                                     myStopId.isNotEmpty &&
                                     stop.id == myStopId;
                                 final highlighted = isDestination || isMine;
@@ -621,8 +686,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                               isDestination
                                                   ? '🏫'
                                                   : isMine
-                                                      ? '📍'
-                                                      : '⭕',
+                                                  ? '📍'
+                                                  : '⭕',
                                               style: const TextStyle(
                                                 fontSize: 13,
                                               ),
@@ -633,8 +698,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                                 isMine && !isDestination
                                                     ? '${stop.name} ($stopLabel)'
                                                     : stop.name,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: highlighted
                                                       ? tint
@@ -675,114 +739,17 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   },
                 ),
 
-                // ── Upcoming holidays ─────────────────────────────────────
-                // Real data from Google's public Pakistan holidays calendar
-                // (`HolidayService`) — replaces the old fixed 3-entry mock
-                // list. Hidden entirely on a fetch error or empty result
-                // rather than showing stale/fake dates.
-                FutureBuilder<List<Holiday>>(
-                  future: _holidaysFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return GlassCard(
-                        enableBlur: false,
-                        padding: const EdgeInsets.all(18),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppTheme.parentPurple,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Loading holidays…',
-                              style: TextStyle(
-                                color: context.textTertiary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    final holidays = snapshot.data ?? const <Holiday>[];
-                    if (holidays.isEmpty) return const SizedBox.shrink();
-                    return GlassCard(
-                      enableBlur: false,
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.t('upcoming_holidays'),
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          ...holidays.asMap().entries.map((entry) {
-                            final h = entry.value;
-                            final color =
-                                _holidayColors[entry.key % _holidayColors.length];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: context.cardBg,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: context.surfaceBorder,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        h.name,
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        _formatHolidayDate(h.date),
-                                        style: TextStyle(
-                                          color: context.textTertiary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                // ── Tomorrow's attendance ──────────────────────────────────
+                // Replaces the old "Upcoming Holidays" block. Only shown
+                // once a driver is actually linked (`hasBus`) -- with no
+                // driver assigned there is nobody to notify.
+                if (hasBus && child != null)
+                  _TomorrowAttendanceCard(
+                    childName: child.name.isEmpty ? 'your child' : child.name,
+                    going: _tomorrowGoing[child.id] ?? true,
+                    submitting: _submittingAttendanceFor == child.id,
+                    onChanged: (going) => _setTomorrowAttendance(child, going),
+                  ),
               ],
             ),
           ),
@@ -862,3 +829,168 @@ class _DaySchedule {
   });
 }
 
+/// "Tomorrow's Attendance" card, replacing the old "Upcoming Holidays"
+/// block. A `going`/`not going` segmented control so a parent can tell the
+/// driver in one tap whether their child is riding tomorrow, instead of the
+/// driver finding out by waiting at an empty stop.
+class _TomorrowAttendanceCard extends StatelessWidget {
+  final String childName;
+  final bool going;
+  final bool submitting;
+  final ValueChanged<bool> onChanged;
+
+  const _TomorrowAttendanceCard({
+    required this.childName,
+    required this.going,
+    required this.submitting,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      enableBlur: false,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.parentPurple.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: Text('📅', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${AppStrings.t('tomorrows_attendance')} — $childName',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      AppStrings.t('tomorrows_attendance_subtitle'),
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: context.cardBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.surfaceBorder),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _AttendanceOption(
+                    label: AppStrings.t('going'),
+                    icon: Icons.check_circle_rounded,
+                    selected: going,
+                    loading: submitting && going,
+                    color: AppTheme.success,
+                    onTap: submitting ? null : () => onChanged(true),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _AttendanceOption(
+                    label: AppStrings.t('not_going'),
+                    icon: Icons.cancel_rounded,
+                    selected: !going,
+                    loading: submitting && !going,
+                    color: AppTheme.error,
+                    onTap: submitting ? null : () => onChanged(false),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceOption extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool loading;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _AttendanceOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.loading,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? color.withValues(alpha: 0.5) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            else
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? color : context.textTertiary,
+              ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? color : context.textSecondary,
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

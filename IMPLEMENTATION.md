@@ -74,10 +74,10 @@ If you are an AI agent picking up this project, follow this loop **every time**:
 | Phase 0 — Foundation | 4 | 7 | 🔵 In progress |
 | Phase 1 — Real accounts & data | 18 | 20 | 🔵 In progress |
 | Phase 1b — Driver service & requests | 14 | 15 | 🔵 In progress |
-| Phase 2 — Live tracking | 0 | 10 | ⬜ Not started |
+| Phase 2 — Live tracking | 0 | 11 | ⬜ Not started |
 | Phase 3 — AI features | 0 | 8 | ⬜ Not started |
 | Phase 4 — Pilot hardening | 0 | 9 | ⬜ Not started |
-| **Total** | **36** | **69** | |
+| **Total** | **36** | **70** | |
 
 **2026-08-18 update:** `firestore.rules`, `database.rules.json`, and
 Email/Password sign-in are all confirmed live — none of it independently
@@ -218,6 +218,7 @@ Need From You*. Until Email/Password is enabled, `signIn()` fails with
 | P2-8 | Geofence events → FCM push to parents | ⬜ | `lib/app/geofence_service.dart` |
 | P2-9 | Real chat replacing the 3 echo bots | ⬜ | `driver_chat_screen.dart`, `live_chat_screen.dart`, `student_driver_chat.dart` |
 | P2-10 | Missed-bus flow on Firestore | ⬜ | `lib/app/missed_bus_service.dart` |
+| P2-11 | Parent next-day attendance notice → driver, real backend | ⬜ added 2026-08-28 — `students/{id}/nextDayAttendance/{dateKey}` write + `NotificationService` push, replacing `parent_schedule.dart`'s current mock (`_setTomorrowAttendance`) | `lib/screens/parent/parent_schedule.dart`, new repository |
 
 ---
 
@@ -661,6 +662,111 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-08-28 (even later still) — hide the day-schedule "Completed" badge for a new account, swap Holidays for a "Tomorrow's Attendance" card
+
+Three related fixes/changes to `parent_schedule.dart`, all in the same
+"don't show a real-looking status when there's nothing real behind it"
+family as the two entries just below.
+
+**Task 1 — the day-detail "Completed" badge.** `sel.status` ('done'/
+'today'/'upcoming') is derived purely from comparing the selected weekday to
+today's date (`_buildSchedule`) — it has no idea whether a driver was ever
+actually assigned. So a brand-new account with no driver, selecting any
+weekday before today (e.g. "Monday" on a Thursday), saw a "Completed" badge
+describing a pickup that never happened, since no schedule ever existed to
+complete. Fixed by wrapping the status badge `Container` in `if (hasBus)` —
+the same "does this child have a real assigned bus/route" signal this screen
+already computes for the pickup/drop-off cards below it (`"Your driver
+hasn't set a schedule yet"`). Icons/labels around it are unaffected — only
+the badge disappears.
+
+**Task 2 — removed "Upcoming Holidays" from this screen.** Deleted the
+`FutureBuilder<List<Holiday>>` block, `_holidaysFuture`, `_holidayColors`,
+`_formatHolidayDate`, and the `holiday_service.dart` import from
+`parent_schedule.dart`. **Note, not hidden:** `lib/app/holiday_service.dart`
+(the real Google Calendar-backed `HolidayService`, filtered to Pakistani
+national + Islamic holidays as of the entry just below this one) is now
+unused dead code — nothing imports it any more. Left in place rather than
+deleted, since it's real working functionality you may want to surface
+elsewhere (an announcements screen, the driver dashboard); say the word if
+you'd rather it be deleted outright or wired in somewhere else.
+
+**Task 3/4 — added a "Tomorrow's Attendance" card in its place.** A
+`going`/`not going` segmented control (`_TomorrowAttendanceCard` +
+`_AttendanceOption`, new private widgets in the same file) so a parent can
+tell the driver in one tap whether their child is riding the next day,
+instead of the driver finding out by waiting at an empty stop. Only shown
+when `hasBus` is true (same gate as Task 1) — there's no driver to notify
+otherwise. State is a per-child `Map<String, bool> _tomorrowGoing` (keyed by
+`ChildInfo.id` so switching children via the child-switcher above doesn't
+leak one child's choice onto another's card), defaulting an unset child to
+"Going" rather than an ambiguous blank state, plus `_submittingAttendanceFor`
+so only the card mid-submit shows a spinner and disables its own buttons.
+
+**Explicitly a mock, and says so in the code.** `_setTomorrowAttendance`
+updates local state optimistically, "calls the API" via a 600ms
+`Future.delayed`, then shows a confirmation `SnackBar` — there is no real
+backend for this yet. `AttendanceRecord` (`transit_core/lib/src/models/trip.dart`)
+is a genuinely different thing: it lives under `trips/{tripId}/attendance/
+{studentId}`, written by the *driver* once a real trip is running (Phase 2,
+not started). A parent's advance notice for a trip that doesn't exist yet
+needs its own home — most naturally a `students/{id}/nextDayAttendance/
+{dateKey}` document plus a driver-facing push through `NotificationService`,
+neither of which exists today. A `// TODO(backend):` comment in
+`_setTomorrowAttendance` shows exactly where that real write would go. Added
+as a new Phase 2 candidate task below rather than left unrecorded.
+
+Added string keys `tomorrows_attendance`, `tomorrows_attendance_subtitle`,
+`going`, `not_going` (English + Urdu) to `language_provider.dart`. Left the
+now-unreferenced `upcoming_holidays` key in place — harmless dead data, not
+worth a separate edit.
+
+`flutter analyze` (full project): 4 issues, all pre-existing (same as before
+this session — the `route_service.dart` info-lint and three Mapbox
+deprecation notices). No new issues.
+
+### 2026-08-28 (later still) — filter "Upcoming Holidays" to Pakistani national + Islamic observances only
+
+`HolidayService` (parent schedule screen) reads Google's own
+`en.pk#holiday@group.v.calendar.google.com` public calendar — already the
+correct, country-restricted source (there's no separate `country=PK` query
+param on the Calendar API; the restriction is which calendar you point at,
+and this was already the right one). The problem wasn't the wrong country —
+it's that Google's Pakistan calendar itself bundles in every regionally
+observed festival for Pakistan's religious minorities (Janmashtami, Durga
+Puja, Dussehra, Diwali, Holi, …) alongside the official national holidays and
+Islamic observances the schedule screen should show. The API has no
+"official/national only" toggle, so this needed a local filter.
+
+**Added `HolidayService.isApprovedHoliday(name)`** — a static, testable
+allowlist match against a curated `_approvedKeywords` list (Kashmir
+Solidarity Day, Pakistan Day, Labour Day, Independence Day, Defence Day,
+Iqbal Day, Quaid-e-Azam Day, Christmas [shares 25 Dec, officially gazetted],
+plus the Islamic observances: Eid-ul-Fitr/Eid-ul-Azha, Ashura/Muharram, Eid
+Milad-un-Nabi, Shab-e-Meraj, Shab-e-Barat, Giarhwin Sharief, Ramadan). It's an
+**allowlist**, deliberately not a blocklist of the unwanted festivals —
+fails closed, so an unrecognised event Google adds later is dropped rather
+than silently shown. Matching is a case-insensitive substring check, since
+Google's exact wording varies year to year ("Eid-ul-Fitr" vs "Eid al-Fitr").
+
+**Wired into `upcomingPakistanHolidays`**: the raw API fetch now requests a
+higher internal limit (`_rawFetchLimit = 30`, up from the caller's
+`maxResults`) since a chunk of the raw feed gets filtered out and there needs
+to be enough left to still fill the caller's requested count (default 5);
+filtering happens right after parsing each item, before it's ever added to
+the returned list; the 6-hour cache now stores the already-filtered list and
+slices to `maxResults` per call.
+
+**No UI changes needed** — `parent_schedule.dart`'s `FutureBuilder<List<Holiday>>`
+already just renders whatever `HolidayService` returns, so the filter is
+transparent to the widget.
+
+`flutter analyze lib/app/holiday_service.dart lib/screens/parent/parent_schedule.dart`:
+0 issues. Not independently verified against a live API response in this
+session (no device/network call made) — the keyword list should be spot
+checked against Google's actual `en.pk` summaries next time the schedule
+screen is run for real, in case a spelling variant slips past the allowlist.
 
 ### 2026-08-28 (later) — hide the live ETA card for a new account with no driver yet, make its "to school"/"to home" text real
 

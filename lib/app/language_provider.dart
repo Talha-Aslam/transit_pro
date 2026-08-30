@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 /// Singleton ChangeNotifier that manages app language (English / Urdu).
 class LanguageProvider extends ChangeNotifier {
@@ -156,6 +156,11 @@ class AppStrings {
     'morning': 'MORNING',
     'evening': 'EVENING',
     'upcoming_holidays': 'Upcoming Holidays',
+    'tomorrows_attendance': "Tomorrow's Attendance",
+    'tomorrows_attendance_subtitle':
+        'Let the driver know if your child is riding tomorrow',
+    'going': 'Going',
+    'not_going': 'Not Going',
     'active': 'Active',
     'completed_check': 'Completed',
     'upcoming_clock': 'Upcoming',
@@ -873,6 +878,11 @@ class AppStrings {
     'morning': 'صبح',
     'evening': 'شام',
     'upcoming_holidays': 'آئندہ تعطیلات',
+    'tomorrows_attendance': 'کل کی حاضری',
+    'tomorrows_attendance_subtitle':
+        'ڈرائیور کو بتائیں کہ کیا آپ کا بچہ کل سفر کرے گا',
+    'going': 'جا رہا ہے',
+    'not_going': 'نہیں جا رہا',
     'active': 'فعال',
     'completed_check': 'مکمل',
     'upcoming_clock': 'آئندہ',
