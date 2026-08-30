@@ -22,6 +22,15 @@ class ChildInfo {
   String name;
   String grade;
   String school;
+
+  /// `Student.instituteType` -- `School`/`College`/`University`/`Academy`.
+  /// Was never carried through this flattened view until now: the "Edit
+  /// Info" sheet (`parent_profile.dart`) had its own local-only guess for
+  /// this (matching `school` against a hardcoded demo list of institute
+  /// names), which silently forgot any real institute not in that tiny
+  /// list. This is the real, persisted value instead.
+  String instituteType;
+
   String busNumber;
   String route;
   String stop;
@@ -44,6 +53,7 @@ class ChildInfo {
     this.name = '',
     this.grade = '',
     this.school = '',
+    this.instituteType = '',
     this.busNumber = '',
     this.route = '',
     this.stop = '',
@@ -58,6 +68,7 @@ class ChildInfo {
     String? name,
     String? grade,
     String? school,
+    String? instituteType,
     String? busNumber,
     String? route,
     String? stop,
@@ -71,6 +82,7 @@ class ChildInfo {
     name: name ?? this.name,
     grade: grade ?? this.grade,
     school: school ?? this.school,
+    instituteType: instituteType ?? this.instituteType,
     busNumber: busNumber ?? this.busNumber,
     route: route ?? this.route,
     stop: stop ?? this.stop,
@@ -191,6 +203,7 @@ class ParentDataService {
         name: s.name,
         grade: s.grade,
         school: s.school,
+        instituteType: s.instituteType,
         busNumber: bus?.busNumber ?? '',
         route: route?.name ?? '',
         stop: session.stopNameFor(s) ?? '',
@@ -396,6 +409,7 @@ class ParentDataService {
       'name': child.name,
       'grade': child.grade,
       'school': child.school,
+      'instituteType': child.instituteType,
       'pickupLocation': ?child.pickup?.toMap(),
       'dropoffLocation': ?child.dropoff?.toMap(),
       'scheduleId': ?child.scheduleId,
@@ -448,7 +462,13 @@ class ParentDataService {
         parentId: uid,
         grade: child.grade,
         school: child.school,
-        instituteType: child.grade,
+        // Was `child.grade` -- a copy-paste of the same default the signup
+        // flow uses when no dedicated instituteType selector exists there
+        // yet. This form (`_ChildFlowSheet`, shared with `updateChild`) now
+        // has its own real instituteType field, so use it.
+        instituteType: child.instituteType,
+        pickupLocation: child.pickup,
+        dropoffLocation: child.dropoff,
       ),
     );
     // The children stream republishes; no local mutation needed.

@@ -274,6 +274,12 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
                 onBack: () => context.pop(),
               ),
               _SeatSummary(driver: driver),
+              // The round card(s) above were sitting almost flush against
+              // the "Waiting / On my roster" toggle below -- a deliberate
+              // gap here (matching the one `_Tabs` already puts under
+              // itself, `EdgeInsets.fromLTRB(16, 0, 16, 14)`) gives both
+              // blocks room to read as separate sections.
+              const SizedBox(height: 14),
               _Tabs(
                 active: _tab,
                 pendingCount: pending.length,
@@ -348,7 +354,7 @@ class _Header extends StatelessWidget {
                 ),
                 Text(
                   pendingCount == 0
-                      ? 'Nothing waiting on you'
+                      ? 'Nothing waiting for you'
                       : '$pendingCount waiting on your reply',
                   style: TextStyle(
                     color: pendingCount == 0
@@ -398,9 +404,9 @@ class _SeatSummary extends StatelessWidget {
 
     if (rounds.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
         child: GlassCard(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           borderColor: AppTheme.warning.withValues(alpha: 0.4),
           child: Row(
             children: [
@@ -423,98 +429,120 @@ class _SeatSummary extends StatelessWidget {
       );
     }
 
+    // Full-width, stacked vertically -- was a horizontal-scrolling row of
+    // fixed `width: 168` cards, which is exactly why "Round 1" looked
+    // squished and centered instead of matching the screen's own margins.
+    // `16` on both sides matches `_Header` and `_Tabs` below exactly (both
+    // `EdgeInsets.fromLTRB(16, ...)`), so the card's left/right edges line
+    // up with everything above and below it.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: SizedBox(
-        height: 108,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: rounds.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 10),
-          itemBuilder: (_, i) {
-            final r = rounds[i];
-            final color = r.isFull ? AppTheme.error : AppTheme.success;
-            final filled = r.totalSeats <= 0
-                ? 0.0
-                : (r.totalSeats - r.availableSeats) / r.totalSeats;
-            return Container(
-              width: 168,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: 0.28)),
+      padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < rounds.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _RoundCard(round: rounds[i]),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One round's live seat availability -- "Round 1", its pickup/drop-off
+/// window, a fill-level progress bar, and "N of M free". Its own widget
+/// (rather than inline per-item code) now that it no longer needs the
+/// `Builder`-per-item trick a horizontal `Row` conversion used to require.
+class _RoundCard extends StatelessWidget {
+  final DriverSchedule round;
+  const _RoundCard({required this.round});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = round;
+    final color = r.isFull ? AppTheme.error : AppTheme.success;
+    final filled = r.totalSeats <= 0
+        ? 0.0
+        : (r.totalSeats - r.availableSeats) / r.totalSeats;
+    // One gap size reused between every internal element (icon row → time
+    // text → progress bar → bottom label) instead of the previous 8/10/8 —
+    // uniform spacing reads as deliberate, mismatched spacing reads as
+    // sloppy even when the differences are only a couple of pixels.
+    const gap = SizedBox(height: 10);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.directions_bus_filled_rounded,
+                  size: 15,
+                  color: color,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.directions_bus_filled_rounded,
-                          size: 14,
-                          color: color,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          r.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  r.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${r.directionLabel} · ${r.timeRange}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.textTertiary,
-                      fontSize: 10.5,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: filled.clamp(0, 1),
-                      minHeight: 5,
-                      backgroundColor: color.withValues(alpha: 0.15),
-                      valueColor: AlwaysStoppedAnimation(color),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    r.isFull
-                        ? 'Full — ${r.totalSeats} booked'
-                        : '${r.availableSeats} of ${r.totalSeats} free',
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            );
-          },
-        ),
+            ],
+          ),
+          gap,
+          Text(
+            '${r.directionLabel} · ${r.timeRange}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: context.textTertiary, fontSize: 11),
+          ),
+          gap,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: filled.clamp(0, 1),
+              minHeight: 6,
+              backgroundColor: color.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation(color),
+            ),
+          ),
+          gap,
+          Text(
+            r.isFull
+                ? 'Full — ${r.totalSeats} booked'
+                : '${r.availableSeats} of ${r.totalSeats} free',
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }

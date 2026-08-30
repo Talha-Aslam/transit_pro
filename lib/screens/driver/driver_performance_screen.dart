@@ -7,6 +7,7 @@ import '../../app/session_service.dart';
 import '../../data/rating_repository.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/driver_rating_bar.dart';
 import '../../widgets/glass_card.dart';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -22,6 +23,56 @@ class _MonthStat {
   final double rating;
 
   const _MonthStat(this.month, this.trips, this.onTime, this.rating);
+}
+
+/// One earned achievement badge.
+///
+/// **Interim, not the real thing.** The task this models describes
+/// achievements "granted dynamically by the backend admin or an AI based on
+/// actual driving performance" — no such collection/service exists yet
+/// (same "not built yet" state as the Metric Breakdown's satisfaction/
+/// compliance/safe-driving scores above). Rather than leave the whole
+/// section hardcoded until that exists, [_computeAchievements] derives a
+/// small, honest set of these from data this screen already streams for
+/// real (trips, ratings) — genuinely earned, just not yet admin/AI-curated.
+/// Swap this for a real `List<Achievement>` from a backend once one exists;
+/// the empty-state UI below only cares that the list can be empty.
+class Achievement {
+  final String icon;
+  final String label;
+  const Achievement(this.icon, this.label);
+}
+
+/// Real thresholds against real data (never invented percentages): a
+/// verified driver's first trip, a strong average rating over a real
+/// sample, a genuinely spotless on-time record, and trip-count milestones.
+/// A new/unverified account with `hasTrips == false` always gets `[]` here
+/// since every rule below requires at least one real trip.
+List<Achievement> _computeAchievements({
+  required bool isVerified,
+  required List<Trip> completed,
+  required double? avgRating,
+  required double? onTimePct,
+}) {
+  if (!isVerified || completed.isEmpty) return const [];
+
+  final achievements = <Achievement>[];
+  if (avgRating != null && avgRating >= 4.8) {
+    achievements.add(const Achievement('⭐', '5-Star Rated'));
+  }
+  // Require a real sample before calling a streak "spotless" — a single
+  // on-time trip is not a pattern.
+  if (onTimePct != null && onTimePct >= 99.9 && completed.length >= 5) {
+    achievements.add(const Achievement('🕐', 'Never Late'));
+  }
+  if (completed.length >= 50) {
+    achievements.add(const Achievement('🏆', '50 Trips'));
+  } else if (completed.length >= 10) {
+    achievements.add(const Achievement('🎯', '10 Trips'));
+  } else {
+    achievements.add(const Achievement('🚌', 'First Trip'));
+  }
+  return achievements;
 }
 
 const _monthNames = [
@@ -43,8 +94,9 @@ List<_MonthStat> _recentMonths(List<Trip> trips) {
       final d = t.startedAt ?? DateTime.tryParse(t.dateKey);
       return d != null && d.year == m.year && d.month == m.month;
     }).toList();
-    final completed =
-        inMonth.where((t) => t.status == TripStatus.completed).toList();
+    final completed = inMonth
+        .where((t) => t.status == TripStatus.completed)
+        .toList();
     final onTime = completed.where((t) => t.onTime == true).length;
     final pct = completed.isEmpty ? 0.0 : onTime / completed.length * 100;
     return _MonthStat(
@@ -71,11 +123,16 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
   void initState() {
     super.initState();
     LanguageProvider.instance.addListener(_rebuild);
+    // Needed for the verification gate below (`Driver.isApproved`) -- a
+    // driver who gets approved while sitting on this screen should see the
+    // placeholder state clear without navigating away and back.
+    SessionService.instance.driver.addListener(_rebuild);
   }
 
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_rebuild);
+    SessionService.instance.driver.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -178,15 +235,33 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
     List<Trip> trips,
     List<DriverRating> ratings,
   ) {
-    final completed =
-        trips.where((t) => t.status == TripStatus.completed).toList();
+    final completed = trips
+        .where((t) => t.status == TripStatus.completed)
+        .toList();
     final onTimeCount = completed.where((t) => t.onTime == true).length;
-    final onTimePct =
-        completed.isEmpty ? null : onTimeCount / completed.length * 100;
+    final onTimePct = completed.isEmpty
+        ? null
+        : onTimeCount / completed.length * 100;
     final avgRating = ratings.isEmpty
         ? null
-        : ratings.map((r) => r.rating).reduce((a, b) => a + b) /
-            ratings.length;
+        : ratings.map((r) => r.rating).reduce((a, b) => a + b) / ratings.length;
+
+    // New-account gate: a driver whose documents haven't cleared review yet
+    // (`Driver.isApproved` -- false while `status` is `pendingVerification`
+    // or `suspended`) is never allowed to accept a request, so there is
+    // structurally no way for them to have a real trip yet either. Checking
+    // both (not just trip count) also covers the moment right after
+    // approval, before a first trip exists -- still nothing real to show.
+    final driver = SessionService.instance.driver.value;
+    final isVerified = driver?.isApproved ?? false;
+    final hasTrips = trips.isNotEmpty;
+    final hasData = isVerified && hasTrips;
+    final achievements = _computeAchievements(
+      isVerified: isVerified,
+      completed: completed,
+      avgRating: avgRating,
+      onTimePct: onTimePct,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -211,14 +286,17 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                     gradient: AppTheme.driverGradient,
                     shape: BoxShape.circle,
                   ),
-                  child: const Center(
-                    // Placeholder: there is no composite "overall score"
-                    // metric anywhere in the app yet — this would need a real
-                    // ratings + operations scoring model, which is out of
-                    // scope here. Trips/rating/on-time below are real.
+                  child: Center(
+                    // Placeholder even when `hasData` is true: there is no
+                    // composite "overall score" metric anywhere in the app
+                    // yet — this would need a real ratings + operations
+                    // scoring model, which is out of scope here. Trips/
+                    // rating/on-time below are real either way. What *is*
+                    // new here is that a driver with nothing real behind
+                    // this number no longer sees an invented one.
                     child: Text(
-                      '96',
-                      style: TextStyle(
+                      hasData ? '96' : 'N/A',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
@@ -226,6 +304,12 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                // Moved here from the driver's own profile page --
+                // `DriverRatingBar` (`widgets/driver_rating_bar.dart`) is
+                // now shown in exactly one place, right under the score
+                // circle, rather than duplicated on both screens.
+                DriverRatingBar(rating: avgRating, count: ratings.length),
                 const SizedBox(height: 12),
                 Text(
                   'Overall Score',
@@ -236,9 +320,15 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                   ),
                 ),
                 Text(
-                  'Excellent Performance',
+                  !isVerified
+                      ? 'Pending Verification'
+                      : !hasTrips
+                      ? 'No data available'
+                      : 'Excellent Performance',
                   style: TextStyle(
-                    color: AppTheme.successLight,
+                    color: hasData
+                        ? AppTheme.successLight
+                        : context.textTertiary,
                     fontSize: 12,
                   ),
                 ),
@@ -246,19 +336,21 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _ScorePill(
-                      '⭐',
-                      avgRating == null ? '—' : avgRating.toStringAsFixed(1),
-                      'Rating',
-                    ),
+                    // No separate "Rating" pill here any more -- the
+                    // `DriverRatingBar` above already shows the same average,
+                    // just with more detail (stars + count). Repeating it as
+                    // a pill too would be clutter, not confirmation.
                     _ScorePill('🏆', '${trips.length}', 'Trips'),
                     _ScorePill(
                       '⏱️',
                       onTimePct == null ? '—' : '${onTimePct.round()}%',
                       'On-Time',
                     ),
-                    // Placeholder: no satisfaction-survey data source exists.
-                    const _ScorePill('😊', '98%', 'Satisfaction'),
+                    // Placeholder even when `hasData` is true: no
+                    // satisfaction-survey data source exists yet. Blank for
+                    // a new/unverified driver rather than always-98% either
+                    // way.
+                    _ScorePill('😊', hasData ? '98%' : '—', 'Satisfaction'),
                   ],
                 ),
               ],
@@ -281,7 +373,10 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                for (final s in _recentMonths(trips)) _MonthRow(s),
+                if (!hasData)
+                  const _EmptyMonthlyState()
+                else
+                  for (final s in _recentMonths(trips)) _MonthRow(s),
               ],
             ),
           ),
@@ -308,24 +403,26 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                   color: AppTheme.driverCyan,
                 ),
                 const SizedBox(height: 12),
-                // Placeholder metrics below: no survey, compliance-tracking or
-                // safe-driving-scoring backend exists yet. Left as static
-                // values rather than invented from unrelated data.
-                const _MetricBar(
+                // Placeholder metrics below even when `hasData` is true: no
+                // survey, compliance-tracking or safe-driving-scoring
+                // backend exists yet. Zeroed out (empty/grey bar) for a
+                // new/unverified driver instead of always showing the same
+                // static values regardless of whether they've ever driven.
+                _MetricBar(
                   label: 'Student Satisfaction',
-                  value: 0.98,
+                  value: hasData ? 0.98 : 0.0,
                   color: AppTheme.success,
                 ),
                 const SizedBox(height: 12),
-                const _MetricBar(
+                _MetricBar(
                   label: 'Route Compliance',
-                  value: 0.99,
+                  value: hasData ? 0.99 : 0.0,
                   color: AppTheme.driverTeal,
                 ),
                 const SizedBox(height: 12),
-                const _MetricBar(
+                _MetricBar(
                   label: 'Safe Driving Score',
-                  value: 0.94,
+                  value: hasData ? 0.94 : 0.0,
                   color: AppTheme.warningLight,
                 ),
               ],
@@ -333,8 +430,11 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Achievements — placeholder: no real achievement/badge system
-          // exists yet, so this stays a static illustration.
+          // Achievements — was six hardcoded badges shown unconditionally
+          // (a brand-new, unverified driver with zero trips saw the exact
+          // same "Top Driver"/"5-Star Week"/etc. as a real veteran). Now
+          // maps over the dynamic `achievements` list computed above, which
+          // is genuinely empty for such an account.
           SizedBox(
             width: double.infinity,
             child: GlassCard(
@@ -351,18 +451,16 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: const [
-                      _Badge('🏆', 'Top Driver'),
-                      _Badge('⭐', '5-Star Week'),
-                      _Badge('🎯', 'Perfect Route'),
-                      _Badge('⚡', 'Speed Demon'),
-                      _Badge('🕐', 'Never Late'),
-                      _Badge('😊', 'Parents\' Choice'),
-                    ],
-                  ),
+                  if (achievements.isEmpty)
+                    const _LockedAchievements()
+                  else
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final a in achievements) _Badge(a.icon, a.label),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -399,6 +497,33 @@ class _ScorePill extends StatelessWidget {
           style: TextStyle(color: context.textTertiary, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+/// Shown instead of `_MonthRow`s for a driver with no verified/real trip
+/// history yet -- replaces what used to be three fully hardcoded rows
+/// (4.8/4.9 star ratings included) that rendered for every account
+/// regardless of whether they had ever driven.
+class _EmptyMonthlyState extends StatelessWidget {
+  const _EmptyMonthlyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.insights_outlined, color: context.textTertiary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Complete your first trip to unlock monthly insights.',
+              style: TextStyle(color: context.textTertiary, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -535,6 +660,68 @@ class _Badge extends StatelessWidget {
             label,
             style: const TextStyle(
               color: AppTheme.driverAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown in place of the achievements `Wrap` for a new/unverified driver
+/// (or any account that simply hasn't earned one yet) -- a message plus a
+/// few grayed-out "locked" silhouettes, so the section reads as "nothing
+/// earned so far" rather than a blank space that looks broken.
+class _LockedAchievements extends StatelessWidget {
+  const _LockedAchievements();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: const [_LockedBadge(), _LockedBadge(), _LockedBadge()],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Start driving to unlock your first achievement!',
+          style: TextStyle(color: context.textTertiary, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _LockedBadge extends StatelessWidget {
+  const _LockedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.surfaceBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 14,
+            color: context.textTertiary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Locked',
+            style: TextStyle(
+              color: context.textTertiary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),

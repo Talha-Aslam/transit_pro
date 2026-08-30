@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
+import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
@@ -34,12 +35,20 @@ class _ParentProfileState extends State<ParentProfile> {
 
   void _onSubscriptionChanged() => setState(() {});
   void _onNotificationPrefsChanged() => setState(() {});
+  // `AppUser.emergencyContacts` lives on the account's own `users/{uid}`
+  // document, synced through `SessionService.user` -- the same notifier
+  // `emergency_contacts_screen.dart` listens to. Without this listener the
+  // "Emergency Contacts" menu subtitle below would only pick up an add/
+  // delete the next time this whole screen happens to rebuild for some
+  // other reason, not "the moment" it actually changes.
+  void _onEmergencyContactsChanged() => setState(() {});
 
   @override
   void initState() {
     super.initState();
     SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
     LanguageProvider.instance.addListener(_onLangChanged);
+    SessionService.instance.user.addListener(_onEmergencyContactsChanged);
     _svc.notificationPrefs.addListener(_onNotificationPrefsChanged);
     _svc.loadNotificationPrefs();
   }
@@ -48,11 +57,23 @@ class _ParentProfileState extends State<ParentProfile> {
   void dispose() {
     SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
     LanguageProvider.instance.removeListener(_onLangChanged);
+    SessionService.instance.user.removeListener(_onEmergencyContactsChanged);
     _svc.notificationPrefs.removeListener(_onNotificationPrefsChanged);
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+
+  /// Strictly dynamic -- no more hardcoded "2 contacts added". Reads the
+  /// same `AppUser.emergencyContacts` list `emergency_contacts_screen.dart`
+  /// reads and writes, so this always reflects what's actually saved.
+  String _emergencyContactsSubtitle() {
+    final count =
+        SessionService.instance.user.value?.emergencyContacts.length ?? 0;
+    if (count == 0) return AppStrings.t('no_contacts_added');
+    if (LanguageProvider.instance.isUrdu) return '$count رابطے شامل ہیں';
+    return count == 1 ? '1 contact added' : '$count contacts added';
+  }
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -667,7 +688,7 @@ class _ParentProfileState extends State<ParentProfile> {
                               _MenuItem(
                                 icon: '📞',
                                 label: AppStrings.t('emergency_contacts'),
-                                desc: AppStrings.t('emergency_contacts_desc'),
+                                desc: _emergencyContactsSubtitle(),
                                 onTap: () =>
                                     context.push('/parent/emergency-contacts'),
                               ),
@@ -1597,9 +1618,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                driver.isApproved
-                                    ? 'Verified'
-                                    : 'Not verified',
+                                driver.isApproved ? 'Verified' : 'Not verified',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -1836,17 +1855,24 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     _scheduleId = widget.initialChild.scheduleId;
 
     if (widget.initialChild.school.isNotEmpty) {
-      for (final entry in _institutes.entries) {
-        if (entry.value.contains(widget.initialChild.school)) {
-          _instituteType = entry.key;
-          _instituteName = widget.initialChild.school;
-          break;
-        }
-      }
-      if (_instituteType == null) {
-        _instituteType = 'School';
-        _instituteName = null;
-      }
+      // Was: guess the type by searching for `school` inside the 9-name
+      // demo list below (`_institutes`), which meant any real institute not
+      // in that tiny hardcoded list silently lost its type on every reopen.
+      // `ChildInfo.instituteType` is now a real, persisted field (see
+      // `ParentDataService`), so read it directly instead of guessing.
+      _instituteType = widget.initialChild.instituteType.isNotEmpty
+          ? widget.initialChild.instituteType
+          : 'School';
+      // The "Institute Name" dropdown below can only offer the demo list's
+      // names -- pre-selecting a value `DropdownButton` doesn't have as an
+      // item throws. Only pre-fill when the real school is actually one of
+      // them; otherwise leave it unselected rather than crash. `_save()`
+      // still falls back to `widget.initialChild.school` either way, so a
+      // real (non-demo) institute name is never lost by opening this sheet.
+      final demoNames = _institutes[_instituteType] ?? const <String>[];
+      _instituteName = demoNames.contains(widget.initialChild.school)
+          ? widget.initialChild.school
+          : null;
     }
 
     // `initialChild.driver` holds a real driver uid when it was assigned
@@ -1854,9 +1880,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     // it so an existing selection shows as selected rather than starting
     // blank every time this sheet reopens.
     if (widget.initialChild.driver.isNotEmpty) {
-      UserRepository.instance.fetchDriver(widget.initialChild.driver).then((
-        d,
-      ) {
+      UserRepository.instance.fetchDriver(widget.initialChild.driver).then((d) {
         if (mounted && d != null) setState(() => _selectedDriver = d);
       });
     }
@@ -1881,6 +1905,10 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
         name: _nameCtrl.text.trim(),
         grade: _gradeCtrl.text.trim(),
         school: _instituteName ?? widget.initialChild.school,
+        // Was never carried out of this sheet at all -- `ParentDataService
+        // .updateChild`/`.addChild` now both persist it (see their doc
+        // comments), so a real change here actually survives a save.
+        instituteType: _instituteType ?? widget.initialChild.instituteType,
         // Picking a driver in this sheet is a preview only (see
         // _showDriverPreview) — it doesn't book a seat or assign a bus/route,
         // so those stay whatever they already were. Only the driver id
@@ -2292,9 +2320,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           final drivers = snap.data!;
                           if (drivers.isEmpty) {
                             return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
                                 'No drivers currently list "$_instituteName" '
                                 'as a stop yet.',
@@ -2394,16 +2420,13 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: _selectedDriver!.orderedSchedules.map((
-                            s,
-                          ) {
+                          children: _selectedDriver!.orderedSchedules.map((s) {
                             final selected = _scheduleId == s.id;
                             final label = s.label.isEmpty
                                 ? s.timeRange
                                 : '${s.label} (${s.timeRange})';
                             return GestureDetector(
-                              onTap: () =>
-                                  setState(() => _scheduleId = s.id),
+                              onTap: () => setState(() => _scheduleId = s.id),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,

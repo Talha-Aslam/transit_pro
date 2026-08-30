@@ -9,7 +9,6 @@ import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
 import '../../app/tracking_service.dart';
-import '../../data/rating_repository.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
@@ -32,14 +31,6 @@ class DriverProfile extends StatefulWidget {
 
 class _DriverProfileState extends State<DriverProfile> {
   final _svc = DriverDataService.instance;
-
-  /// Real average and count from `ratings/{driverId}_*_*`, replacing the
-  /// `4.8` / `(128 ratings)` literals that showed for every driver regardless
-  /// of whether anyone had ever rated them.
-  double? _avgRating;
-  int _ratingCount = 0;
-  String? _ratingSubUid;
-  StreamSubscription<List<DriverRating>>? _ratingSub;
 
   /// Real completed-trip count from `TripRepository`, replacing the
   /// hardcoded `DriverTripMetrics.totalTrips` (136) every driver used to see
@@ -100,9 +91,7 @@ class _DriverProfileState extends State<DriverProfile> {
     // was true when the screen opened.
     SessionService.instance.driver.addListener(_onLangChanged);
     SessionService.instance.rideRequests.addListener(_onLangChanged);
-    SessionService.instance.addListener(_ensureRatingSubscription);
     SessionService.instance.addListener(_ensureTripCountSubscription);
-    _ensureRatingSubscription();
     _ensureTripCountSubscription();
     _routeStarted = TrackingService.instance.route != null;
     TrackingService.instance.isSimulating.addListener(_onTrackingChanged);
@@ -115,11 +104,9 @@ class _DriverProfileState extends State<DriverProfile> {
     _svc.locationSharing.removeListener(_onLocationSharingChanged);
     SessionService.instance.driver.removeListener(_onLangChanged);
     SessionService.instance.rideRequests.removeListener(_onLangChanged);
-    SessionService.instance.removeListener(_ensureRatingSubscription);
     SessionService.instance.removeListener(_ensureTripCountSubscription);
     TrackingService.instance.isSimulating.removeListener(_onTrackingChanged);
     TrackingService.instance.isLive.removeListener(_onTrackingChanged);
-    _ratingSub?.cancel();
     _tripCountSub?.cancel();
     super.dispose();
   }
@@ -129,34 +116,6 @@ class _DriverProfileState extends State<DriverProfile> {
     if (started != _routeStarted && mounted) {
       setState(() => _routeStarted = started);
     }
-  }
-
-  /// (Re)subscribes to this driver's real ratings whenever the signed-in uid
-  /// changes — including the first time it becomes available.
-  void _ensureRatingSubscription() {
-    final uid = SessionService.instance.uid;
-    if (uid == _ratingSubUid) return;
-    _ratingSubUid = uid;
-    _ratingSub?.cancel();
-    _ratingSub = null;
-    if (uid == null) {
-      setState(() {
-        _avgRating = null;
-        _ratingCount = 0;
-      });
-      return;
-    }
-    _ratingSub =
-        RatingRepository.instance.watchForDriver(uid).listen((ratings) {
-      if (!mounted) return;
-      setState(() {
-        _ratingCount = ratings.length;
-        _avgRating = ratings.isEmpty
-            ? null
-            : ratings.map((r) => r.rating).reduce((a, b) => a + b) /
-                ratings.length;
-      });
-    });
   }
 
   /// (Re)subscribes to this driver's real trips whenever the signed-in uid
@@ -174,13 +133,15 @@ class _DriverProfileState extends State<DriverProfile> {
       });
       return;
     }
-    _tripCountSub =
-        TripRepository.instance.watchTripsForDriver(uid).listen((trips) {
+    _tripCountSub = TripRepository.instance.watchTripsForDriver(uid).listen((
+      trips,
+    ) {
       if (!mounted) return;
       setState(() {
         _trips = trips;
-        _completedTripCount =
-            trips.where((t) => t.status == TripStatus.completed).length;
+        _completedTripCount = trips
+            .where((t) => t.status == TripStatus.completed)
+            .length;
       });
     });
   }
@@ -223,6 +184,36 @@ class _DriverProfileState extends State<DriverProfile> {
         ? 'No students booked yet'
         : '$booked student${booked == 1 ? '' : 's'} on your roster';
   }
+
+  /// Subtitle for the "Performance Report" row. Was the hardcoded
+  /// `performance_report_desc` string ("96% on-time rate") shown for every
+  /// driver regardless of whether they had completed a single real trip.
+  /// `_trips`/`_completedTripCount` are already the real, live-subscribed
+  /// data this screen uses for the trip-history row above — reused here
+  /// rather than a second Firestore listener for the same numbers.
+  String _performanceSummary() {
+    if (_completedTripCount == 0) return 'No trips completed yet';
+    final completed = _trips
+        .where((t) => t.status == TripStatus.completed)
+        .toList();
+    final onTime = completed.where((t) => t.onTime == true).length;
+    final pct = (onTime / completed.length * 100).round();
+    return '$pct% on-time rate';
+  }
+
+  /// Subtitle + color for the "Documents & License" row. Was the hardcoded
+  /// `documents_license_desc` string ("All verified ✓") shown even for a
+  /// brand-new driver still sitting in `DriverStatus.pendingVerification` —
+  /// same real `Driver.isApproved` gate `driver_performance_screen.dart`
+  /// uses for its own new-account state, not a separate invented field.
+  bool get _documentsVerified =>
+      SessionService.instance.driver.value?.isApproved ?? false;
+
+  String get _documentsSummary =>
+      _documentsVerified ? 'All verified ✓' : 'Pending verification';
+
+  Color get _documentsColor =>
+      _documentsVerified ? AppTheme.success : AppTheme.warning;
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -381,48 +372,11 @@ class _DriverProfileState extends State<DriverProfile> {
                         fontSize: 14,
                       ),
                     ),
+                    // The star-rating row that used to live here has moved
+                    // to the "Performance Report" screen (`DriverRatingBar`,
+                    // `widgets/driver_rating_bar.dart`) -- this profile page
+                    // now shows it in exactly one place instead of two.
                     const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          children: List.generate(
-                            5,
-                            (i) => Text(
-                              '⭐',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: i < (_avgRating ?? 0).floor()
-                                    ? Colors.white
-                                    : context.textTertiary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _avgRating == null
-                              ? '—'
-                              : _avgRating!.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: AppTheme.warningLight,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _ratingCount == 0
-                              ? 'No ratings yet'
-                              : '($_ratingCount rating${_ratingCount == 1 ? '' : 's'})',
-                          style: TextStyle(
-                            color: context.textTertiary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -674,13 +628,14 @@ class _DriverProfileState extends State<DriverProfile> {
                           _MenuItem(
                             icon: '🏆',
                             label: AppStrings.t('performance_report'),
-                            desc: AppStrings.t('performance_report_desc'),
+                            desc: _performanceSummary(),
                             onTap: () => context.push('/driver/performance'),
                           ),
                           _MenuItem(
                             icon: '📜',
                             label: AppStrings.t('documents_license'),
-                            desc: AppStrings.t('documents_license_desc'),
+                            desc: _documentsSummary,
+                            descColor: _documentsColor,
                             onTap: () => context.push('/driver/documents'),
                           ),
                           _MenuItem(
@@ -1019,12 +974,14 @@ class _InfoCard extends StatelessWidget {
 class _MenuItem extends StatelessWidget {
   final String icon, label;
   final String? desc;
+  final Color? descColor;
   final bool isLast;
   final VoidCallback? onTap;
   const _MenuItem({
     required this.icon,
     required this.label,
     this.desc,
+    this.descColor,
     this.isLast = false,
     this.onTap,
   });
@@ -1067,8 +1024,11 @@ class _MenuItem extends StatelessWidget {
                     Text(
                       desc!,
                       style: TextStyle(
-                        color: context.textTertiary,
+                        color: descColor ?? context.textTertiary,
                         fontSize: 12,
+                        fontWeight: descColor != null
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                   ],

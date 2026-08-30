@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/driver_data_service.dart';
@@ -35,16 +37,59 @@ class _ParentScheduleState extends State<ParentSchedule> {
   /// Next-day attendance choice per child, keyed by [ChildInfo.id] so
   /// switching children (the child switcher above) doesn't leak one child's
   /// choice onto another's card. Local-only for now -- see
-  /// [_setTomorrowAttendance] -- so a missing entry defaults the toggle to
+  /// [_submitAttendance] -- so a missing entry defaults the toggle to
   /// "Going", the common case, rather than an ambiguous unset state.
   final Map<String, bool> _tomorrowGoing = {};
 
-  /// Id of the child whose attendance toggle is mid-submit, so only that
-  /// card's buttons disable/show a spinner -- not every child's, and not the
-  /// rest of the screen.
+  /// How many days (starting tomorrow) the child will be absent, keyed by
+  /// child id -- only meaningful while that child's [_tomorrowGoing] entry
+  /// is `false`. Defaults to 1 the first time a child is marked "Not
+  /// Attending" (see [_onAttendanceToggle]).
+  final Map<String, int> _absenceDays = {};
+  int _daysFor(ChildInfo child) => _absenceDays[child.id] ?? 1;
+
+  /// Id of the child whose attendance is mid-submit, so only that card's
+  /// controls disable/show a spinner -- not every child's, and not the rest
+  /// of the screen.
   String? _submittingAttendanceFor;
 
-  /// Sends the parent's next-day attendance choice to the driver.
+  /// The absence-days stepper fires on every +/- tap; without this, holding
+  /// or repeatedly tapping it would fire a "mock API call" (and a stacked
+  /// SnackBar) per tap. Debounced the same way `map_picker_screen.dart`'s
+  /// search box already debounces typing -- wait for the parent to settle
+  /// on a number, then submit once.
+  Timer? _absenceDebounce;
+
+  /// Flips [child]'s tomorrow status and submits immediately -- unlike the
+  /// day-count stepper, a Going/Not-Attending toggle is a single deliberate
+  /// tap, not something that needs debouncing.
+  void _onAttendanceToggle(ChildInfo child, bool going) {
+    _absenceDebounce?.cancel();
+    setState(() {
+      _tomorrowGoing[child.id] = going;
+      if (!going) _absenceDays.putIfAbsent(child.id, () => 1);
+    });
+    unawaited(
+      _submitAttendance(
+        child,
+        going: going,
+        days: going ? null : _daysFor(child),
+      ),
+    );
+  }
+
+  /// Updates the local day count immediately (so the stepper feels
+  /// instant) and debounces the actual "notify the driver" submission.
+  void _onAbsenceDaysChanged(ChildInfo child, int days) {
+    setState(() => _absenceDays[child.id] = days);
+    _absenceDebounce?.cancel();
+    _absenceDebounce = Timer(const Duration(milliseconds: 500), () {
+      unawaited(_submitAttendance(child, going: false, days: days));
+    });
+  }
+
+  /// Sends the parent's next-day attendance choice (and, if absent, how
+  /// many days) to the driver.
   ///
   /// **Mock for now.** There is no backend for this yet: `AttendanceRecord`
   /// (`transit_core/lib/src/models/trip.dart`) is deliberately a different
@@ -52,43 +97,52 @@ class _ParentScheduleState extends State<ParentSchedule> {
   /// document, written by the *driver* once a real trip is running (Phase 2,
   /// not started, see IMPLEMENTATION.md). This is a *parent's advance notice*
   /// for a trip that doesn't exist yet, so it needs its own home -- most
-  /// naturally a `students/{id}/nextDayAttendance/{dateKey}` document plus a
-  /// write to `NotificationService`/FCM so the driver actually sees it,
-  /// neither of which exists today. Wiring that up is a real, separate task;
+  /// naturally a `students/{id}/nextDayAttendance/{dateKey}` document (one
+  /// per absent date, so a multi-day absence is `days` separate documents,
+  /// each independently cancellable) plus a write to `NotificationService`/
+  /// FCM so the driver actually sees it, neither of which exists today.
+  /// Wiring that up is a real, separate task (see IMPLEMENTATION.md's P2-11);
   /// this stands in for it so the UI has something to call, updates local
   /// state optimistically, and is honest in its comments about not being
   /// real yet -- exactly like `driver_data_service.dart`'s explicit
   /// TODO-style notes elsewhere in this app.
-  Future<void> _setTomorrowAttendance(ChildInfo child, bool going) async {
-    setState(() {
-      _submittingAttendanceFor = child.id;
-      _tomorrowGoing[child.id] = going;
-    });
+  Future<void> _submitAttendance(
+    ChildInfo child, {
+    required bool going,
+    int? days,
+  }) async {
+    setState(() => _submittingAttendanceFor = child.id);
     try {
-      // TODO(backend): replace with a real write, e.g.
+      // TODO(backend): replace with real writes, e.g.
+      //   final dateKeys = List.generate(
+      //     days ?? 1,
+      //     (i) => Trip.dateKeyFor(DateTime.now().add(Duration(days: i + 1))),
+      //   );
       //   await AttendanceRepository.instance.setNextDayAttendance(
       //     studentId: child.id,
       //     driverId: child.driver,
-      //     dateKey: Trip.dateKeyFor(DateTime.now().add(const Duration(days: 1))),
+      //     dateKeys: going ? [] : dateKeys,
       //     going: going,
       //   );
       // which should also trigger a driver-facing notification the same way
       // `NotificationService` already pushes ride-request replies today.
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
+      final name = child.name.isEmpty ? 'Your child' : child.name;
+      final message = going
+          ? 'Driver notified: $name is attending tomorrow.'
+          : 'Driver notified: $name will be absent for ${_daysLabel(days ?? 1)}.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            going
-                ? "Driver notified: ${child.name.isEmpty ? 'Your child' : child.name} is attending tomorrow."
-                : "Driver notified: ${child.name.isEmpty ? 'Your child' : child.name} will not attend tomorrow.",
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
       );
     } finally {
       if (mounted) setState(() => _submittingAttendanceFor = null);
     }
+  }
+
+  String _daysLabel(int days) {
+    if (LanguageProvider.instance.isUrdu) return '$days دن';
+    return days == 1 ? '1 day' : '$days days';
   }
 
   void _onLangChanged() => setState(() {});
@@ -96,6 +150,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _absenceDebounce?.cancel();
     super.dispose();
   }
 
@@ -108,13 +163,38 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Friday',
   ];
 
+  /// Full Mon–Fri dates of the *current* week -- the single source of truth
+  /// [_dates] (day-of-month for the header row) and the day-selector's
+  /// absence dots both read from, so the two can never disagree about which
+  /// calendar day column `i` represents.
+  List<DateTime> get _weekDates {
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    return List.generate(5, (i) => monday.add(Duration(days: i)));
+  }
+
   /// Day-of-month for Mon–Fri of the *current* week, so the day selector
   /// stays in step with the header's date range below instead of always
   /// showing a fixed "Feb 23–27".
-  List<int> get _dates {
-    final now = DateTime.now();
-    final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
-    return List.generate(5, (i) => monday.add(Duration(days: i)).day);
+  List<int> get _dates => _weekDates.map((d) => d.day).toList();
+
+  /// True when [date] falls inside the child's reported next-day absence
+  /// window -- tomorrow through `tomorrow + (absenceDays - 1)` -- so the
+  /// week's day-selector dots can turn red for exactly the days the parent
+  /// marked absent, the same [_tomorrowGoing]/[_absenceDays] state the
+  /// "Tomorrow's Attendance" card below reads and writes. Bonus-task link:
+  /// this is the whole mechanism -- no separate calendar state needed, the
+  /// day selector just asks this method per date.
+  bool _isAbsentOn(ChildInfo? child, DateTime date) {
+    if (child == null) return false;
+    final going = _tomorrowGoing[child.id] ?? true;
+    if (going) return false;
+    final days = _absenceDays[child.id] ?? 1;
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final start = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+    final end = start.add(Duration(days: days - 1));
+    final d = DateTime(date.year, date.month, date.day);
+    return !d.isBefore(start) && !d.isAfter(end);
   }
 
   /// The selected child's assigned driver, resolved the same way
@@ -404,6 +484,14 @@ class _ParentScheduleState extends State<ParentSchedule> {
                     children: List.generate(5, (i) {
                       final isSelected = _selectedDay == i;
                       final isToday = schedule[i].status == 'today';
+                      // Bonus-task link: the absent-days dot color reads
+                      // straight from the same `_tomorrowGoing`/
+                      // `_absenceDays` state the attendance card below
+                      // writes -- see `_isAbsentOn` -- so marking a
+                      // multi-day absence there immediately turns the
+                      // matching dates' dots red here, no separate
+                      // calendar state to keep in sync.
+                      final isAbsent = _isAbsentOn(child, _weekDates[i]);
                       return Expanded(
                         child: GestureDetector(
                           onTap: () => setState(() => _selectedDay = i),
@@ -465,7 +553,9 @@ class _ParentScheduleState extends State<ParentSchedule> {
                                   width: 6,
                                   height: 6,
                                   decoration: BoxDecoration(
-                                    color: schedule[i].status == 'done'
+                                    color: isAbsent
+                                        ? AppTheme.error
+                                        : schedule[i].status == 'done'
                                         ? AppTheme.success
                                         : schedule[i].status == 'today'
                                         ? AppTheme.purple
@@ -747,8 +837,11 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   _TomorrowAttendanceCard(
                     childName: child.name.isEmpty ? 'your child' : child.name,
                     going: _tomorrowGoing[child.id] ?? true,
+                    absenceDays: _daysFor(child),
                     submitting: _submittingAttendanceFor == child.id,
-                    onChanged: (going) => _setTomorrowAttendance(child, going),
+                    daysLabel: _daysLabel,
+                    onToggle: (going) => _onAttendanceToggle(child, going),
+                    onDaysChanged: (days) => _onAbsenceDaysChanged(child, days),
                   ),
               ],
             ),
@@ -830,26 +923,37 @@ class _DaySchedule {
 }
 
 /// "Tomorrow's Attendance" card, replacing the old "Upcoming Holidays"
-/// block. A `going`/`not going` segmented control so a parent can tell the
-/// driver in one tap whether their child is riding tomorrow, instead of the
-/// driver finding out by waiting at an empty stop.
+/// block. Defaults green/"Attending Tomorrow"; tapping the switch flips it
+/// to red/"Not Attending" and reveals an animated day-count stepper for a
+/// multi-day absence.
 class _TomorrowAttendanceCard extends StatelessWidget {
   final String childName;
   final bool going;
+  final int absenceDays;
   final bool submitting;
-  final ValueChanged<bool> onChanged;
+  final String Function(int days) daysLabel;
+  final ValueChanged<bool> onToggle;
+  final ValueChanged<int> onDaysChanged;
 
   const _TomorrowAttendanceCard({
     required this.childName,
     required this.going,
+    required this.absenceDays,
     required this.submitting,
-    required this.onChanged,
+    required this.daysLabel,
+    required this.onToggle,
+    required this.onDaysChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = going ? AppTheme.success : AppTheme.error;
     return GlassCard(
       enableBlur: false,
+      gradient: LinearGradient(
+        colors: [color.withValues(alpha: 0.14), color.withValues(alpha: 0.05)],
+      ),
+      borderColor: color.withValues(alpha: 0.3),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -857,17 +961,32 @@ class _TomorrowAttendanceCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.parentPurple.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Center(
-                  child: Text('📅', style: TextStyle(fontSize: 16)),
+                child: Center(
+                  child: submitting
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: color,
+                          ),
+                        )
+                      : Icon(
+                          going
+                              ? Icons.check_circle_rounded
+                              : Icons.cancel_rounded,
+                          color: color,
+                          size: 24,
+                        ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,57 +994,50 @@ class _TomorrowAttendanceCard extends StatelessWidget {
                     Text(
                       '${AppStrings.t('tomorrows_attendance')} — $childName',
                       style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        color: context.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      AppStrings.t('tomorrows_attendance_subtitle'),
+                      going
+                          ? AppStrings.t('attending_tomorrow')
+                          : AppStrings.t('not_attending'),
                       style: TextStyle(
-                        color: context.textTertiary,
-                        fontSize: 11,
+                        color: color,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
               ),
+              Switch(
+                value: going,
+                activeTrackColor: AppTheme.success,
+                onChanged: submitting ? null : onToggle,
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: context.cardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: context.surfaceBorder),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _AttendanceOption(
-                    label: AppStrings.t('going'),
-                    icon: Icons.check_circle_rounded,
-                    selected: going,
-                    loading: submitting && going,
-                    color: AppTheme.success,
-                    onTap: submitting ? null : () => onChanged(true),
+          // Task 3: revealed only in the "Not Attending" state, animated
+          // rather than an abrupt appear/disappear.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: going
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: _AbsenceDaysStepper(
+                      days: absenceDays,
+                      enabled: !submitting,
+                      label: daysLabel(absenceDays),
+                      onChanged: onDaysChanged,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _AttendanceOption(
-                    label: AppStrings.t('not_going'),
-                    icon: Icons.cancel_rounded,
-                    selected: !going,
-                    loading: submitting && !going,
-                    color: AppTheme.error,
-                    onTap: submitting ? null : () => onChanged(false),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -933,62 +1045,96 @@ class _TomorrowAttendanceCard extends StatelessWidget {
   }
 }
 
-class _AttendanceOption extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final bool loading;
-  final Color color;
-  final VoidCallback? onTap;
+/// Task 3's "clean counter": -/+ stepper for how many days (starting
+/// tomorrow) the child will be absent. Clamped to a school-term-sane
+/// 1–14 range rather than allowing an unbounded or negative count.
+class _AbsenceDaysStepper extends StatelessWidget {
+  static const _min = 1;
+  static const _max = 14;
 
-  const _AttendanceOption({
+  final int days;
+  final bool enabled;
+  final String label;
+  final ValueChanged<int> onChanged;
+
+  const _AbsenceDaysStepper({
+    required this.days,
+    required this.enabled,
     required this.label,
-    required this.icon,
-    required this.selected,
-    required this.loading,
-    required this.color,
-    required this.onTap,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.5) : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading)
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: color),
-              )
-            else
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? color : context.textTertiary,
-              ),
-            const SizedBox(width: 6),
-            Text(
-              label,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.surfaceBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              AppStrings.t('for_how_many_days'),
               style: TextStyle(
-                color: selected ? color : context.textSecondary,
+                color: context.textSecondary,
                 fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
+          ),
+          _StepperButton(
+            icon: Icons.remove_rounded,
+            onTap: enabled && days > _min ? () => onChanged(days - 1) : null,
+          ),
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          _StepperButton(
+            icon: Icons.add_rounded,
+            onTap: enabled && days < _max ? () => onChanged(days + 1) : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _StepperButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppTheme.error.withValues(alpha: 0.12)
+              : context.cardBgElevated,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? AppTheme.error : context.textTertiary,
         ),
       ),
     );
