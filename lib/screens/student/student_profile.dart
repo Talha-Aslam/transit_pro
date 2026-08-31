@@ -72,12 +72,7 @@ class _StudentProfileState extends State<StudentProfile> {
         _FieldDef(AppStrings.t('school'), info.school),
       ],
       onSave: (v) => _svc.updateStudentInfo(
-        info.copyWith(
-          name: v[0],
-          studentId: v[1],
-          grade: v[2],
-          school: v[3],
-        ),
+        info.copyWith(name: v[0], studentId: v[1], grade: v[2], school: v[3]),
       ),
     );
   }
@@ -218,69 +213,31 @@ class _StudentProfileState extends State<StudentProfile> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          guardian.email,
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          guardian.phone,
-                          style: TextStyle(
-                            color: context.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 10,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            GestureDetector(
-                              onTap: _editGuardianInfo,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: context.cardBg,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: context.surfaceBorder,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.black54,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      AppStrings.t('edit_info'),
-                                      style: TextStyle(
-                                        color: context.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                        if (guardian.email.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            guardian.email,
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 13,
                             ),
-                            _SubscriptionChip(
-                              label:
-                                  '${SubscriptionProvider.instance.planDisplayName} Plan · ${AppStrings.t('active')}',
-                              color: AppTheme.studentAmber,
+                          ),
+                        ],
+                        if (guardian.phone.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            guardian.phone,
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 13,
                             ),
-                          ],
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        _SubscriptionChip(
+                          label:
+                              '${SubscriptionProvider.instance.planDisplayName} Plan · ${AppStrings.t('active')}',
+                          color: AppTheme.studentAmber,
                         ),
                       ],
                     ),
@@ -523,13 +480,19 @@ class _StudentProfileState extends State<StudentProfile> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'PARENT/GUARDIAN',
-                            style: TextStyle(
-                              color: context.textTertiary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'PARENT/GUARDIAN',
+                                style: TextStyle(
+                                  color: context.textTertiary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const Spacer(),
+                              _EditInfoButton(onTap: _editGuardianInfo),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           _DetailRow(
@@ -958,6 +921,45 @@ class _QuickStat extends StatelessWidget {
           style: TextStyle(color: context.textTertiary, fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+/// Compact "Edit Info" pill for a card header. Extracted from the header
+/// pill row (where it sat full-size next to the subscription chip) and
+/// scaled down — smaller padding/icon/font — so it reads as a header
+/// action rather than a second headline button.
+class _EditInfoButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _EditInfoButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.surfaceBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.edit, size: 13, color: Colors.black54),
+            const SizedBox(width: 5),
+            Text(
+              AppStrings.t('edit_info'),
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

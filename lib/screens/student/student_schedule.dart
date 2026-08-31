@@ -540,25 +540,44 @@ class _NoDriverState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      // Was `.start` -- with no `width`/`Expanded`/`stretch` anywhere
+      // below, a `Column`'s `.start` alignment lets each child (this
+      // `Padding`+`GlassCard` included) shrink-wrap to its own natural
+      // width instead of filling what the Column actually has available.
+      // Here that meant the card sized itself to its one line of centered
+      // text, then sat flush against the *left* margin (honoring `.start`)
+      // while the *right* side was simply wherever the text happened to
+      // end -- an uneven gap, not a layout bug in the card itself.
+      // `.stretch` forces every child, including this one, to fill the
+      // Column's full width; each child's own internal alignment (the
+      // header's left-aligned title, the card's centered icon/text below)
+      // is unaffected, since that's controlled by their own widgets, not
+      // by this outer one.
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         header,
         const SizedBox(height: 16),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          // Matches the header's own `EdgeInsets.fromLTRB(20, ...)` margin
+          // (`_buildHeader`) exactly -- was `16` here, 4px narrower than
+          // the header on each side, so even a full-width card wouldn't
+          // have lined up with the title above it.
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: GlassCard(
             padding: const EdgeInsets.all(24),
             child: Column(
+              // Explicit, not just relying on `Column`'s own `.center`
+              // default, so it's clear this is deliberate: the icon and
+              // text should stay centered no matter how wide the card
+              // ends up being.
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Text('🚌', style: TextStyle(fontSize: 32)),
                 const SizedBox(height: 12),
                 Text(
                   'Please select a driver to view the schedule.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: context.textSecondary, fontSize: 14),
                 ),
               ],
             ),

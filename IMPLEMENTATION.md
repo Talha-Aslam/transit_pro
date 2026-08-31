@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-08-31
+> **Last updated:** 2026-09-01
 
 ---
 
@@ -662,6 +662,88 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-09-01 — moved "Edit Info" from the profile header into the Parent/Guardian card
+
+`student_profile.dart`'s "Edit Info" pill used to sit at the top of the
+screen next to the subscription chip, disconnected from the
+"PARENT/GUARDIAN" section it actually edits.
+
+**Fix.** Extracted the pill into a standalone `_EditInfoButton` widget,
+scaled down for a card header (smaller padding/icon/font than the
+original) instead of the full-size button. Removed it from the top header
+`Wrap` — which now holds only the subscription chip, so the leftover
+`Wrap` collapsed to a single centered widget. Restructured the
+"PARENT/GUARDIAN" section header from a bare `Text` into
+`Row(children: [Text(...), const Spacer(), _EditInfoButton(...)])`, using
+`Spacer()` to push the label left and the button right — the card's
+`Column` already used `crossAxisAlignment: .start`, so no other alignment
+changes were needed.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-01 — tightened the gap between name and action pills on Student Profile header
+
+`student_profile.dart`'s header (avatar → name → "Edit Info"/"Premium Plan"
+pills) showed a large empty gap between the username and the pill row for
+accounts with no guardian email/phone on file.
+
+**Cause.** `GuardianInfo` defaults `email`/`phone` to `''`
+(`student_data_service.dart`), but the header unconditionally rendered
+`Text(guardian.email)` and `Text(guardian.phone)` between the name and the
+button `Wrap`, each with its own `SizedBox` gap (6/4/12px). For an empty
+guardian record that's two blank lines plus three stacked gaps around
+nothing — not a stray `SizedBox` or a `spaceEvenly` alignment (the header
+`Column` already defaults to `.start`), just unconditional rendering of
+fields that can be empty.
+
+**Fix.** Wrapped the email and phone `Text`s in `if (...isNotEmpty) ...[]`
+so an empty field renders nothing at all instead of a blank line, and
+replaced the three separate trailing gaps with one fixed
+`SizedBox(height: 16)` right before the pill row — always the same size,
+regardless of how many guardian-info lines rendered above it.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-01 — fixed the lopsided "select a driver" empty-state card on Student Schedule
+
+`student_schedule.dart`'s `_NoDriverState` (shown to a student with no
+driver/bus assigned yet — "Please select a driver to view the schedule.")
+had an uneven right-hand gap: the card visibly stopped short of the
+screen's right margin while sitting flush on the left.
+
+**Cause.** The outer `Column` wrapping the header and the card used
+`crossAxisAlignment: CrossAxisAlignment.start`. With no `width`,
+`Expanded`, or `stretch` anywhere in that subtree, `.start` lets each
+child — the card included — shrink-wrap to its own natural width rather
+than filling what the `Column` actually has available. The card's content
+is one short, centered line of text, so the card sized itself to that
+text's width, then sat against the left margin (honoring `.start`) with
+the right side landing wherever the text happened to end: an uneven gap,
+not a bug in the card's own internal layout.
+
+**Fix — `crossAxisAlignment: CrossAxisAlignment.stretch`** on that outer
+`Column`, per the request's own suggested mechanism, verified against this
+specific widget tree first: `_NoDriverState` sits directly inside a
+`SingleChildScrollView` (`student_schedule.dart` build method), which
+*is* width-bounded (only its scroll axis, height, is unbounded), so
+`.stretch` has a real width to fill here — unlike a bare `shrinkWrap`
+`GridView` a few tasks ago, where the same mechanism would have thrown
+rather than helped. Each child's own internal alignment is unaffected:
+the header keeps its left-aligned title (a nested `Column` with its own
+`crossAxisAlignment: start`), and the card's icon/text stay centered via
+an explicit `crossAxisAlignment: CrossAxisAlignment.center` added to its
+own inner `Column` (previously relying on that being the unstated
+default).
+
+**Also aligned the card's side margins to the header's.** The header uses
+`EdgeInsets.fromLTRB(20, ...)`; the card's wrapping `Padding` used `16` —
+4px narrower on each side, so even a full-width card wouldn't have lined
+up with the title directly above it. Changed to `EdgeInsets.symmetric(
+horizontal: 20)` to match exactly.
+
+`flutter analyze` (full project): 4 issues, all pre-existing (unchanged
+from every prior entry). No new issues.
 
 ### 2026-08-31 (even later) — closed the empty strip at the bottom of the driver info card
 
