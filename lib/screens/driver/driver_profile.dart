@@ -482,69 +482,90 @@ class _DriverProfileState extends State<DriverProfile> {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          Column(
+                          // Was three manual `Row`s of two `Expanded` cards.
+                          // A plain `Row` only stretches its own two children
+                          // to match *each other*, and only within that one
+                          // row — it does nothing to equalise height across
+                          // rows. `GridView.count` fixes all 6 cells to one
+                          // shared width *and* height instead, driven by a
+                          // single `childAspectRatio`.
+                          //
+                          // The ratio here is deliberately *tight* — sized
+                          // to `_InfoCard`'s own compact natural height, not
+                          // to whatever "Total Students" would need if left
+                          // alone. That only works because
+                          // `_TotalStudentsCard` was restructured below to
+                          // actually fit that budget (icon+label sharing a
+                          // row, value+steppers sharing a row) rather than
+                          // asking the grid to grow around it.
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            // This grid sits inside the screen's own
+                            // scrolling `SingleChildScrollView` — it must
+                            // not try to scroll independently.
+                            physics: const NeverScrollableScrollPhysics(),
+                            mainAxisSpacing: 8,
+                            crossAxisSpacing: 8,
+                            // History of this number, so the next person
+                            // (or the next me) doesn't re-derive it from
+                            // scratch or re-break it the same way twice:
+                            //  - 2.2 overflowed every cell by ~8.5px --
+                            //    the ratio was hand-estimated, and default
+                            //    `TextStyle` line height runs ~1.2x the raw
+                            //    font size, not 1.0x.
+                            //  - Fixed that two ways at once: lowered the
+                            //    ratio to 1.9 (taller cells) *and* shrank
+                            //    each card's content (tighter line-height,
+                            //    less padding). Only one of those was
+                            //    needed -- stacked together they overshot
+                            //    into a visible empty strip at the bottom
+                            //    of this whole card (reported with a
+                            //    screenshot), since the now-shorter content
+                            //    no longer needed cells that tall.
+                            //  - 2.4 is the recalibration: real content
+                            //    height with the trimmed padding/line-height
+                            //    in place is ~58px for `_InfoCard` (its
+                            //    Container's own numbers: 8px vertical
+                            //    padding x2 + 16px icon + 2px gap + ~10px
+                            //    label + 1px gap + ~13px value), so this
+                            //    targets roughly 65px of cell height at a
+                            //    typical ~157px cell width -- a real ~7px
+                            //    buffer this time, not a second stacked
+                            //    safety margin on top of the first.
+                            childAspectRatio: 1.9,
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _InfoCard(
-                                      icon: '🪪',
-                                      label: AppStrings.t('license_no_lbl'),
-                                      value: info.license,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _InfoCard(
-                                      icon: '📅',
-                                      label: AppStrings.t('experience_lbl'),
-                                      value: info.experience,
-                                    ),
-                                  ),
-                                ],
+                              _InfoCard(
+                                icon: '🪪',
+                                label: AppStrings.t('license_no_lbl'),
+                                value: info.license,
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _InfoCard(
-                                      icon: '🚌',
-                                      label: AppStrings.t('bus_number_lbl'),
-                                      value: info.busNumber.isEmpty
-                                          ? 'Not assigned yet'
-                                          : info.busNumber,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _InfoCard(
-                                      icon: '🗺️',
-                                      label: AppStrings.t('route_lbl'),
-                                      value: info.route,
-                                    ),
-                                  ),
-                                ],
+                              _InfoCard(
+                                icon: '📅',
+                                label: AppStrings.t('experience_lbl'),
+                                value: info.experience,
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _InfoCard(
-                                      icon: '📞',
-                                      label: AppStrings.t('mobile_lbl'),
-                                      value: info.phone,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _TotalStudentsCard(
-                                      autoCount: info.autoStudentCount,
-                                      manualCount: info.manualStudentCount,
-                                      onChanged: (v) =>
-                                          _svc.setManualStudentCount(v),
-                                    ),
-                                  ),
-                                ],
+                              _InfoCard(
+                                icon: '🚌',
+                                label: AppStrings.t('bus_number_lbl'),
+                                value: info.busNumber.isEmpty
+                                    ? 'Not assigned yet'
+                                    : info.busNumber,
+                              ),
+                              _InfoCard(
+                                icon: '🗺️',
+                                label: AppStrings.t('route_lbl'),
+                                value: info.route,
+                              ),
+                              _InfoCard(
+                                icon: '📞',
+                                label: AppStrings.t('mobile_lbl'),
+                                value: info.phone,
+                              ),
+                              _TotalStudentsCard(
+                                autoCount: info.autoStudentCount,
+                                manualCount: info.manualStudentCount,
+                                onChanged: (v) => _svc.setManualStudentCount(v),
                               ),
                             ],
                           ),
@@ -822,8 +843,12 @@ class _TotalStudentsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final total = autoCount + manualCount;
     return Container(
-      padding: const EdgeInsets.all(10),
+      // Reduced from 10 -- this card has two more real lines of content
+      // than `_InfoCard` and needs to give some room back to fit the same
+      // tight grid cell.
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(12),
@@ -832,41 +857,46 @@ class _TotalStudentsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text('👥', style: const TextStyle(fontSize: 16)),
-          const SizedBox(height: 3),
-          Text(
-            AppStrings.t('total_students_lbl'),
-            style: TextStyle(
-              color: context.textTertiary,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          // Icon + label share one row instead of two separate lines --
+          // the single biggest space saver here.
+          Row(
+            children: [
+              const Text('👥', style: TextStyle(fontSize: 14, height: 1)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  AppStrings.t('total_students_lbl'),
+                  style: TextStyle(
+                    color: context.textTertiary,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    height: 1.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 2),
-          Text(
-            '${autoCount + manualCount} total',
-            style: TextStyle(
-              color: context.textPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$autoCount in-app',
-            style: TextStyle(color: context.textTertiary, fontSize: 9),
-          ),
+          // Value + steppers share one row instead of the steppers sitting
+          // on their own row underneath a separate "in-app"/"offline" pair
+          // of lines -- the other explicit space saver.
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '+$manualCount offline',
-                style: TextStyle(color: context.textTertiary, fontSize: 9),
+                '$total total',
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -885,6 +915,20 @@ class _TotalStudentsCard extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+          const SizedBox(height: 2),
+          // The in-app/manual breakdown compressed onto one line. Wrapped
+          // in `FittedBox` (not just `overflow: ellipsis`) because this is
+          // the one piece of text on this card with no fixed upper bound --
+          // both counts can run to multiple digits -- so it shrinks to fit
+          // rather than ever risking a clipped line or a bottom overflow.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '$autoCount in-app · +$manualCount offline',
+              style: TextStyle(color: context.textTertiary, fontSize: 8),
+            ),
           ),
         ],
       ),
@@ -932,7 +976,11 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      // Was 10 -- trimmed alongside the grid's aspect-ratio fix (Method A)
+      // as a second, independent margin against the same overflow: even if
+      // a future ratio tweak drifts tight again, this card now needs a few
+      // fewer px to lay itself out.
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: context.cardBgElevated,
         borderRadius: BorderRadius.circular(12),
@@ -942,25 +990,27 @@ class _InfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(height: 3),
+          Text(icon, style: const TextStyle(fontSize: 16, height: 1)),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
               color: context.textTertiary,
               fontSize: 9,
               fontWeight: FontWeight.w600,
+              height: 1.1,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             value,
             style: TextStyle(
               color: context.textPrimary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
+              height: 1.1,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

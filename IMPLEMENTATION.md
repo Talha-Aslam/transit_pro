@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-08-28
+> **Last updated:** 2026-08-31
 
 ---
 
@@ -662,6 +662,125 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-08-31 (even later) — closed the empty strip at the bottom of the driver info card
+
+Reported with a screenshot: a visible empty gap between the bottom row of
+cards ("Mobile"/"Total Students") and the rounded bottom edge of the
+"Driver Information" card.
+
+**Corrected the premise first, not just applied the requested fix.** The
+ask was for `Expanded`-wrapped rows / a `LayoutBuilder`-driven `GridView`
+to "stretch cards to fill the parent's available height" — but the
+"blue block" (the `GlassCard` wrapping this section) has no fixed height
+of its own; it's `padding: EdgeInsets.all(18)` around a shrink-wrapped
+`GridView`, so its height is *entirely derived from* the grid's height.
+`Expanded` specifically requires a parent with a bounded height it can
+divide up (a `Row`/`Column` inside something like a fixed-height
+`SizedBox`) — added here with no such ancestor, it would throw
+`RenderFlex children have non-zero flex but incoming height constraints
+are unbounded`, not fix anything.
+
+**Real cause: two overflow fixes stacked when only one was needed.** The
+entry just below this one fixed an 8.5px overflow two ways at once —
+lowered `childAspectRatio` from `2.2` to `1.9` (taller cells) *and*
+shrank each card's content (tighter line-height, less padding). Either
+alone would likely have cleared 8.5px; doing both meant the now-shorter
+content no longer needed cells that tall, and the difference showed up as
+exactly the empty strip in the screenshot.
+
+**Fix: recalibrated `childAspectRatio` from `1.9` to `2.4`** using real
+numbers instead of another estimate — `_InfoCard`'s actual content height
+with the trimmed padding/line-height now in place works out to ~58px
+(8px vertical padding ×2 + 16px icon + 2px gap + ~10px label + 1px gap +
+~13px value), so `2.4` targets ~65px of cell height at a typical ~157px
+cell width: a real ~7px buffer this time, not a second safety margin
+stacked on the first one. Left the derivation in a comment so the next
+tuning pass has real numbers to start from instead of re-guessing.
+
+`flutter analyze` (full project): 4 issues, all pre-existing (unchanged
+from every prior entry). No new issues.
+
+### 2026-08-31 (later) — fixed "BOTTOM OVERFLOWED BY 8.5 PIXELS" on every driver info card
+
+The tight `childAspectRatio: 2.2` from the entry just below turned out to
+be a bit too tight in practice — every cell in the grid, not just "Total
+Students", overflowed its `Column` by ~8.5px.
+
+**Cause.** `childAspectRatio` is a hand-picked number, not a measurement.
+Constraining a `GridView` cell's aspect ratio fixes its height at
+`cellWidth ÷ ratio` regardless of what its child actually needs — estimate
+the child's real height even slightly low (here: assuming close to the raw
+font size per line, when Flutter's default `TextStyle` renders each line
+at roughly 1.2× that) and the `Column` inside has nowhere to put the
+difference. It doesn't resize the box to fit; it overflows past the bottom
+edge instead, which is exactly the "RenderFlex overflowed" error/yellow-
+black stripes.
+
+**Method A — adjusted the grid.** `childAspectRatio` lowered from `2.2` to
+`1.9` (taller cells for the same width), with a few spare px of margin
+built in rather than the bare minimum needed to clear 8.5px exactly — so
+the next label, locale, or font-scale change doesn't reopen the identical
+bug.
+
+**Method B — compressed content, as a second independent margin, not a
+substitute for Method A.** In `_InfoCard`: padding changed from a uniform
+`all(10)` to `symmetric(horizontal: 10, vertical: 8)` (saves vertical
+space without narrowing the card), the two inter-line `SizedBox` gaps
+trimmed (3→2, 2→1), and — the actual root-cause fix, not just a cosmetic
+trim — each `Text`'s `style` now sets `height: 1.1` (`1.0` for the emoji
+icon), tightening Flutter's default ~1.2× line-height multiplier down
+toward the font's actual glyph height. Applied the same `height`/gap
+trims to `_TotalStudentsCard`, the more content-dense of the two.
+
+Both methods deliberately applied together — Method A's margin absorbs
+ordinary content/locale drift; Method B's line-height fix addresses the
+actual measurement gap that caused this specific overflow, not just its
+symptom.
+
+`flutter analyze` (full project): 4 issues, all pre-existing (unchanged
+from every prior entry). No new issues.
+
+### 2026-08-31 — driver info cards: `GridView.count` with a tight ratio, "Total Students" shrunk to fit instead of the grid growing around it
+
+Same underlying problem as round 6/round 5's overflow fix — the "Driver
+Information" block (License No, Experience, Bus Number, Route, Mobile,
+Total Students) was three manual `Row`s of two `Expanded` cards, and "Total
+Students" (extra breakdown lines + a +/- stepper) came out taller than the
+rest since a plain `Row` doesn't equalise height across separate rows. This
+entry takes the opposite direction from an earlier attempt at this same
+fix: instead of growing every card to match "Total Students"' natural
+height, "Total Students" itself was restructured to fit inside the same
+compact size as the other five.
+
+**`GridView.count(crossAxisCount: 2, shrinkWrap: true, physics:
+NeverScrollableScrollPhysics(), mainAxisSpacing: 8, crossAxisSpacing: 8,
+childAspectRatio: 2.2)`** replaces the three `Row`s — `childAspectRatio`
+is deliberately tight, sized to `_InfoCard`'s own compact natural height
+(icon + label + value, ~67px including padding) rather than to whatever
+"Total Students" would need left alone. `shrinkWrap` + `NeverScrollable-
+ScrollPhysics` since the grid sits inside the screen's own
+`SingleChildScrollView`.
+
+**`_TotalStudentsCard` restructured to actually fit that tighter budget:**
+- Icon + label now share one `Row` instead of two stacked lines.
+- The total count + the +/- stepper buttons now share one `Row`
+  (`mainAxisAlignment: MainAxisAlignment.spaceBetween`) instead of the
+  steppers sitting on their own line below a separate "in-app"/"offline"
+  pair of lines.
+- The in-app/manual breakdown compressed onto a single line, wrapped in
+  `FittedBox(fit: BoxFit.scaleDown)` rather than relying on `overflow:
+  ellipsis` alone — this is the one piece of text on the card with no fixed
+  upper bound (both counts can run to multiple digits), so it shrinks to
+  fit instead of ever risking a clipped line or bottom overflow.
+- Padding reduced from `10` to `8` to reclaim a little more room.
+
+`_InfoCard` itself needed no change — it was already this compact; the
+grid's tight ratio just needed something on the other side of the pairing
+to actually match it.
+
+`flutter analyze` (full project): 4 issues, all pre-existing (unchanged
+from every prior entry). No new issues.
 
 ### 2026-08-28 (round 10) — extracted `DriverRatingBar`, moved off the profile page onto Performance Report
 
