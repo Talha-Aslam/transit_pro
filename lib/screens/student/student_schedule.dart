@@ -260,7 +260,14 @@ class _StudentScheduleState extends State<StudentSchedule> {
             studentInfo.busNumber.isNotEmpty || studentInfo.route.isNotEmpty;
         if (!hasBus) {
           return SingleChildScrollView(
-            child: _NoDriverState(header: _buildHeader(context)),
+            padding: const EdgeInsets.only(bottom: 100),
+            child: Column(
+              children: [
+                _NoDriverState(header: _buildHeader(context)),
+                const SizedBox(height: 24),
+                const _ManualTimetableSection(),
+              ],
+            ),
           );
         }
         return ValueListenableBuilder<DriverTimingSlots>(
@@ -584,6 +591,311 @@ class _NoDriverState extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Lets a student without a driver assigned yet keep their own weekly
+/// pickup/drop-off routine. Purely local state — see `_saveSchedule` for
+/// why "Save Schedule" is a mock rather than a real persistence call.
+class _ManualTimetableSection extends StatefulWidget {
+  const _ManualTimetableSection();
+
+  @override
+  State<_ManualTimetableSection> createState() =>
+      _ManualTimetableSectionState();
+}
+
+class _ManualTimetableSectionState extends State<_ManualTimetableSection> {
+  static const _weekDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  // Weekdays on by default, weekend off -- a reasonable starting point a
+  // student can flip, not a claim about their real routine.
+  late final Map<String, bool> _dayActive = {
+    for (final d in _weekDays) d: d != 'Saturday' && d != 'Sunday',
+  };
+
+  late final Map<String, Map<String, TimeOfDay>> _dayTimes = {
+    for (final d in _weekDays)
+      d: {
+        'pickup': const TimeOfDay(hour: 7, minute: 15),
+        'dropoff': const TimeOfDay(hour: 14, minute: 30),
+      },
+  };
+
+  Future<void> _pickTime(String day, String key) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _dayTimes[day]![key]!,
+      helpText: key == 'pickup' ? 'Select pickup time' : 'Select drop-off time',
+    );
+    if (picked != null) {
+      setState(() => _dayTimes[day]![key] = picked);
+    }
+  }
+
+  void _saveSchedule() {
+    // TODO(backend): there's no endpoint yet to persist a student-authored
+    // manual timetable. This builds the real payload from real widget
+    // state so the save flow is provable end-to-end, but nothing is sent
+    // anywhere -- wire this into StudentDataService once a backend exists,
+    // the same way `notificationPrefs` persists via SharedPreferences
+    // today (see `loadNotificationPrefs`/`setNotificationPref`).
+    final payload = {
+      for (final day in _weekDays)
+        day: _dayActive[day]!
+            ? {
+                'pickup': formatTimeOfDay(_dayTimes[day]!['pickup']!),
+                'dropoff': formatTimeOfDay(_dayTimes[day]!['dropoff']!),
+              }
+            : null,
+    };
+    debugPrint('Manual timetable (mock save): $payload');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Schedule saved on this device (not synced yet)'),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+          child: Text(
+            'Manual Timetable',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+          child: Text(
+            'Set your own pickup and drop-off routine while you wait for a '
+            'driver to be assigned.',
+            style: TextStyle(color: context.textSecondary, fontSize: 13),
+          ),
+        ),
+        for (final day in _weekDays)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _DayScheduleCard(
+              day: day,
+              active: _dayActive[day]!,
+              pickup: _dayTimes[day]!['pickup']!,
+              dropoff: _dayTimes[day]!['dropoff']!,
+              onActiveChanged: (v) => setState(() => _dayActive[day] = v),
+              onPickPickup: () => _pickTime(day, 'pickup'),
+              onPickDropoff: () => _pickTime(day, 'dropoff'),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveSchedule,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.studentAmber,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                'Save Schedule',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DayScheduleCard extends StatelessWidget {
+  final String day;
+  final bool active;
+  final TimeOfDay pickup;
+  final TimeOfDay dropoff;
+  final ValueChanged<bool> onActiveChanged;
+  final VoidCallback onPickPickup;
+  final VoidCallback onPickDropoff;
+
+  const _DayScheduleCard({
+    required this.day,
+    required this.active,
+    required this.pickup,
+    required this.dropoff,
+    required this.onActiveChanged,
+    required this.onPickPickup,
+    required this.onPickDropoff,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: dark
+                ? Colors.black.withValues(alpha: 0.45)
+                : const Color(0xFFA9B4C0).withValues(alpha: 0.35),
+            offset: const Offset(5, 5),
+            blurRadius: 12,
+          ),
+          BoxShadow(
+            color: dark
+                ? Colors.white.withValues(alpha: 0.03)
+                : Colors.white.withValues(alpha: 0.9),
+            offset: const Offset(-5, -5),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  day,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                active ? 'Active' : 'Off',
+                style: TextStyle(
+                  color: active ? AppTheme.success : context.textTertiary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 6),
+              AppSwitch(
+                value: active,
+                activeColor: AppTheme.studentAmber,
+                onChanged: onActiveChanged,
+              ),
+            ],
+          ),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: active ? 1 : 0.4,
+            child: IgnorePointer(
+              ignoring: !active,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _MiniTimeButton(
+                      label: 'Pickup Time',
+                      time: formatTimeOfDay(pickup),
+                      icon: '🏠',
+                      color: AppTheme.studentAmber,
+                      onTap: onPickPickup,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MiniTimeButton(
+                      label: 'Drop-off Time',
+                      time: formatTimeOfDay(dropoff),
+                      icon: '🏡',
+                      color: AppTheme.success,
+                      onTap: onPickDropoff,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniTimeButton extends StatelessWidget {
+  final String label, time, icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MiniTimeButton({
+    required this.label,
+    required this.time,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(icon, style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              time,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

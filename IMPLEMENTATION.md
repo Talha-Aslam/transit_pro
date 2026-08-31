@@ -663,6 +663,41 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-01 — added a "Manual Timetable" for students without a driver yet
+
+`student_schedule.dart`'s no-driver empty state ("Please select a driver
+to view the schedule.") was a dead end — a student waiting on a driver
+assignment had no way to plan their own routine in the meantime.
+
+**Added.** `_ManualTimetableSection`, rendered directly below the existing
+empty-state card whenever `!hasBus`:
+- 7 neumorphic `_DayScheduleCard`s (Monday–Sunday), each with an
+  `AppSwitch` (the app's existing switch widget, not a raw `Switch` — see
+  below) toggling "Active"/"Off", and Pickup/Drop-off `_MiniTimeButton`s
+  that open the native `showTimePicker`. When a day is off, the time
+  buttons are grayed out (`AnimatedOpacity`) and untappable
+  (`IgnorePointer`) rather than removed, so the row's layout doesn't jump.
+- State lives in `Map<String, bool> _dayActive` and
+  `Map<String, Map<String, TimeOfDay>> _dayTimes` on
+  `_ManualTimetableSectionState`, keyed by day name — local widget state
+  only, per this being a stand-in for a real per-student schedule.
+- A "Save Schedule" button at the bottom calls `_saveSchedule()`, which
+  builds the real save payload from that state and prints/snackbars it —
+  explicitly a mock (`// TODO(backend)` comment), since there's no backend
+  endpoint yet to persist a student-authored manual timetable. Wiring it
+  up for real should follow `StudentDataService.notificationPrefs`'s
+  existing SharedPreferences pattern once that endpoint exists.
+- Neumorphic card look built from two opposing `BoxShadow`s (dark
+  bottom-right, light top-left) on `context.cardBg`, since the app has no
+  existing neumorphic style to reuse — its other cards (`GlassCard`) are
+  flat/glassmorphic by convention.
+- Used the app's `AppSwitch` (`glass_card.dart`) instead of Material's
+  `Switch` — `Switch.activeColor` is deprecated in this Flutter version
+  (`activeThumbColor` replaces it), and `AppSwitch` is what every other
+  toggle in the app already uses.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
 ### 2026-09-01 — moved "Edit Info" from the profile header into the Parent/Guardian card
 
 `student_profile.dart`'s "Edit Info" pill used to sit at the top of the
