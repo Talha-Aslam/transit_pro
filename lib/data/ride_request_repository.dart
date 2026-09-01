@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Raised when a request cannot proceed for a reason the user needs to read —
 /// the round filled up, the request was already answered, the driver changed
 /// their schedule. Distinct from a Firestore error: these are all normal
@@ -51,12 +49,12 @@ class RideRequestRepository {
       .map(_newestFirst);
 
   /// Everything one family has asked for, across all their children.
-  Stream<List<RideRequest>> watchForRequester(String requesterId) =>
-      Db.rideRequests
-          .where('requesterId', isEqualTo: requesterId)
-          .snapshots()
-          .docsList
-          .map(_newestFirst);
+  Stream<List<RideRequest>> watchForRequester(String requesterId) => Db
+      .rideRequests
+      .where('requesterId', isEqualTo: requesterId)
+      .snapshots()
+      .docsList
+      .map(_newestFirst);
 
   Future<RideRequest?> fetch({
     required String driverId,
@@ -135,7 +133,8 @@ class RideRequestRepository {
       studentGrade: student.grade,
       school: student.school,
       driverName: driver.name,
-      scheduleLabel: '${schedule.label} · ${schedule.directionLabel} '
+      scheduleLabel:
+          '${schedule.label} · ${schedule.directionLabel} '
           '${schedule.timeRange}',
       pickupLocation: student.pickupLocation,
       note: note,
@@ -144,18 +143,16 @@ class RideRequestRepository {
     await Db.rideRequests.doc(id).set(request);
     // Separate write: a server timestamp cannot travel through `withConverter`,
     // which serialises a typed model and has no place to put a sentinel.
-    await _rawRequest(id).set(
-      {'createdAt': Db.now, 'respondedAt': null},
-      SetOptions(merge: true),
-    );
+    await _rawRequest(
+      id,
+    ).set({'createdAt': Db.now, 'respondedAt': null}, SetOptions(merge: true));
     return request;
   }
 
   /// The family withdrawing before the driver has answered.
-  Future<void> cancel(String requestId) => _rawRequest(requestId).update({
-        'status': RideRequestStatus.cancelled.name,
-        'respondedAt': Db.now,
-      });
+  Future<void> cancel(String requestId) => _rawRequest(
+    requestId,
+  ).update({'status': RideRequestStatus.cancelled.name, 'respondedAt': Db.now});
 
   // ── Driver side ───────────────────────────────────────────────────────────
 
@@ -189,7 +186,9 @@ class RideRequestRepository {
 
       final request = RideRequest.fromMap(requestSnap.id, requestSnap.data()!);
       if (request.driverId != driverId) {
-        throw const RideRequestException('That request is not addressed to you.');
+        throw const RideRequestException(
+          'That request is not addressed to you.',
+        );
       }
       if (request.isAccepted) {
         // Not an error. The follow-up student write may have failed last time,
@@ -258,19 +257,15 @@ class RideRequestRepository {
     required String driverId,
     required String scheduleId,
     String? busId,
-  }) =>
-      Db.fs.collection('students').doc(studentId).update({
-        'driverId': driverId,
-        'scheduleId': scheduleId,
-        if (busId != null && busId.isNotEmpty) 'busId': busId,
-        'updatedAt': Db.now,
-      });
+  }) => Db.fs.collection('students').doc(studentId).update({
+    'driverId': driverId,
+    'scheduleId': scheduleId,
+    if (busId != null && busId.isNotEmpty) 'busId': busId,
+    'updatedAt': Db.now,
+  });
 
   /// Declines a request. No seat moves, so no transaction is needed.
-  Future<void> reject({
-    required String requestId,
-    String? responseNote,
-  }) =>
+  Future<void> reject({required String requestId, String? responseNote}) =>
       _rawRequest(requestId).update({
         'status': RideRequestStatus.rejected.name,
         if (responseNote != null && responseNote.trim().isNotEmpty)
@@ -297,7 +292,9 @@ class RideRequestRepository {
 
       final request = RideRequest.fromMap(requestSnap.id, requestSnap.data()!);
       if (request.driverId != driverId) {
-        throw const RideRequestException('That booking is not yours to change.');
+        throw const RideRequestException(
+          'That booking is not yours to change.',
+        );
       }
       if (!request.isAccepted) {
         throw const RideRequestException(

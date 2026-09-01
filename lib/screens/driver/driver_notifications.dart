@@ -8,30 +8,30 @@ import '../../app/driver_alerts_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/missed_bus_service.dart';
 import '../../app/session_service.dart';
-import '../../data/messaging_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
 /// Icon + accent colour for a notification, by its domain type.
 (String, Color) _appearanceFor(NotificationType type) => switch (type) {
-      NotificationType.emergency => ('🚨', AppTheme.error),
-      NotificationType.missedBus => ('🚌', AppTheme.error),
-      NotificationType.absent => ('⚠️', AppTheme.warning),
-      NotificationType.delay => ('⏰', AppTheme.warning),
-      NotificationType.boarded => ('✅', AppTheme.success),
-      NotificationType.busArrived => ('🏫', AppTheme.success),
-      NotificationType.busApproaching => ('🔔', AppTheme.warning),
-      NotificationType.busDeparted => ('🚌', AppTheme.info),
-      NotificationType.routeStarted => ('📍', AppTheme.info),
-      NotificationType.routeCompleted => ('🌇', AppTheme.success),
-      NotificationType.pickupAssigned => ('🧑‍✈️', AppTheme.success),
-      NotificationType.rideRequest => ('📬', AppTheme.warning),
-      NotificationType.rideRequestAnswered => ('📨', AppTheme.info),
-      NotificationType.payment => ('💳', AppTheme.success),
-      NotificationType.document => ('📜', AppTheme.purple),
-      NotificationType.chat => ('💬', AppTheme.info),
-      NotificationType.system => ('🔔', AppTheme.info),
-    };
+  NotificationType.emergency => ('🚨', AppTheme.error),
+  NotificationType.missedBus => ('🚌', AppTheme.error),
+  NotificationType.absent => ('⚠️', AppTheme.warning),
+  NotificationType.delay => ('⏰', AppTheme.warning),
+  NotificationType.boarded => ('✅', AppTheme.success),
+  NotificationType.busArrived => ('🏫', AppTheme.success),
+  NotificationType.busApproaching => ('🔔', AppTheme.warning),
+  NotificationType.busDeparted => ('🚌', AppTheme.info),
+  NotificationType.routeStarted => ('📍', AppTheme.info),
+  NotificationType.routeCompleted => ('🌇', AppTheme.success),
+  NotificationType.pickupAssigned => ('🧑‍✈️', AppTheme.success),
+  NotificationType.rideRequest => ('📬', AppTheme.warning),
+  NotificationType.rideRequestAnswered => ('📨', AppTheme.info),
+  NotificationType.payment => ('💳', AppTheme.success),
+  NotificationType.document => ('📜', AppTheme.purple),
+  NotificationType.chat => ('💬', AppTheme.info),
+  NotificationType.system => ('🔔', AppTheme.info),
+  NotificationType.adminMessage => ('🛡️', AppTheme.purple),
+};
 
 /// Which of this screen's three tabs a notification falls under.
 ///
@@ -42,14 +42,14 @@ import '../../widgets/glass_card.dart';
 /// produce read as `Admin`; the fully automated bus/route/attendance events
 /// read as `System`.
 String _tabFor(NotificationType type) => switch (type) {
-      NotificationType.chat || NotificationType.rideRequest => 'Parents',
-      NotificationType.document ||
-      NotificationType.payment ||
-      NotificationType.rideRequestAnswered ||
-      NotificationType.pickupAssigned =>
-        'Admin',
-      _ => 'System',
-    };
+  NotificationType.chat || NotificationType.rideRequest => 'Parents',
+  NotificationType.document ||
+  NotificationType.payment ||
+  NotificationType.rideRequestAnswered ||
+  NotificationType.pickupAssigned ||
+  NotificationType.adminMessage => 'Admin',
+  _ => 'System',
+};
 
 String _timeLabel(DateTime? when) {
   if (when == null) return 'Just now';
@@ -123,13 +123,13 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   int get _unread => _notifications.where((m) => !m.read).length;
 
   List<UserNotification> get _filtered => _notifications.where((m) {
-        return switch (_activeTab) {
-          'Parents' => _tabFor(m.type) == 'Parents',
-          'Admin' => _tabFor(m.type) == 'Admin',
-          'System' => _tabFor(m.type) == 'System',
-          _ => true,
-        };
-      }).toList();
+    return switch (_activeTab) {
+      'Parents' => _tabFor(m.type) == 'Parents',
+      'Admin' => _tabFor(m.type) == 'Admin',
+      'System' => _tabFor(m.type) == 'System',
+      _ => true,
+    };
+  }).toList();
 
   void _openMsg(UserNotification msg) {
     setState(() => _selectedMsg = msg);
@@ -151,8 +151,9 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   Future<void> _markAllRead() async {
     final uid = _session.uid;
     setState(() {
-      _notifications =
-          _notifications.map((m) => m.copyWith(read: true)).toList();
+      _notifications = _notifications
+          .map((m) => m.copyWith(read: true))
+          .toList();
     });
     DriverAlertsService.instance.setUnreadCount(0);
     if (uid == null) return;
@@ -241,14 +242,10 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: AppTheme.driverAccent.withValues(
-                            alpha: 0.15,
-                          ),
+                          color: AppTheme.driverAccent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: AppTheme.driverAccent.withValues(
-                              alpha: 0.3,
-                            ),
+                            color: AppTheme.driverAccent.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Icon(
@@ -285,9 +282,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: count > 0
-                                      ? AppTheme.error.withValues(
-                                          alpha: 0.4,
-                                        )
+                                      ? AppTheme.error.withValues(alpha: 0.4)
                                       : context.surfaceBorder,
                                 ),
                               ),
@@ -356,56 +351,59 @@ class _DriverNotificationsState extends State<DriverNotifications> {
               children: [
                 // Tabs
                 Row(
-                  children: {
-                    'All': AppStrings.t('all'),
-                    'Parents': AppStrings.t('parents_tab'),
-                    'Admin': AppStrings.t('admin_tab'),
-                    'System': AppStrings.t('system_tab'),
-                  }.entries.map((e) {
-                    final tab = e.key;
-                    final label = e.value;
-                    final active = _activeTab == tab;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _activeTab = tab),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? AppTheme.driverCyan.withValues(
-                                      alpha: 0.15,
-                                    )
-                                  : context.cardBgElevated,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: active
-                                    ? AppTheme.driverCyan.withValues(
-                                        alpha: 0.4,
-                                      )
-                                    : context.surfaceBorder,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                label,
-                                style: TextStyle(
+                  children:
+                      {
+                        'All': AppStrings.t('all'),
+                        'Parents': AppStrings.t('parents_tab'),
+                        'Admin': AppStrings.t('admin_tab'),
+                        'System': AppStrings.t('system_tab'),
+                      }.entries.map((e) {
+                        final tab = e.key;
+                        final label = e.value;
+                        final active = _activeTab == tab;
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: GestureDetector(
+                              onTap: () => setState(() => _activeTab = tab),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
                                   color: active
-                                      ? AppTheme.driverAccent
-                                      : context.textTertiary,
-                                  fontSize: 12,
-                                  fontWeight: active
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
+                                      ? AppTheme.driverCyan.withValues(
+                                          alpha: 0.15,
+                                        )
+                                      : context.cardBgElevated,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: active
+                                        ? AppTheme.driverCyan.withValues(
+                                            alpha: 0.4,
+                                          )
+                                        : context.surfaceBorder,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      color: active
+                                          ? AppTheme.driverAccent
+                                          : context.textTertiary,
+                                      fontSize: 12,
+                                      fontWeight: active
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
                 ),
                 const SizedBox(height: 14),
 
@@ -462,8 +460,9 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                             color: color.withValues(
                                               alpha: 0.12,
                                             ),
-                                            borderRadius:
-                                                BorderRadius.circular(14),
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
                                             border: Border.all(
                                               color: color.withValues(
                                                 alpha: 0.25,
@@ -496,15 +495,15 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                                           ? 'Notification'
                                                           : msg.title,
                                                       style: TextStyle(
-                                                        color: context
-                                                            .textPrimary,
+                                                        color:
+                                                            context.textPrimary,
                                                         fontSize: 13,
                                                         fontWeight: msg.read
                                                             ? FontWeight.w500
                                                             : FontWeight.w700,
                                                       ),
-                                                      overflow: TextOverflow
-                                                          .ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                   Text(
@@ -521,14 +520,12 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                               Text(
                                                 msg.body,
                                                 style: TextStyle(
-                                                  color:
-                                                      context.textSecondary,
+                                                  color: context.textSecondary,
                                                   fontSize: 12,
                                                   height: 1.4,
                                                 ),
                                                 maxLines: 2,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ],
                                           ),
@@ -555,10 +552,7 @@ class _DriverNotificationsState extends State<DriverNotifications> {
                                       left: 0,
                                       top: 0,
                                       bottom: 0,
-                                      child: Container(
-                                        width: 3,
-                                        color: color,
-                                      ),
+                                      child: Container(width: 3, color: color),
                                     ),
                                 ],
                               ),
@@ -645,15 +639,10 @@ class _DetailView extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.25),
-                    ),
+                    border: Border.all(color: color.withValues(alpha: 0.25)),
                   ),
                   child: Center(
-                    child: Text(
-                      icon,
-                      style: const TextStyle(fontSize: 22),
-                    ),
+                    child: Text(icon, style: const TextStyle(fontSize: 22)),
                   ),
                 ),
               ],

@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Reads and writes `ratings/{driverId}_{raterId}_{weekKey}`.
 ///
 /// The composite document id is the whole one-rating-per-week mechanism: a
@@ -20,8 +18,7 @@ class RatingRepository {
     required String driverId,
     required String raterId,
     required String weekKey,
-  }) =>
-      '${driverId}_${raterId}_$weekKey';
+  }) => '${driverId}_${raterId}_$weekKey';
 
   /// Every rating this user has given, newest first. Small by construction —
   /// one per driver per week.
@@ -33,17 +30,21 @@ class RatingRepository {
           .docsList;
 
   Future<List<DriverRating>> fetchByRater(String raterId) async {
-    final snap =
-        await Db.ratings.where('raterId', isEqualTo: raterId).limit(100).get();
+    final snap = await Db.ratings
+        .where('raterId', isEqualTo: raterId)
+        .limit(100)
+        .get();
     return snap.docs.map((d) => d.data()).toList();
   }
 
-  Stream<List<DriverRating>> watchForDriver(String driverId, {int limit = 50}) =>
-      Db.ratings
-          .where('driverId', isEqualTo: driverId)
-          .limit(limit)
-          .snapshots()
-          .docsList;
+  Stream<List<DriverRating>> watchForDriver(
+    String driverId, {
+    int limit = 50,
+  }) => Db.ratings
+      .where('driverId', isEqualTo: driverId)
+      .limit(limit)
+      .snapshots()
+      .docsList;
 
   /// Submits a rating for the current ISO week.
   ///
@@ -63,7 +64,9 @@ class RatingRepository {
     final id = idFor(driverId: driverId, raterId: raterId, weekKey: weekKey);
 
     try {
-      await Db.ratings.doc(id).set(
+      await Db.ratings
+          .doc(id)
+          .set(
             DriverRating(
               id: id,
               driverId: driverId,

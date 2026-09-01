@@ -1,7 +1,5 @@
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Buses and routes. Mostly read-only from the mobile app — the admin app owns
 /// the writes.
 class FleetRepository {
@@ -24,8 +22,10 @@ class FleetRepository {
   /// The route this driver is assigned to. Returns null while unassigned,
   /// which the driver UI should surface rather than crash on.
   Future<BusRoute?> fetchRouteForDriver(String driverId) async {
-    final snap =
-        await Db.routes.where('driverId', isEqualTo: driverId).limit(1).get();
+    final snap = await Db.routes
+        .where('driverId', isEqualTo: driverId)
+        .limit(1)
+        .get();
     return snap.docs.isEmpty ? null : snap.docs.first.data();
   }
 
@@ -41,11 +41,10 @@ class FleetRepository {
     return ref.id;
   }
 
-  Future<void> updateRoute(String routeId, Map<String, dynamic> fields) =>
-      Db.fs
-          .collection('routes')
-          .doc(routeId)
-          .update({...fields, 'updatedAt': Db.now});
+  Future<void> updateRoute(String routeId, Map<String, dynamic> fields) => Db.fs
+      .collection('routes')
+      .doc(routeId)
+      .update({...fields, 'updatedAt': Db.now});
 
   /// Replaces the whole embedded stop list. Stops are embedded rather than kept
   /// in their own collection because they are always read with the route.
@@ -70,6 +69,8 @@ class FleetRepository {
     return ref.id;
   }
 
-  Future<void> updateBus(String busId, Map<String, dynamic> fields) =>
-      Db.fs.collection('buses').doc(busId).update({...fields, 'updatedAt': Db.now});
+  Future<void> updateBus(String busId, Map<String, dynamic> fields) => Db.fs
+      .collection('buses')
+      .doc(busId)
+      .update({...fields, 'updatedAt': Db.now});
 }

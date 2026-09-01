@@ -247,6 +247,49 @@ class DriverDataService {
     });
   }
 
+  // ── Attendance-aware roster (illustrative) ──────────────────────────────
+  //
+  // Mirrors the parent-side `AttendanceService` mock (`app/attendance_service
+  // .dart`) so a driver starting their route can tell who to actually pick up
+  // today. Not wired into a screen yet — the real roster feed (`SessionService
+  // .roster`/`.routeStudents`, merged in `_rebuild` above) has no attendance
+  // filter applied anywhere today; this shows the shape that filter should
+  // take once `AttendanceService` is real.
+
+  /// Filters [fullRoster] down to students marked "attending" for [date]
+  /// (today, by default).
+  ///
+  /// **Only ever fetch one day's worth of attendance here — never the whole
+  /// week.** `students/{id}/attendance/{dateKey}` is one small document per
+  /// day; querying every roster student's *entire* week when the route only
+  /// needs today's date multiplies reads by ~5-7x for data that's either
+  /// already in the past (irrelevant once the bus has left) or not yet
+  /// decided (a parent can still change their mind about Thursday on
+  /// Monday). Always scope the query to a single `dateKey`.
+  Future<List<Student>> rosterAttendingOn(
+    List<Student> fullRoster, {
+    DateTime? date,
+  }) async {
+    final dateKey = Trip.dateKeyFor(date ?? DateTime.now());
+
+    // TODO(backend): real version reads exactly one doc per roster student,
+    // for this one dateKey, e.g.:
+    //   final snaps = await Future.wait(fullRoster.map((s) => Db.fs
+    //       .collection('students').doc(s.id)
+    //       .collection('attendance').doc(dateKey).get()));
+    //   return [
+    //     for (var i = 0; i < fullRoster.length; i++)
+    //       if ((snaps[i].data()?['isAttending'] as bool?) ?? true) fullRoster[i],
+    //   ];
+    // No document for a student == no notice was sent == still attending,
+    // matching `AttendanceService`/the parent-side day selector's default.
+    debugPrint(
+      'rosterAttendingOn (mock): would query dateKey=$dateKey only, '
+      'not the whole week',
+    );
+    return fullRoster;
+  }
+
   /// The +/- offline-student control on the driver profile. Never negative —
   /// a driver un-clicking below zero would otherwise silently subtract from
   /// the real, auto-counted roster instead of just zeroing out their own
@@ -272,8 +315,9 @@ class DriverDataService {
     final uid = SessionService.instance.uid;
     timingSlots.value = slots;
     if (uid == null) return;
-    await UserRepository.instance
-        .updateDriver(uid, {'timingSlots': slots.toMap()});
+    await UserRepository.instance.updateDriver(uid, {
+      'timingSlots': slots.toMap(),
+    });
   }
 
   /// Pulls the number back out of a display string like `'8 Years'`.

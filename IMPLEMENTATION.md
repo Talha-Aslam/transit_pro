@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-09-01
+> **Last updated:** 2026-09-02
 
 ---
 
@@ -74,10 +74,11 @@ If you are an AI agent picking up this project, follow this loop **every time**:
 | Phase 0 — Foundation | 4 | 7 | 🔵 In progress |
 | Phase 1 — Real accounts & data | 18 | 20 | 🔵 In progress |
 | Phase 1b — Driver service & requests | 14 | 15 | 🔵 In progress |
+| Phase 1c — Admin app wiring | 5 | 6 | 🔵 In progress |
 | Phase 2 — Live tracking | 0 | 11 | ⬜ Not started |
 | Phase 3 — AI features | 0 | 8 | ⬜ Not started |
 | Phase 4 — Pilot hardening | 0 | 9 | ⬜ Not started |
-| **Total** | **36** | **70** | |
+| **Total** | **41** | **76** | |
 
 **2026-08-18 update:** `firestore.rules`, `database.rules.json`, and
 Email/Password sign-in are all confirmed live — none of it independently
@@ -204,6 +205,45 @@ Need From You*. Until Email/Password is enabled, `signIn()` fails with
 
 ---
 
+## Phase 1c — Admin app wiring
+
+Added 2026-09-01. `transit_admin` (the separate admin app, `../../transit_admin`)
+was a UI mock with zero Firestore calls and its own incompatible model layer —
+this phase wires it to the real backend `transit_pro`/`transit_core` already
+run on, and builds the driver-verification and account-support workflows
+requested: view/approve/reject a driver's compliance documents, message a
+driver/parent/student about an issue, and edit a parent's or student's account
+details.
+
+| ID | Task | Status | Files |
+|---|---|---|---|
+| P1c-1 | Move `Db` and `MessagingRepository` out of `transit_pro` into `transit_core`, so both apps read/write the identical typed Firestore layer instead of a hand-maintained copy | ✅ | `transit_core/lib/src/{db,messaging_repository}.dart`, `transit_core/lib/transit_core.dart`; import-path updates in 11 `transit_pro` files (no logic changes) |
+| P1c-2 | Add `NotificationType.adminMessage` — a direct admin-to-user message, distinct from the automated `document` status-change notice | ✅ | `transit_core/lib/src/enums.dart`; icon/tab mapping in `transit_pro/lib/app/notification_service.dart`, `lib/screens/driver/driver_notifications.dart` |
+| P1c-3 | `transit_admin` depends on `transit_core`; real admin login (`signInWithEmailAndPassword` + require `users/{uid}.role == admin`); new `AdminRepository` for admin-only queries (list all drivers/users-by-role, document review, messaging) | ✅ | `transit_admin/pubspec.yaml`, `lib/app/auth_service.dart`, `lib/screens/login_screen.dart`, `lib/data/admin_repository.dart` |
+| P1c-4 | Driver management + detail wired to real data: list/filter by `DriverStatus`, Approve/Suspend, Compliance Documents section (view/verify/reject with a reason, rejection also messages the driver) | ✅ | `transit_admin/lib/screens/admin/admin_driver_management.dart`, `admin_driver_detail.dart` |
+| P1c-5 | Parent management + detail wired to real data: real children list, edit form (name/phone/email) saves, Activate/Deactivate, Message action | ✅ | `transit_admin/lib/screens/admin/admin_parent_management.dart`, `admin_parent_detail.dart` |
+| P1c-6 | Student management + detail wired to real data: edit form (name/grade/school/medical notes) saves, Suspend/re-enable transport, Message action | ✅ | `transit_admin/lib/screens/admin/admin_student_management.dart`, `admin_student_detail.dart` |
+| P1c-7 | `transit_admin` router auth guard (`redirect` gating `/admin/*` on a signed-in session, mirroring `transit_pro/lib/app/router.dart`) | ⬜ | `transit_admin/lib/app/router.dart` |
+
+**Deliberately out of scope this pass**, left mock: `AdminDashboard`, fees,
+routes, vehicles, and subscription/billing screens in `transit_admin`.
+`AdminParentDetail`'s old billing/subscription/payment-history UI was
+**removed** rather than wired — `transit_core`'s `AppUser`/`Student` schema has
+no per-parent billing concept, and a fake billing panel wired to nothing would
+have been worse than no panel. A real payment view would read the `payments`
+collection instead; not built here. The 4 history tabs on the driver/student
+detail screens (Trip/Attendance/SOS/Earnings/Missed/Access) are still
+illustrative mock rows — no trip/attendance data source is wired into either
+app's admin view yet.
+
+**Verified:** `flutter analyze` — zero errors in `transit_core`, `transit_pro`
+(4 pre-existing infos, unchanged), and `transit_admin`. **Not verified: real
+login end to end** — see *What I Need From You* below; nobody here can create
+the Firebase Auth account + `users/{uid}` doc needed to sign in as an admin,
+so the flow is untested past "compiles and the rules allow it."
+
+---
+
 ## Phase 2 — Live tracking across devices
 
 | ID | Task | Status | Files |
@@ -218,7 +258,7 @@ Need From You*. Until Email/Password is enabled, `signIn()` fails with
 | P2-8 | Geofence events → FCM push to parents | ⬜ | `lib/app/geofence_service.dart` |
 | P2-9 | Real chat replacing the 3 echo bots | ⬜ | `driver_chat_screen.dart`, `live_chat_screen.dart`, `student_driver_chat.dart` |
 | P2-10 | Missed-bus flow on Firestore | ⬜ | `lib/app/missed_bus_service.dart` |
-| P2-11 | Parent next-day attendance notice → driver, real backend | ⬜ added 2026-08-28 — `students/{id}/nextDayAttendance/{dateKey}` write + `NotificationService` push, replacing `parent_schedule.dart`'s current mock (`_setTomorrowAttendance`) | `lib/screens/parent/parent_schedule.dart`, new repository |
+| P2-11 | Parent per-day attendance notice → driver, real backend | ⬜ still mock, **generalized 2026-09-02** from "tomorrow + N days" to "any date in the visible week" — see the 2026-09-02 changelog entry. Mock now lives in its own `AttendanceService` (`updateAttendance(studentId, date, isAttending)`) instead of inline in the screen; real version is `students/{id}/attendance/{dateKey}` write + `NotificationService` push | `lib/app/attendance_service.dart`, `lib/screens/parent/parent_schedule.dart` |
 
 ---
 
@@ -274,8 +314,26 @@ Disclose these in the report as scoped-out future work.
 
 ## 🔴 What I Need From You
 
-**Everything that was actually blocking something is resolved as of
-2026-08-18.** What's left below is genuinely open, nothing more:
+**2026-09-01 — new item from the admin-app wiring (Phase 1c):**
+
+0. **#10 — create a real admin account, so `transit_admin` login can be
+   tested at all.** `transit_admin`'s login now calls real Firebase Auth and
+   requires `users/{uid}.role == 'admin'` — I can't invent credentials (same
+   rule as everywhere else in this project), and creating a Firebase Auth user
+   isn't something I can do from here. Two steps: Firebase console →
+   Authentication → add a user (email + password), then Firestore console →
+   `users/{that uid}` → set `role: "admin"` (the `create` rule for `users`
+   deliberately excludes the `admin` role from self-signup, so this has to be
+   a manual document write, not something the app can do for you). Once that
+   exists, sign in to `transit_admin` and run through: viewing a real driver's
+   pending documents, approving/rejecting one, sending a message to a driver
+   and confirming it shows up in that account's notification inbox in
+   `transit_pro`, and editing a parent's or student's details and confirming
+   the change is visible back in `transit_pro`. See Phase 1c above for what's
+   built and what's still mock.
+
+**Everything that was actually blocking something before this is resolved as
+of 2026-08-18.** What's left below is genuinely open, nothing more:
 
 1. **#9 — verify the Mapbox migration on a real device.** I built a debug APK
    successfully in this session (proves the Gradle/token/compile chain works),
@@ -662,6 +720,169 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-09-02 — generalized parent attendance from "tomorrow only" to any day in the visible week
+
+`parent_schedule.dart`'s attendance card only ever covered *tomorrow*, plus a
+day-count stepper for a run of consecutive absent days starting tomorrow —
+reasonable for its original scope, but it meant a parent couldn't mark, say,
+"Thursday" absent without first marking Monday–Wednesday absent too. Asked to
+generalize it: a toggle for whichever date is currently selected in the
+horizontal Mon–Fri day selector above, any day, one tap each.
+
+**State model changed** from `Map<String, bool> _tomorrowGoing` +
+`Map<String, int> _absenceDays` (both implicitly anchored to "tomorrow") to
+`Map<String, Map<DateTime, bool>> _attendanceByChildAndDate` — child id, then
+date (normalized to midnight via `_dateOnly`), so any Mon–Fri date can be
+independently marked attending/absent. The day-selector's red dot
+(`_isAbsentOn`) now just reads this map directly for the date that column
+represents — same mechanism as before, simpler, since there's no more
+"is this date inside the absence window" range check to get right.
+
+**Dropped the multi-day absence stepper** (`_AbsenceDaysStepper`,
+`_StepperButton`) — with the day selector itself now the way to pick *which*
+day, a separate "for how many days" control was solving a problem that no
+longer exists; a parent marking three days absent now taps three day cells
+and toggles each, which is also more correct (each day is independently
+cancellable, rather than "3 days starting tomorrow" being one bundled
+choice a parent couldn't partially undo).
+
+**New `AttendanceService`** (`lib/app/attendance_service.dart`) — pulled the
+mock write out of the screen into its own class,
+`updateAttendance({studentId, date, isAttending})`, with the real
+Firestore/Supabase equivalent spelled out in doc comments (a
+`students/{id}/attendance/{dateKey}` document, `dateKey` from the existing
+`Trip.dateKeyFor` so the format matches what the rest of the app already
+uses). Still a mock — `Future.delayed` + `debugPrint`, no backend — same
+honesty-about-mocks pattern this file already used inline; P2-11 (real
+backend) is unchanged, still not started.
+
+**New illustrative driver-side method**, `DriverDataService.
+rosterAttendingOn(fullRoster, {date})` — not wired into a driver screen (no
+screen asked for it), but shows the shape the real roster filter should take:
+one Firestore read per roster student for exactly one `dateKey`, never a
+whole week. Commented explicitly on why — a week-wide query would multiply
+reads ~5-7x for days that are either already past (irrelevant once the bus
+left) or not yet decided (a parent can still change Thursday's answer on
+Monday), for a screen that only ever needs *today's* date.
+
+**Neumorphic styling**, per this task's own constraint — the new
+`_AttendanceToggleCard` uses the same two-opposing-`BoxShadow` recipe
+`student_schedule.dart`'s `_DayScheduleCard` already established (dark
+shadow bottom-right, light top-left, `context.isDark`-aware), rather than
+this screen's usual glassmorphic `GlassCard`, since that's the one
+neumorphic pattern already in the app.
+
+**Localization**: repurposed the now-unused `tomorrows_attendance*`/
+`attending_tomorrow`/`for_how_many_days` string keys (English + Urdu, in
+`language_provider.dart`) into generic `attendance_label`/`attending` keys
+that read correctly for any day, not just "tomorrow"; `not_attending` was
+already generic and needed no rename, just an Urdu value fix (was
+"tomorrow-absent"-specific, now plain "absent").
+
+`flutter analyze`: 4 pre-existing issues (unchanged), no new ones.
+
+### 2026-09-01 (later) — wired `transit_admin` to the real backend: driver verification, admin messaging, account edits (Phase 1c)
+
+The admin app (`../../transit_admin`, a separate Flutter project) was a UI
+mock — zero `FirebaseFirestore` calls anywhere in it, its own parallel model
+layer (`admin_user_models.dart`) that didn't match `transit_core`'s schema,
+and a login screen that faked success with a `Future.delayed` instead of
+calling Firebase Auth. Requested: whatever exists in `transit_pro`'s data
+should be visible in `transit_admin`; admin should be able to review and
+verify a driver's uploaded documents, approve/reject the driver, and message
+them if a document has an issue; the same oversight for parents and students;
+and admin should be able to edit a parent's or student's account details when
+they report a problem.
+
+**Moved `Db` and `MessagingRepository` from `transit_pro` into `transit_core`**
+(`transit_core/lib/src/db.dart`, `messaging_repository.dart`, exported from
+the barrel file) rather than writing a second copy in `transit_admin` — both
+apps now read/write through the identical typed Firestore layer, which is the
+actual mechanism for "changes in one app show up in the other": one schema,
+enforced by the compiler, not two hand-maintained ones that can drift.
+`transit_core`'s own doc comment already said neither app should declare its
+own copy; this makes that true for the data-access layer, not just the
+models. Updated the import in the 11 `transit_pro` files that used these
+(mechanical path changes only, `db.dart`/`messaging_repository.dart` deleted
+from `transit_pro/lib/data/`) — `flutter analyze` confirms no behavior
+change (still 4 pre-existing infos, same ones as before, zero errors).
+
+**`transit_admin` now depends on `transit_core`** (`path: ../transit_core`,
+confirmed no Firebase package-version conflicts — both projects already
+pinned identical ranges). Added `NotificationType.adminMessage` to the shared
+enum for a direct admin-to-user message (distinct from the existing
+`document` type, which is the automated "your document status changed"
+notice) — required updating two exhaustive `switch` expressions in
+`transit_pro` (`notification_service.dart`, `driver_notifications.dart`) to
+add the new case, both one-line additions.
+
+**Real admin login.** `AuthService.signInWithEmail` (new, alongside the
+existing `signInWithGoogle`) calls `signInWithEmailAndPassword`, then reads
+`Db.users.doc(uid)` and requires `role == UserRole.admin` — signs back out and
+throws `NotAnAdminException` otherwise, so a real-but-non-admin account still
+can't reach the admin shell. `firestore.rules`' `isAdmin()` already covered
+every collection this needed (`users`, `drivers`, `documents`, `students`) —
+verified by reading the rules file before writing any of this, no rules
+changes were required. Removed the on-screen "USE DEMO ACCOUNT" tile
+(`admin@transit.com`/`admin123`) since it's no longer honest once login is
+real.
+
+**New `AdminRepository`** (`transit_admin/lib/data/admin_repository.dart`) —
+the admin-only queries that have no mobile-app equivalent (list every driver,
+list every user of a role), built directly on the now-shared `Db`, plus
+`updateDriverStatus`, `updateDriverDocument` (writes `status`/`verifiedBy`/
+`verifiedAt`/`rejectionReason`), `updateUser`/`updateStudent`, and
+`messageUser` (wraps `MessagingRepository.push` with a `NotificationType.
+adminMessage`).
+
+**Driver management + detail** (`admin_driver_management.dart`,
+`admin_driver_detail.dart`) rewritten off `transit_core`'s `Driver`/
+`DriverDocument` instead of the mock `DriverRecord`. List now streams real
+drivers with a status filter (added a "Pending" filter specifically so new
+sign-ups needing verification surface first — `DriverStatus.
+pendingVerification` had no equivalent in the old three-value mock enum).
+Detail screen: real Approve (→ `DriverStatus.offline`, the normal at-rest
+status) / Suspend buttons; a new **Compliance Documents** section streams
+`DriverDocument`s, dedupes to the latest upload per `DocumentType` (a driver
+can have several re-upload attempts on file), and lets admin View (opens the
+Cloudinary URL via `url_launcher`) / Verify / Reject each one — Reject prompts
+for a reason, writes it to the document, and sends the driver a
+`adminMessage` notification with that reason so they see it without opening
+the admin app. Performance bars now derive from real fields (`reliabilityScore`,
+`rating`, harsh-braking/over-speed counts) instead of hardcoded 92/88/95%.
+Route navigation changed from passing the whole mock object via `extra` to
+passing just the driver id, so the detail screen subscribes to live data
+itself (`router.dart` updated to match).
+
+**Parent and student management + detail** (`admin_parent_management.dart`,
+`admin_parent_detail.dart`, `admin_student_management.dart`,
+`admin_student_detail.dart`) — same real-data + id-based-navigation pattern.
+Both detail screens gained an inline edit form (parent: name/phone/email;
+student: name/grade/school/medical notes) with a Save button writing via
+`AdminRepository.updateUser`/`updateStudent`, and a Message action identical
+to the driver one. `AdminParentDetail`'s old billing/subscription/payment-
+history UI (plans, invoices, "Retry Payment", enforcement panel) was
+**removed, not wired** — `transit_core`'s `AppUser`/`Student` schema has no
+per-parent billing concept, so keeping a fake billing panel wired to nothing
+would have been worse than removing it. A real payment view would read the
+existing `payments` collection instead; that's a separate, not-yet-requested
+task.
+
+**Deliberately left mock, out of scope this pass:** `AdminDashboard`, fees,
+routes, vehicles, subscription screens in `transit_admin` (still on
+`admin_user_models.dart`); the Trip History/Attendance/SOS/Earnings/Missed/
+Access tabs on the driver and student detail screens (illustrative rows, no
+trip/attendance data source wired into either admin view yet); a
+`transit_admin` router `redirect` auth guard — login is now real, but
+`/admin/*` is still reachable without signing in first if navigated to
+directly, since nothing gates the route itself yet.
+
+`flutter analyze`: zero errors in `transit_core`, `transit_admin`, and
+`transit_pro` (4 pre-existing infos, unchanged). **Not independently
+verified**: real login end to end — no Firebase Auth account with
+`role: admin` exists yet for anyone to sign in with here. See *What I Need
+From You* #10.
 
 ### 2026-09-01 — added a "Manual Timetable" for students without a driver yet
 

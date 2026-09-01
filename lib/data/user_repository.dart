@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Reads and writes `users/{uid}`, `drivers/{uid}` and `students/{id}`.
 class UserRepository {
   UserRepository._();
@@ -30,8 +28,10 @@ class UserRepository {
     });
   }
 
-  Future<void> updateUser(String uid, Map<String, dynamic> fields) =>
-      Db.fs.collection('users').doc(uid).update({...fields, 'updatedAt': Db.now});
+  Future<void> updateUser(String uid, Map<String, dynamic> fields) => Db.fs
+      .collection('users')
+      .doc(uid)
+      .update({...fields, 'updatedAt': Db.now});
 
   /// Stamps server timestamps on the documents onboarding just created.
   ///
@@ -42,7 +42,10 @@ class UserRepository {
   Future<void> touchCreated(String uid, UserRole role) async {
     final stamps = {'createdAt': Db.now, 'updatedAt': Db.now};
     try {
-      await Db.fs.collection('users').doc(uid).set(stamps, SetOptions(merge: true));
+      await Db.fs
+          .collection('users')
+          .doc(uid)
+          .set(stamps, SetOptions(merge: true));
       if (role == UserRole.driver) {
         await Db.fs
             .collection('drivers')
@@ -75,10 +78,8 @@ class UserRepository {
 
   /// Every child belonging to one parent. This is what the parent dashboard's
   /// child selector binds to.
-  Stream<List<Student>> watchChildren(String parentId) => Db.students
-      .where('parentId', isEqualTo: parentId)
-      .snapshots()
-      .docsList;
+  Stream<List<Student>> watchChildren(String parentId) =>
+      Db.students.where('parentId', isEqualTo: parentId).snapshots().docsList;
 
   Future<List<Student>> fetchChildren(String parentId) async {
     final snap = await Db.students.where('parentId', isEqualTo: parentId).get();
@@ -94,10 +95,8 @@ class UserRepository {
   }
 
   /// The driver's manifest — everyone assigned to a route.
-  Stream<List<Student>> watchStudentsOnRoute(String routeId) => Db.students
-      .where('routeId', isEqualTo: routeId)
-      .snapshots()
-      .docsList;
+  Stream<List<Student>> watchStudentsOnRoute(String routeId) =>
+      Db.students.where('routeId', isEqualTo: routeId).snapshots().docsList;
 
   Future<String> addStudent(Student student) async {
     final ref = await Db.students.add(student);
@@ -106,10 +105,10 @@ class UserRepository {
   }
 
   Future<void> updateStudent(String studentId, Map<String, dynamic> fields) =>
-      Db.fs
-          .collection('students')
-          .doc(studentId)
-          .update({...fields, 'updatedAt': Db.now});
+      Db.fs.collection('students').doc(studentId).update({
+        ...fields,
+        'updatedAt': Db.now,
+      });
 
   Future<void> deleteStudent(String studentId) =>
       Db.students.doc(studentId).delete();
@@ -132,11 +131,11 @@ class UserRepository {
     });
   }
 
-  Future<void> updateDriver(String driverId, Map<String, dynamic> fields) =>
-      Db.fs
-          .collection('drivers')
-          .doc(driverId)
-          .update({...fields, 'updatedAt': Db.now});
+  Future<void> updateDriver(String driverId, Map<String, dynamic> fields) => Db
+      .fs
+      .collection('drivers')
+      .doc(driverId)
+      .update({...fields, 'updatedAt': Db.now});
 
   Future<void> setLocationSharing(String driverId, bool enabled) =>
       updateDriver(driverId, {'locationSharing': enabled});
@@ -151,10 +150,9 @@ class UserRepository {
   Future<void> replaceSchedules(
     String driverId,
     List<DriverSchedule> schedules,
-  ) =>
-      updateDriver(driverId, {
-        'schedules': schedules.map((s) => s.toMap()).toList(),
-      });
+  ) => updateDriver(driverId, {
+    'schedules': schedules.map((s) => s.toMap()).toList(),
+  });
 
   /// Replaces a driver's service areas, keeping the query mirror in step.
   ///
@@ -169,17 +167,16 @@ class UserRepository {
     double? radiusKm,
     GeoCoord? baseLocation,
     int? missedBusFarePaisa,
-  }) =>
-      updateDriver(driverId, {
-        'serviceAreas': areas.map((a) => a.toMap()).toList(),
-        'serviceSchools': areas
-            .map((a) => a.normalizedName)
-            .where((n) => n.isNotEmpty)
-            .toList(),
-        'serviceRadiusKm': ?radiusKm,
-        'baseLocation': ?baseLocation?.toMap(),
-        'missedBusFarePaisa': ?missedBusFarePaisa,
-      });
+  }) => updateDriver(driverId, {
+    'serviceAreas': areas.map((a) => a.toMap()).toList(),
+    'serviceSchools': areas
+        .map((a) => a.normalizedName)
+        .where((n) => n.isNotEmpty)
+        .toList(),
+    'serviceRadiusKm': ?radiusKm,
+    'baseLocation': ?baseLocation?.toMap(),
+    'missedBusFarePaisa': ?missedBusFarePaisa,
+  });
 
   /// A driver's compliance documents. Rules allow a driver to `create` a new
   /// attempt at any time but forbid them touching `status`/`verifiedBy` on an
@@ -187,10 +184,7 @@ class UserRepository {
   /// not an edit of the old one, and this stream can hold several per
   /// [DocumentType] over time. Callers pick the latest by `uploadedAt`.
   Stream<List<DriverDocument>> watchDriverDocuments(String driverId) =>
-      Db.documents
-          .where('driverId', isEqualTo: driverId)
-          .snapshots()
-          .docsList;
+      Db.documents.where('driverId', isEqualTo: driverId).snapshots().docsList;
 
   Future<void> submitDriverDocument(DriverDocument document) async {
     final ref = await Db.documents.add(document);
@@ -203,10 +197,8 @@ class UserRepository {
   /// admin-assigned route", which is empty for a driver who signed themselves up
   /// and runs their own rounds. This is the roster that actually exists in the
   /// pilot.
-  Stream<List<Student>> watchRoster(String driverId) => Db.students
-      .where('driverId', isEqualTo: driverId)
-      .snapshots()
-      .docsList;
+  Stream<List<Student>> watchRoster(String driverId) =>
+      Db.students.where('driverId', isEqualTo: driverId).snapshots().docsList;
 
   // ── Driver discovery ──────────────────────────────────────────────────────
 
@@ -231,8 +223,9 @@ class UserRepository {
   Future<List<Driver>> fetchDriversServing(String school) async {
     final key = ServiceArea.normalize(school);
     if (key.isEmpty) return const [];
-    final snap =
-        await Db.drivers.where('serviceSchools', arrayContains: key).get();
+    final snap = await Db.drivers
+        .where('serviceSchools', arrayContains: key)
+        .get();
     return snap.docs.map((d) => d.data()).toList();
   }
 
@@ -259,7 +252,9 @@ class UserRepository {
       if (!d.coversLocation(from)) continue;
 
       final matched = d.serviceAreas
-          .where((a) => a.normalizedName == ServiceArea.normalize(student.school))
+          .where(
+            (a) => a.normalizedName == ServiceArea.normalize(student.school),
+          )
           .toList();
 
       matches.add(
@@ -267,8 +262,7 @@ class UserRepository {
           driver: d,
           distanceKm: d.distanceKmFrom(from),
           matchedAreas: matched,
-          openSchedules:
-              d.orderedSchedules.where((s) => s.hasSpace).toList(),
+          openSchedules: d.orderedSchedules.where((s) => s.hasSpace).toList(),
         ),
       );
     }

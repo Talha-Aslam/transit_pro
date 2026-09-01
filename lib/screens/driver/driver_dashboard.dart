@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart' hide StopStatus;
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/live_location_repository.dart';
-import '../../data/messaging_repository.dart';
 import '../../app/driver_alerts_service.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/notification_service.dart';
@@ -556,12 +555,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                       borderRadius: BorderRadius.circular(4),
                                       child: LinearProgressIndicator(
                                         value: progress,
-                                        backgroundColor:
-                                            context.cardBgElevated,
+                                        backgroundColor: context.cardBgElevated,
                                         valueColor:
                                             const AlwaysStoppedAnimation(
-                                          AppTheme.success,
-                                        ),
+                                              AppTheme.success,
+                                            ),
                                         minHeight: 8,
                                       ),
                                     ),
@@ -875,15 +873,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 const SizedBox(height: 12),
                                 routeProgress == null
                                     ? _StatBarPlaceholder(
-                                        label: AppStrings.t(
-                                          'route_completion',
-                                        ),
+                                        label: AppStrings.t('route_completion'),
                                         message: 'Not started yet',
                                       )
                                     : _StatBar(
-                                        label: AppStrings.t(
-                                          'route_completion',
-                                        ),
+                                        label: AppStrings.t('route_completion'),
                                         value: (routeProgress * 100).round(),
                                         total: 100,
                                         color: AppTheme.driverAccent,
@@ -988,7 +982,8 @@ class _SeatRequestsBanner extends StatelessWidget {
         final pending = session.pendingRideRequests.length;
         final booked = session.acceptedRideRequests.length;
 
-        final notSetUp = driver != null &&
+        final notSetUp =
+            driver != null &&
             (driver.serviceAreas.isEmpty || driver.schedules.isEmpty);
 
         final Color accent;
@@ -1020,9 +1015,9 @@ class _SeatRequestsBanner extends StatelessWidget {
           subtitle = driver == null
               ? 'Loading your rounds…'
               : '${driver.totalAvailableSeats} of '
-                  '${driver.totalSeatsOffered} seats free across '
-                  '${driver.schedules.length} round'
-                  '${driver.schedules.length == 1 ? '' : 's'}.';
+                    '${driver.totalSeatsOffered} seats free across '
+                    '${driver.schedules.length} round'
+                    '${driver.schedules.length == 1 ? '' : 's'}.';
           route = '/driver/ride-requests';
         }
 
@@ -1068,10 +1063,7 @@ class _SeatRequestsBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: context.textTertiary,
-                ),
+                Icon(Icons.chevron_right_rounded, color: context.textTertiary),
               ],
             ),
           ),
@@ -1288,10 +1280,10 @@ class _VerificationRequiredDialog extends StatelessWidget {
   const _VerificationRequiredDialog({this.status});
 
   String get _statusLine => switch (status) {
-        DriverStatus.suspended =>
-          'Your account has been suspended. Contact support for details.',
-        _ => 'Your documents are still pending admin verification.',
-      };
+    DriverStatus.suspended =>
+      'Your account has been suspended. Contact support for details.',
+    _ => 'Your documents are still pending admin verification.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1403,7 +1395,8 @@ class _EmergencySheetState extends State<_EmergencySheet> {
     await broadcastToFamilies(
       type: NotificationType.emergency,
       title: '🚨 Emergency alert – $vehicle',
-      body: 'The driver has triggered an emergency alert. '
+      body:
+          'The driver has triggered an emergency alert. '
           'You will be contacted shortly.',
     );
     if (!mounted) return;
@@ -1472,25 +1465,29 @@ class _AlertAllSheetState extends State<_AlertAllSheet> {
     (
       icon: '⏱️',
       label: 'Running 10 min late',
-      body: '{vehicle} is running approximately 10 minutes behind schedule '
+      body:
+          '{vehicle} is running approximately 10 minutes behind schedule '
           'today.',
     ),
     (
       icon: '⚠️',
       label: 'Minor breakdown – wait 15 min',
-      body: '{vehicle} has a minor issue. Expect a 15-minute delay. Stay at '
+      body:
+          '{vehicle} has a minor issue. Expect a 15-minute delay. Stay at '
           'your stop.',
     ),
     (
       icon: '✅',
       label: 'Running ahead of schedule',
-      body: '{vehicle} is running 5 minutes ahead of schedule. Please be at '
+      body:
+          '{vehicle} is running 5 minutes ahead of schedule. Please be at '
           'your stop now.',
     ),
     (
       icon: '🌧️',
       label: 'Delayed due to weather',
-      body: '{vehicle} is delayed due to weather conditions. We will update you '
+      body:
+          '{vehicle} is delayed due to weather conditions. We will update you '
           'shortly.',
     ),
   ];

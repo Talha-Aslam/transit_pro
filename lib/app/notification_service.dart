@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:transit_core/transit_core.dart';
 
-import '../data/messaging_repository.dart';
 import 'geofence_service.dart';
 import 'language_provider.dart';
 
@@ -151,38 +150,42 @@ class NotificationService {
     unbind();
     _boundUid = uid;
     _isFirstSnapshot = true;
-    _inboxSub = MessagingRepository.instance.watchNotifications(uid).listen(
-      (items) {
-        final incoming = items.map(_fromFirestore).toList();
+    _inboxSub = MessagingRepository.instance
+        .watchNotifications(uid)
+        .listen(
+          (items) {
+            final incoming = items.map(_fromFirestore).toList();
 
-        // Anything with a docId we haven't seen on this stream yet just
-        // arrived from another device (a driver's alert, a ride-request
-        // reply, a route event) — that is exactly the case with no on-screen
-        // owner to raise a banner itself, so this stream does it instead.
-        // Skipped on the first snapshot after bind: that one is the existing
-        // inbox catching up, not new arrivals.
-        if (!_isFirstSnapshot) {
-          for (final n in incoming) {
-            if (n.docId != null && !_seenRemoteIds.contains(n.docId) && !n.read) {
-              unawaited(_pushSystemNotification(n));
+            // Anything with a docId we haven't seen on this stream yet just
+            // arrived from another device (a driver's alert, a ride-request
+            // reply, a route event) — that is exactly the case with no on-screen
+            // owner to raise a banner itself, so this stream does it instead.
+            // Skipped on the first snapshot after bind: that one is the existing
+            // inbox catching up, not new arrivals.
+            if (!_isFirstSnapshot) {
+              for (final n in incoming) {
+                if (n.docId != null &&
+                    !_seenRemoteIds.contains(n.docId) &&
+                    !n.read) {
+                  unawaited(_pushSystemNotification(n));
+                }
+              }
             }
-          }
-        }
-        _isFirstSnapshot = false;
-        _seenRemoteIds = {
-          for (final n in incoming)
-            if (n.docId != null) n.docId!,
-        };
+            _isFirstSnapshot = false;
+            _seenRemoteIds = {
+              for (final n in incoming)
+                if (n.docId != null) n.docId!,
+            };
 
-        _remote = incoming;
-        _publish();
-      },
-      onError: (Object e) {
-        debugPrint('NotificationService: inbox stream failed — $e');
-        // Leave whatever is already on screen. An unreadable inbox is not worth
-        // blanking the list the user is reading, and the stream retries itself.
-      },
-    );
+            _remote = incoming;
+            _publish();
+          },
+          onError: (Object e) {
+            debugPrint('NotificationService: inbox stream failed — $e');
+            // Leave whatever is already on screen. An unreadable inbox is not worth
+            // blanking the list the user is reading, and the stream retries itself.
+          },
+        );
   }
 
   /// Called on sign-out. Drops both lists: notifications are per-account, and
@@ -234,7 +237,9 @@ class NotificationService {
       // notifications without either source knowing about the other. A document
       // whose server timestamp has not landed yet sorts newest, which is right —
       // it is the one that just arrived.
-      id: created?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
+      id:
+          created?.millisecondsSinceEpoch ??
+          DateTime.now().millisecondsSinceEpoch,
       type: _uiTypeFor(n.type),
       icon: icon,
       title: n.title,
@@ -263,25 +268,27 @@ class NotificationService {
     _ => 'info',
   };
 
-  static (String, Color) _appearanceFor(NotificationType type) => switch (type) {
-    NotificationType.emergency => ('🚨', Color(0xFFEF4444)),
-    NotificationType.missedBus => ('🚌', Color(0xFFEF4444)),
-    NotificationType.absent => ('⚠️', Color(0xFFF59E0B)),
-    NotificationType.delay => ('⏰', Color(0xFFF59E0B)),
-    NotificationType.boarded => ('✅', Color(0xFF10B981)),
-    NotificationType.busArrived => ('🏫', Color(0xFF10B981)),
-    NotificationType.busApproaching => ('🔔', Color(0xFFF59E0B)),
-    NotificationType.busDeparted => ('🚌', Color(0xFF3B82F6)),
-    NotificationType.routeStarted => ('📍', Color(0xFF3B82F6)),
-    NotificationType.routeCompleted => ('🌇', Color(0xFF10B981)),
-    NotificationType.pickupAssigned => ('🧑‍✈️', Color(0xFF10B981)),
-    NotificationType.rideRequest => ('📬', Color(0xFFF59E0B)),
-    NotificationType.rideRequestAnswered => ('📨', Color(0xFF3B82F6)),
-    NotificationType.payment => ('💳', Color(0xFF10B981)),
-    NotificationType.document => ('📜', Color(0xFF8B5CF6)),
-    NotificationType.chat => ('💬', Color(0xFF3B82F6)),
-    NotificationType.system => ('🔔', Color(0xFF3B82F6)),
-  };
+  static (String, Color) _appearanceFor(NotificationType type) =>
+      switch (type) {
+        NotificationType.emergency => ('🚨', Color(0xFFEF4444)),
+        NotificationType.missedBus => ('🚌', Color(0xFFEF4444)),
+        NotificationType.absent => ('⚠️', Color(0xFFF59E0B)),
+        NotificationType.delay => ('⏰', Color(0xFFF59E0B)),
+        NotificationType.boarded => ('✅', Color(0xFF10B981)),
+        NotificationType.busArrived => ('🏫', Color(0xFF10B981)),
+        NotificationType.busApproaching => ('🔔', Color(0xFFF59E0B)),
+        NotificationType.busDeparted => ('🚌', Color(0xFF3B82F6)),
+        NotificationType.routeStarted => ('📍', Color(0xFF3B82F6)),
+        NotificationType.routeCompleted => ('🌇', Color(0xFF10B981)),
+        NotificationType.pickupAssigned => ('🧑‍✈️', Color(0xFF10B981)),
+        NotificationType.rideRequest => ('📬', Color(0xFFF59E0B)),
+        NotificationType.rideRequestAnswered => ('📨', Color(0xFF3B82F6)),
+        NotificationType.payment => ('💳', Color(0xFF10B981)),
+        NotificationType.document => ('📜', Color(0xFF8B5CF6)),
+        NotificationType.chat => ('💬', Color(0xFF3B82F6)),
+        NotificationType.system => ('🔔', Color(0xFF3B82F6)),
+        NotificationType.adminMessage => ('🛡️', Color(0xFF8B5CF6)),
+      };
 
   static String _timeLabel(DateTime? when) {
     if (when == null) return 'Just now';
@@ -293,15 +300,27 @@ class NotificationService {
   static String _dateLabel(DateTime? when) {
     if (when == null) return 'Today';
     final now = DateTime.now();
-    final days = DateTime(now.year, now.month, now.day)
-        .difference(DateTime(when.year, when.month, when.day))
-        .inDays;
+    final days = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(DateTime(when.year, when.month, when.day)).inDays;
     if (days <= 0) return 'Today';
     if (days == 1) return 'Yesterday';
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${weekdays[when.weekday - 1]}, '
         '${months[when.month - 1]} ${when.day}';
@@ -434,5 +453,4 @@ class NotificationService {
   }
 
   int get unreadCount => history.value.where((n) => !n.read).length;
-
 }

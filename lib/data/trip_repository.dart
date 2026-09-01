@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Trips and their attendance subcollection.
 ///
 /// A trip is created by **Start Route** and closed by **End Route** — controls
@@ -24,7 +22,8 @@ class TripRepository {
     required List<Student> students,
   }) async {
     final now = DateTime.now();
-    final ref = Db.trips.doc(); // client-side id so we can return it immediately
+    final ref = Db.trips
+        .doc(); // client-side id so we can return it immediately
 
     final trip = Trip(
       id: ref.id,
@@ -47,7 +46,11 @@ class TripRepository {
     });
     for (final s in students) {
       batch.set(
-        Db.fs.collection('trips').doc(ref.id).collection('attendance').doc(s.id),
+        Db.fs
+            .collection('trips')
+            .doc(ref.id)
+            .collection('attendance')
+            .doc(s.id),
         AttendanceRecord(
           studentId: s.id,
           studentName: s.name,
@@ -78,11 +81,10 @@ class TripRepository {
     });
   }
 
-  Future<void> cancelTrip(String tripId) =>
-      Db.fs.collection('trips').doc(tripId).update({
-        'status': TripStatus.cancelled.name,
-        'endedAt': Db.now,
-      });
+  Future<void> cancelTrip(String tripId) => Db.fs
+      .collection('trips')
+      .doc(tripId)
+      .update({'status': TripStatus.cancelled.name, 'endedAt': Db.now});
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -106,13 +108,13 @@ class TripRepository {
       .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
 
   /// Trip history for a route, newest first.
-  Stream<List<Trip>> watchTripsForRoute(String routeId, {int limit = 50}) =>
-      Db.trips
-          .where('routeId', isEqualTo: routeId)
-          .orderBy('dateKey', descending: true)
-          .limit(limit)
-          .snapshots()
-          .docsList;
+  Stream<List<Trip>> watchTripsForRoute(String routeId, {int limit = 50}) => Db
+      .trips
+      .where('routeId', isEqualTo: routeId)
+      .orderBy('dateKey', descending: true)
+      .limit(limit)
+      .snapshots()
+      .docsList;
 
   Stream<List<Trip>> watchTripsForDriver(String driverId, {int limit = 50}) =>
       Db.trips
@@ -138,8 +140,7 @@ class TripRepository {
   Stream<AttendanceRecord?> watchAttendanceForStudent(
     String tripId,
     String studentId,
-  ) =>
-      Db.attendance(tripId).doc(studentId).snapshots().map((s) => s.data());
+  ) => Db.attendance(tripId).doc(studentId).snapshots().map((s) => s.data());
 
   Future<void> markAttendance({
     required String tripId,
@@ -147,13 +148,12 @@ class TripRepository {
     required AttendanceStatus status,
     required String markedBy,
     String? stopId,
-  }) =>
-      Db.fs
-          .collection('trips')
-          .doc(tripId)
-          .collection('attendance')
-          .doc(studentId)
-          .set({
+  }) => Db.fs
+      .collection('trips')
+      .doc(tripId)
+      .collection('attendance')
+      .doc(studentId)
+      .set({
         'status': status.name,
         'markedAt': Db.now,
         'markedBy': markedBy,

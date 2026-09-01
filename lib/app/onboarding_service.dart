@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
-import '../data/db.dart';
 import '../data/user_repository.dart';
 import '../services/cloudinary_service.dart';
 import 'profile_draft.dart';
@@ -219,8 +218,11 @@ class OnboardingService {
       );
     }
     try {
-      return await CloudinaryService.instance
-          .uploadDriverDocument(file, uid, docType);
+      return await CloudinaryService.instance.uploadDriverDocument(
+        file,
+        uid,
+        docType,
+      );
     } on UploadException catch (e) {
       throw OnboardingException(e.message);
     } catch (e) {

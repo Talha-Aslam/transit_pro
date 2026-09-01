@@ -1,7 +1,5 @@
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// Fee records.
 ///
 /// The gateway integration is deliberately out of scope (JazzCash/EasyPaisa
@@ -78,29 +76,27 @@ class PaymentRepository {
     String? slipUrl,
     String? slipPublicId,
     String? notes,
-  }) =>
-      Db.fs.collection('payments').doc(paymentId).update({
-        'method': method.name,
-        'slipUrl': ?slipUrl,
-        'slipPublicId': ?slipPublicId,
-        'notes': ?notes,
-        'paidAt': Db.now,
-      });
+  }) => Db.fs.collection('payments').doc(paymentId).update({
+    'method': method.name,
+    'slipUrl': ?slipUrl,
+    'slipPublicId': ?slipPublicId,
+    'notes': ?notes,
+    'paidAt': Db.now,
+  });
 
   /// Driver or admin confirms the money actually arrived. Only this flips the
   /// status to paid.
   Future<void> confirmReceipt({
     required String paymentId,
     required String confirmedBy,
-  }) =>
-      Db.fs.collection('payments').doc(paymentId).update({
-        'status': PaymentStatus.paid.name,
-        'confirmedBy': confirmedBy,
-        'confirmedAt': Db.now,
-      });
+  }) => Db.fs.collection('payments').doc(paymentId).update({
+    'status': PaymentStatus.paid.name,
+    'confirmedBy': confirmedBy,
+    'confirmedAt': Db.now,
+  });
 
-  Future<void> markOverdue(String paymentId) =>
-      Db.fs.collection('payments').doc(paymentId).update({
-        'status': PaymentStatus.overdue.name,
-      });
+  Future<void> markOverdue(String paymentId) => Db.fs
+      .collection('payments')
+      .doc(paymentId)
+      .update({'status': PaymentStatus.overdue.name});
 }

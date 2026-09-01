@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
-import '../data/messaging_repository.dart';
 import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
 import 'session_service.dart';

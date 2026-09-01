@@ -1,7 +1,5 @@
 import 'package:transit_core/transit_core.dart';
 
-import 'db.dart';
-
 /// The missed-bus request lifecycle, now genuinely cross-device.
 ///
 /// In the prototype this worked only because every role ran in one process
@@ -20,19 +18,22 @@ class MissedBusRepository {
   /// `cancelled` is excluded — that is the terminal state [cancelRequest]
   /// writes once the requester dismisses a resolved request, and is also
   /// what a fresh cancel should immediately revert to the empty form for.
-  Stream<MissedBusRequest?> watchActiveForStudent(String studentId) =>
-      Db.missedBusRequests
-          .where('studentId', isEqualTo: studentId)
-          .where('status', whereIn: [
-            MissedBusStatus.searching.name,
-            MissedBusStatus.accepted.name,
-            MissedBusStatus.declined.name,
-            MissedBusStatus.noDrivers.name,
-          ])
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .snapshots()
-          .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
+  Stream<MissedBusRequest?> watchActiveForStudent(String studentId) => Db
+      .missedBusRequests
+      .where('studentId', isEqualTo: studentId)
+      .where(
+        'status',
+        whereIn: [
+          MissedBusStatus.searching.name,
+          MissedBusStatus.accepted.name,
+          MissedBusStatus.declined.name,
+          MissedBusStatus.noDrivers.name,
+        ],
+      )
+      .orderBy('createdAt', descending: true)
+      .limit(1)
+      .snapshots()
+      .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
 
   /// The driver's incoming queue — every request still searching for a bus.
   Stream<List<MissedBusRequest>> watchOpenRequests() => Db.missedBusRequests
@@ -57,35 +58,33 @@ class MissedBusRepository {
     required Driver driver,
     required Bus bus,
     int? etaMinutes,
-  }) =>
-      Db.fs.collection('missedBusRequests').doc(requestId).update({
-        'status': MissedBusStatus.accepted.name,
-        'assignedDriverId': driver.id,
-        'assignedDriverName': driver.name,
-        'assignedDriverPhone': driver.phone,
-        'assignedBusId': bus.id,
-        'assignedBusNumber': bus.busNumber,
-        'etaMinutes': ?etaMinutes,
-        'farePaisa': ?(driver.missedBusFarePaisa > 0 ? driver.missedBusFarePaisa : null),
-        'resolvedAt': Db.now,
-      });
+  }) => Db.fs.collection('missedBusRequests').doc(requestId).update({
+    'status': MissedBusStatus.accepted.name,
+    'assignedDriverId': driver.id,
+    'assignedDriverName': driver.name,
+    'assignedDriverPhone': driver.phone,
+    'assignedBusId': bus.id,
+    'assignedBusNumber': bus.busNumber,
+    'etaMinutes': ?etaMinutes,
+    'farePaisa': ?(driver.missedBusFarePaisa > 0
+        ? driver.missedBusFarePaisa
+        : null),
+    'resolvedAt': Db.now,
+  });
 
-  Future<void> declineRequest(String requestId) =>
-      Db.fs.collection('missedBusRequests').doc(requestId).update({
-        'status': MissedBusStatus.declined.name,
-        'resolvedAt': Db.now,
-      });
+  Future<void> declineRequest(String requestId) => Db.fs
+      .collection('missedBusRequests')
+      .doc(requestId)
+      .update({'status': MissedBusStatus.declined.name, 'resolvedAt': Db.now});
 
-  Future<void> cancelRequest(String requestId) =>
-      Db.fs.collection('missedBusRequests').doc(requestId).update({
-        'status': MissedBusStatus.cancelled.name,
-        'resolvedAt': Db.now,
-      });
+  Future<void> cancelRequest(String requestId) => Db.fs
+      .collection('missedBusRequests')
+      .doc(requestId)
+      .update({'status': MissedBusStatus.cancelled.name, 'resolvedAt': Db.now});
 
   /// Called when the search window expires with no driver having accepted.
-  Future<void> markNoDriversAvailable(String requestId) =>
-      Db.fs.collection('missedBusRequests').doc(requestId).update({
-        'status': MissedBusStatus.noDrivers.name,
-        'resolvedAt': Db.now,
-      });
+  Future<void> markNoDriversAvailable(String requestId) => Db.fs
+      .collection('missedBusRequests')
+      .doc(requestId)
+      .update({'status': MissedBusStatus.noDrivers.name, 'resolvedAt': Db.now});
 }
