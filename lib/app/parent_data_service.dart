@@ -133,6 +133,11 @@ class ParentDataService {
   /// placeholder while the upload is in flight.
   final childImages = ValueNotifier<List<File?>>([]);
 
+  /// Indices currently mid-upload in [updateChildImage] — lets
+  /// `ChildAvatarImage` show a spinner overlay rather than looking "done"
+  /// before the photo has actually saved.
+  final uploadingChildIndices = ValueNotifier<Set<int>>({});
+
   /// Mirrors [SessionService.selectedChildIndex] so existing screens keep
   /// working; that notifier is the one the session actually follows.
   ValueNotifier<int> get selectedChildIndex =>
@@ -180,6 +185,7 @@ class ParentDataService {
       parentInfo.value = ParentInfo();
       children.value = [];
       childImages.value = [];
+      uploadingChildIndices.value = {};
       driverRatings.value = {};
       paidFeeMonths.value = {};
       feeNotifications.value = [];
@@ -439,6 +445,7 @@ class ParentDataService {
       return;
     }
 
+    _setUploading(index, true);
     try {
       final result = await CloudinaryService.instance.uploadProfilePhoto(
         image,
@@ -447,9 +454,34 @@ class ParentDataService {
       await UserRepository.instance.updateStudent(childId, {
         'photoUrl': result.secureUrl,
       });
+
+      // Reflects the persisted URL immediately rather than waiting for the
+      // Firestore stream to round-trip back — `ChildAvatarImage` still
+      // prefers the local `File` above while it's set, so this doesn't
+      // change what's on screen right now, but it means `child.photoUrl`
+      // is correct from this point on even before the next snapshot
+      // arrives (and it's what survives if the local `File` is cleared,
+      // e.g. by `_rebuild()` on a fresh sign-in with a cold `childImages`).
+      final updated = List<ChildInfo>.from(children.value);
+      if (index < updated.length) {
+        updated[index] = updated[index].copyWith(photoUrl: result.secureUrl);
+        children.value = updated;
+      }
     } catch (e) {
       debugPrint('child photo upload failed: $e');
+    } finally {
+      _setUploading(index, false);
     }
+  }
+
+  void _setUploading(int index, bool uploading) {
+    final updated = Set<int>.from(uploadingChildIndices.value);
+    if (uploading) {
+      updated.add(index);
+    } else {
+      updated.remove(index);
+    }
+    uploadingChildIndices.value = updated;
   }
 
   Future<void> addChild(ChildInfo child) async {

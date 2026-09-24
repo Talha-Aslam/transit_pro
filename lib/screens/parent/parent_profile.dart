@@ -13,6 +13,7 @@ import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
+import '../../widgets/child_avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/profile_form_fields.dart' show FieldLabel, MapPointField;
@@ -1043,47 +1044,49 @@ class _ChildCardState extends State<_ChildCard> {
                 children: [
                   // ── Child avatar with camera overlay ──────────────────
                   GestureDetector(
-                    onTap: _pickChildImage,
+                    onTap: () {
+                      final uploading = _svc.uploadingChildIndices.value
+                          .contains(widget.index);
+                      if (!uploading) _pickChildImage();
+                    },
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        ValueListenableBuilder<List<File?>>(
-                          valueListenable: _svc.childImages,
-                          builder: (_, imgs, _) {
-                            final file = widget.index < imgs.length
-                                ? imgs[widget.index]
-                                : null;
-                            return Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                gradient: file == null
-                                    ? const LinearGradient(
-                                        colors: [
-                                          Color(0xFFF59E0B),
-                                          Color(0xFFD97706),
-                                        ],
-                                      )
-                                    : null,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: file != null
-                                    ? Image.file(
-                                        file,
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : Image.asset(
-                                        'assets/images/profile/boy_transparent.gif',
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.contain,
-                                        filterQuality: FilterQuality.high,
-                                      ),
-                              ),
+                        ValueListenableBuilder<Set<int>>(
+                          valueListenable: _svc.uploadingChildIndices,
+                          builder: (_, uploading, _) {
+                            return ValueListenableBuilder<List<File?>>(
+                              valueListenable: _svc.childImages,
+                              builder: (_, imgs, _) {
+                                final file = widget.index < imgs.length
+                                    ? imgs[widget.index]
+                                    : null;
+                                final hasPhoto =
+                                    file != null ||
+                                    (c.photoUrl?.isNotEmpty ?? false);
+                                return Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: hasPhoto
+                                        ? null
+                                        : const LinearGradient(
+                                            colors: [
+                                              Color(0xFFF59E0B),
+                                              Color(0xFFD97706),
+                                            ],
+                                          ),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: ChildAvatarImage(
+                                    localFile: file,
+                                    photoUrl: c.photoUrl,
+                                    size: 44,
+                                    borderRadius: BorderRadius.circular(14),
+                                    uploading: uploading.contains(widget.index),
+                                  ),
+                                );
+                              },
                             );
                           },
                         ),

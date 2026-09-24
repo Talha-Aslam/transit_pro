@@ -721,6 +721,62 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-25 — fixed child avatar photos not surviving logout/login
+
+A parent tapping the camera icon on a child's avatar (`parent_profile.dart`'s
+`_ChildCard`) saw the new photo update instantly on both the dashboard and
+profile screen — then vanish after logging out and back in.
+
+**Not what it looked like.** `ParentDataService.updateChildImage` already
+uploaded the picked photo (to Cloudinary — this project has no Firebase
+Storage; see `cloudinary_service.dart`'s class doc, "not provisioned on
+`transitpro-db`... enabling it requires the paid Blaze plan") and already
+wrote the resulting URL to `students/{id}.photoUrl` in Firestore. Both
+steps were real and already worked.
+
+**The actual bug** was purely in the two avatar widgets
+(`parent_dashboard.dart` and `parent_profile.dart`'s `_ChildCard`): both
+rendered *only* `Image.file(childImages[i])` or a hardcoded placeholder —
+neither ever read `child.photoUrl` at all. `childImages` is deliberately
+transient (an in-memory `List<File?>` holding a picked photo just until
+the upload lands, per its own doc comment), and it's reset to all-null on
+every fresh sign-in. So the real, persisted URL was sitting in Firestore
+the whole time; nothing on screen ever looked at it.
+
+**Fix.**
+- New `lib/widgets/child_avatar_image.dart` — `ChildAvatarImage`, shared by
+  both screens (they were duplicating the same avatar-rendering block
+  already): prefers `localFile` (the in-flight local preview) → falls back
+  to `Image.network(photoUrl)` via `CloudinaryService.thumbnail` (an
+  existing helper for exactly this — a resized delivery URL instead of
+  shipping a full-resolution photo into a 44px avatar) → falls back to the
+  placeholder asset. An `uploading` flag overlays a scrim + spinner.
+- `ParentDataService` gained `uploadingChildIndices` (a
+  `ValueNotifier<Set<int>>`), set around the Cloudinary call in
+  `updateChildImage` — the "Loading State" ask. Also now updates
+  `children.value` with the new `photoUrl` immediately on a successful
+  upload, rather than waiting on the next Firestore snapshot, so
+  `child.photoUrl` is correct as soon as the write lands.
+- `parent_profile.dart`'s `_ChildCard` avatar and `parent_dashboard.dart`'s
+  child photo both switched to `ChildAvatarImage`; the profile card's
+  camera button is also now disabled (`onTap: null`) while that index is
+  uploading, instead of allowing another pick mid-upload.
+
+No `firestore.rules` change needed — the `students` update rule already
+allows the owning parent to write any field except `parentId`/
+`isTransportSuspended`, `photoUrl` included.
+
+**Worth checking on your end:** `CloudinaryService.instance.isConfigured`
+gates the upload entirely — if `CLOUDINARY_CLOUD_NAME` /
+`CLOUDINARY_UPLOAD_PRESET` aren't passed via `--dart-define` in your run
+config, `updateChildImage` already silently no-ops past the upload (by
+design — the app stays usable without it) and only the local preview will
+ever show, which reproduces the exact symptom reported here for a
+different reason. Worth confirming those are set if photos still don't
+persist after this fix.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
 ### 2026-09-25 — moved Deactivate/Delete Account into the main settings list
 
 Yesterday's Deactivate/Delete Account feature shipped as its own

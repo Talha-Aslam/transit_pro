@@ -12,6 +12,7 @@ import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/child_avatar_image.dart';
 import '../../widgets/find_driver_banner.dart';
 import '../../widgets/glass_card.dart';
 
@@ -314,47 +315,44 @@ class _ParentDashboardState extends State<ParentDashboard> {
                               : Row(
                                   children: [
                                     // Child photo
-                                    ValueListenableBuilder<List<File?>>(
-                                      valueListenable: svc.childImages,
-                                      builder: (_, imgs, _) {
-                                        final file = safeIdx < imgs.length
-                                            ? imgs[safeIdx]
-                                            : null;
-                                        return Container(
-                                          width: 62,
-                                          height: 62,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.parentPurple
-                                                .withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                            border: Border.all(
-                                              color: AppTheme.success
-                                                  .withValues(alpha: 0.4),
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                            child: file != null
-                                                ? Image.file(
-                                                    file,
-                                                    width: 62,
-                                                    height: 62,
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : Image.asset(
-                                                    'assets/images/profile/boy_transparent.gif',
-                                                    width: 62,
-                                                    height: 62,
-                                                    fit: BoxFit.contain,
-                                                    filterQuality:
-                                                        FilterQuality.high,
-                                                  ),
-                                          ),
+                                    ValueListenableBuilder<Set<int>>(
+                                      valueListenable:
+                                          svc.uploadingChildIndices,
+                                      builder: (_, uploading, _) {
+                                        return ValueListenableBuilder<
+                                          List<File?>
+                                        >(
+                                          valueListenable: svc.childImages,
+                                          builder: (_, imgs, _) {
+                                            final file = safeIdx < imgs.length
+                                                ? imgs[safeIdx]
+                                                : null;
+                                            return Container(
+                                              width: 62,
+                                              height: 62,
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.parentPurple
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                border: Border.all(
+                                                  color: AppTheme.success
+                                                      .withValues(alpha: 0.4),
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: ChildAvatarImage(
+                                                localFile: file,
+                                                photoUrl: child.photoUrl,
+                                                size: 62,
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                                uploading: uploading.contains(
+                                                  safeIdx,
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         );
                                       },
                                     ),
