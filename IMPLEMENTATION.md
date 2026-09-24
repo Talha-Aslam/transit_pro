@@ -721,6 +721,28 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-25 — removed the DISTANCE stat from Find a Driver's stat row
+
+`find_drivers_screen.dart`'s `_DriverMatchCard` showed three stats —
+SEATS FREE, DISTANCE, RATING. Removed DISTANCE, per request, leaving the
+other two.
+
+**No `mainAxisAlignment` change was needed** — the requested mechanism
+doesn't apply here, though the *visual* goal (no awkward center gap) is
+still fully met. Each `_Stat` wraps itself in `Expanded`
+(`find_drivers_screen.dart`'s `_Stat.build`), so the `Row`'s three
+children already consumed 100% of its width with zero slack space for a
+`mainAxisAlignment` to redistribute — that's why one was never set here in
+the first place. With DISTANCE's `_Stat` removed, the remaining two
+`Expanded` children automatically split the row 50/50, same as the
+original three split it into thirds; nothing else needed adjusting.
+
+`match.distanceKm` itself (and the ranking that uses it) is untouched —
+this only removed the on-card display, not the underlying "nearest first"
+matching logic.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
 ### 2026-09-25 — fixed child avatar photos not surviving logout/login
 
 A parent tapping the camera icon on a child's avatar (`parent_profile.dart`'s

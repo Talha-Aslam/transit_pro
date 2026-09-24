@@ -695,16 +695,6 @@ class _DriverMatchCard extends StatelessWidget {
                   color: match.hasOpenSeats ? AppTheme.success : AppTheme.error,
                 ),
                 _Stat(
-                  label: 'DISTANCE',
-                  // Null distance is "we don't know", never "0 km away". Showing
-                  // 0 for an unpinned location would put an unranked driver at
-                  // the top of a list the parent believes is sorted by distance.
-                  value: match.distanceKm == null
-                      ? '—'
-                      : '${match.distanceKm!.toStringAsFixed(1)} km',
-                  color: context.textPrimary,
-                ),
-                _Stat(
                   label: 'RATING',
                   value: d.ratingCount == 0
                       ? 'New'
