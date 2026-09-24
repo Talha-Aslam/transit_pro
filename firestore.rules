@@ -269,8 +269,19 @@ service cloud.firestore {
     // lets a chosen driver attach themselves to someone else's child.
 
     match /ride_requests/{requestId} {
+      // `!exists(...)` first is load-bearing, not defensive style:
+      // `RideRequestRepository.send()` reads this doc *before* the family's
+      // first-ever request to a given driver exists, to check for a prior
+      // request. On a nonexistent document `resource` is null, and
+      // `resource.data.x` on null throws inside rule evaluation -- Firestore
+      // treats a throw as denied, not as "false" -- so without this guard
+      // that pre-check read fails with permission-denied and every family's
+      // *first* request to a new driver would error out before it ever
+      // reaches `create`. This only leaks whether a doc exists, never its
+      // contents, to any signed-in user.
       allow read: if signedIn()
-                  && (resource.data.requesterId == uid()
+                  && (!exists(/databases/$(database)/documents/ride_requests/$(requestId))
+                      || resource.data.requesterId == uid()
                       || resource.data.driverId == uid()
                       || isAdmin());
 

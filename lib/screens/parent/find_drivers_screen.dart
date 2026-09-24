@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
@@ -104,6 +105,24 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppTheme.warning),
       );
+    } on FirebaseException catch (e) {
+      // Distinct from the catch-all below so a rule denial reads as exactly
+      // that in the console ('permission-denied') instead of being lumped in
+      // with a generic network failure -- `e.code` is what tells the two
+      // apart, `e` alone does not always show it clearly.
+      debugPrint('requestSeat failed — Firebase ${e.code}: ${e.message ?? e}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'permission-denied'
+                ? 'You do not have permission to send that request.'
+                : 'Could not send that request. Check your connection and '
+                      'try again.',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
     } catch (e) {
       debugPrint('requestSeat failed: $e');
       if (!mounted) return;
@@ -124,9 +143,9 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
     try {
       await RideMatchService.instance.cancelRequest(request);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request withdrawn.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Request withdrawn.')));
     } catch (e) {
       debugPrint('cancelRequest failed: $e');
       if (!mounted) return;
@@ -158,8 +177,9 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: innerCtx.cardBg,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -225,8 +245,8 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                               size: 18,
                               color: free
                                   ? (isSelected
-                                      ? widget.accent
-                                      : innerCtx.textTertiary)
+                                        ? widget.accent
+                                        : innerCtx.textTertiary)
                                   : innerCtx.textTertiary,
                             ),
                             const SizedBox(width: 12),
@@ -257,9 +277,7 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                             Text(
                               free ? '${r.availableSeats} free' : 'Full',
                               style: TextStyle(
-                                color: free
-                                    ? AppTheme.success
-                                    : AppTheme.error,
+                                color: free ? AppTheme.success : AppTheme.error,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -273,10 +291,7 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                   TextField(
                     controller: noteCtrl,
                     maxLines: 2,
-                    style: TextStyle(
-                      color: innerCtx.textPrimary,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: innerCtx.textPrimary, fontSize: 14),
                     decoration: const InputDecoration(
                       hintText: 'Anything the driver should know? (optional)',
                     ),
@@ -286,14 +301,14 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                     onTap: selected == null
                         ? null
                         : () => Navigator.pop(
-                              innerCtx,
-                              _RoundChoice(
-                                schedule: selected!,
-                                note: noteCtrl.text.trim().isEmpty
-                                    ? null
-                                    : noteCtrl.text.trim(),
-                              ),
+                            innerCtx,
+                            _RoundChoice(
+                              schedule: selected!,
+                              note: noteCtrl.text.trim().isEmpty
+                                  ? null
+                                  : noteCtrl.text.trim(),
                             ),
+                          ),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 15),
@@ -352,24 +367,26 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                     ? const _Message(
                         emoji: '👶',
                         title: 'No child on this account yet',
-                        body: 'Add a child from your profile, then come back to '
+                        body:
+                            'Add a child from your profile, then come back to '
                             'find drivers for their school.',
                       )
                     : subject.school.trim().isEmpty
-                        ? _Message(
-                            emoji: '🏫',
-                            title: 'No school on ${subject.name}\'s record',
-                            body: 'Driver search matches on the school your '
-                                'child attends. Add it from your profile and '
-                                'this list will fill in.',
-                          )
-                        : _MatchList(
-                            student: subject,
-                            accent: widget.accent,
-                            busyDriverId: _busyDriverId,
-                            onRequest: (m) => _request(m, subject),
-                            onCancel: _cancel,
-                          ),
+                    ? _Message(
+                        emoji: '🏫',
+                        title: 'No school on ${subject.name}\'s record',
+                        body:
+                            'Driver search matches on the school your '
+                            'child attends. Add it from your profile and '
+                            'this list will fill in.',
+                      )
+                    : _MatchList(
+                        student: subject,
+                        accent: widget.accent,
+                        busyDriverId: _busyDriverId,
+                        onRequest: (m) => _request(m, subject),
+                        onCancel: _cancel,
+                      ),
               ),
             ],
           ),
@@ -423,10 +440,7 @@ class _Header extends StatelessWidget {
                 ),
                 Text(
                   'Drivers who already run to your school',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -521,7 +535,8 @@ class _MatchList extends StatelessWidget {
           return const _Message(
             emoji: '⚠️',
             title: 'Could not load drivers',
-            body: 'The server refused the request. Check your connection and '
+            body:
+                'The server refused the request. Check your connection and '
                 'pull back into this screen to retry.',
           );
         }
@@ -538,7 +553,8 @@ class _MatchList extends StatelessWidget {
           return _Message(
             emoji: '🔍',
             title: 'No drivers serve ${student.school} yet',
-            body: 'Nobody has listed this institution. As drivers join, they '
+            body:
+                'Nobody has listed this institution. As drivers join, they '
                 'will appear here automatically — nothing to check back on '
                 'manually.',
           );
@@ -555,10 +571,7 @@ class _MatchList extends StatelessWidget {
                   '${matches.length} driver${matches.length == 1 ? '' : 's'} '
                   'serving ${student.school}'
                   '${student.pickupLocation == null ? '' : ', nearest first'}',
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
               );
             }
@@ -617,9 +630,7 @@ class _DriverMatchCard extends StatelessWidget {
       child: GlassCard(
         enableBlur: false,
         padding: const EdgeInsets.all(16),
-        borderColor: booked
-            ? AppTheme.success.withValues(alpha: 0.4)
-            : null,
+        borderColor: booked ? AppTheme.success.withValues(alpha: 0.4) : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -681,9 +692,7 @@ class _DriverMatchCard extends StatelessWidget {
                 _Stat(
                   label: 'SEATS FREE',
                   value: '${match.availableSeats}',
-                  color: match.hasOpenSeats
-                      ? AppTheme.success
-                      : AppTheme.error,
+                  color: match.hasOpenSeats ? AppTheme.success : AppTheme.error,
                 ),
                 _Stat(
                   label: 'DISTANCE',
@@ -720,8 +729,7 @@ class _DriverMatchCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: match.driver.orderedSchedules.map((r) {
-                  final color =
-                      r.hasSpace ? AppTheme.success : AppTheme.error;
+                  final color = r.hasSpace ? AppTheme.success : AppTheme.error;
                   return Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 9,
@@ -730,8 +738,7 @@ class _DriverMatchCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: color.withValues(alpha: 0.28)),
+                      border: Border.all(color: color.withValues(alpha: 0.28)),
                     ),
                     child: Text(
                       '${r.directionLabel} ${r.timeRange} · '
@@ -851,11 +858,7 @@ class _Stat extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _Stat({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _Stat({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -892,11 +895,7 @@ class _Banner extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _Banner({
-    required this.color,
-    required this.icon,
-    required this.text,
-  });
+  const _Banner({required this.color, required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {

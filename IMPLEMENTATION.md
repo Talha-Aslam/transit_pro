@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-09-02
+> **Last updated:** 2026-09-24
 
 ---
 
@@ -720,6 +720,48 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-09-24 — fixed "Could not send that request" on Find a Driver's seat requests
+
+A parent tapping "Request a seat" on `find_drivers_screen.dart` got the
+generic red snackbar "Could not send that request. Check your connection
+and try again." for what turned out to be **every family's first-ever
+request to a given driver** — not a connection problem at all.
+
+**Root cause.** `RideRequestRepository.send()`
+(`ride_request_repository.dart:105`) reads
+`ride_requests/{driverId}_{studentId}` before writing, to check for a
+prior request. The very first time a family asks a particular driver,
+that document doesn't exist yet. `firestore.rules`' old `read` rule for
+`ride_requests` unconditionally evaluated
+`resource.data.requesterId == uid()` — and on a nonexistent document
+`resource` is `null`, so `resource.data` throws inside rule evaluation.
+Firestore denies the request on any rule error, so that pre-check read
+failed with `permission-denied` before the client ever got to build the
+request document. Everything downstream of that — the payload shape, the
+`create` rule, the deterministic `{driverId}_{studentId}` id, the
+`ownsStudent` check — was already correct; nothing ever got that far.
+
+**Fix.** Added an `!exists(...)` short-circuit to the `ride_requests`
+`read` rule (`firestore.rules`) so a signed-in user may always read "this
+request doesn't exist yet" — only reading another party's actual request
+contents still requires being the requester, the driver, or an admin, so
+nothing new is exposed. **This rules file still needs `firebase deploy
+--only firestore:rules` (or the console) before the fix takes effect** —
+I did not run that, since it changes a shared backend deployment rather
+than local code.
+
+**Also**, per the request to make failures diagnosable: added a
+`FirebaseException`-specific catch in `find_drivers_screen.dart`'s
+`_request()`, between the existing `RideRequestException` and catch-all
+handlers, that logs `e.code`/`e.message` distinctly (a `permission-denied`
+now reads as exactly that in the console instead of being folded into a
+generic `$e`) and shows a more specific snackbar for that one code. The
+generic catch-all and its `debugPrint('requestSeat failed: $e')` were
+already present and already correct — this only splits out the one case
+that was previously indistinguishable from a real network failure.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
 
 ### 2026-09-02 — generalized parent attendance from "tomorrow only" to any day in the visible week
 
