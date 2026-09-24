@@ -92,11 +92,25 @@ service cloud.firestore {
                     && userId == uid()
                     && request.resource.data.role in ['parent', 'student', 'driver'];
 
+      // `isActive` stays admin-only in one direction (false → true, an
+      // admin reactivating a suspended account) but the owning user may now
+      // flip it true → false themselves: that is exactly what
+      // `AccountService.deactivate()` (the app's "Deactivate Account"
+      // button) does, and it is safe precisely because it is one-way — a
+      // user can pause their own account but never un-suspend it, which
+      // stays exclusively an admin action.
       allow update: if signedIn()
-                    && ((userId == uid() && unchanged('role') && unchanged('isActive'))
+                    && ((userId == uid()
+                         && unchanged('role')
+                         && (unchanged('isActive')
+                             || (resource.data.isActive == true
+                                 && request.resource.data.isActive == false)))
                         || isAdmin());
 
-      allow delete: if isAdmin();
+      // A user may delete their own account document -- `AccountService
+      // .delete()`'s hard-delete path -- in addition to an admin deleting
+      // any account.
+      allow delete: if signedIn() && (userId == uid() || isAdmin());
     }
 
     // ── students ────────────────────────────────────────────────────────────
@@ -145,8 +159,14 @@ service cloud.firestore {
                                 || resource.data.driverId == uid()))
                         || isAdmin());
 
+      // `studentId == uid()` here too, for the same reason as `create`:
+      // without it, a self-registered student using `AccountService
+      // .delete()`'s hard-delete path could never remove their own record —
+      // only the parent-owned case was covered before this was added.
       allow delete: if signedIn()
-                    && (resource.data.parentId == uid() || isAdmin());
+                    && (resource.data.parentId == uid()
+                        || studentId == uid()
+                        || isAdmin());
     }
 
     // ── drivers ─────────────────────────────────────────────────────────────
@@ -170,7 +190,9 @@ service cloud.firestore {
                          && unchanged('routeId'))
                         || isAdmin());
 
-      allow delete: if isAdmin();
+      // A driver may delete their own profile -- `AccountService.delete()`'s
+      // hard-delete path -- in addition to an admin removing any driver.
+      allow delete: if signedIn() && (driverId == uid() || isAdmin());
     }
 
     // ── buses & routes ──────────────────────────────────────────────────────

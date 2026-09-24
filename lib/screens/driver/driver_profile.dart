@@ -12,6 +12,7 @@ import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
+import '../../widgets/account_management_section.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 
@@ -690,8 +691,26 @@ class _DriverProfileState extends State<DriverProfile> {
                           _MenuItem(
                             icon: '📄',
                             label: AppStrings.t('terms_lbl'),
-                            isLast: true,
                             onTap: () => context.push('/driver/terms'),
+                          ),
+                          _MenuItem(
+                            materialIcon: Icons.pause_circle_outline_rounded,
+                            label: 'Deactivate Account',
+                            onTap: () => confirmAndDeactivateAccount(
+                              context,
+                              accentColor: AppTheme.driverCyan,
+                            ),
+                          ),
+                          _MenuItem(
+                            materialIcon: Icons.delete_forever_rounded,
+                            label: 'Delete Account',
+                            labelColor: AppTheme.error,
+                            isLast: true,
+                            onTap: () => confirmAndDeleteAccount(
+                              context,
+                              role: UserRole.driver,
+                              accentColor: AppTheme.driverCyan,
+                            ),
                           ),
                         ],
                       ),
@@ -1022,19 +1041,38 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _MenuItem extends StatelessWidget {
-  final String icon, label;
+  final String? icon;
+
+  /// An alternative to [icon] for a row with no natural emoji — Deactivate
+  /// / Delete Account use this so their icon can actually be tinted red;
+  /// an emoji glyph ignores `TextStyle.color` in practice, a `Material`
+  /// `Icon` doesn't.
+  final IconData? materialIcon;
+
+  final String label;
   final String? desc;
   final Color? descColor;
+
+  /// Tints both [label] and [materialIcon] (not [icon] — see above). Used
+  /// for "Delete Account"; left null everywhere else, which keeps the
+  /// standard `context.textPrimary` label color.
+  final Color? labelColor;
+
   final bool isLast;
   final VoidCallback? onTap;
   const _MenuItem({
-    required this.icon,
+    this.icon,
+    this.materialIcon,
     required this.label,
     this.desc,
     this.descColor,
+    this.labelColor,
     this.isLast = false,
     this.onTap,
-  });
+  }) : assert(
+         icon != null || materialIcon != null,
+         'Provide either icon or materialIcon.',
+       );
 
   @override
   Widget build(BuildContext context) {
@@ -1057,7 +1095,13 @@ class _MenuItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 18)),
+                child: materialIcon != null
+                    ? Icon(
+                        materialIcon,
+                        size: 18,
+                        color: labelColor ?? context.textPrimary,
+                      )
+                    : Text(icon!, style: const TextStyle(fontSize: 18)),
               ),
             ),
             const SizedBox(width: 14),
@@ -1067,7 +1111,10 @@ class _MenuItem extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(color: context.textPrimary, fontSize: 14),
+                    style: TextStyle(
+                      color: labelColor ?? context.textPrimary,
+                      fontSize: 14,
+                    ),
                   ),
                   if (desc != null) ...[
                     const SizedBox(height: 2),

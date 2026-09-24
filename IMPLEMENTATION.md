@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-09-24
+> **Last updated:** 2026-09-25
 
 ---
 
@@ -720,6 +720,109 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-09-25 — moved Deactivate/Delete Account into the main settings list
+
+Yesterday's Deactivate/Delete Account feature shipped as its own
+`AccountManagementSection` card, sitting between the Theme card and Logout
+— visually disconnected from the rest of the profile screen's settings.
+Moved into each screen's existing settings list instead, as two more rows
+right after Help & Support / Terms of Service, styled identically to
+every other row in that list.
+
+**Changed** — `parent_profile.dart`'s `_MenuItem`, `driver_profile.dart`'s
+`_MenuItem`, `student_profile.dart`'s `_SettingTile`: all three gained
+`materialIcon` (an `IconData` alternative to the existing emoji `icon`
+field) and `labelColor`. Deactivate/Delete needed this because their icon
+had to actually be tintable — an emoji glyph ignores `TextStyle.color` in
+practice, a `Material` `Icon` doesn't, so these two rows are the first in
+each list to use a real icon instead of an emoji. `labelColor` tints both
+the icon and the label text together; left `null` everywhere else, which
+keeps every existing row's standard color.
+
+Both new rows: "Deactivate Account" (`Icons.pause_circle_outline_rounded`,
+standard text color) and "Delete Account" (`Icons.delete_forever_rounded`,
+`AppTheme.error` on both icon and label, appended last so the existing
+`isLast: true` border logic each tile already had gives it the clean
+divider above it and no divider below it, for free). No subtitles on
+either — the two are self-explanatory, and every other row in these lists
+already goes without a subtitle unless it has real data to show (a plan
+name, a language, a rating) rather than repeating the label as prose.
+
+The standalone `AccountManagementSection` widget this replaces (from
+yesterday) is deleted — its confirm-then-act functions
+(`confirmAndDeactivateAccount`/`confirmAndDeleteAccount` in
+`account_management_section.dart`) are unchanged and now called directly
+from each list row's `onTap` instead of from that card.
+
+`flutter analyze`: 4 pre-existing issues, no new ones. No `firestore.rules`
+change needed — this is a UI-only move; yesterday's rules deploy already
+covers what these rows call.
+
+### 2026-09-24 — added Deactivate/Delete Account for all three roles
+
+Parents, drivers and students previously had no way to leave the app on
+their own terms — no soft-pause, no permanent removal, just "keep using it
+or ask an administrator."
+
+**Added.**
+- `lib/app/account_service.dart` — new `AccountService` singleton:
+  - `deactivate()`: writes `users/{uid}.isActive = false`, then signs out.
+    A real soft delete, not cosmetic — `AuthService.signIn()` already
+    refused sign-in for `isActive == false` accounts before this feature
+    existed, so nothing else needed to change for deactivation to take
+    effect immediately.
+  - `delete({required role})`: deletes this account's own Firestore
+    documents (`drivers/{uid}` or `students/{uid}` depending on role, then
+    `users/{uid}`) **before** deleting the Firebase Auth account, because
+    `user.delete()` ends the session immediately on success and any
+    Firestore write after that point runs unauthenticated. Catches
+    `FirebaseAuthException` with code `requires-recent-login` specifically
+    and asks the user to sign in again and retry — its class doc comment
+    walks through the one unavoidable partial-failure window that ordering
+    leaves (Firestore docs gone, Auth account still live) and why
+    re-running the same method from a fresh session completes it cleanly.
+  - Deliberately does **not** cascade into data that only *references* the
+    account — a parent's children, past `ride_requests`, ratings, trip
+    history. That needs a trusted cross-collection identity (a Cloud
+    Function on the Admin SDK), which this project doesn't have yet, same
+    constraint `RideMatchService` already documents for notifications.
+    Marked `TODO(backend)`.
+- `lib/widgets/account_management_section.dart` — reusable
+  `AccountManagementSection` widget (two rows: Deactivate, red Delete) plus
+  `confirmAndDeactivateAccount`/`confirmAndDeleteAccount`, each a
+  confirm-dialog-then-act flow mirroring `logout_flow.dart`'s
+  `confirmAndSignOut` shape on purpose (a blocking spinner, then either
+  `context.go('/role-select')` or an error snackbar) so the two read as the
+  same pattern.
+- Wired into `parent_profile.dart`, `driver_profile.dart` and
+  `student_profile.dart`, just above each screen's existing Logout row,
+  passing each role's own accent color and `UserRole`.
+
+**`firestore.rules` changes required for this to actually work** — three
+gaps, found by reading the existing rules against what each action needs,
+not assumed:
+1. `users` update rule required `unchanged('isActive')` unconditionally —
+   by design (see `AppUser`'s class doc: `isActive` is meant to be
+   client-untouchable). Loosened to allow exactly one direction from the
+   owning user: `true → false`. `false → true` (reactivating) stays
+   admin-only, so a user can pause their own account but never
+   self-un-suspend.
+2. `users` and `drivers` delete rules were `isAdmin()`-only. Added
+   `userId == uid()` / `driverId == uid()` so an account can delete its own
+   document.
+3. `students` delete rule only checked `resource.data.parentId == uid()` —
+   a **pre-existing gap**, not something this feature introduced: a
+   self-registered student (the same `studentId == uid()` case the `read`/
+   `create`/`update` rules on this collection already special-case) could
+   never delete their own record. Added the same case to `delete`.
+
+**Deployed** via `firebase deploy --only firestore:rules` to
+`transitpro-db` — confirmed with the user first, since this changes who
+can delete/deactivate accounts on the live backend, same as the rules
+deploy earlier today.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
 
 ### 2026-09-24 — fixed "Could not send that request" on Find a Driver's seat requests
 
