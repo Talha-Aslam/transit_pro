@@ -721,6 +721,212 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-25 — fixed "SEATS FREE" summing seats across rounds on Find a Driver
+
+`find_drivers_screen.dart`'s "SEATS FREE" stat (`match.availableSeats`)
+could show more free seats than the vehicle physically has — a driver
+running two rounds on the same 10-seat vehicle, 9 free on Round 1 and 10
+free on Round 2 (everyone from Round 1 was dropped off by then, so the
+same physical seats are free again), showed "19 seats free".
+
+**Root cause** was in `transit_core`, not the screen itself:
+`DriverMatch.availableSeats` (`ride_request.dart`) was
+`openSchedules.fold(0, (sum, s) => sum + s.availableSeats)` — a straight
+sum across every open round, when a parent can only ever book one round
+per request (`_pickRound` in this same screen) and the same seats are
+reused between rounds, never held open across all of them at once.
+
+**Fix.** Changed it to the max of any single open round's
+`availableSeats` instead of their sum — "the best a single round can
+offer", which is the real answer to what the headline figure is actually
+asking. Went with this over reading a vehicle's physical `capacity`
+(the task's other suggested option) because `Driver` has no direct
+capacity field — only a `busId` reference to a separate `Bus` document,
+which would need an async join this synchronous getter can't do; the
+per-round max needs nothing extra and is exactly as correct for a parent
+deciding whether to keep looking at this driver.
+
+The per-round chips (`DriverSchedule.availableSeats`, on `_MatchList`'s
+schedule chips and inside `_pickRound`'s round list) were already correct
+per-round and are untouched — they were never summing anything.
+
+**Left alone, out of scope:** `Driver.totalSeatsOffered`
+(`driver.dart`) has the same-looking `fold`-a-sum shape, but it's a
+different, legitimate metric for a different screen — the driver's own
+dashboard, where every call site's own copy says "seats free **across**
+[N] rounds" (`driver_dashboard.dart`, `driver_booked_students_screen.dart`)
+— a genuine total-capacity-across-rounds figure for the driver's own
+planning view, not "how many can I book right now" for a parent. Not the
+same bug; left untouched.
+
+`flutter analyze`: 4 pre-existing issues, no new ones (transit_core is a
+path dependency, so the fix applies immediately without a version bump).
+
+### 2026-09-25 — fixed the child card's garbled bullet and hardcoded "On the Bus" badge
+
+`parent_dashboard.dart`'s child status card, two bugs:
+
+**Encoding glitch.** The grade/school subtitle joined with `' Â· '` —
+`Â·` is what a UTF-8-encoded `·` (middle dot, U+00B7) looks like when
+misread back as Latin-1, so the two-byte character had been re-saved as
+two separate garbled characters at some point. Replaced with a plain `•`
+(bullet, U+2022) written directly in the join, so there's a real
+character in the source rather than something that could silently
+mis-decode again.
+
+**Hardcoded badge.** The card always showed "On the Bus" in green,
+regardless of whether the child actually had a driver — a brand-new
+account with nobody assigned yet still saw "On the Bus". Now checks
+`_isLinkedWithDriver(child)` — the exact same real check
+(`child.driver.isNotEmpty`) the Live ETA card lower on this same screen
+already gates on — and shows a neutral gray "Unassigned" badge
+(new `unassigned_status` string, English + Urdu) when there's no driver,
+"On the Bus" only when there is. Per the request, this still isn't wired
+to a real transit state (boarded/not-boarded) — that's future work; this
+only stops the badge from lying about whether a driver exists at all.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-25 — made child sign-up's Grade/Class and Roll Number required
+
+**Not a `TextFormField`/`validator` change** — this app's sign-up form
+doesn't use `Form`/`TextFormField` at all; every field is a plain
+`TextField`; `ChildCard` in `profile_form_fields.dart`. The single place
+that both draws the red-asterisk "required" marker and blocks submission
+is `ProfileRequirements.missing()` (`profile_draft.dart`) — its own class
+doc comment explains why: "the completion form renders exactly the fields
+this reports missing, and the submit button validates against the same
+call, so the asterisks on screen and the rules being enforced can never
+disagree." So both fields' required-ness is enforced there instead of via
+a per-field validator, to stay inside that one existing mechanism rather
+than add a second, competing one.
+
+**UI** (`profile_form_fields.dart`'s `ChildCard`): "GRADE / CLASS
+(OPTIONAL)" → `FieldLabel('GRADE / CLASS', important: true)`; "SCHOOL ROLL
+NUMBER (OPTIONAL)" → `FieldLabel('SCHOOL ROLL NUMBER', important: true)` —
+`FieldLabel`'s existing `important` flag already draws the same red `*`
+`CHILD'S NAME` uses, so no new styling code was needed. Roll number's hint
+also changed from "Leave blank if you do not have one" to "e.g. 12345",
+since blank is no longer an acceptable answer.
+
+**Validation** (`ProfileRequirements.missing()`): added
+`kids[i].grade.trim().isEmpty` and `kids[i].studentIdNumber.trim().isEmpty`
+gap checks alongside the existing name/institute-type/school ones — this
+is what actually blocks `_signup()`/the Google completion screen from
+proceeding, both of which already call
+`ProfileRequirements.firstGapMessage(draft)` before submitting.
+
+This reverses this session's own earlier call (2026-09-25, the sign-up
+grade/institute-type fix) to make grade optional — updated that entry's
+stale "optional" reasoning in `ChildDraft.studentIdNumber`'s doc comment
+too, so it doesn't contradict the code next to it.
+
+**Out of scope, left as-is:** the Edit Info screen's ("Roll Number" in
+`_ChildFlowSheet`, `parent_profile.dart`) hint still says "(optional)" and
+`_save()` still allows saving it blank — the request was specifically
+about "the child registration form" (sign-up), and Edit Info has no
+equivalent required-field-blocking mechanism to hook into. Worth flagging
+in case you want the same requirement there.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-25 — linked "Roll Number" between sign-up and Edit Info
+
+Sign-up already collected a per-child roll number (`ChildCard`'s "SCHOOL
+ROLL NUMBER" field) and already persisted it to
+`students/{id}.studentIdNumber`. The gap was entirely on the read/edit
+side: `ChildInfo` — the flattened, parent-facing model `_ChildFlowSheet`
+("Edit Info") and `ParentDataService` are built on — had no
+`studentIdNumber` field at all, so the value sign-up saved was invisible
+and uneditable from that point on; the same class of bug as the
+`instituteType` and manual-timetable fixes earlier, just for a field
+nobody had wired up in the first place rather than one that got
+double-mapped.
+
+**Fix.**
+- `ChildInfo` (`parent_data_service.dart`) gained `studentIdNumber`
+  (+ `copyWith` support).
+- `ParentDataService._rebuild()` now maps `studentIdNumber:
+  s.studentIdNumber` from the live `Student`, so it reaches the UI at all.
+- `ParentDataService.updateChild()` now writes
+  `'studentIdNumber': child.studentIdNumber` back to Firestore — via the
+  same `UserRepository.updateStudent(child.id, {...})` call already
+  targeting the exact sign-up-created document (see the `updateChild`/
+  `_save` doc comments from the earlier `instituteType` fix — that
+  targeting was already correct, only the field list needed extending).
+- `ParentDataService.addChild()` now also passes `studentIdNumber` when
+  creating a child from the in-app "Add Child" sheet, for the same reason
+  `instituteType` was added there previously — otherwise a child added
+  in-app (rather than at sign-up) would silently lose whatever roll number
+  was typed into the now-visible field.
+- `_ChildFlowSheet` (`parent_profile.dart`) gained a `_studentIdCtrl`,
+  pre-filled from `widget.initialChild.studentIdNumber`, a "Roll Number"
+  `_buildTextField` row (placed after Institute Name, mirroring sign-up's
+  ordering), and `_save()` now includes `studentIdNumber:
+  _studentIdCtrl.text.trim()` in the `ChildInfo` it hands back.
+
+No `firestore.rules` change needed — the `students` update rule already
+lets the owning parent write any field except `parentId`/
+`isTransportSuspended`.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-25 — fixed sign-up never actually collecting a child's grade
+
+The parent-facing "Edit Info" screen (`_ChildFlowSheet` in
+`parent_profile.dart`) has separate "Grade / Class" and "Institute Type"
+fields, and both already correctly load from and save to the exact
+`students/{id}` document created at sign-up (`id`/`updateChild` wiring,
+`instituteType` persistence) — that part was already fixed in an earlier
+pass and is unrelated to what was actually wrong here.
+
+**The real bug**, found by tracing the sign-up form's data all the way to
+Firestore rather than assuming the described symptom: the per-child form
+at sign-up (`ChildCard` in `profile_form_fields.dart`) had exactly one
+selector for both concepts. Its dropdown was labelled "GRADE / LEVEL" but
+its options (`kGradeOptions`) were `['School', 'College', 'University',
+'Academy']` — an institute *type*, not a grade — and
+`onboarding_service.dart` wrote that single value into **both**
+`Student.grade` and `Student.instituteType`. So for every parent-created
+child, "Edit Info"'s Grade / Class field never had a real grade to
+pre-populate with — it showed "School" or "University" instead, because
+that's the only value sign-up had ever collected. This affected new
+children going forward, not existing documents (nothing to migrate:
+existing `grade`/`instituteType` values were merely duplicates of each
+other, not corrupted).
+
+**Fix.**
+- `ChildDraft` (`profile_draft.dart`) and `ChildFormData`
+  (`profile_form_fields.dart`) now carry `grade` and `instituteType` as two
+  genuinely separate fields, matching `ChildInfo`'s existing shape (the
+  Firestore/edit-screen side already had this split).
+- `ChildCard` gained a real free-typed "GRADE / CLASS (OPTIONAL)" text
+  field, and its existing dropdown is relabelled "INSTITUTE TYPE" (the
+  `grade_level_lbl`/`select_level_hint` strings in `language_provider.dart`
+  changed from "GRADE / LEVEL"/"Select level" to "INSTITUTE TYPE"/"Select
+  institute type", English and Urdu) — it was always this same dropdown
+  used for the self-registering student's own "Grade Level" field too
+  (`signup_screen.dart`'s `_studentGrade` → `draft.instituteType`), so the
+  rename is consistent there as well, not just for the per-child case.
+- `onboarding_service.dart`'s `UserRole.parent` branch now writes
+  `instituteType: child.instituteType.trim()` instead of
+  `child.grade.trim()` — the actual bug fix; everything else here was
+  already correct.
+- `signup_screen.dart` and `profile_completion_screen.dart` (the Google
+  onboarding path — both build a `ChildDraft` from the same shared
+  `ChildCard`/`ChildFormData`, so both needed, and got, the same fix) now
+  pass `grade: c.gradeCtrl.text` and `instituteType: c.instituteType`
+  instead of the one collapsed field.
+- `ProfileRequirements.missing()`'s per-child validation now requires
+  Institute Type (the bounded, meaningful choice) instead of the old
+  "grade" check, which — now that `grade` is genuinely optional free text —
+  would otherwise block sign-up over a field many families won't have a
+  formal value for.
+
+`flutter analyze`: 4 pre-existing issues, no new ones. No `firestore.rules`
+change needed — this only changes what the client sends, not who's allowed
+to send it.
+
 ### 2026-09-25 — removed the DISTANCE stat from Find a Driver's stat row
 
 `find_drivers_screen.dart`'s `_DriverMatchCard` showed three stats —

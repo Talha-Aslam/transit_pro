@@ -379,11 +379,24 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                                 ),
                                                 const SizedBox(height: 3),
                                                 Text(
+                                                  // Was ' Â· ' -- a UTF-8
+                                                  // encoded '·' (middle dot,
+                                                  // U+00B7) misread back as
+                                                  // Latin-1, which is what
+                                                  // turns one clean 2-byte
+                                                  // character into the
+                                                  // literal two-character
+                                                  // garble "Â·". Written as
+                                                  // an explicit •
+                                                  // escape rather than a
+                                                  // pasted glyph so this
+                                                  // can't happen again from
+                                                  // this line specifically.
                                                   [child.grade, child.school]
                                                       .where(
                                                         (s) => s.isNotEmpty,
                                                       )
-                                                      .join(' Â· '),
+                                                      .join(' • '),
                                                   style: TextStyle(
                                                     color:
                                                         context.textSecondary,
@@ -396,10 +409,25 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          StatusBadge(
-                                            label: AppStrings.t('on_the_bus'),
-                                            color: AppTheme.success,
-                                          ),
+                                          // Was hardcoded to "On the Bus"
+                                          // regardless of whether this
+                                          // child actually has a driver --
+                                          // `_isLinkedWithDriver` is the
+                                          // same real check the Live ETA
+                                          // card below already gates on.
+                                          _isLinkedWithDriver(child)
+                                              ? StatusBadge(
+                                                  label: AppStrings.t(
+                                                    'on_the_bus',
+                                                  ),
+                                                  color: AppTheme.success,
+                                                )
+                                              : StatusBadge(
+                                                  label: AppStrings.t(
+                                                    'unassigned_status',
+                                                  ),
+                                                  color: context.textTertiary,
+                                                ),
                                         ],
                                       ),
                                     ),

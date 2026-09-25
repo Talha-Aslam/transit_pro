@@ -655,9 +655,19 @@ class _MapPointFieldState extends State<MapPointField> {
 /// them.
 class ChildFormData {
   final nameCtrl = TextEditingController();
+
+  /// Free-typed grade/class, e.g. "Grade 5", "O-Level" — distinct from
+  /// [instituteType] below. See `ChildDraft.grade`'s doc comment for why
+  /// these used to be the same field and why that broke "Edit Info"'s
+  /// pre-population.
+  final gradeCtrl = TextEditingController();
+
   final schoolCtrl = TextEditingController();
   final studentIdCtrl = TextEditingController();
-  String? grade;
+
+  /// School/College/University/Academy — one of `kGradeOptions`.
+  String? instituteType;
+
   bool isCustomSchool = false;
 
   /// Where the child is collected from. Optional, but it is what turns driver
@@ -667,18 +677,21 @@ class ChildFormData {
 
   ChildFormData({
     String name = '',
+    String grade = '',
+    this.instituteType,
     String school = '',
     String studentId = '',
-    this.grade,
     this.pickup,
   }) {
     nameCtrl.text = name;
+    gradeCtrl.text = grade;
     schoolCtrl.text = school;
     studentIdCtrl.text = studentId;
   }
 
   void dispose() {
     nameCtrl.dispose();
+    gradeCtrl.dispose();
     schoolCtrl.dispose();
     studentIdCtrl.dispose();
   }
@@ -759,14 +772,27 @@ class ChildCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
+            const FieldLabel('GRADE / CLASS', important: true),
+            const SizedBox(height: 6),
+            TextField(
+              controller: data.gradeCtrl,
+              style: TextStyle(color: context.textPrimary, fontSize: 15),
+              decoration: const InputDecoration(hintText: 'e.g. Grade 5'),
+            ),
+            const SizedBox(height: 12),
+            // Was labelled "GRADE / LEVEL" and stored straight into
+            // `ChildDraft.grade` — this dropdown's actual value domain
+            // (`kGradeOptions`: School/College/University/Academy) is the
+            // institute type, not a grade. See `ChildDraft.grade`'s doc
+            // comment.
             FieldLabel(AppStrings.t('grade_level_lbl'), important: true),
             const SizedBox(height: 6),
             ThemedDropdown(
               hint: AppStrings.t('select_level_hint'),
-              value: data.grade,
+              value: data.instituteType,
               items: kGradeOptions,
               onChanged: (v) {
-                data.grade = v;
+                data.instituteType = v;
                 onChanged();
               },
             ),
@@ -782,14 +808,12 @@ class ChildCard extends StatelessWidget {
               },
             ),
             const SizedBox(height: 12),
-            const FieldLabel('SCHOOL ROLL NUMBER (OPTIONAL)'),
+            const FieldLabel('SCHOOL ROLL NUMBER', important: true),
             const SizedBox(height: 6),
             TextField(
               controller: data.studentIdCtrl,
               style: TextStyle(color: context.textPrimary, fontSize: 15),
-              decoration: const InputDecoration(
-                hintText: 'Leave blank if you do not have one',
-              ),
+              decoration: const InputDecoration(hintText: 'e.g. 12345'),
             ),
             const SizedBox(height: 12),
             const FieldLabel('PICKUP POINT (OPTIONAL)'),

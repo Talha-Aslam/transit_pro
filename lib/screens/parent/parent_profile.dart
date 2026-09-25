@@ -1517,6 +1517,7 @@ class _ChildFlowSheet extends StatefulWidget {
 class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _gradeCtrl;
+  late final TextEditingController _studentIdCtrl;
   late final TextEditingController _locationCtrl;
 
   String? _instituteType;
@@ -1899,6 +1900,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.initialChild.name);
     _gradeCtrl = TextEditingController(text: widget.initialChild.grade);
+    _studentIdCtrl = TextEditingController(
+      text: widget.initialChild.studentIdNumber,
+    );
     _locationCtrl = TextEditingController(text: widget.initialChild.stop)
       ..addListener(() => setState(() {})); // To trigger bus list visibility
     _pickup = widget.initialChild.pickup;
@@ -1941,6 +1945,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   void dispose() {
     _nameCtrl.dispose();
     _gradeCtrl.dispose();
+    _studentIdCtrl.dispose();
     _locationCtrl.dispose();
     super.dispose();
   }
@@ -1960,6 +1965,12 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
         // .updateChild`/`.addChild` now both persist it (see their doc
         // comments), so a real change here actually survives a save.
         instituteType: _instituteType ?? widget.initialChild.instituteType,
+        // Same story as instituteType above: collected at sign-up
+        // (`ChildCard`'s "SCHOOL ROLL NUMBER" field) but, until now, this
+        // sheet had no field for it at all, so any edit was silently
+        // discarded — the roll number could be set once at sign-up and
+        // never again.
+        studentIdNumber: _studentIdCtrl.text.trim(),
         // Picking a driver in this sheet is a preview only (see
         // _showDriverPreview) — it doesn't book a seat or assign a bus/route,
         // so those stay whatever they already were. Only the driver id
@@ -2267,6 +2278,11 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           ),
                         ],
                       ),
+                    _buildTextField(
+                      "Roll Number",
+                      _studentIdCtrl,
+                      "e.g. 12345 (optional)",
+                    ),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [

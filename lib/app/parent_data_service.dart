@@ -37,6 +37,13 @@ class ChildInfo {
   String driver;
   String? photoUrl;
 
+  /// `Student.studentIdNumber` -- the school's own roll number. Collected at
+  /// sign-up (`ChildCard`'s "SCHOOL ROLL NUMBER" field) but, like
+  /// `instituteType` before it, never carried into this flattened view --
+  /// "Edit Info" had no field for it at all, so a parent could never see or
+  /// correct the roll number they gave at sign-up.
+  String studentIdNumber;
+
   /// Where the child is collected from / dropped off, from
   /// `Student.pickupLocation`/`.dropoffLocation`. Set at signup but, until
   /// now, never surfaced (or editable) anywhere past that point.
@@ -59,6 +66,7 @@ class ChildInfo {
     this.stop = '',
     this.driver = '',
     this.photoUrl,
+    this.studentIdNumber = '',
     this.pickup,
     this.dropoff,
     this.scheduleId,
@@ -74,6 +82,7 @@ class ChildInfo {
     String? stop,
     String? driver,
     String? photoUrl,
+    String? studentIdNumber,
     GeoCoord? pickup,
     GeoCoord? dropoff,
     String? scheduleId,
@@ -88,6 +97,7 @@ class ChildInfo {
     stop: stop ?? this.stop,
     driver: driver ?? this.driver,
     photoUrl: photoUrl ?? this.photoUrl,
+    studentIdNumber: studentIdNumber ?? this.studentIdNumber,
     pickup: pickup ?? this.pickup,
     dropoff: dropoff ?? this.dropoff,
     scheduleId: scheduleId ?? this.scheduleId,
@@ -223,6 +233,7 @@ class ParentDataService {
         // lookup keyed on "this child's driver".
         driver: bus?.driverId ?? s.driverId ?? '',
         photoUrl: s.photoUrl,
+        studentIdNumber: s.studentIdNumber,
         pickup: s.pickupLocation,
         dropoff: s.dropoffLocation,
         scheduleId: s.scheduleId,
@@ -416,6 +427,7 @@ class ParentDataService {
       'grade': child.grade,
       'school': child.school,
       'instituteType': child.instituteType,
+      'studentIdNumber': child.studentIdNumber,
       'pickupLocation': ?child.pickup?.toMap(),
       'dropoffLocation': ?child.dropoff?.toMap(),
       'scheduleId': ?child.scheduleId,
@@ -499,6 +511,7 @@ class ParentDataService {
         // yet. This form (`_ChildFlowSheet`, shared with `updateChild`) now
         // has its own real instituteType field, so use it.
         instituteType: child.instituteType,
+        studentIdNumber: child.studentIdNumber,
         pickupLocation: child.pickup,
         dropoffLocation: child.dropoff,
       ),

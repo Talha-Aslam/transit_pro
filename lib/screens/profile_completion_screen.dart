@@ -95,9 +95,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   /// than "later, from your profile" is the difference between a driver who gets
   /// requests and one who waits indefinitely wondering why nobody calls.
   final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
-  final List<RoundFormData> _rounds = [
-    RoundFormData.fresh(ordinal: 1),
-  ];
+  final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
   double _serviceRadiusKm = 5;
   GeoCoord? _baseLocation;
 
@@ -231,7 +229,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         .map(
           (c) => ChildDraft(
             name: c.nameCtrl.text,
-            grade: c.grade ?? '',
+            grade: c.gradeCtrl.text,
+            instituteType: c.instituteType ?? '',
             school: c.schoolCtrl.text,
             studentIdNumber: c.studentIdCtrl.text,
             pickupLocation: c.pickup,

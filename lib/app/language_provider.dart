@@ -42,6 +42,7 @@ class AppStrings {
     'good_evening': 'Good Evening',
     'no_children_yet': 'No children added yet',
     'on_the_bus': 'On the Bus',
+    'unassigned_status': 'Unassigned',
     'to_school': 'to school',
     'to_home': 'to home',
     'todays_schedule': 'Today\'s Schedule',
@@ -369,8 +370,13 @@ class AppStrings {
     'add_another_child': 'Add Another Child',
     'childs_name_lbl': "CHILD'S NAME",
     'childs_name_hint': "Child's full name",
-    'grade_level_lbl': 'GRADE / LEVEL',
-    'select_level_hint': 'Select level',
+    // Was 'GRADE / LEVEL' — this selector's actual options (School/College/
+    // University/Academy, see `kGradeOptions`) are the institute type, not a
+    // grade, and the child form now has its own separate free-typed grade
+    // field right above this dropdown. Relabelled so the two don't both say
+    // "grade".
+    'grade_level_lbl': 'INSTITUTE TYPE',
+    'select_level_hint': 'Select institute type',
     'school_institution_lbl': 'SCHOOL / INSTITUTION',
     'license_number_lbl': 'LICENSE NUMBER',
     'enter_license_hint': 'Enter your driving license number',
@@ -757,6 +763,7 @@ class AppStrings {
     'good_evening': 'شام بخیر',
     'no_children_yet': 'ابھی تک کوئی بچہ شامل نہیں کیا گیا',
     'on_the_bus': 'باصلاحیت بس پر ہے',
+    'unassigned_status': 'غیر تفویض شدہ',
     'to_school': 'اسکول کے لیے',
     'to_home': 'گھر کے لیے',
     'todays_schedule': 'آج کا شیڈول',
@@ -1087,8 +1094,8 @@ class AppStrings {
     'add_another_child': 'ایک اور بچہ شامل کریں',
     'childs_name_lbl': 'بچے کا نام',
     'childs_name_hint': 'بچے کا پورا نام',
-    'grade_level_lbl': 'کلاس / لیول',
-    'select_level_hint': 'لیول منتخب کریں',
+    'grade_level_lbl': 'ادارے کی قسم',
+    'select_level_hint': 'ادارے کی قسم منتخب کریں',
     'school_institution_lbl': 'اسکول / ادارہ',
     'license_number_lbl': 'لائسنس نمبر',
     'enter_license_hint': 'ڈرائیونگ لائسنس نمبر درج کریں',

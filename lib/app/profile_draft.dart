@@ -5,12 +5,28 @@ import 'package:transit_core/transit_core.dart';
 /// One child on a parent's account, as typed into a form.
 class ChildDraft {
   final String name;
+
+  /// Free-typed grade/class, e.g. "Grade 5", "O-Level", "BS-CS 2nd Year".
+  ///
+  /// Was, until now, the same field as [instituteType] below — the sign-up
+  /// form's one "GRADE / LEVEL" dropdown only ever offered `kGradeOptions`
+  /// (School/College/University/Academy) and wrote that single choice into
+  /// both `Student.grade` and `Student.instituteType`. That's why the
+  /// parent-facing "Edit Info" screen's separate "Grade / Class" text field
+  /// (`_ChildFlowSheet._gradeCtrl`) always pre-populated with something
+  /// like "School" instead of a real grade — there had never been a
+  /// distinct grade value collected at sign-up to show it. This field and
+  /// [instituteType] are now genuinely separate, matching what "Edit Info"
+  /// already expected.
   final String grade;
+
+  /// School/College/University/Academy — one of `kGradeOptions`.
+  final String instituteType;
+
   final String school;
 
-  /// The school's own roll number, if the family has one. Optional — a parent
-  /// registering a five-year-old usually does not, and demanding it would block
-  /// them. Uniqueness never depends on it: see [Student.publicCode].
+  /// The school's own roll number. Required — see [ProfileRequirements]
+  /// below. Uniqueness never depends on it: see [Student.publicCode].
   final String studentIdNumber;
 
   /// Where the child is collected from. Optional at sign-up, but without it
@@ -20,13 +36,16 @@ class ChildDraft {
   const ChildDraft({
     this.name = '',
     this.grade = '',
+    this.instituteType = '',
     this.school = '',
     this.studentIdNumber = '',
     this.pickupLocation,
   });
 
   bool get isBlank =>
-      name.trim().isEmpty && grade.trim().isEmpty && school.trim().isEmpty;
+      name.trim().isEmpty &&
+      instituteType.trim().isEmpty &&
+      school.trim().isEmpty;
 
   /// Name reduced for duplicate detection — case and inner spacing folded, so
   /// `"Jack  Jones"` and `"jack jones"` are recognised as the same child.
@@ -36,17 +55,18 @@ class ChildDraft {
   ChildDraft copyWith({
     String? name,
     String? grade,
+    String? instituteType,
     String? school,
     String? studentIdNumber,
     GeoCoord? pickupLocation,
-  }) =>
-      ChildDraft(
-        name: name ?? this.name,
-        grade: grade ?? this.grade,
-        school: school ?? this.school,
-        studentIdNumber: studentIdNumber ?? this.studentIdNumber,
-        pickupLocation: pickupLocation ?? this.pickupLocation,
-      );
+  }) => ChildDraft(
+    name: name ?? this.name,
+    grade: grade ?? this.grade,
+    instituteType: instituteType ?? this.instituteType,
+    school: school ?? this.school,
+    studentIdNumber: studentIdNumber ?? this.studentIdNumber,
+    pickupLocation: pickupLocation ?? this.pickupLocation,
+  );
 }
 
 /// Everything a sign-up form can collect, for any role.
@@ -155,31 +175,30 @@ class ProfileDraft {
     List<DriverSchedule>? schedules,
     File? licensePhoto,
     File? idCardPhoto,
-  }) =>
-      ProfileDraft(
-        role: role ?? this.role,
-        name: name ?? this.name,
-        email: email ?? this.email,
-        phone: phone ?? this.phone,
-        photoUrl: photoUrl ?? this.photoUrl,
-        children: children ?? this.children,
-        studentIdNumber: studentIdNumber ?? this.studentIdNumber,
-        instituteType: instituteType ?? this.instituteType,
-        school: school ?? this.school,
-        pickupLocation: pickupLocation ?? this.pickupLocation,
-        dropoffLocation: dropoffLocation ?? this.dropoffLocation,
-        licenseNumber: licenseNumber ?? this.licenseNumber,
-        experienceYears: experienceYears ?? this.experienceYears,
-        vehicleNumber: vehicleNumber ?? this.vehicleNumber,
-        vehicleType: vehicleType ?? this.vehicleType,
-        seatCapacity: seatCapacity ?? this.seatCapacity,
-        serviceAreas: serviceAreas ?? this.serviceAreas,
-        serviceRadiusKm: serviceRadiusKm ?? this.serviceRadiusKm,
-        baseLocation: baseLocation ?? this.baseLocation,
-        schedules: schedules ?? this.schedules,
-        licensePhoto: licensePhoto ?? this.licensePhoto,
-        idCardPhoto: idCardPhoto ?? this.idCardPhoto,
-      );
+  }) => ProfileDraft(
+    role: role ?? this.role,
+    name: name ?? this.name,
+    email: email ?? this.email,
+    phone: phone ?? this.phone,
+    photoUrl: photoUrl ?? this.photoUrl,
+    children: children ?? this.children,
+    studentIdNumber: studentIdNumber ?? this.studentIdNumber,
+    instituteType: instituteType ?? this.instituteType,
+    school: school ?? this.school,
+    pickupLocation: pickupLocation ?? this.pickupLocation,
+    dropoffLocation: dropoffLocation ?? this.dropoffLocation,
+    licenseNumber: licenseNumber ?? this.licenseNumber,
+    experienceYears: experienceYears ?? this.experienceYears,
+    vehicleNumber: vehicleNumber ?? this.vehicleNumber,
+    vehicleType: vehicleType ?? this.vehicleType,
+    seatCapacity: seatCapacity ?? this.seatCapacity,
+    serviceAreas: serviceAreas ?? this.serviceAreas,
+    serviceRadiusKm: serviceRadiusKm ?? this.serviceRadiusKm,
+    baseLocation: baseLocation ?? this.baseLocation,
+    schedules: schedules ?? this.schedules,
+    licensePhoto: licensePhoto ?? this.licensePhoto,
+    idCardPhoto: idCardPhoto ?? this.idCardPhoto,
+  );
 }
 
 /// The single definition of "what does this role still owe us?".
@@ -208,8 +227,19 @@ class ProfileRequirements {
           for (var i = 0; i < kids.length; i++) {
             final label = 'Child ${i + 1}';
             if (kids[i].name.trim().isEmpty) gaps.add('$label — name');
+            // Grade/class and roll number are both required now — the form
+            // marks them with the same red asterisk as name/school, so this
+            // has to actually enforce that (see this class's own doc
+            // comment on why "the same call" backs both the asterisk and
+            // the block on submit).
             if (kids[i].grade.trim().isEmpty) gaps.add('$label — grade');
+            if (kids[i].instituteType.trim().isEmpty) {
+              gaps.add('$label — institute type');
+            }
             if (kids[i].school.trim().isEmpty) gaps.add('$label — school');
+            if (kids[i].studentIdNumber.trim().isEmpty) {
+              gaps.add('$label — school roll number');
+            }
           }
 
           // Two children on the same account with the same name is almost always

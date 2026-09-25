@@ -84,7 +84,14 @@ class OnboardingService {
               parentId: uid,
               grade: child.grade.trim(),
               school: child.school.trim(),
-              instituteType: child.grade.trim(),
+              // Was `child.grade.trim()` — a leftover from when the sign-up
+              // form's single "GRADE / LEVEL" dropdown wrote its
+              // School/College/University/Academy choice into *both*
+              // `grade` and `instituteType`, because there was no distinct
+              // instituteType field to read from at the time. `ChildDraft`
+              // now carries them separately (see its `grade` doc comment),
+              // so this reads the real one instead of doubling up `grade`.
+              instituteType: child.instituteType.trim(),
               studentIdNumber: child.studentIdNumber.trim(),
               // Derived from the document id, so it inherits that id's
               // uniqueness rather than needing a collision check — which a

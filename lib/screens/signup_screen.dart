@@ -139,51 +139,52 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   UserRole _roleFromId(String id) => switch (id) {
-        'driver' => UserRole.driver,
-        'student' => UserRole.student,
-        _ => UserRole.parent,
-      };
+    'driver' => UserRole.driver,
+    'student' => UserRole.student,
+    _ => UserRole.parent,
+  };
 
   /// Everything the form has collected, in the shape `OnboardingService` wants.
   ///
   /// The same type the Google completion screen builds, which is what
   /// guarantees the two routes create identical accounts.
   ProfileDraft _buildDraft() => ProfileDraft(
-        role: _roleFromId(_selectedRole),
-        name: _nameCtrl.text,
-        email: _emailCtrl.text,
-        phone: _phoneCtrl.text,
-        children: _children
-            .map(
-              (c) => ChildDraft(
-                name: c.nameCtrl.text,
-                grade: c.grade ?? '',
-                school: c.schoolCtrl.text,
-                studentIdNumber: c.studentIdCtrl.text,
-                pickupLocation: c.pickup,
-              ),
-            )
-            .toList(),
-        studentIdNumber: _studentIdCtrl.text,
-        instituteType: _studentGrade ?? '',
-        school: _studentSchoolCtrl.text,
-        pickupLocation: _studentPickupLatLng,
-        dropoffLocation: _studentDropoffLatLng,
-        licenseNumber: _licenseCtrl.text,
-        experienceYears: int.tryParse(_experienceCtrl.text.trim()) ?? 0,
-        vehicleNumber: _vehicleCtrl.text,
-        vehicleType: _vehicleType ?? '',
-        seatCapacity: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
-        serviceAreas: _serviceAreas
-            .where((a) => !a.isBlank)
-            .map((a) => a.toModel())
-            .toList(),
-        serviceRadiusKm: _serviceRadiusKm,
-        baseLocation: _baseLocation,
-        schedules: _rounds.map((r) => r.toModel()).toList(),
-        licensePhoto: _licensePhoto,
-        idCardPhoto: _idCardPhoto,
-      );
+    role: _roleFromId(_selectedRole),
+    name: _nameCtrl.text,
+    email: _emailCtrl.text,
+    phone: _phoneCtrl.text,
+    children: _children
+        .map(
+          (c) => ChildDraft(
+            name: c.nameCtrl.text,
+            grade: c.gradeCtrl.text,
+            instituteType: c.instituteType ?? '',
+            school: c.schoolCtrl.text,
+            studentIdNumber: c.studentIdCtrl.text,
+            pickupLocation: c.pickup,
+          ),
+        )
+        .toList(),
+    studentIdNumber: _studentIdCtrl.text,
+    instituteType: _studentGrade ?? '',
+    school: _studentSchoolCtrl.text,
+    pickupLocation: _studentPickupLatLng,
+    dropoffLocation: _studentDropoffLatLng,
+    licenseNumber: _licenseCtrl.text,
+    experienceYears: int.tryParse(_experienceCtrl.text.trim()) ?? 0,
+    vehicleNumber: _vehicleCtrl.text,
+    vehicleType: _vehicleType ?? '',
+    seatCapacity: int.tryParse(_seatCapacityCtrl.text.trim()) ?? 0,
+    serviceAreas: _serviceAreas
+        .where((a) => !a.isBlank)
+        .map((a) => a.toModel())
+        .toList(),
+    serviceRadiusKm: _serviceRadiusKm,
+    baseLocation: _baseLocation,
+    schedules: _rounds.map((r) => r.toModel()).toList(),
+    licensePhoto: _licensePhoto,
+    idCardPhoto: _idCardPhoto,
+  );
 
   Future<void> _signup() async {
     if (!_agreeTerms) return;
@@ -241,7 +242,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -668,18 +671,18 @@ class _SignupScreenState extends State<SignupScreen> {
       case 'parent':
         return [
           ..._children.asMap().entries.map(
-                (entry) => ChildCard(
-                  key: ValueKey(entry.value),
-                  index: entry.key,
-                  data: entry.value,
-                  canRemove: _children.length > 1,
-                  onRemove: () => setState(() {
-                    _children[entry.key].dispose();
-                    _children.removeAt(entry.key);
-                  }),
-                  onChanged: () => setState(() {}),
-                ),
-              ),
+            (entry) => ChildCard(
+              key: ValueKey(entry.value),
+              index: entry.key,
+              data: entry.value,
+              canRemove: _children.length > 1,
+              onRemove: () => setState(() {
+                _children[entry.key].dispose();
+                _children.removeAt(entry.key);
+              }),
+              onChanged: () => setState(() {}),
+            ),
+          ),
           const SizedBox(height: 6),
           GestureDetector(
             onTap: () => setState(() => _children.add(ChildFormData())),
@@ -848,10 +851,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FieldLabel(
-                      AppStrings.t('student_id_lbl'),
-                      important: true,
-                    ),
+                    FieldLabel(AppStrings.t('student_id_lbl'), important: true),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _studentIdCtrl,
@@ -1038,40 +1038,39 @@ class _SignupScreenState extends State<SignupScreen> {
     ],
   );
 
-  Widget _serviceAddButton(String label, VoidCallback onTap) =>
-      GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: AppTheme.driverCyan.withValues(alpha: 0.5),
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.add_circle_outline,
-                color: AppTheme.driverCyan,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppTheme.driverCyan,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+  Widget _serviceAddButton(String label, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: AppTheme.driverCyan.withValues(alpha: 0.5),
+          width: 1.5,
         ),
-      );
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.add_circle_outline,
+            color: AppTheme.driverCyan,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.driverCyan,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Owns the visibility toggles and live mismatch check locally, so typing in
