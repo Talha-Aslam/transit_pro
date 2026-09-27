@@ -721,6 +721,59 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — profile avatars now open a full-screen pinch-to-zoom viewer
+
+**Confirmed the premise, but only for the two big header avatars.** Tapping
+the parent's own avatar in `parent_profile.dart` and the student's own
+avatar in `student_profile.dart` genuinely did nothing — on both screens the
+camera-badge overlay was its own `GestureDetector`, while the avatar image
+itself had none. `_ChildCard`'s small child avatar (in the parent's child
+list) was different: its whole `Stack` — image *and* camera badge — shared
+one `GestureDetector` that opened the image picker, so a tap there already
+did something (change the photo), not nothing.
+
+**New reusable piece:** `lib/widgets/zoomable_image_viewer.dart` exports
+`showZoomableImageDialog(BuildContext, ImageProvider, {accentColor})` — a
+`Dialog.fullscreen` with a "Pinch to Zoom" label, an `InteractiveViewer`
+(`minScale: 1, maxScale: 5`) rendering the given `ImageProvider`, and a
+circular close button (`accentColor` background, default
+`AppTheme.parentPurple`, white `Icons.close`) pinned top-right. Takes an
+`ImageProvider` rather than a `File`/URL directly so any avatar can reuse it
+regardless of where its image currently comes from.
+
+**Wiring:**
+- `parent_profile.dart`: added a file-scope `_viewAvatarPhoto(context, file,
+  photoUrl)` helper (shared by the state class and `_ChildCard`, which is
+  why it isn't a State method) that builds a `FileImage`/`NetworkImage`
+  (via `CloudinaryService.thumbnail`) and opens the dialog, or no-ops if
+  there's no photo yet. The parent's own avatar `Container` is now wrapped
+  in a `GestureDetector` calling it — no conflict, since the camera badge is
+  a sibling `Positioned`, not inside that `GestureDetector`.
+- `_ChildCard`: this one **did** need restructuring to avoid a tap
+  conflict. The outer `GestureDetector` (previously wrapping the whole
+  avatar `Stack` to open the image picker) now calls `_viewAvatarPhoto`
+  instead; the camera badge `Positioned` got its own new `GestureDetector`
+  wrapping just itself, calling the original pick-a-new-photo logic
+  (respecting the existing `uploadingChildIndices` guard). Net effect: tap
+  the photo to view it zoomed, tap the small camera icon to change it —
+  same split already used (implicitly) on the two big header avatars.
+- `student_profile.dart`: same pattern, but this screen only ever reads
+  `ProfileService.instance.studentImage` (a local `File?`, no
+  `photoUrl`/network fallback here — a separate pre-existing gap, out of
+  scope for this task) so the avatar's `GestureDetector.onTap` is `null`
+  (i.e. inert) until a photo exists, then opens the viewer with a
+  `FileImage`, using `AppTheme.studentAmber` as the accent color to match
+  this screen's branding.
+
+Not touched: `_ChildCard`'s camera badge and the two header avatars' camera
+badges already looked and behaved like "tap to change photo" affordances,
+so no visual change was needed there beyond giving the badge its own hit
+area.
+
+`flutter analyze`: `parent_profile.dart`, `student_profile.dart`, and the
+new `zoomable_image_viewer.dart` all clean; full project unchanged at the 4
+pre-existing info-level issues.
+
 ### 2026-09-27 — parent profile header badge: dropped the child count, text now matches the Subscription menu subtitle
 
 **Context:** the header badge next to "Edit Info" read `"{status} · N

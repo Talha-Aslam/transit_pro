@@ -20,6 +20,23 @@ import '../../widgets/child_avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/profile_form_fields.dart' show FieldLabel, MapPointField;
+import '../../widgets/zoomable_image_viewer.dart';
+
+/// Opens the full-screen pinch-to-zoom viewer for an avatar -- shared by the
+/// parent's own avatar in [_ParentProfileState] and each `_ChildCard` below,
+/// which is why this lives at file scope rather than on either State. Prefers
+/// a freshly-picked local [file] (matches what the avatar itself is
+/// currently rendering while an upload is in flight), else the persisted
+/// [photoUrl]; does nothing if there's no photo yet to inspect.
+void _viewAvatarPhoto(BuildContext context, File? file, String? photoUrl) {
+  final ImageProvider? image = file != null
+      ? FileImage(file)
+      : (photoUrl != null && photoUrl.isNotEmpty)
+      ? NetworkImage(CloudinaryService.thumbnail(photoUrl, width: 800))
+      : null;
+  if (image == null) return;
+  showZoomableImageDialog(context, image);
+}
 
 class ParentProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -359,48 +376,57 @@ class _ParentProfileState extends State<ParentProfile> {
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Container(
-                              width: 84,
-                              height: 84,
-                              decoration: BoxDecoration(
-                                color: const Color.fromARGB(
-                                  255,
-                                  223,
-                                  156,
-                                  55,
-                                ).withValues(alpha: 0.8),
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: AppTheme.parentPurple.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                  width: 3,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.parentPurple.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
+                            GestureDetector(
+                              onTap: () => _viewAvatarPhoto(
+                                context,
+                                ProfileService.instance.parentImage.value,
+                                SessionService.instance.user.value?.photoUrl,
                               ),
-                              child: ValueListenableBuilder<File?>(
-                                valueListenable:
-                                    ProfileService.instance.parentImage,
-                                builder: (_, file, _) =>
-                                    ValueListenableBuilder<AppUser?>(
-                                      valueListenable:
-                                          SessionService.instance.user,
-                                      builder: (_, user, _) => ChildAvatarImage(
-                                        localFile: file,
-                                        photoUrl: user?.photoUrl,
-                                        size: 84,
-                                        borderRadius: BorderRadius.circular(23),
-                                        uploading: _uploadingParentPhoto,
-                                      ),
+                              child: Container(
+                                width: 84,
+                                height: 84,
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(
+                                    255,
+                                    223,
+                                    156,
+                                    55,
+                                  ).withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(26),
+                                  border: Border.all(
+                                    color: AppTheme.parentPurple.withValues(
+                                      alpha: 0.5,
                                     ),
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.parentPurple.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: ValueListenableBuilder<File?>(
+                                  valueListenable:
+                                      ProfileService.instance.parentImage,
+                                  builder: (_, file, _) =>
+                                      ValueListenableBuilder<AppUser?>(
+                                        valueListenable:
+                                            SessionService.instance.user,
+                                        builder: (_, user, _) =>
+                                            ChildAvatarImage(
+                                              localFile: file,
+                                              photoUrl: user?.photoUrl,
+                                              size: 84,
+                                              borderRadius:
+                                                  BorderRadius.circular(23),
+                                              uploading: _uploadingParentPhoto,
+                                            ),
+                                      ),
+                                ),
                               ),
                             ),
                             Positioned(
@@ -1136,9 +1162,11 @@ class _ChildCardState extends State<_ChildCard> {
                   // ── Child avatar with camera overlay ──────────────────
                   GestureDetector(
                     onTap: () {
-                      final uploading = _svc.uploadingChildIndices.value
-                          .contains(widget.index);
-                      if (!uploading) _pickChildImage();
+                      final imgs = _svc.childImages.value;
+                      final file = widget.index < imgs.length
+                          ? imgs[widget.index]
+                          : null;
+                      _viewAvatarPhoto(context, file, c.photoUrl);
                     },
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -1184,18 +1212,25 @@ class _ChildCardState extends State<_ChildCard> {
                         Positioned(
                           bottom: -3,
                           right: -3,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.parentGradient,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.camera_alt,
-                                size: 10,
-                                color: Colors.white,
+                          child: GestureDetector(
+                            onTap: () {
+                              final uploading = _svc.uploadingChildIndices.value
+                                  .contains(widget.index);
+                              if (!uploading) _pickChildImage();
+                            },
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.parentGradient,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.camera_alt,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),

@@ -13,6 +13,7 @@ import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
+import '../../widgets/zoomable_image_viewer.dart';
 import 'student_driver_details_screen.dart';
 
 class StudentProfile extends StatefulWidget {
@@ -143,41 +144,52 @@ class _StudentProfileState extends State<StudentProfile> {
                         Stack(
                           alignment: Alignment.center,
                           children: [
-                            Container(
-                              width: 110,
-                              height: 110,
-                              decoration: BoxDecoration(
-                                gradient: AppTheme.studentGradient,
-                                borderRadius: BorderRadius.circular(26),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.studentAmber.withValues(
-                                      alpha: 0.25,
-                                    ),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: ValueListenableBuilder<File?>(
-                                valueListenable:
-                                    ProfileService.instance.studentImage,
-                                builder: (_, file, _) => file != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(26),
-                                        child: Image.file(
-                                          file,
-                                          width: 110,
-                                          height: 110,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      )
-                                    : const Center(
-                                        child: Text(
-                                          '👩',
-                                          style: TextStyle(fontSize: 40),
-                                        ),
+                            ValueListenableBuilder<File?>(
+                              valueListenable:
+                                  ProfileService.instance.studentImage,
+                              builder: (_, file, _) => GestureDetector(
+                                onTap: file == null
+                                    ? null
+                                    : () => showZoomableImageDialog(
+                                        context,
+                                        FileImage(file),
+                                        accentColor: AppTheme.studentAmber,
                                       ),
+                                child: Container(
+                                  width: 110,
+                                  height: 110,
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.studentGradient,
+                                    borderRadius: BorderRadius.circular(26),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.studentAmber.withValues(
+                                          alpha: 0.25,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: file != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            26,
+                                          ),
+                                          child: Image.file(
+                                            file,
+                                            width: 110,
+                                            height: 110,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : const Center(
+                                          child: Text(
+                                            '👩',
+                                            style: TextStyle(fontSize: 40),
+                                          ),
+                                        ),
+                                ),
                               ),
                             ),
                             Positioned(
