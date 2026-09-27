@@ -721,6 +721,80 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — parent profile header badge: dropped the child count, text now matches the Subscription menu subtitle
+
+**Context:** the header badge next to "Edit Info" read `"{status} · N
+child(ren)"` (e.g. `"Trial · 1 child"`) — a holdover from before this badge
+was even wired to real subscription state. Task: simplify it to exactly
+`"Active Subscription"` and drop the child count entirely.
+
+**Fix:** rather than hand-writing a second, slightly different string
+(which would drift from the "Subscription" menu subtitle below it), the
+badge's `Text` now calls the same `_subscriptionMenuSubtitle(AppUser?)`
+helper the menu item already uses. Result: `"Active Subscription"` once a
+real subscription is active — the exact string requested — and
+`"Free Trial · Trial"` / `"Free Trial · Expired"` otherwise, with no child
+count anywhere in the string. No new state to clean up: `_subscriptionStatusWord`
+stays in use (it's what `_subscriptionMenuSubtitle` calls internally), and
+the `children` `ValueListenableBuilder` is still needed for the rest of the
+screen (child list, "Add Child" section header), so nothing was removable
+there.
+
+**Layout:** the badge's `Row` (`mainAxisSize: MainAxisSize.min`) inside a
+`Material`/`InkWell`/`Container` isn't wrapped in an `Expanded`/`Flexible` —
+it already sizes to its content and centers via the parent `Row`'s
+`mainAxisAlignment: MainAxisAlignment.center`, so the shorter, count-free
+text needed no layout changes.
+
+`flutter analyze`: `lib/screens/parent/parent_profile.dart` clean; full
+project unchanged at the 4 pre-existing info-level issues.
+
+### 2026-09-27 — parent profile's "Premium" badge and Subscription subtitle now read real account status
+
+**Confirmed the premise:** both spots (the header badge next to "Edit
+Info", and the "Subscription" menu item's subtitle) read
+`SubscriptionProvider.instance.planDisplayName` — a purely local
+`ChangeNotifier` whose `_plan` field defaults to `'premium'` and is never
+changed by anything reachable from the UI since the tiered plan picker
+was removed (`subscription_screen.dart` moved to `SessionService.instance
+.user`/`AppUser.subscriptionStatus` when trial/single-plan support was
+added). So both spots really were stuck showing "Premium" forever,
+independent of the account's actual state.
+
+- `transit_core/lib/src/models/user.dart` — added `AppUser
+  .isSubscriptionActive` (`subscriptionStatus == 'active'`) and
+  `AppUser.isTrialExpired` (still on trial, past `trialEndDate`), so the
+  same two checks `subscription_screen.dart` already does inline become
+  reusable instead of copied a third time.
+- `lib/screens/parent/parent_profile.dart`:
+  - New `_subscriptionStatusWord(user)` ("Active"/"Trial"/"Expired") and
+    `_subscriptionMenuSubtitle(user)` ("Active Subscription", or "Free
+    Trial · Active"/"Free Trial · Expired"), both reading
+    `SessionService.instance.user.value` — the same Firestore-backed
+    record the main Subscription screen treats as truth.
+  - Header badge: `'${_subscriptionStatusWord(...)} · N children'`
+    (was `'${SubscriptionProvider...planDisplayName} · N children'`).
+  - "Subscription" menu item's `desc`: now
+    `_subscriptionMenuSubtitle(...)` (was the hardcoded `'... Plan ·
+    Active'` string).
+  - Removed the now-pointless `SubscriptionProvider` listener
+    (`_onSubscriptionChanged`) this screen held — neither text spot reads
+    that notifier anymore, so listening to it no longer does anything;
+    left in place it would have been dead weight, not a real integration.
+    This screen already listens to `SessionService.instance.user` for the
+    emergency-contacts subtitle, which is what actually keeps these two
+    updated live now.
+- `lib/app/language_provider.dart` — new `expired_badge` key (English +
+  Urdu), for a trial that's run out without a purchase yet.
+
+**Not touched:** `student_profile.dart`'s own `_SubscriptionChip` still
+reads the same vestigial `SubscriptionProvider.planDisplayName` — same bug,
+different screen, out of scope for this request (which quoted parent
+profile's exact text), left for a follow-up if wanted.
+
+`flutter analyze`: `transit_core` clean, `transit_pro` unchanged at the
+4-issue baseline.
+
 ### 2026-09-27 — subscription-tier badge on parent + student profile now taps through to Subscription
 
 **Confirmed the premise:** both `parent_profile.dart` (the "⭐ Premium Plan

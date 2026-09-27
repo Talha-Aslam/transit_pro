@@ -10,7 +10,6 @@ import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/session_service.dart';
-import '../../app/subscription_provider.dart';
 import '../../data/institute_repository.dart';
 import '../../data/user_repository.dart';
 import '../../services/cloudinary_service.dart';
@@ -45,7 +44,6 @@ class _ParentProfileState extends State<ParentProfile> {
   /// already use for the same purpose.
   bool _uploadingParentPhoto = false;
 
-  void _onSubscriptionChanged() => setState(() {});
   void _onNotificationPrefsChanged() => setState(() {});
   // `AppUser.emergencyContacts` lives on the account's own `users/{uid}`
   // document, synced through `SessionService.user` -- the same notifier
@@ -58,7 +56,6 @@ class _ParentProfileState extends State<ParentProfile> {
   @override
   void initState() {
     super.initState();
-    SubscriptionProvider.instance.addListener(_onSubscriptionChanged);
     LanguageProvider.instance.addListener(_onLangChanged);
     SessionService.instance.user.addListener(_onEmergencyContactsChanged);
     _svc.notificationPrefs.addListener(_onNotificationPrefsChanged);
@@ -67,7 +64,6 @@ class _ParentProfileState extends State<ParentProfile> {
 
   @override
   void dispose() {
-    SubscriptionProvider.instance.removeListener(_onSubscriptionChanged);
     LanguageProvider.instance.removeListener(_onLangChanged);
     SessionService.instance.user.removeListener(_onEmergencyContactsChanged);
     _svc.notificationPrefs.removeListener(_onNotificationPrefsChanged);
@@ -85,6 +81,34 @@ class _ParentProfileState extends State<ParentProfile> {
     if (count == 0) return AppStrings.t('no_contacts_added');
     if (LanguageProvider.instance.isUrdu) return '$count رابطے شامل ہیں';
     return count == 1 ? '1 contact added' : '$count contacts added';
+  }
+
+  /// One word describing [user]'s real subscription state -- reused by the
+  /// header badge and the Settings menu subtitle below, both of which used
+  /// to hardcode "Premium" via the now-vestigial `SubscriptionProvider`
+  /// (a purely local `_plan` field nothing ever changes since the tiered
+  /// plan picker was removed). Reads `SessionService.instance.user` instead
+  /// -- the same Firestore-backed record `subscription_screen.dart` already
+  /// treats as the source of truth -- so both spots update the moment that
+  /// document changes (a purchase, or a trial quietly expiring), with no
+  /// extra listener beyond the one this screen already has on it.
+  String _subscriptionStatusWord(AppUser? user) {
+    if (user == null || !user.isSubscriptionActive) {
+      return (user?.isTrialExpired ?? false)
+          ? AppStrings.t('expired_badge')
+          : AppStrings.t('trial_badge');
+    }
+    return AppStrings.t('active');
+  }
+
+  /// Full sentence for the Settings menu's "Subscription" subtitle -- e.g.
+  /// "Active Subscription" or "Free Trial · Active" -- built from the same
+  /// state [_subscriptionStatusWord] summarises for the header badge.
+  String _subscriptionMenuSubtitle(AppUser? user) {
+    if (user != null && user.isSubscriptionActive) {
+      return AppStrings.t('active_subscription_status');
+    }
+    return '${AppStrings.t('free_trial_status')} · ${_subscriptionStatusWord(user)}';
   }
 
   /// Picks a photo (camera or gallery), shows it instantly via
@@ -472,7 +496,9 @@ class _ParentProfileState extends State<ParentProfile> {
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
-                                        '${SubscriptionProvider.instance.planDisplayName} · ${children.length} ${children.length == 1 ? 'child' : 'children'}',
+                                        _subscriptionMenuSubtitle(
+                                          SessionService.instance.user.value,
+                                        ),
                                         style: const TextStyle(
                                           color: AppTheme.parentAccent,
                                           fontSize: 12,
@@ -736,8 +762,9 @@ class _ParentProfileState extends State<ParentProfile> {
                               _MenuItem(
                                 icon: '💳',
                                 label: AppStrings.t('subscription'),
-                                desc:
-                                    '${SubscriptionProvider.instance.planDisplayName} Plan · Active',
+                                desc: _subscriptionMenuSubtitle(
+                                  SessionService.instance.user.value,
+                                ),
                                 onTap: () =>
                                     context.push('/parent/subscription'),
                               ),

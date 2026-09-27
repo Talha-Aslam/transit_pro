@@ -327,6 +327,7 @@ class AppStrings {
     'trial_ends_label': 'Ends',
     'renews_label': 'Renews',
     'trial_badge': 'Trial',
+    'expired_badge': 'Expired',
     'trial_expired_title': 'Trial expired',
     'trial_expired_message':
         'Your free trial has expired. Please buy a subscription to continue using Transit Pro.',
@@ -1070,6 +1071,7 @@ class AppStrings {
     'trial_ends_label': 'ختم ہو گا',
     'renews_label': 'تجدید',
     'trial_badge': 'ٹرائل',
+    'expired_badge': 'ختم شدہ',
     'trial_expired_title': 'ٹرائل ختم ہو گیا',
     'trial_expired_message':
         'آپ کا فری ٹرائل ختم ہو چکا ہے۔ ٹرانزٹ پرو استعمال جاری رکھنے کے لیے براہ کرم سبسکرپشن خریدیں۔',
