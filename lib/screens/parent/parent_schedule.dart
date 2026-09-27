@@ -118,19 +118,6 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Saturday',
   ];
 
-  /// Lowercase full day names, matching the keys
-  /// `EditWeeklyScheduleScreen` saves `Student.requestedSchedule` under —
-  /// same Mon..Sat order as [_weekDays]/[_fullWeekDays] so index `i` always
-  /// refers to the same calendar day across all three lists.
-  static const _kWeekdayKeys = [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-  ];
-
   /// Full Mon–Sat dates of the *current* week -- the single source of truth
   /// [_dates] (day-of-month for the header row) and the day-selector's
   /// absence dots both read from, so the two can never disagree about which
@@ -245,7 +232,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
           : weekday < todayWeekday
           ? 'done'
           : 'upcoming';
-      final override = requestedSchedule?[_kWeekdayKeys[i]];
+      final override = requestedSchedule?[kWeekdayKeys[i]];
       return _DaySchedule(
         day: _weekDays[i],
         pickup: override?['morningPickup'] ?? defaultPickup,

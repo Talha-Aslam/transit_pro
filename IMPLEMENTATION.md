@@ -721,6 +721,82 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — parent's own profile photo now actually persists
+
+**Confirmed the premise:** `ParentProfile._pickImage()` only ever wrote the
+picked file into `ProfileService.instance.parentImage`, a plain in-memory
+`ValueNotifier<File?>` with no Firestore/Cloudinary write at all — so yes,
+it really did vanish on every restart, unlike the child photo flow
+(`ParentDataService.updateChildImage`), which already uploads and
+persists correctly.
+
+**Cloudinary, not Firebase Storage:** this app doesn't use
+`firebase_storage` anywhere — image uploads go through `CloudinaryService`
+(already used for child/driver photos). Implemented the fix on that
+existing path instead of introducing a second upload backend.
+
+- `lib/screens/parent/parent_profile.dart`:
+  - `_pickImage()` now uploads the picked file via `CloudinaryService
+    .instance.uploadProfilePhoto(file, uid)` and saves the returned
+    `secureUrl` to `users/{uid}.photoUrl` via `UserRepository.instance
+    .updateUser` — the same two-step flow `ParentDataService
+    .updateChildImage` already uses for child photos. Guarded by
+    `CloudinaryService.isConfigured` and `SessionService.uid != null`,
+    matching that method's own guards.
+  - New `_uploadingParentPhoto` bool driving a spinner overlay during the
+    upload.
+  - The avatar now renders via `ChildAvatarImage` (already a shared
+    widget, previously used only for child avatars) instead of a bare
+    `Image.file`/`Image.asset` switch — it already implements exactly this
+    precedence (local file while picked/uploading, else the persisted
+    `photoUrl` via `CloudinaryService.thumbnail`, else a placeholder) and
+    already takes an `uploading` flag for the spinner, so no new avatar
+    widget was needed.
+- No `firestore.rules` change: the existing `users/{uid}` update rule
+  already lets the owning user write any field except `role` and the
+  one-way `isActive` lock, `photoUrl` included.
+
+`flutter analyze`: unchanged at the 4-issue baseline.
+
+### 2026-09-27 — parent Home "Today's Schedule" card now syncs with `EditWeeklyScheduleScreen`
+
+**Request:** the "School Time"/"Off Time" chips on the Home screen were
+static and didn't reflect the per-day times a parent saves on
+`EditWeeklyScheduleScreen`; make them read live from Firestore, picking the
+right field for today's weekday, with a Sunday fallback.
+
+**What I found first:** the times weren't literally hardcoded strings —
+they already came from the assigned driver's real `DriverTimingSlots`
+(same source `parent_schedule.dart` uses), just not from `Student
+.requestedSchedule` (the per-weekday override `EditWeeklyScheduleScreen`
+writes), and identical every day regardless of weekday. So the real gap
+was exactly what this task describes, just via the actual schema
+(`requestedSchedule['monday']['morningPickup']`, not a flat
+`wednesday_morning_pickup`-style field).
+
+- `lib/app/driver_data_service.dart` — new public `kWeekdayKeys` (`monday`
+  .. `saturday`), promoted out of `parent_schedule.dart`'s private
+  `_kWeekdayKeys` (now deleted there in favor of this shared one) so both
+  screens index `requestedSchedule` the same way.
+- `lib/screens/parent/parent_dashboard.dart`:
+  - New `_todayWeekday()` (`DateTime.now().weekday`, 1=Mon..7=Sun).
+  - The "Today's Schedule" card's `Builder` became a
+    `StreamBuilder<Student?>` on `UserRepository.instance.watchStudent
+    (child.id)` — the same document `EditWeeklyScheduleScreen` writes to,
+    so a save there now shows up here live.
+  - Per-day field mapping: `requestedSchedule[kWeekdayKeys[weekday - 1]]`
+    when present overrides the driver's shared time for that one field
+    (`morningPickup`/`eveningDropoff`), otherwise falls back to
+    `DriverTimingSlots` exactly as before.
+  - Sunday (`weekday == 7`): `kWeekdayKeys` has no 7th entry and transit
+    doesn't run, so this branches to a dedicated `no_transit_today` message
+    instead of indexing out of range or showing a stale Saturday time.
+- `lib/app/language_provider.dart` — new `no_transit_today` key (English +
+  Urdu).
+
+`flutter analyze`: `transit_pro` unchanged at the 4-issue baseline;
+`transit_core` untouched by this entry.
+
 ### 2026-09-27 — parent Home "Today's Schedule" card: dropped "At School", renamed the other two
 
 **Same request as the previous entry, this time for the other dashboard.**

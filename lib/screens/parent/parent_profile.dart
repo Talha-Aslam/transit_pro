@@ -13,6 +13,7 @@ import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
 import '../../data/institute_repository.dart';
 import '../../data/user_repository.dart';
+import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
@@ -37,6 +38,12 @@ class ParentProfile extends StatefulWidget {
 
 class _ParentProfileState extends State<ParentProfile> {
   final _svc = ParentDataService.instance;
+
+  /// True while the parent's own freshly-picked photo is mid-upload to
+  /// Cloudinary -- drives `ChildAvatarImage`'s spinner overlay on the avatar
+  /// at the top of this screen, the same widget the child cards below
+  /// already use for the same purpose.
+  bool _uploadingParentPhoto = false;
 
   void _onSubscriptionChanged() => setState(() {});
   void _onNotificationPrefsChanged() => setState(() {});
@@ -80,6 +87,12 @@ class _ParentProfileState extends State<ParentProfile> {
     return count == 1 ? '1 contact added' : '$count contacts added';
   }
 
+  /// Picks a photo (camera or gallery), shows it instantly via
+  /// `ProfileService.parentImage` (a local file, gone on restart), then
+  /// uploads it to Cloudinary and saves the returned URL onto this
+  /// account's own `users/{uid}` document -- the part that used to be
+  /// missing entirely, which is why a picked photo never survived an app
+  /// restart. Mirrors `ParentDataService.updateChildImage`'s upload flow.
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
       context,
@@ -90,8 +103,30 @@ class _ParentProfileState extends State<ParentProfile> {
       source: source,
       imageQuality: 85,
     );
-    if (picked != null) {
-      ProfileService.instance.parentImage.value = File(picked.path);
+    if (picked == null) return;
+
+    final file = File(picked.path);
+    ProfileService.instance.parentImage.value = file;
+
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+
+    if (!CloudinaryService.instance.isConfigured) {
+      debugPrint('Cloudinary not configured — parent photo kept locally only.');
+      return;
+    }
+
+    setState(() => _uploadingParentPhoto = true);
+    try {
+      final result = await CloudinaryService.instance.uploadProfilePhoto(
+        file,
+        uid,
+      );
+      await UserRepository.instance.updateUser(uid, {
+        'photoUrl': result.secureUrl,
+      });
+    } finally {
+      if (mounted) setState(() => _uploadingParentPhoto = false);
     }
   }
 
@@ -330,23 +365,18 @@ class _ParentProfileState extends State<ParentProfile> {
                               child: ValueListenableBuilder<File?>(
                                 valueListenable:
                                     ProfileService.instance.parentImage,
-                                builder: (_, file, _) => ClipRRect(
-                                  borderRadius: BorderRadius.circular(23),
-                                  child: file != null
-                                      ? Image.file(
-                                          file,
-                                          width: 84,
-                                          height: 84,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Image.asset(
-                                          'assets/images/profile/boy_transparent.gif',
-                                          width: 84,
-                                          height: 84,
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.high,
-                                        ),
-                                ),
+                                builder: (_, file, _) =>
+                                    ValueListenableBuilder<AppUser?>(
+                                      valueListenable:
+                                          SessionService.instance.user,
+                                      builder: (_, user, _) => ChildAvatarImage(
+                                        localFile: file,
+                                        photoUrl: user?.photoUrl,
+                                        size: 84,
+                                        borderRadius: BorderRadius.circular(23),
+                                        uploading: _uploadingParentPhoto,
+                                      ),
+                                    ),
                               ),
                             ),
                             Positioned(

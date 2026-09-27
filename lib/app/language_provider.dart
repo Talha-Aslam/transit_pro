@@ -60,6 +60,7 @@ class AppStrings {
     // Schedule" card's two remaining chips.
     'school_time_label': 'School Time',
     'off_time_label': 'Off Time',
+    'no_transit_today': 'No transit today — enjoy your day off!',
     'done': 'Done',
     'pending': 'Pending',
     'total_trips': 'Total Trips',
@@ -802,6 +803,7 @@ class AppStrings {
     'drop_off': 'ڈراپ آف',
     'school_time_label': 'اسکول کا وقت',
     'off_time_label': 'واپسی کا وقت',
+    'no_transit_today': 'آج ٹرانزٹ نہیں ہے — اپنی چھٹی کا لطف اٹھائیں!',
     'done': 'مکمل',
     'pending': 'زیر التواء',
     'total_trips': 'کل سفر',

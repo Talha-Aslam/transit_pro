@@ -10,6 +10,7 @@ import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
 import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
+import '../../data/user_repository.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/child_avatar_image.dart';
@@ -83,6 +84,11 @@ class _ParentDashboardState extends State<ParentDashboard> {
     if (driver == null) return null;
     return DriverTimingSlots.fromMap(driver.timingSlots);
   }
+
+  /// `DateTime.now().weekday`: 1=Monday .. 7=Sunday. Transit doesn't run
+  /// Sunday, so callers must handle `== 7` themselves rather than index
+  /// [kWeekdayKeys] (Mon–Sat only) with it directly.
+  int _todayWeekday() => DateTime.now().weekday;
 
   @override
   Widget build(BuildContext context) {
@@ -681,8 +687,18 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         const SizedBox(height: 30),
 
                         // ── Today's schedule ──────────────────────────────────────────
-                        Builder(
-                          builder: (context) {
+                        // Syncs with whatever the family last saved on
+                        // `EditWeeklyScheduleScreen` -- that screen writes
+                        // straight to `students/{id}.requestedSchedule`, so
+                        // listening to the same document here (like
+                        // `parent_schedule.dart` already does) is what makes
+                        // a save there show up on the Home screen too, with
+                        // no extra plumbing in between.
+                        StreamBuilder<Student?>(
+                          stream: (child == null || child.id.isEmpty)
+                              ? Stream<Student?>.value(null)
+                              : UserRepository.instance.watchStudent(child.id),
+                          builder: (context, snap) {
                             // Real pickup/drop-off times, sourced from the
                             // assigned driver's own `timingSlots` once
                             // SessionService has resolved that driver (see
@@ -696,6 +712,32 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             // attendance record, which is part of the same
                             // trip-data gap noted above the stats grid.
                             final slots = _timingSlotsFor(child);
+                            final weekday = _todayWeekday(); // 1=Mon..7=Sun
+                            final requestedSchedule =
+                                snap.data?.requestedSchedule;
+                            // Transit doesn't run Sunday -- there's no
+                            // `kWeekdayKeys` entry for it and no driver leg
+                            // to show, so this is a distinct empty state
+                            // rather than falling through to a stale
+                            // Saturday time or a null-index crash.
+                            final isSunday = weekday == 7;
+                            final override = isSunday
+                                ? null
+                                : requestedSchedule?[kWeekdayKeys[weekday - 1]];
+                            final pickupTime =
+                                override?['morningPickup'] ??
+                                (slots == null
+                                    ? '—'
+                                    : formatTimeOfDay(
+                                        slots.morningPickupFromHome,
+                                      ));
+                            final dropoffTime =
+                                override?['eveningDropoff'] ??
+                                (slots == null
+                                    ? '—'
+                                    : formatTimeOfDay(
+                                        slots.afternoonDropoffAtHome,
+                                      ));
                             return GlassCard(
                               enableBlur: false,
                               padding: const EdgeInsets.all(18),
@@ -743,47 +785,53 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     ],
                                   ),
                                   const SizedBox(height: 14),
-                                  // `_ScheduleChip` already wraps itself in
-                                  // `Expanded`, so the two remaining chips
-                                  // fill the Row's width equally on their
-                                  // own -- an explicit `mainAxisAlignment`
-                                  // would be a no-op here since there are no
-                                  // non-flexible children left to space out.
-                                  Row(
-                                    children: [
-                                      _ScheduleChip(
-                                        icon:
-                                            'assets/images/schedule/waiting_for_bus_transparent.png',
-                                        label: AppStrings.t(
-                                          'school_time_label',
+                                  if (isSunday)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 6,
+                                      ),
+                                      child: Text(
+                                        AppStrings.t('no_transit_today'),
+                                        style: TextStyle(
+                                          color: context.textTertiary,
+                                          fontSize: 13,
                                         ),
-                                        time: slots == null
-                                            ? '—'
-                                            : formatTimeOfDay(
-                                                slots.morningPickupFromHome,
-                                              ),
-                                        status: slots == null
-                                            ? null
-                                            : AppStrings.t('done'),
-                                        color: AppTheme.success,
                                       ),
-                                      const SizedBox(width: 8),
-                                      _ScheduleChip(
-                                        icon:
-                                            'assets/images/schedule/drop_off_transparent.png',
-                                        label: AppStrings.t('off_time_label'),
-                                        time: slots == null
-                                            ? '—'
-                                            : formatTimeOfDay(
-                                                slots.afternoonDropoffAtHome,
-                                              ),
-                                        status: slots == null
-                                            ? null
-                                            : AppStrings.t('pending'),
-                                        color: AppTheme.warning,
-                                      ),
-                                    ],
-                                  ),
+                                    )
+                                  else
+                                    // `_ScheduleChip` already wraps itself in
+                                    // `Expanded`, so the two remaining chips
+                                    // fill the Row's width equally on their
+                                    // own -- an explicit `mainAxisAlignment`
+                                    // would be a no-op here since there are no
+                                    // non-flexible children left to space out.
+                                    Row(
+                                      children: [
+                                        _ScheduleChip(
+                                          icon:
+                                              'assets/images/schedule/waiting_for_bus_transparent.png',
+                                          label: AppStrings.t(
+                                            'school_time_label',
+                                          ),
+                                          time: pickupTime,
+                                          status: slots == null
+                                              ? null
+                                              : AppStrings.t('done'),
+                                          color: AppTheme.success,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _ScheduleChip(
+                                          icon:
+                                              'assets/images/schedule/drop_off_transparent.png',
+                                          label: AppStrings.t('off_time_label'),
+                                          time: dropoffTime,
+                                          status: slots == null
+                                              ? null
+                                              : AppStrings.t('pending'),
+                                          color: AppTheme.warning,
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             );

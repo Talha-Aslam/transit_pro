@@ -139,6 +139,22 @@ class DriverTimingSlots {
   }
 }
 
+/// Lowercase full day names, Monday first -- the keys
+/// `EditWeeklyScheduleScreen` saves `Student.requestedSchedule` under, and
+/// `DateTime.weekday - 1` (1=Mon..6=Sat) indexes straight into this for
+/// "today's" key. Deliberately Mon–Sat only, not all 7: transit doesn't run
+/// Sunday, so there is no `requestedSchedule` entry for it -- callers must
+/// branch on `DateTime.now().weekday == 7` themselves rather than index
+/// this with it.
+const kWeekdayKeys = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
 String formatTimeOfDay(TimeOfDay time) {
   final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
   final minute = time.minute.toString().padLeft(2, '0');
