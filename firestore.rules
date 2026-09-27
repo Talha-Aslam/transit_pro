@@ -504,6 +504,26 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ── institutes ──────────────────────────────────────────────────────────
+    //
+    // A crowdsourced directory grown by `InstituteRepository
+    // .ensureInstituteExists` — every real institute name a parent saves on
+    // Edit Info becomes a document here, for future autocomplete
+    // suggestions. Read is open to any signed-in user (that's the whole
+    // point — everyone benefits from what everyone else has already typed);
+    // create requires a real name/type so the directory can't fill up with
+    // blank entries. No client update/delete: an existing entry is shared,
+    // immutable history, not any one contributor's to rename or remove.
+    match /institutes/{instituteId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.type is string
+                    && request.resource.data.type.size() > 0;
+      allow update, delete: if isAdmin();
+    }
+
     // ── audit log ───────────────────────────────────────────────────────────
     //
     // Append-only. Nobody may edit or erase history from a client.

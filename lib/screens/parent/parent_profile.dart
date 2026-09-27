@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
+import '../../data/institute_repository.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
@@ -679,6 +681,12 @@ class _ParentProfileState extends State<ParentProfile> {
                                 label: AppStrings.t('trip_history'),
                                 //desc: AppStrings.t('trip_history_desc'),
                                 onTap: () => context.push('/parent/trips'),
+                              ),
+                              _MenuItem(
+                                materialIcon: Icons.access_time_rounded,
+                                label: AppStrings.t('pickup_dropoff_times'),
+                                onTap: () =>
+                                    context.push('/parent/weekly-schedule'),
                               ),
                               _MenuItem(
                                 icon: '💳',
@@ -2067,6 +2075,23 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
         scheduleId: _scheduleId,
       ),
     );
+
+    // Best-effort and fire-and-forget: growing the crowdsourced institute
+    // directory is a nice-to-have for future autocomplete suggestions, not
+    // something worth blocking this save (or this sheet closing) on. Reads
+    // whatever text is actually left in the controller at the moment Save
+    // was pressed, not `_instituteType`/`instituteName` from earlier in
+    // this method, so a last-second edit is never missed.
+    final type = _instituteType;
+    if (type != null) {
+      unawaited(
+        InstituteRepository.instance.ensureInstituteExists(
+          type: type,
+          rawName: _instituteNameCtrl.text,
+        ),
+      );
+    }
+
     Navigator.pop(context);
   }
 

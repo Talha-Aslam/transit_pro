@@ -7,6 +7,7 @@ import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -106,26 +107,43 @@ class _ParentScheduleState extends State<ParentSchedule> {
     super.dispose();
   }
 
-  static const _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  static const _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   static const _fullWeekDays = [
     'Monday',
     'Tuesday',
     'Wednesday',
     'Thursday',
     'Friday',
+    'Saturday',
   ];
 
-  /// Full Mon–Fri dates of the *current* week -- the single source of truth
+  /// Lowercase full day names, matching the keys
+  /// `EditWeeklyScheduleScreen` saves `Student.requestedSchedule` under —
+  /// same Mon..Sat order as [_weekDays]/[_fullWeekDays] so index `i` always
+  /// refers to the same calendar day across all three lists.
+  static const _kWeekdayKeys = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+  ];
+
+  /// Full Mon–Sat dates of the *current* week -- the single source of truth
   /// [_dates] (day-of-month for the header row) and the day-selector's
   /// absence dots both read from, so the two can never disagree about which
   /// calendar day column `i` represents.
   List<DateTime> get _weekDates {
     final now = DateTime.now();
     final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
-    return List.generate(5, (i) => monday.add(Duration(days: i)));
+    return List.generate(
+      _weekDays.length,
+      (i) => monday.add(Duration(days: i)),
+    );
   }
 
-  /// Day-of-month for Mon–Fri of the *current* week, so the day selector
+  /// Day-of-month for Mon–Sat of the *current* week, so the day selector
   /// stays in step with the header's date range below instead of always
   /// showing a fixed "Feb 23–27".
   List<int> get _dates => _weekDates.map((d) => d.day).toList();
@@ -157,26 +175,34 @@ class _ParentScheduleState extends State<ParentSchedule> {
     return DriverTimingSlots.fromMap(driver.timingSlots);
   }
 
-  /// Builds the Mon–Fri schedule from the assigned driver's real data.
+  /// Builds the Mon–Sat schedule from the assigned driver's real data,
+  /// overridden per day by whatever the family saved for that weekday in
+  /// `Student.requestedSchedule` (`EditWeeklyScheduleScreen`).
   ///
   /// `DriverTimingSlots` only stores one set of times, not one per weekday,
-  /// so every day shares the same real pickup/drop-off time — what differs
-  /// per day is the 'done'/'today'/'upcoming' status (derived from the real
-  /// current date instead of a hardcoded 'Wednesday') and whether the driver
-  /// actually runs that weekday at all, per `DriverSchedule.runsOn` (empty
-  /// `weekdays` on every schedule means "every day").
-  List<_DaySchedule> _buildSchedule(Driver? driver, DriverTimingSlots? slots) {
+  /// so every day shares the same real pickup/drop-off time by default —
+  /// what differs per day is the 'done'/'today'/'upcoming' status (derived
+  /// from the real current date instead of a hardcoded 'Wednesday'), whether
+  /// the driver actually runs that weekday at all, per `DriverSchedule
+  /// .runsOn` (empty `weekdays` on every schedule means "every day"), and now
+  /// also the family's own requested time for that specific day, when they've
+  /// set one.
+  List<_DaySchedule> _buildSchedule(
+    Driver? driver,
+    DriverTimingSlots? slots,
+    Map<String, Map<String, String>>? requestedSchedule,
+  ) {
     final todayWeekday = DateTime.now().weekday; // 1=Mon..7=Sun
-    final pickup = slots == null
+    final defaultPickup = slots == null
         ? '—'
         : formatTimeOfDay(slots.morningPickupFromHome);
-    final dropoff = slots == null
+    final defaultDropoff = slots == null
         ? '—'
         : formatTimeOfDay(slots.afternoonDropoffAtHome);
     final schedules = driver?.schedules ?? const [];
 
-    return List.generate(5, (i) {
-      final weekday = i + 1; // Mon=1..Fri=5
+    return List.generate(_weekDays.length, (i) {
+      final weekday = i + 1; // Mon=1..Sat=6
       final runsThisDay =
           schedules.isEmpty || schedules.any((s) => s.runsOn(weekday));
       final status = weekday == todayWeekday
@@ -184,10 +210,11 @@ class _ParentScheduleState extends State<ParentSchedule> {
           : weekday < todayWeekday
           ? 'done'
           : 'upcoming';
+      final override = requestedSchedule?[_kWeekdayKeys[i]];
       return _DaySchedule(
         day: _weekDays[i],
-        pickup: pickup,
-        dropoff: dropoff,
+        pickup: override?['morningPickup'] ?? defaultPickup,
+        dropoff: override?['eveningDropoff'] ?? defaultDropoff,
         status: status,
         note: (driver != null && !runsThisDay) ? 'No pickup this day' : '',
       );
@@ -223,17 +250,17 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Dec',
   ];
 
-  /// e.g. "Feb 23–27, 2026" for the current week's Mon–Fri, computed instead
+  /// e.g. "Sep 21–26, 2026" for the current week's Mon–Sat, computed instead
   /// of hardcoded.
   String _weekRangeLabel() {
     final now = DateTime.now();
     final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
-    final friday = monday.add(const Duration(days: 4));
+    final saturday = monday.add(const Duration(days: 5));
     final startLabel = '${_months[monday.month - 1]} ${monday.day}';
-    final endLabel = monday.month == friday.month
-        ? '${friday.day}'
-        : '${_months[friday.month - 1]} ${friday.day}';
-    return '$startLabel–$endLabel, ${friday.year}';
+    final endLabel = monday.month == saturday.month
+        ? '${saturday.day}'
+        : '${_months[saturday.month - 1]} ${saturday.day}';
+    return '$startLabel–$endLabel, ${saturday.year}';
   }
 
   @override
@@ -256,46 +283,67 @@ class _ParentScheduleState extends State<ParentSchedule> {
                 (child.busNumber.isNotEmpty || child.route.isNotEmpty);
             final driver = _driverFor(child);
             final slots = _timingSlotsFor(driver);
-            final schedule = _buildSchedule(driver, slots);
-            final selectedIndex = _selectedDay.clamp(0, schedule.length - 1);
-            final sel = schedule[selectedIndex];
 
-            Color statusColor;
-            String statusLabel;
-            switch (sel.status) {
-              case 'done':
-                statusColor = AppTheme.success;
-                statusLabel = AppStrings.t('completed_check');
-                break;
-              case 'today':
-                statusColor = AppTheme.purple;
-                statusLabel = AppStrings.t('active');
-                break;
-              default:
-                statusColor = context.textTertiary;
-                statusLabel = AppStrings.t('upcoming_clock');
-            }
+            // Syncs this screen with whatever the family last saved on
+            // `EditWeeklyScheduleScreen` -- that screen writes straight to
+            // `students/{id}.requestedSchedule`, so listening to the same
+            // document here is what makes a save there show up here live,
+            // with no extra plumbing in between.
+            final studentId = child?.id ?? '';
+            return StreamBuilder<Student?>(
+              stream: studentId.isEmpty
+                  ? Stream<Student?>.value(null)
+                  : UserRepository.instance.watchStudent(studentId),
+              builder: (context, snap) {
+                final schedule = _buildSchedule(
+                  driver,
+                  slots,
+                  snap.data?.requestedSchedule,
+                );
+                final selectedIndex = _selectedDay.clamp(
+                  0,
+                  schedule.length - 1,
+                );
+                final sel = schedule[selectedIndex];
 
-            // The real stop name this child boards at, resolved through the
-            // admin-assigned route (`SessionService.stopNameFor`) — empty
-            // when no admin route exists yet, rather than a fabricated
-            // street name.
-            final stopLabel = child != null && child.stop.isNotEmpty
-                ? child.stop
-                : AppStrings.t('your_stop');
+                Color statusColor;
+                String statusLabel;
+                switch (sel.status) {
+                  case 'done':
+                    statusColor = AppTheme.success;
+                    statusLabel = AppStrings.t('completed_check');
+                    break;
+                  case 'today':
+                    statusColor = AppTheme.purple;
+                    statusLabel = AppStrings.t('active');
+                    break;
+                  default:
+                    statusColor = context.textTertiary;
+                    statusLabel = AppStrings.t('upcoming_clock');
+                }
 
-            return _buildBody(
-              context,
-              children: children,
-              selectedChildIndex: safeIdx,
-              child: child,
-              schedule: schedule,
-              sel: sel,
-              hasBus: hasBus,
-              statusColor: statusColor,
-              statusLabel: statusLabel,
-              stopLabel: stopLabel,
-              myStopId: SessionService.instance.selectedChild?.stopId,
+                // The real stop name this child boards at, resolved through
+                // the admin-assigned route (`SessionService.stopNameFor`) —
+                // empty when no admin route exists yet, rather than a
+                // fabricated street name.
+                final stopLabel = child != null && child.stop.isNotEmpty
+                    ? child.stop
+                    : AppStrings.t('your_stop');
+
+                return _buildBody(
+                  context,
+                  children: children,
+                  selectedChildIndex: safeIdx,
+                  child: child,
+                  schedule: schedule,
+                  sel: sel,
+                  hasBus: hasBus,
+                  statusColor: statusColor,
+                  statusLabel: statusLabel,
+                  stopLabel: stopLabel,
+                  myStopId: SessionService.instance.selectedChild?.stopId,
+                );
+              },
             );
           },
         );
@@ -418,27 +466,34 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   const SizedBox(height: 12),
                 ],
                 // ── Day selector ─────────────────────────────────────────
+                // Wrapped in a horizontal scroll view: 6 tiles (Mon–Sat) no
+                // longer fit `Expanded` across a phone-width card without
+                // overflowing, the way the previous 5 (Mon–Fri) did.
                 GlassCard(
                   enableBlur: false,
                   padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: List.generate(5, (i) {
-                      final isSelected = _selectedDay == i;
-                      final isToday = schedule[i].status == 'today';
-                      // Bonus-task link: the absent-days dot color reads
-                      // straight from the same `_tomorrowGoing`/
-                      // `_absenceDays` state the attendance card below
-                      // writes -- see `_isAbsentOn` -- so marking a
-                      // multi-day absence there immediately turns the
-                      // matching dates' dots red here, no separate
-                      // calendar state to keep in sync.
-                      final isAbsent = _isAbsentOn(child, _weekDates[i]);
-                      return Expanded(
-                        child: GestureDetector(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(_weekDays.length, (i) {
+                        final isSelected = _selectedDay == i;
+                        final isToday = schedule[i].status == 'today';
+                        // Bonus-task link: the absent-days dot color reads
+                        // straight from the same `_tomorrowGoing`/
+                        // `_absenceDays` state the attendance card below
+                        // writes -- see `_isAbsentOn` -- so marking a
+                        // multi-day absence there immediately turns the
+                        // matching dates' dots red here, no separate
+                        // calendar state to keep in sync.
+                        final isAbsent = _isAbsentOn(child, _weekDates[i]);
+                        return GestureDetector(
                           onTap: () => setState(() => _selectedDay = i),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            margin: EdgeInsets.only(right: i < 4 ? 6 : 0),
+                            width: 52,
+                            margin: EdgeInsets.only(
+                              right: i < _weekDays.length - 1 ? 6 : 0,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
                               color: isSelected
@@ -507,9 +562,9 @@ class _ParentScheduleState extends State<ParentSchedule> {
                               ],
                             ),
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      }),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

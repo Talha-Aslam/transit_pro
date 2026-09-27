@@ -19,6 +19,7 @@ import '../screens/parent/driver_chat_screen.dart';
 import '../screens/parent/trip_history_screen.dart';
 import '../screens/parent/subscription_screen.dart';
 import '../screens/parent/emergency_contacts_screen.dart';
+import '../screens/parent/edit_weekly_schedule_screen.dart';
 import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
 import '../screens/driver/driver_layout.dart';
@@ -245,6 +246,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/parent/emergency-contacts',
       builder: (context, state) => const EmergencyContactsScreen(),
+    ),
+    GoRoute(
+      path: '/parent/weekly-schedule',
+      builder: (context, state) => const EditWeeklyScheduleScreen(),
     ),
     GoRoute(
       path: '/parent/change-password',

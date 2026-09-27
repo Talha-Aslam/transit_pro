@@ -721,6 +721,192 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — parent Schedule screen: added Saturday, and it now syncs live with `EditWeeklyScheduleScreen`
+
+**Request:** add Saturday to the Mon–Fri day selector, make the header date
+range dynamic, and make the pickup/drop-off card read the per-day times a
+parent saved on `EditWeeklyScheduleScreen`, updating live as the user taps a
+different day.
+
+**What changed, and why not the literal field names asked for:** the
+premise mentioned reading `saturday_morning_pickup`/`saturday_evening_drop`-
+style flat fields — those don't exist; the real schema (added in the
+previous entry) is `Student.requestedSchedule['saturday']['morningPickup'
+/'eveningDropoff']`, a nested map, one key per weekday. Wired against that
+instead of inventing a second, parallel field naming scheme.
+
+- `lib/screens/parent/parent_schedule.dart`:
+  - `_weekDays`/`_fullWeekDays` extended to 6 entries (added `'Sat'`/
+    `'Saturday'`); new `_kWeekdayKeys` (`monday`..`saturday`) for looking
+    up `requestedSchedule` by the same index.
+  - `_weekDates`/`_dates`/`_buildSchedule` all generate 6 days instead of a
+    hardcoded 5; `_weekRangeLabel()` now spans Monday→Saturday (e.g. "Sep
+    21–26, 2026") instead of Monday→Friday.
+  - Day-selector `Row` (6 tiles) wrapped in
+    `SingleChildScrollView(scrollDirection: Axis.horizontal)` and each tile
+    changed from `Expanded` to a fixed `width: 52` — `Expanded` doesn't work
+    unconstrained inside a scrollable axis, and 6 equal-width tiles no
+    longer fit a phone-width card without this.
+  - `build()` now wraps the child-dependent portion in
+    `StreamBuilder<Student?>` on `UserRepository.instance.watchStudent
+    (child.id)` — the same document `EditWeeklyScheduleScreen` writes
+    `requestedSchedule` to, so a save there is reflected here on the next
+    snapshot, no manual refresh.
+  - `_buildSchedule(driver, slots, requestedSchedule)` gained a third
+    parameter: for each weekday it now prefers that day's saved
+    `morningPickup`/`eveningDropoff` override when present, falling back to
+    the driver's shared `DriverTimingSlots` time otherwise (unchanged
+    behavior for any day the family hasn't customized). Tapping a day in
+    the selector already retargeted `_selectedDay`/the detail card's title
+    to that day — that part didn't need to change, only the time values
+    backing it.
+
+`flutter analyze` in `transit_pro`: still the 4-issue pre-existing
+baseline, no new issues.
+
+### 2026-09-27 — new `EditWeeklyScheduleScreen`: per-child Monday–Saturday pickup/drop-off times
+
+**Request:** the "Pickup / Dropoff Times" menu item (previous entry) should
+route to a dedicated screen where the parent edits their child's morning
+pickup / evening drop-off time for every day Monday through Saturday, with a
+"Save Weekly Schedule" button batch-writing all 12 values to Firestore.
+
+**Where this data actually lives:** the previous entry's open question is
+now resolved by this request itself — these are a genuinely new **per-child
+preference**, not the driver's real shared `DriverTimingSlots` (which stays
+untouched; letting one parent edit that would silently change the bus time
+for every other family on the route). Added `Student.requestedSchedule`
+(`transit_core`): `Map<String, Map<String, String>>?`, keyed `monday`..
+`saturday`, each `{'morningPickup': '7:15 AM', 'eveningDropoff': '3:15 PM'}`
+— only the days/times a parent actually set are present. No `firestore.rules`
+change was needed: the existing parent-owned `students/{id}` update rule
+already allows any field except `parentId`/`isTransportSuspended`.
+
+- `transit_core/lib/src/models/student.dart` — added `requestedSchedule`
+  field, threaded through `fromMap`/`toMap`.
+- `lib/screens/parent/edit_weekly_schedule_screen.dart` (NEW) —
+  `EditWeeklyScheduleScreen`: loads the selected child
+  (`ParentDataService.instance.selectedChild`) via
+  `UserRepository.instance.fetchStudent`, renders a scrollable card per
+  weekday (Monday–Saturday) with tappable "Morning Pickup"/"Evening
+  Dropoff" tiles opening `showTimePicker()`, and a "Save Weekly Schedule"
+  button that batch-writes the whole nested map in one
+  `UserRepository.instance.updateStudent(id, {'requestedSchedule': ...})`
+  call. Reuses the existing `formatTimeOfDay()` helper
+  (`app/driver_data_service.dart`, already used by 5 other screens) instead
+  of introducing a second, separate `intl`-based formatter for the same
+  job.
+- `lib/app/router.dart` — new route `/parent/weekly-schedule`.
+- `lib/screens/parent/parent_profile.dart` — "Pickup / Dropoff Times"
+  menu item's `onTap` now pushes `/parent/weekly-schedule` (previously
+  jumped to the read-only Schedule tab).
+
+**Not done (out of scope for this request):** the Home page / dashboard
+does not display or read `requestedSchedule` anywhere yet — it's saved but
+not surfaced elsewhere. Also worth deciding later: whether a driver or
+admin should ever see a family's requested times (e.g. to actually adjust
+the route), since right now this is a private, unread-by-anyone-else
+preference.
+
+`flutter analyze`: `transit_core` clean, `transit_pro` at the unchanged
+4-issue baseline.
+
+### 2026-09-27 — added a "Pickup / Dropoff Times" entry to the parent Settings menu
+
+**Request:** add a menu item routing to the schedule management screen.
+
+**What I found first:** the task assumed a pushable "Schedule management
+screen" the parent could navigate to. There isn't one — `ParentSchedule`
+(`parent_schedule.dart`) is a bottom-nav **tab** hosted in an `IndexedStack`
+inside `ParentLayout` (`parent_layout.dart:74`), not a route registered in
+`router.dart`, and it requires an `onBack` callback that switches tabs rather
+than popping a route. It's also currently read-only: the times it shows
+(`_TimeCard`'s Morning Pickup / Evening Drop) come from the assigned
+**driver's** shared `DriverTimingSlots`, not a per-child editable field — so
+"where they can edit their morning and evening times" isn't something this
+screen does yet. That's a separate, larger question (does editing belong on
+the driver's own schedule screen, or does it need a new per-child override
+field?) than adding a menu entry, so it's left open below rather than
+guessed at here.
+
+**What I did:** added the menu item using the same "jump to tab" pattern
+this screen already uses elsewhere (`ParentProfile.onNavigate`, declared but
+previously unused in this file — `ParentDashboard` already calls
+`onNavigate(2)` the same way for its own "Today's Schedule" shortcut). No
+new route was needed.
+
+- `lib/screens/parent/parent_profile.dart` — new `_MenuItem` ("Pickup /
+  Dropoff Times", `Icons.access_time_rounded`) inserted right after "Trip
+  History", `onTap: () => widget.onNavigate(2)` (tab index 2 = Schedule,
+  per `ParentLayout._navItems`).
+- `lib/app/language_provider.dart` — added `pickup_dropoff_times` (English
+  + Urdu).
+
+**Open question for later:** the actual tap-to-edit-times feature (from the
+prior "Friday Schedule" request) still needs a decision — should editing
+live on the driver's own schedule screen (affects every family on that
+route, but matches who really owns `DriverTimingSlots`), or does it need a
+brand-new per-child schedule-override field that doesn't exist in the
+schema today?
+
+`flutter analyze` in `transit_pro`: 4 issues (unchanged pre-existing
+baseline, all pre-dating this session).
+
+### 2026-09-27 — Institute Name saves now crowdsource a real `institutes` directory
+
+The Institute Name autocomplete (previous entry) suggested from a fixed
+local dummy list only — nothing a parent actually typed ever went
+anywhere. This makes the other half real: saving a child's profile now
+grows a genuine, shared Firestore directory of institute names, though
+the autocomplete's *suggestion* source is still that local list (swapping
+it to read live from this new directory is the sketch already documented
+on `_instituteSuggestionsFor`, unchanged by this entry).
+
+**New collection, `institutes/{id}`** (`transit_core`): a new `Institute`
+model (`name`, `type`, `createdAt`) and `Db.institutes` typed collection
+getter, following the same pattern as every other collection in `Db`.
+[id] is deterministic — `{type}_{slug(name)}` — not auto-generated, so
+"Punjab College" typed by any number of different parents, however they
+capitalised or spaced it, always resolves to the *same* document instead
+of a pile of near-duplicates; this is also what makes the write safe to
+issue unconditionally on every save rather than only when a name "looks
+new" (an institute that already exists is just a no-op read).
+
+**`InstituteRepository`** (new, `transit_pro/lib/data/`):
+- `titleCase(String)` — trims, collapses whitespace, and title-cases word
+  by word, *except* a token that's already all-caps is left alone. Naive
+  title-casing would otherwise mangle a real acronym like "LUMS" or "UET"
+  into "Lums"/"Uet", which is a worse outcome than the duplicate-entry
+  problem this function exists to prevent in the first place.
+- `ensureInstituteExists({type, rawName})` — sanitises `rawName`, checks
+  `institutes/{id}` by its deterministic id, and creates it if missing. A
+  single raw `Db.fs.collection('institutes').doc(id).set(...)` with
+  `Db.now` inline for `createdAt`, not `Institute.toMap()` through the
+  typed converter followed by a patch — `FieldValue.serverTimestamp()`
+  can't travel through a typed converter, and (unlike some other
+  repositories here that work around that with a create-then-patch
+  `update()`) `firestore.rules` only grants a regular user `create` on
+  this collection, never `update`, so the timestamp has to be right in
+  the one write that's actually allowed.
+
+**Integration**: `_ChildFlowSheetState._save()` in `parent_profile.dart`
+now fires `InstituteRepository.instance.ensureInstituteExists(...)`
+(`unawaited` — this is a nice-to-have for future suggestions, not
+something worth blocking the save or the sheet closing on) using whatever
+text is actually left in `_instituteNameCtrl` at the moment Save is
+pressed, alongside the existing save-to-`ChildInfo.school` write that
+already happens.
+
+**Rules** (deployed to `transitpro-db` after confirming): new
+`institutes/{instituteId}` match block — any signed-in user may read (the
+whole point of crowdsourcing) or create an entry with a non-empty
+`name`/`type`; only admin may update or delete one, since an existing
+entry is shared, immutable history, not any one contributor's to rename
+or remove.
+
+`flutter analyze` in both `transit_pro/` and `transit_core/`: 4
+pre-existing issues in `transit_pro` (unchanged), 0 in `transit_core`.
+
 ### 2026-09-27 — Institute Name autocomplete on Edit Info
 
 Upgraded the free-text "Institute Name" field (`_ChildFlowSheet` in
