@@ -721,6 +721,64 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — Institute Name autocomplete on Edit Info
+
+Upgraded the free-text "Institute Name" field (`_ChildFlowSheet` in
+`parent_profile.dart`, added just before this) into a typeahead using
+`RawAutocomplete<String>` — not the higher-level `Autocomplete` widget,
+which always creates and owns its own internal `TextEditingController`.
+That would have orphaned `_instituteNameCtrl`, which several other things
+in this sheet read directly (`_save`, `_openInstituteMap`, `showBuses`,
+`_driversStreamFor`) — `RawAutocomplete` accepts an external controller,
+so all of that keeps working unchanged and this really is just the same
+field with suggestions added, not a parallel field.
+
+`fieldViewBuilder` reproduces `_buildTextField`'s exact label style, fill
+color, border radius/colors and focus color (`widget.accentColor`) so it
+is visually indistinguishable from every other field on this sheet, and
+the map-pin tooltip beside it needed no changes at all. `optionsBuilder`
+(`_instituteSuggestionsFor`) does a case-insensitive `contains` match
+against a dummy `_institutes` map (already existed, now expanded per
+institute type with the "Punjab College" → "Punjab College Airline
+Campus" example this was speced against), scoped to whichever institute
+type is currently selected so a College suggestion can't leak into a
+School search.
+
+Firestore isn't wired up — there's no `institutes` collection in this
+schema, and adding one wasn't asked for — but the doc comment on
+`_instituteSuggestionsFor` sketches the swap in full, including the real
+constraint that makes it not a drop-in replacement: `optionsBuilder` must
+return synchronously, so a live query needs a debounced write into a
+cached list this method then filters, and Firestore itself has no
+server-side "contains" — only a prefix range scan (`orderBy('name')
+.startAt([query]).endAt(['$query'])`), which finds names *starting
+with* what's typed, not "Punjab" appearing anywhere inside a longer name,
+without a dedicated search service (Algolia, Typesense, etc.) behind it.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-27 — unified child-card subtitle formatting via a shared `ChildInfo.displayInfo` getter
+
+The `(instituteType, grade, school)` formatting added for the home-page
+student card (previous entry) was written as a private helper local to
+`parent_dashboard.dart`, so the "Children" list card on Profile/Settings
+(`parent_profile.dart`) still showed the old `grade · school` format —
+same data, different string. Moved the formatting logic onto the model
+itself as `ChildInfo.displayInfo` (`parent_data_service.dart`) rather than
+leaving it duplicated (or copy-pasted a second time): both cards now call
+the same getter, so they can't independently drift again. Deleted
+`parent_dashboard.dart`'s local `_childSubtitle` helper in favor of
+`child.displayInfo`, and swapped the Children list card's
+`[c.grade, c.school].where(...).join(' · ')` for `c.displayInfo`
+(guarding the `Text` on `c.displayInfo.isNotEmpty` instead of the old
+`c.grade.isNotEmpty || c.school.isNotEmpty`, since the getter is now the
+one source of truth for whether there's anything to show). Same
+empty-string filtering as before — `ChildInfo`'s fields are non-nullable
+strings defaulting to `''`, never `null`, but a field nobody filled in is
+still dropped so nothing ever renders a stray `", "` or the word "null".
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
 ### 2026-09-27 — free-text Institute Name field + new student-card subtitle format
 
 **Edit Info (`_ChildFlowSheet` in `parent_profile.dart`)**: the "Institute

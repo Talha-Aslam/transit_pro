@@ -1136,12 +1136,9 @@ class _ChildCardState extends State<_ChildCard> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (c.grade.isNotEmpty || c.school.isNotEmpty)
+                        if (c.displayInfo.isNotEmpty)
                           Text(
-                            [
-                              c.grade,
-                              c.school,
-                            ].where((s) => s.isNotEmpty).join(' · '),
+                            c.displayInfo,
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 11,
@@ -1531,6 +1528,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   late final TextEditingController _studentIdCtrl;
   late final TextEditingController _locationCtrl;
   late final TextEditingController _instituteNameCtrl;
+  final FocusNode _instituteNameFocus = FocusNode();
 
   String? _instituteType;
 
@@ -1900,11 +1898,82 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     }
   }
 
+  // Dummy data source for the "Institute Name" autocomplete below, keyed by
+  // institute type so a College suggestion never leaks into a School search.
+  // Swapping this for a real, live source (e.g. a Firestore `institutes`
+  // collection) only means replacing `_instituteSuggestionsFor` — see its
+  // doc comment for exactly what that swap looks like.
   final Map<String, List<String>> _institutes = {
-    'School': ['Lincoln Elementary', 'Springfield High', 'Beaconhouse'],
-    'College': ['City College', 'State College', 'Punjab College'],
-    'University': ['University of Lahore', 'FAST NUCES', 'LUMS', 'UET'],
+    'School': [
+      'Beaconhouse School System',
+      'City School',
+      'Lahore Grammar School',
+      'Roots International School',
+    ],
+    'College': [
+      'Punjab College',
+      'Punjab College Airline Campus',
+      'Punjab College Boys Campus',
+      'Government College Lahore',
+      'Kinnaird College',
+    ],
+    'University': [
+      'University of Lahore',
+      'FAST NUCES',
+      'LUMS',
+      'UET',
+      'Punjab University',
+    ],
   };
+
+  /// Case-insensitive, "contains anywhere" match against [_institutes]'s
+  /// dummy list for the currently selected institute type — typing "punjab"
+  /// finds "Punjab College" *and* "Punjab College Airline Campus" the same
+  /// way it would with real data.
+  ///
+  /// ── Swapping this for Firestore later ──────────────────────────────────
+  /// `RawAutocomplete.optionsBuilder` must return synchronously, so a live
+  /// backend can't just be awaited in here — the usual pattern is a
+  /// debounced query that writes into a cached `List<String>` field, which
+  /// this method then filters/returns exactly like it does today. Sketch,
+  /// assuming an `institutes` collection with `type`/`name` fields:
+  ///
+  /// ```dart
+  /// Timer? _instituteQueryDebounce;
+  /// List<String> _liveInstituteSuggestions = [];
+  ///
+  /// void _onInstituteNameChanged(String query) {
+  ///   _instituteQueryDebounce?.cancel();
+  ///   _instituteQueryDebounce = Timer(const Duration(milliseconds: 250), () async {
+  ///     if (query.trim().isEmpty || _instituteType == null) return;
+  ///     // Firestore has no server-side "contains" — only a prefix range
+  ///     // scan (`>= query` and `< query + ''`), so this only ever
+  ///     // suggests names *starting with* what's typed, not "Punjab" inside
+  ///     // "Airline Punjab College". A real substring/fuzzy search needs a
+  ///     // dedicated search service (Algolia, Typesense, etc.) behind it.
+  ///     final snap = await FirebaseFirestore.instance
+  ///         .collection('institutes')
+  ///         .where('type', isEqualTo: _instituteType)
+  ///         .orderBy('name')
+  ///         .startAt([query])
+  ///         .endAt(['$query'])
+  ///         .limit(20)
+  ///         .get();
+  ///     if (!mounted) return;
+  ///     setState(() {
+  ///       _liveInstituteSuggestions =
+  ///           snap.docs.map((d) => d.data()['name'] as String).toList();
+  ///     });
+  ///   });
+  /// }
+  /// ```
+  Iterable<String> _instituteSuggestionsFor(String query) {
+    final type = _instituteType;
+    if (type == null || query.isEmpty) return const [];
+    final pool = _institutes[type] ?? const [];
+    final needle = query.toLowerCase();
+    return pool.where((name) => name.toLowerCase().contains(needle));
+  }
 
   @override
   void initState() {
@@ -1956,6 +2025,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     _studentIdCtrl.dispose();
     _locationCtrl.dispose();
     _instituteNameCtrl.dispose();
+    _instituteNameFocus.dispose();
     super.dispose();
   }
 
@@ -2099,6 +2169,126 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     );
   }
 
+  /// Same label/field styling as [_buildTextField] — this only replaces
+  /// that field's plain `TextField` with a typeahead, everything around it
+  /// (label text, fill color, borders, the map-pin tooltip next to it)
+  /// stays exactly as it already was.
+  ///
+  /// `RawAutocomplete`, not the higher-level `Autocomplete` widget: the
+  /// latter always creates and owns its own `TextEditingController`
+  /// internally, which would orphan `_instituteNameCtrl` — every other
+  /// read of the institute name in this file (`_save`, `_openInstituteMap`,
+  /// `showBuses`, `_driversStreamFor`) would silently stop seeing typed
+  /// input. `RawAutocomplete` accepts an external controller instead, so
+  /// all of that keeps working unchanged.
+  Widget _buildInstituteNameField() {
+    return RawAutocomplete<String>(
+      textEditingController: _instituteNameCtrl,
+      focusNode: _instituteNameFocus,
+      optionsBuilder: (TextEditingValue value) =>
+          _instituteSuggestionsFor(value.text.trim().toLowerCase()),
+      onSelected: (_) {
+        // A different institute name means whatever driver/round was
+        // picked for the old one no longer applies — same reset the plain
+        // TextField's onChanged used to do.
+        setState(() {
+          _selectedDriver = null;
+          _scheduleId = null;
+        });
+      },
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Institute Name",
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: controller,
+              focusNode: focusNode,
+              onChanged: (_) {
+                setState(() {
+                  _selectedDriver = null;
+                  _scheduleId = null;
+                });
+              },
+              style: TextStyle(color: context.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "e.g. Springfield High",
+                hintStyle: TextStyle(color: context.textHint),
+                filled: true,
+                fillColor: context.isDark
+                    ? AppTheme.bgDarkBlue
+                    : const Color(0xFFF1F5F9),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: context.inputBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: context.inputBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: widget.accentColor, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final list = options.toList();
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            color: context.isDark ? AppTheme.bgDark : Colors.white,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: list.length,
+                itemBuilder: (context, index) {
+                  final option = list[index];
+                  return InkWell(
+                    onTap: () => onSelected(option),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _openInstituteMap() async {
     final institute = _instituteNameCtrl.text.trim();
     if (institute.isEmpty) return;
@@ -2226,22 +2416,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Expanded(
-                            child: _buildTextField(
-                              "Institute Name",
-                              _instituteNameCtrl,
-                              "e.g. Springfield High",
-                              onChanged: (_) {
-                                // A different institute name means whatever
-                                // driver/round was picked for the old one
-                                // no longer applies.
-                                setState(() {
-                                  _selectedDriver = null;
-                                  _scheduleId = null;
-                                });
-                              },
-                            ),
-                          ),
+                          Expanded(child: _buildInstituteNameField()),
                           const SizedBox(width: 10),
                           Tooltip(
                             message: "Open institute in Google Maps",

@@ -45,20 +45,6 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
   void _onLangChanged() => setState(() {});
 
-  /// `(instituteType, grade, instituteName)` — any field a parent hasn't
-  /// filled in yet is a real empty string here (see `ChildInfo`), never a
-  /// Dart `null`, but this filters blanks out either way so a half-filled
-  /// profile shows e.g. `(Grade 5)` rather than `(, Grade 5, )` or a
-  /// literal "null".
-  String _childSubtitle(ChildInfo child) {
-    final parts = [
-      child.instituteType,
-      child.grade,
-      child.school,
-    ].where((s) => s.isNotEmpty).toList();
-    return parts.isEmpty ? '' : '(${parts.join(', ')})';
-  }
-
   /// True once [child] is actually matched with a driver (`child.driver`
   /// holds the driver's uid) -- the signal that distinguishes a real,
   /// upcoming/in-progress trip from a brand-new account nobody has accepted
@@ -393,7 +379,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                                 ),
                                                 const SizedBox(height: 3),
                                                 Text(
-                                                  _childSubtitle(child),
+                                                  child.displayInfo,
                                                   style: TextStyle(
                                                     color:
                                                         context.textSecondary,

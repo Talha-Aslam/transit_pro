@@ -72,6 +72,22 @@ class ChildInfo {
     this.scheduleId,
   });
 
+  /// `(instituteType, grade, school)` — the one shared format every card
+  /// showing a child's institute info renders (parent dashboard's student
+  /// card, the "Children" list on Profile/Settings). These fields are
+  /// plain non-nullable strings defaulting to `''`, never a Dart `null`,
+  /// but a field nobody has filled in yet is still filtered out here so a
+  /// half-filled profile shows e.g. `(Grade 5)` rather than `(, Grade 5, )`
+  /// or a literal "null" anywhere in the string.
+  String get displayInfo {
+    final parts = [
+      instituteType,
+      grade,
+      school,
+    ].where((s) => s.isNotEmpty).toList();
+    return parts.isEmpty ? '' : '(${parts.join(', ')})';
+  }
+
   ChildInfo copyWith({
     String? name,
     String? grade,
