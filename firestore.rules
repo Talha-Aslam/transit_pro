@@ -424,10 +424,17 @@ service cloud.firestore {
 
         allow read: if signedIn() && inThread();
 
-        // You may only send as yourself.
+        // You may only send as yourself, and only ever claim to be a
+        // 'user' — 'ai'/'admin' are for the support Cloud Function
+        // (Admin SDK, bypasses these rules entirely) and a real admin's
+        // own client to set, never an ordinary participant impersonating
+        // either one in their own support thread.
         allow create: if signedIn()
                       && inThread()
-                      && request.resource.data.senderId == uid();
+                      && request.resource.data.senderId == uid()
+                      && (!('senderRole' in request.resource.data)
+                          || request.resource.data.senderRole == 'user'
+                          || isAdmin());
 
         // Read receipts only; message text is immutable once sent.
         allow update: if signedIn() && inThread() && unchanged('text');

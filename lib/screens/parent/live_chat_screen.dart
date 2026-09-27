@@ -29,6 +29,8 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
 
   String? _chatId;
   bool _sending = false;
+  ChatThread? _thread;
+  StreamSubscription<ChatThread?>? _threadSub;
 
   /// Set when [_init] fails, so the screen can show a real error state
   /// instead of leaving the caller stuck on a spinner forever — that
@@ -53,6 +55,9 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
       final chatId = await _messaging.ensureThread(uid, kSupportParticipantId);
       if (!mounted) return;
       setState(() => _chatId = chatId);
+      _threadSub = _messaging.watchThread(chatId).listen((t) {
+        if (mounted) setState(() => _thread = t);
+      }, onError: (Object e) => debugPrint('live chat watchThread failed: $e'));
       // Best-effort: opening the thread is what "reading" it means here,
       // not a failure worth surfacing to the user if the write doesn't
       // land.
@@ -74,6 +79,7 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _threadSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -113,6 +119,7 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
         senderId: uid,
         recipientId: kSupportParticipantId,
         text: text,
+        senderRole: 'user',
       );
       _scrollToBottom();
     } catch (e) {
@@ -199,10 +206,17 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                           ),
                         ),
                         Text(
-                          AppStrings.t('live_chat_hours'),
+                          _thread?.status == 'admin_active'
+                              ? AppStrings.t('live_chat_admin_status')
+                              : AppStrings.t('live_chat_hours'),
                           style: TextStyle(
-                            color: context.textSecondary,
+                            color: _thread?.status == 'admin_active'
+                                ? AppTheme.info
+                                : context.textSecondary,
                             fontSize: 11,
+                            fontWeight: _thread?.status == 'admin_active'
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                       ],
@@ -278,6 +292,9 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                               isMine: messages[index].senderId == uid,
                               timeLabel: _formattedTime(messages[index].sentAt),
                             ),
+                            // ^ `senderRole` on each message (not just
+                            // `isMine`) is what picks the AI-grey vs.
+                            // admin-blue bubble style below.
                           );
                         },
                       ),
@@ -372,12 +389,21 @@ class _MessageBubble extends StatelessWidget {
     required this.timeLabel,
   });
 
+  /// A message predating `senderRole` (every driver↔parent chat message,
+  /// and any support reply sent before the AI existed) was always a real
+  /// human reply — so a null role on the other side reads as `'admin'`,
+  /// not as some unknown fourth kind of sender.
+  String get _role => message.senderRole ?? (isMine ? 'user' : 'admin');
+
   @override
   Widget build(BuildContext context) {
-    // "Mine" (the signed-in user) aligns right, exactly as before; the
-    // other side (support, whichever admin replies) aligns left — same
-    // visual language as the driver chat, just keyed off a real senderId
-    // comparison instead of a hardcoded isSupport flag.
+    // "Mine" (the signed-in user) aligns right in purple, exactly as
+    // before. The other side now has two looks instead of one: the AI
+    // (grey) and an admin who's taken over (blue) — same left-aligned
+    // layout, different accent color and avatar emoji.
+    final isAi = _role == 'ai';
+    final otherColor = isAi ? context.textSecondary : AppTheme.info;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -391,11 +417,15 @@ class _MessageBubble extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                gradient: AppTheme.parentGradient,
+                gradient: isAi ? null : AppTheme.parentGradient,
+                color: isAi ? context.cardBgElevated : null,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
-                child: Text('💬', style: TextStyle(fontSize: 14)),
+              child: Center(
+                child: Text(
+                  isAi ? '🤖' : '💬',
+                  style: const TextStyle(fontSize: 14),
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -422,7 +452,7 @@ class _MessageBubble extends StatelessWidget {
                     ),
                     border: isMine
                         ? null
-                        : Border.all(color: context.surfaceBorder),
+                        : Border.all(color: otherColor.withValues(alpha: 0.3)),
                   ),
                   child: Text(
                     message.text,
@@ -435,7 +465,7 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  timeLabel,
+                  isMine ? timeLabel : '${isAi ? 'AI' : 'Admin'} · $timeLabel',
                   style: TextStyle(color: context.textTertiary, fontSize: 10),
                 ),
               ],

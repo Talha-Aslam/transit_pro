@@ -1530,9 +1530,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   late final TextEditingController _gradeCtrl;
   late final TextEditingController _studentIdCtrl;
   late final TextEditingController _locationCtrl;
+  late final TextEditingController _instituteNameCtrl;
 
   String? _instituteType;
-  String? _instituteName;
 
   // Where the child is collected from / dropped off. Pre-filled below from
   // `widget.initialChild.pickup`/`.dropoff` — see `ParentDataService._rebuild`
@@ -1916,29 +1916,26 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     );
     _locationCtrl = TextEditingController(text: widget.initialChild.stop)
       ..addListener(() => setState(() {})); // To trigger bus list visibility
+    // Was a dropdown limited to a 9-name demo list per institute type —
+    // pre-selecting any real institute not in that tiny hardcoded list was
+    // impossible, so a parent whose child's school wasn't one of the demo
+    // names could never see or re-edit it here at all (it silently showed
+    // "unselected" every time this sheet reopened, even though `_save()`
+    // did preserve the real value underneath). A free-text field has no
+    // such list to be limited to.
+    _instituteNameCtrl = TextEditingController(text: widget.initialChild.school)
+      ..addListener(() => setState(() {})); // Drives showBuses/driver search
     _pickup = widget.initialChild.pickup;
     _dropoff = widget.initialChild.dropoff;
     _scheduleId = widget.initialChild.scheduleId;
 
     if (widget.initialChild.school.isNotEmpty) {
-      // Was: guess the type by searching for `school` inside the 9-name
-      // demo list below (`_institutes`), which meant any real institute not
-      // in that tiny hardcoded list silently lost its type on every reopen.
-      // `ChildInfo.instituteType` is now a real, persisted field (see
-      // `ParentDataService`), so read it directly instead of guessing.
+      // `ChildInfo.instituteType` is a real, persisted field (see
+      // `ParentDataService`), so read it directly instead of guessing it
+      // from the school name.
       _instituteType = widget.initialChild.instituteType.isNotEmpty
           ? widget.initialChild.instituteType
           : 'School';
-      // The "Institute Name" dropdown below can only offer the demo list's
-      // names -- pre-selecting a value `DropdownButton` doesn't have as an
-      // item throws. Only pre-fill when the real school is actually one of
-      // them; otherwise leave it unselected rather than crash. `_save()`
-      // still falls back to `widget.initialChild.school` either way, so a
-      // real (non-demo) institute name is never lost by opening this sheet.
-      final demoNames = _institutes[_instituteType] ?? const <String>[];
-      _instituteName = demoNames.contains(widget.initialChild.school)
-          ? widget.initialChild.school
-          : null;
     }
 
     // `initialChild.driver` holds a real driver uid when it was assigned
@@ -1958,10 +1955,12 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     _gradeCtrl.dispose();
     _studentIdCtrl.dispose();
     _locationCtrl.dispose();
+    _instituteNameCtrl.dispose();
     super.dispose();
   }
 
   void _save() {
+    final instituteName = _instituteNameCtrl.text.trim();
     widget.onSave(
       ChildInfo(
         // Without the id, `ParentDataService.updateChild` has nothing to
@@ -1971,7 +1970,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
         id: widget.initialChild.id,
         name: _nameCtrl.text.trim(),
         grade: _gradeCtrl.text.trim(),
-        school: _instituteName ?? widget.initialChild.school,
+        school: instituteName.isNotEmpty
+            ? instituteName
+            : widget.initialChild.school,
         // Was never carried out of this sheet at all -- `ParentDataService
         // .updateChild`/`.addChild` now both persist it (see their doc
         // comments), so a real change here actually survives a save.
@@ -2099,8 +2100,8 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   }
 
   Future<void> _openInstituteMap() async {
-    final institute = _instituteName ?? widget.initialChild.school;
-    if (institute.trim().isEmpty) return;
+    final institute = _instituteNameCtrl.text.trim();
+    if (institute.isEmpty) return;
 
     final query = [
       institute.trim(),
@@ -2161,12 +2162,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
 
     final sheetHeight = MediaQuery.of(context).size.height * 0.85;
 
-    final availableSchools = _instituteType != null
-        ? _institutes[_instituteType]!
-        : <String>[];
-
+    final instituteName = _instituteNameCtrl.text.trim();
     final bool showBuses =
-        _instituteName != null && _locationCtrl.text.trim().isNotEmpty;
+        instituteName.isNotEmpty && _locationCtrl.text.trim().isNotEmpty;
 
     return SizedBox(
       height: sheetHeight,
@@ -2221,10 +2219,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           )
                           .toList(),
                       onChanged: (val) {
-                        setState(() {
-                          _instituteType = val;
-                          _instituteName = null;
-                        });
+                        setState(() => _instituteType = val);
                       },
                     ),
                     if (_instituteType != null)
@@ -2232,21 +2227,15 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
-                            child: _buildDropdown<String>(
-                              label: "Institute Name",
-                              value: _instituteName,
-                              hint: "Select your $_instituteType",
-                              items: availableSchools
-                                  .map(
-                                    (s) => DropdownMenuItem(
-                                      value: s,
-                                      child: Text(s),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (val) {
+                            child: _buildTextField(
+                              "Institute Name",
+                              _instituteNameCtrl,
+                              "e.g. Springfield High",
+                              onChanged: (_) {
+                                // A different institute name means whatever
+                                // driver/round was picked for the old one
+                                // no longer applies.
                                 setState(() {
-                                  _instituteName = val;
                                   _selectedDriver = null;
                                   _scheduleId = null;
                                 });
@@ -2257,7 +2246,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           Tooltip(
                             message: "Open institute in Google Maps",
                             child: GestureDetector(
-                              onTap: _instituteName == null
+                              onTap: instituteName.isEmpty
                                   ? null
                                   : _openInstituteMap,
                               child: Container(
@@ -2265,21 +2254,21 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                                 width: 46,
                                 height: 46,
                                 decoration: BoxDecoration(
-                                  color: _instituteName == null
+                                  color: instituteName.isEmpty
                                       ? context.surfaceBorder.withValues(
                                           alpha: 0.45,
                                         )
                                       : AppTheme.info.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: _instituteName == null
+                                    color: instituteName.isEmpty
                                         ? context.surfaceBorder
                                         : AppTheme.info.withValues(alpha: 0.25),
                                   ),
                                 ),
                                 child: Icon(
                                   Icons.my_location_rounded,
-                                  color: _instituteName == null
+                                  color: instituteName.isEmpty
                                       ? context.textTertiary
                                       : AppTheme.info,
                                   size: 22,
@@ -2379,7 +2368,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       // _showDriverPreview for what picking one here does (a
                       // preview only, not a booking).
                       StreamBuilder<List<Driver>>(
-                        stream: _driversStreamFor(_instituteName!),
+                        stream: _driversStreamFor(instituteName),
                         builder: (context, snap) {
                           if (!snap.hasData) {
                             return const Padding(
@@ -2400,7 +2389,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
-                                'No drivers currently list "$_instituteName" '
+                                'No drivers currently list "$instituteName" '
                                 'as a stop yet.',
                                 style: TextStyle(
                                   color: context.textSecondary,

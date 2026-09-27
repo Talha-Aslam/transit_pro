@@ -721,6 +721,129 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — free-text Institute Name field + new student-card subtitle format
+
+**Edit Info (`_ChildFlowSheet` in `parent_profile.dart`)**: the "Institute
+Name" field was a `DropdownButton` limited to a 9-name hardcoded demo list
+(3 per institute type). Its own code comment already documented the bug:
+pre-selecting a value the dropdown doesn't have as an item throws, so any
+real institute not in that tiny demo list showed as permanently
+"unselected" every time this sheet reopened — a parent could never see or
+re-edit their child's actual institute name, even though `_save()` did
+quietly preserve it underneath. Replaced the dropdown with a
+`TextEditingController`-backed `TextFormField` (`_instituteNameCtrl`,
+using the same `_buildTextField` helper every other field on this sheet
+already uses) that pre-populates from `widget.initialChild.school` and
+saves back through the exact same `ChildInfo.school` field `_save()`
+always wrote to — no new Firestore field needed, since `school` already
+*was* "Institute Name", just inaccessible for anything outside the demo
+list. Every other place that read the old `_instituteName` state
+(`_openInstituteMap`, the "drivers serving this institute" search, the
+map-pin tooltip's enabled state) now reads the controller's trimmed text
+instead.
+
+**Student card subtitle** (`parent_dashboard.dart`): changed from
+`grade • school` to the requested `(instituteType, grade, instituteName)`
+via a new `_childSubtitle(ChildInfo child)` helper. `ChildInfo`'s fields
+are non-nullable strings defaulting to `''` (never a Dart `null`), so
+"null-checking" here means filtering out whichever parts are still empty
+rather than guarding against an actual `null` — a child with only a grade
+set shows `(Grade 5)`, not `(, Grade 5, )` or a literal `"null"` anywhere
+in the string. Scoped to this one card, as asked — `student_profile.dart`
+and `parent_missed_bus_screen.dart` still show their existing
+`grade · school` formatting and were left untouched.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-27 — Live Chat: AI first-line support with admin handoff
+
+Live Chat was already a real Firestore-backed chat (`MessagingRepository`,
+`chats`/`chats/{id}/messages`, a `StreamBuilder<List<ChatMessage>>`) from
+earlier work this project — not the "dummy UI" it was described as this
+time around. What was actually missing was everything about an AI
+responder and a human handoff, which is what this entry adds.
+
+**Schema** (`transit_core`): `ChatThread` gained `status`
+(`'ai_active' | 'admin_active'`, meaningful only for a support thread —
+null for ordinary driver↔parent threads, which have no handoff concept).
+`ChatMessage` gained `senderRole` (`'user' | 'ai' | 'admin'`; null on
+every message predating this field reads as `'admin'` for the non-sender
+side, since every reply before the AI existed was a real human's). Added
+`kSupportAiSenderId = 'support_ai'` alongside the existing
+`kSupportParticipantId = 'support'` — the AI's `senderId`, since there is
+no real uid for it. `MessagingRepository.ensureThread` now stamps
+`status: 'ai_active'` on a brand-new support thread only (an ordinary
+thread gets no `status` field at all); `sendMessage` takes an optional
+`senderRole`; a new `watchThread(chatId)` streams a single thread doc for
+a status banner. `firestore.rules`'s message-create rule now rejects a
+client claiming `senderRole: 'ai'`/`'admin'` for its own message (only the
+Cloud Function's Admin SDK, which bypasses rules, or a real admin's own
+client may write those) — deployed.
+
+**Flutter UI** (`live_chat_screen.dart`): sends now carry
+`senderRole: 'user'` explicitly; the header subtitle swaps to "Connected
+to admin" once `status == 'admin_active'`; `_MessageBubble` picks a role
+off `message.senderRole` (falling back to `'admin'` for a null role on the
+other side) to render three looks instead of two — user (right, purple,
+unchanged), AI (left, grey, 🤖), admin (left, blue accent, 💬) — with a
+small "AI ·" / "Admin ·" label under each non-user bubble's timestamp.
+
+**Cloud Function** (`functions/index.js`, `functions/package.json`) — this
+project's **first** Cloud Function; there was no `functions/` directory or
+any trusted server-side code here before. `onSupportMessageCreated`
+triggers on every new `chats/{chatId}/messages/{messageId}`, filters to
+support threads by checking the sentinel is in the split `chatId`, ignores
+its own/an admin's messages via `senderRole`, and does nothing at all once
+`status != 'ai_active'` — checked fresh on every message, which is the
+actual mechanism behind "the AI pauses its own responses", not a one-time
+flag. It loads the last 20 messages, calls the Anthropic Messages API
+(`claude-sonnet-4-5`) with a system prompt describing the transport system
+(missed-bus bidding, the 30-day trial + single subscription, emergency
+contacts, live tracking — written as an illustrative example, flagged in
+the file's own comments to be rewritten for real policies before relying
+on it) and a single `escalate_to_admin` tool. If the model calls that
+tool, the function writes a "Transferring you to an admin…" message,
+flips `status` to `'admin_active'`, writes an in-app notification to every
+admin account, and — using `admin.messaging().sendEachForMulticast` over
+whatever tokens are already sitting in `users/{uid}.fcmTokens` — sends a
+**real push**, which nothing in this project had ever actually done before
+(`PushNotificationService`'s own doc comment previously said this needed
+"a Cloud Function... which this project doesn't have"; this is that
+function). A failed Anthropic call escalates to a human rather than
+leaving the user stuck on silence.
+
+**Deploy status**: `transitpro-db` turned out to still be on the Spark
+(free) plan — Cloud Functions and Secret Manager both require Blaze, so
+`firebase functions:secrets:set ANTHROPIC_API_KEY` failed outright with an
+upgrade link. All code is written, `npm install` inside `functions/`
+resolves cleanly, and the module loads without error, but **the function
+is not deployed** and the secret is not set. Once the project is on Blaze:
+run `firebase functions:secrets:set ANTHROPIC_API_KEY` in `functions/`
+(prompts for the key, hidden input, never stored in this repo), then
+`firebase deploy --only functions` (or `npm run deploy`).
+
+**Known gaps, out of scope for this pass**:
+- `transit_admin` has `watchSupportThreads()` to list open support threads
+  but **no reply-composer screen yet** — an admin can see a thread was
+  escalated (via the new notification) but there's no UI to actually type
+  a reply. Sending as admin only needs
+  `MessagingRepository.instance.sendMessage(..., senderRole: 'admin')`
+  from wherever that composer eventually gets built; the pipeline (and the
+  Flutter chat UI's blue "Admin" bubble) is ready for it.
+- The system prompt's transport-system facts are illustrative, not
+  pulled from live data (no fares, no actual account lookups) — the model
+  cannot answer "what's my child's bus number" today, only general
+  how-the-app-works questions; it will (correctly) escalate anything
+  requiring real account data.
+- No per-field Firestore rule restricts who may flip `status` back from
+  `admin_active` to `ai_active` — only the broad existing "participant or
+  admin may update" rule applies, same looseness already accepted for the
+  Missed Bus bidding rules this session.
+
+`flutter analyze` in both `transit_pro/` and `transit_core/`: 4
+pre-existing issues in `transit_pro` (unchanged), 0 in `transit_core`.
+`node --check` and a bare `require()` of `functions/index.js` both pass.
+
 ### 2026-09-27 — Missed Bus: turned single-shot accept/decline into a live bidding flow
 
 Replaced the old "driver taps Accept, fare is whatever they'd already set
