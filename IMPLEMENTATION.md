@@ -721,6 +721,40 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — Attendance toggle: real weekday name, re-coupled to the day selector (no lock this time)
+
+**Request:** show the actual weekday name (via `intl`'s `DateFormat
+('EEEE')`) instead of "Today"/"Tomorrow", updating dynamically both when
+the 7:01 AM cutoff triggers and when the parent taps a different day in
+the top day-selector row.
+
+**Clarified with the user first**, since this is a partial reversal of the
+immediately preceding entry (which they'd asked to revert back to a
+cutoff-only, `_selectedDay`-independent card): confirmed they now want the
+day selector to drive this card again, but *without* the past-day
+lock/grayscale from two entries ago — this entry is narrower than that one.
+
+- `pubspec.yaml` — re-added `intl: ^0.20.2`.
+- `lib/screens/parent/parent_schedule.dart`:
+  - New `_attendanceDateOverride` (`DateTime?`): null until the parent taps
+    a day in the selector, at which point it's set to that exact date
+    (`_weekDates[i]`) in the same `setState` that already updates
+    `_selectedDay` — one tap now drives both.
+  - `_attendanceTargetDate` prefers `_attendanceDateOverride` when set,
+    falling back to the existing 7:01 AM cutoff pick (today/tomorrow)
+    otherwise — so the card starts on the automatic pick and switches to
+    manual once the parent taps anywhere in the row.
+  - Removed `_AttendanceToggleCard.isToday` and the `'Today'`/`'Tomorrow'`
+    special-casing; `dayLabel` is now always `DateFormat('EEEE')
+    .format(attendanceTargetDate)`, and `_submitAttendance`'s snackbar
+    message uses the same formatter (replacing the manual
+    `_kAllWeekdayNames` array, now removed as redundant).
+  - Deliberately did **not** reintroduce the past-day lock/`ColorFiltered`
+    grayscale from two entries ago — not asked for this time, and the user
+    had just asked to revert exactly that.
+
+`flutter analyze`: unchanged at the 4-issue baseline.
+
 ### 2026-09-27 — reverted: real weekday names + past-day lock/grayscale on the attendance toggle
 
 A request to show the actual weekday name (via `intl`'s `DateFormat

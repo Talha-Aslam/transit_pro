@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/attendance_service.dart';
 import '../../app/driver_data_service.dart';
@@ -87,7 +88,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
       final name = child.name.isEmpty ? 'Your child' : child.name;
       final dayLabel = _dateOnly(date) == _dateOnly(DateTime.now())
           ? 'today'
-          : 'on ${_kAllWeekdayNames[date.weekday - 1]}';
+          : 'on ${DateFormat('EEEE').format(date)}';
       final message = attending
           ? 'Driver notified: $name is attending $dayLabel.'
           : 'Driver notified: $name will be absent $dayLabel.';
@@ -115,20 +116,6 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Thursday',
     'Friday',
     'Saturday',
-  ];
-
-  /// All 7 days, for formatting an arbitrary [DateTime.weekday] (1..7) --
-  /// unlike [_fullWeekDays] (Mon–Sat only, this schedule's display range),
-  /// `_attendanceTargetDate` can legitimately land on a Sunday (a Saturday
-  /// evening's "Tomorrow"), which would index [_fullWeekDays] out of range.
-  static const _kAllWeekdayNames = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
   ];
 
   /// Lowercase full day names, matching the keys
@@ -185,16 +172,21 @@ class _ParentScheduleState extends State<ParentSchedule> {
     return now.hour * 60 + now.minute >= time.hour * 60 + time.minute;
   }
 
+  /// Once the parent taps a specific day in the day selector below, that
+  /// explicit choice pins the attendance card to that date; null means "no
+  /// manual choice yet -- use the 7:01 AM cutoff's automatic Today/Tomorrow
+  /// pick" (see [_attendanceTargetDate]). Set alongside [_selectedDay] by
+  /// the same tap handler, so one tap drives both.
+  DateTime? _attendanceDateOverride;
+
   /// Which calendar date the attendance toggle should ask about right now:
-  /// today, until [_kAttendanceCutoff] (7:01 AM); tomorrow from that moment
-  /// on, for the rest of the day, until the cutoff resets at the next
-  /// morning's 7:01 AM.
-  ///
-  /// Deliberately independent of [_selectedDay] (the day the parent is
-  /// manually browsing in the day selector above): tapping "Wed" to look at
-  /// Wednesday's schedule on a Monday shouldn't change which date this card
-  /// is asking the parent to confirm.
+  /// whatever day the parent last tapped in the day selector
+  /// ([_attendanceDateOverride]), if they've tapped one; otherwise the
+  /// automatic cutoff pick -- today, until [_kAttendanceCutoff] (7:01 AM),
+  /// tomorrow from that moment on, resetting at the next morning's 7:01 AM.
   DateTime get _attendanceTargetDate {
+    final override = _attendanceDateOverride;
+    if (override != null) return override;
     final now = DateTime.now();
     return _isPast(_kAttendanceCutoff) ? now.add(const Duration(days: 1)) : now;
   }
@@ -532,7 +524,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
                         // calendar state to keep in sync.
                         final isAbsent = _isAbsentOn(child, _weekDates[i]);
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedDay = i),
+                          onTap: () => setState(() {
+                            _selectedDay = i;
+                            _attendanceDateOverride = _weekDates[i];
+                          }),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             width: 52,
@@ -870,25 +865,19 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   },
                 ),
 
-                // ── Attendance -- auto-shifts to "Tomorrow" at 7:01 AM ──────
+                // ── Attendance -- cutoff-picked, or whatever day is tapped ──
                 // Replaces the old "Upcoming Holidays" block. Only shown
                 // once a driver is actually linked (`hasBus`) -- with no
                 // driver assigned there is nobody to notify. Targets
-                // `attendanceTargetDate`, not `_selectedDay` -- see
-                // `_attendanceTargetDate`'s doc comment for why the two are
-                // independent.
+                // `attendanceTargetDate`: the day the parent last tapped in
+                // the selector above, or the 7:01 AM cutoff's automatic
+                // Today/Tomorrow pick before any tap -- see that getter's
+                // doc comment.
                 if (hasBus && child != null)
                   _AttendanceToggleCard(
                     childName: child.name.isEmpty ? 'your child' : child.name,
                     date: attendanceTargetDate,
-                    // `isToday: true` makes the card render "Today" itself
-                    // regardless of `dayLabel` (see `_AttendanceToggleCard`
-                    // below) -- 'Tomorrow' only ever shows once the 7:01 AM
-                    // cutoff has passed, i.e. exactly when `isToday` is false.
-                    dayLabel: 'Tomorrow',
-                    isToday:
-                        _dateOnly(attendanceTargetDate) ==
-                        _dateOnly(DateTime.now()),
+                    dayLabel: DateFormat('EEEE').format(attendanceTargetDate),
                     attending: _isAttending(child, attendanceTargetDate),
                     submitting: _submittingAttendanceFor == child.id,
                     onToggle: (attending) => _onAttendanceToggle(
@@ -990,7 +979,6 @@ class _AttendanceToggleCard extends StatelessWidget {
   final String childName;
   final DateTime date;
   final String dayLabel;
-  final bool isToday;
   final bool attending;
   final bool submitting;
   final ValueChanged<bool> onToggle;
@@ -999,7 +987,6 @@ class _AttendanceToggleCard extends StatelessWidget {
     required this.childName,
     required this.date,
     required this.dayLabel,
-    required this.isToday,
     required this.attending,
     required this.submitting,
     required this.onToggle,
@@ -1070,7 +1057,7 @@ class _AttendanceToggleCard extends StatelessWidget {
                 children: [
                   Text(
                     '${AppStrings.t('attendance_label')} — $childName, '
-                    '${isToday ? 'Today' : dayLabel}',
+                    '$dayLabel',
                     style: TextStyle(
                       color: context.textSecondary,
                       fontSize: 11,

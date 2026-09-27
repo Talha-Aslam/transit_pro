@@ -24,6 +24,7 @@ dependencies:
   firebase_database: ^12.1.0
   google_sign_in: 6.2.1
   mapbox_maps_flutter: ^2.28.3
+  intl: ^0.20.2
 
   # Shared domain layer — models, enums and config used by BOTH this app and
   # the admin app. See ../../transit_core.
