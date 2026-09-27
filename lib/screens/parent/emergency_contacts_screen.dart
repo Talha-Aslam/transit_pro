@@ -68,12 +68,13 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) {
+      builder: (sheetContext) {
         final bottom = MediaQuery.of(context).viewInsets.bottom;
+        final isDark = sheetContext.isDark;
         return Container(
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
           decoration: BoxDecoration(
-            color: AppTheme.bgDark,
+            color: isDark ? AppTheme.bgDark : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -85,7 +86,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: isDark ? Colors.white24 : Colors.grey[300],
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -96,7 +97,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                     ? AppStrings.t('add_contact')
                     : AppStrings.t('edit_contact'),
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : Colors.black87,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -106,12 +107,14 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 nameCtrl,
                 AppStrings.t('full_name'),
                 Icons.person_outline,
+                isDark: isDark,
               ),
               const SizedBox(height: 10),
               _buildField(
                 relCtrl,
                 AppStrings.t('relation'),
                 Icons.family_restroom,
+                isDark: isDark,
               ),
               const SizedBox(height: 10),
               _buildField(
@@ -119,6 +122,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 AppStrings.t('phone_number'),
                 Icons.phone_outlined,
                 type: TextInputType.phone,
+                isDark: isDark,
               ),
               const SizedBox(height: 18),
               Row(
@@ -129,13 +133,15 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         decoration: BoxDecoration(
-                          color: Colors.white10,
+                          color: isDark ? Colors.white10 : Colors.grey[200],
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Center(
                           child: Text(
                             AppStrings.t('cancel'),
-                            style: const TextStyle(color: Colors.white70),
+                            style: TextStyle(
+                              color: isDark ? Colors.white70 : Colors.grey[800],
+                            ),
                           ),
                         ),
                       ),
@@ -196,22 +202,24 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     TextEditingController ctrl,
     String hint,
     IconData icon, {
+    required bool isDark,
     TextInputType type = TextInputType.text,
   }) {
+    final fadedColor = isDark ? Colors.white38 : Colors.grey[600];
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.bgDarkBlue,
+        color: isDark ? AppTheme.bgDarkBlue : Colors.grey[100],
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.grey[300]!),
       ),
       child: TextField(
         controller: ctrl,
         keyboardType: type,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white38),
-          prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+          hintStyle: TextStyle(color: fadedColor),
+          prefixIcon: Icon(icon, color: fadedColor, size: 20),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,
@@ -439,8 +447,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.info.withValues(alpha:
-                                              0.12,
+                                            color: AppTheme.info.withValues(
+                                              alpha: 0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               10,
@@ -462,8 +470,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                                           width: 36,
                                           height: 36,
                                           decoration: BoxDecoration(
-                                            color: AppTheme.error.withValues(alpha:
-                                              0.12,
+                                            color: AppTheme.error.withValues(
+                                              alpha: 0.12,
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               10,

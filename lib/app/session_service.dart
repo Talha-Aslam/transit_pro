@@ -8,6 +8,7 @@ import '../data/payment_repository.dart';
 import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
 import 'notification_service.dart';
+import 'push_notification_service.dart';
 
 /// Where the signed-in user stands, from the router's point of view.
 enum SessionState {
@@ -118,7 +119,10 @@ class SessionService extends ChangeNotifier {
   /// The live request for one child, whatever its state — so the parent's
   /// search results can show "Awaiting reply" on a driver they already asked
   /// instead of offering the button again.
-  RideRequest? requestFor({required String studentId, required String driverId}) {
+  RideRequest? requestFor({
+    required String studentId,
+    required String driverId,
+  }) {
     final id = RideRequest.idFor(driverId: driverId, studentId: studentId);
     for (final r in rideRequests.value) {
       if (r.id == id) return r;
@@ -128,7 +132,8 @@ class SessionService extends ChangeNotifier {
 
   /// The rounds the signed-in driver offers, in reading order. Empty for any
   /// other role.
-  List<DriverSchedule> get mySchedules => driver.value?.orderedSchedules ?? const [];
+  List<DriverSchedule> get mySchedules =>
+      driver.value?.orderedSchedules ?? const [];
 
   /// Lookup caches for documents referenced by id.
   ///
@@ -226,28 +231,40 @@ class SessionService extends ChangeNotifier {
     // an empty notification list.
     NotificationService.instance.bindToUser(uid);
 
+    // Fire-and-forget: this shows an OS permission dialog and does a
+    // network round trip (`getToken()`), neither of which should hold up
+    // sign-in — the caller is already past the point of needing this to
+    // have finished, and it's best-effort by design (see the class doc).
+    unawaited(PushNotificationService.instance.registerForUser(uid));
+
     _subs.add(
-      UserRepository.instance.watchUser(uid).listen(
-        _onUser,
-        onError: (Object e) {
-          debugPrint('SessionService: user stream failed — $e');
-          // This is the listener *erroring* — permission-denied, a backend
-          // outage — not a successful read that simply found no document. A
-          // missing document comes through _onUser(null) below and correctly
-          // means "needs onboarding"; this means "we don't actually know",
-          // and must never be reported as the former. Conflating the two is
-          // what used to send a user hitting a Firestore rules problem into
-          // an onboarding loop with no way out, since retrying the exact same
-          // broken request always fails identically.
-          lastError = e;
-          _setState(SessionState.error);
-        },
-      ),
+      UserRepository.instance
+          .watchUser(uid)
+          .listen(
+            _onUser,
+            onError: (Object e) {
+              debugPrint('SessionService: user stream failed — $e');
+              // This is the listener *erroring* — permission-denied, a backend
+              // outage — not a successful read that simply found no document. A
+              // missing document comes through _onUser(null) below and correctly
+              // means "needs onboarding"; this means "we don't actually know",
+              // and must never be reported as the former. Conflating the two is
+              // what used to send a user hitting a Firestore rules problem into
+              // an onboarding loop with no way out, since retrying the exact same
+              // broken request always fails identically.
+              lastError = e;
+              _setState(SessionState.error);
+            },
+          ),
     );
   }
 
   /// Tears the session down. Called on sign-out.
   Future<void> stop({bool notify = true}) async {
+    // Captured before `_uid` is cleared below — `unregisterForUser` needs
+    // it to remove the right entry from `fcmTokens`.
+    final signingOutUid = _uid;
+
     for (final sub in _subs) {
       await sub.cancel();
     }
@@ -270,6 +287,14 @@ class SessionService extends ChangeNotifier {
     // Notifications are per-account. Leaving them would show one family's alerts
     // to the next person signing in on a shared phone.
     NotificationService.instance.unbind();
+
+    // Same per-account reasoning as above: a token left behind would keep
+    // this device receiving push for an account no longer signed in on it.
+    if (signingOutUid != null) {
+      unawaited(
+        PushNotificationService.instance.unregisterForUser(signingOutUid),
+      );
+    }
 
     user.value = null;
     children.value = [];
@@ -464,13 +489,10 @@ class SessionService extends ChangeNotifier {
       _busSub = null;
       bus.value = null;
       if (busId != null && busId.isNotEmpty) {
-        _busSub = FleetRepository.instance.watchBus(busId).listen(
-              (b) {
-                bus.value = b;
-                _backfillForRole();
-              },
-              onError: (Object e) => debugPrint('bus stream: $e'),
-            );
+        _busSub = FleetRepository.instance.watchBus(busId).listen((b) {
+          bus.value = b;
+          _backfillForRole();
+        }, onError: (Object e) => debugPrint('bus stream: $e'));
       }
     }
 
@@ -480,13 +502,10 @@ class SessionService extends ChangeNotifier {
       _routeSub = null;
       route.value = null;
       if (routeId != null && routeId.isNotEmpty) {
-        _routeSub = FleetRepository.instance.watchRoute(routeId).listen(
-              (r) {
-                route.value = r;
-                _backfillForRole();
-              },
-              onError: (Object e) => debugPrint('route stream: $e'),
-            );
+        _routeSub = FleetRepository.instance.watchRoute(routeId).listen((r) {
+          route.value = r;
+          _backfillForRole();
+        }, onError: (Object e) => debugPrint('route stream: $e'));
       }
 
       // A driver's passenger list is whoever shares their route.
@@ -494,15 +513,12 @@ class SessionService extends ChangeNotifier {
       _routeStudentsSub = null;
       routeStudents.value = [];
       if (role == UserRole.driver && routeId != null && routeId.isNotEmpty) {
-        _routeStudentsSub =
-            UserRepository.instance.watchStudentsOnRoute(routeId).listen(
-                  (list) {
-                    routeStudents.value = list;
-                    _backfillForRole();
-                  },
-                  onError: (Object e) =>
-                      debugPrint('route students stream: $e'),
-                );
+        _routeStudentsSub = UserRepository.instance
+            .watchStudentsOnRoute(routeId)
+            .listen((list) {
+              routeStudents.value = list;
+              _backfillForRole();
+            }, onError: (Object e) => debugPrint('route students stream: $e'));
       }
     }
   }
@@ -635,5 +651,4 @@ class SessionService extends ChangeNotifier {
       sink();
     }
   }
-
 }

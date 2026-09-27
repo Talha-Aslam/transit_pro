@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
+import '../../app/auth_service.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
@@ -666,12 +667,16 @@ class _DriverProfileState extends State<DriverProfile> {
                             desc: LanguageProvider.instance.lang,
                             onTap: () => context.push('/driver/language'),
                           ),
-                          _MenuItem(
-                            icon: '🔐',
-                            label: AppStrings.t('change_password'),
-                            onTap: () =>
-                                context.push('/driver/change-password'),
-                          ),
+                          // A Google-only account has no password to
+                          // change here — see the same guard on
+                          // `parent_profile.dart`'s Change Password entry.
+                          if (AuthService.instance.hasPasswordProvider)
+                            _MenuItem(
+                              icon: '🔐',
+                              label: AppStrings.t('change_password'),
+                              onTap: () =>
+                                  context.push('/driver/change-password'),
+                            ),
                           _MenuItem(
                             icon: '📞',
                             label: AppStrings.t('emergency_contacts'),

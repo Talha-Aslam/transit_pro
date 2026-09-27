@@ -1,8 +1,20 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
 import '../../theme/app_theme.dart';
 
+/// Real-time support chat, backed by the same `chats`/`chats/{id}/messages`
+/// Firestore structure — and the same `MessagingRepository` — already used
+/// for driver↔parent chat (`driver_chat_screen.dart`). That repository
+/// existed, fully built and tested-looking, before this screen used it; this
+/// screen (and `driver_chat_screen.dart`, `student_driver_chat.dart`) were
+/// the dummy, in-memory, canned-bot-reply UI it was apparently built for but
+/// never wired up to.
 class LiveChatScreen extends StatefulWidget {
   const LiveChatScreen({super.key});
 
@@ -13,56 +25,66 @@ class LiveChatScreen extends StatefulWidget {
 class _LiveChatScreenState extends State<LiveChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(
-      text:
-          'Hi there! 👋 Welcome to TransitPro Support. How can we help you today?',
-      isSupport: true,
-      time: _formattedTime(DateTime.now()),
-    ),
-  ];
-  bool _isTyping = false;
+  final _messaging = MessagingRepository.instance;
 
-  static String _formattedTime(DateTime dt) {
+  String? _chatId;
+  bool _sending = false;
+
+  /// Set when [_init] fails, so the screen can show a real error state
+  /// instead of leaving the caller stuck on a spinner forever — that
+  /// silence (an unhandled exception inside an un-awaited `initState`
+  /// call) is what previously took the whole app down instead of just
+  /// this screen.
+  Object? _initError;
+
+  @override
+  void initState() {
+    super.initState();
+    LanguageProvider.instance.addListener(_onLangChanged);
+    _init();
+  }
+
+  void _onLangChanged() => setState(() {});
+
+  Future<void> _init() async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+    try {
+      final chatId = await _messaging.ensureThread(uid, kSupportParticipantId);
+      if (!mounted) return;
+      setState(() => _chatId = chatId);
+      // Best-effort: opening the thread is what "reading" it means here,
+      // not a failure worth surfacing to the user if the write doesn't
+      // land.
+      unawaited(_messaging.markThreadRead(chatId, uid));
+    } on FirebaseException catch (e) {
+      // Distinct from the catch-all below so a rule denial reads as
+      // exactly that in the console instead of a generic failure — same
+      // pattern as `find_drivers_screen.dart`'s `_request()`.
+      debugPrint(
+        'live chat ensureThread failed — Firebase ${e.code}: ${e.message}',
+      );
+      if (mounted) setState(() => _initError = e);
+    } catch (e) {
+      debugPrint('live chat ensureThread failed: $e');
+      if (mounted) setState(() => _initError = e);
+    }
+  }
+
+  @override
+  void dispose() {
+    LanguageProvider.instance.removeListener(_onLangChanged);
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  static String _formattedTime(DateTime? dt) {
+    if (dt == null) return '';
     final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
     final m = dt.minute.toString().padLeft(2, '0');
     final period = dt.hour < 12 ? 'AM' : 'PM';
     return '$h:$m $period';
-  }
-
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    _controller.clear();
-
-    setState(() {
-      _messages.add(
-        _ChatMessage(
-          text: text,
-          isSupport: false,
-          time: _formattedTime(DateTime.now()),
-        ),
-      );
-      _isTyping = true;
-    });
-    _scrollToBottom();
-
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
-    setState(() {
-      _isTyping = false;
-      _messages.add(
-        _ChatMessage(
-          text:
-              'Thanks for reaching out! Our team has received your message and will get back to you shortly. For urgent issues please call +92 300 0000000.',
-          isSupport: true,
-          time: _formattedTime(DateTime.now()),
-        ),
-      );
-    });
-    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -70,29 +92,55 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    final uid = SessionService.instance.uid;
+    final chatId = _chatId;
+    if (text.isEmpty || uid == null || chatId == null || _sending) return;
+
+    setState(() => _sending = true);
+    _controller.clear();
+    try {
+      await _messaging.sendMessage(
+        chatId: chatId,
+        senderId: uid,
+        recipientId: kSupportParticipantId,
+        text: text,
+      );
+      _scrollToBottom();
+    } catch (e) {
+      debugPrint('live chat sendMessage failed: $e');
+      if (!mounted) return;
+      // The text is already cleared from the field; put it back so nothing
+      // typed is lost to a failed send.
+      _controller.text = text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('message_send_failed')),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final uid = SessionService.instance.uid;
     return Scaffold(
       body: Container(
         decoration: context.scaffoldBg,
         child: SafeArea(
           child: Column(
             children: [
-              // App bar
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                 decoration: BoxDecoration(
@@ -150,25 +198,12 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: AppTheme.success,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              AppStrings.t('chat_online_status'),
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          AppStrings.t('live_chat_hours'),
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -178,20 +213,74 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
 
               // Messages list
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  itemCount: _messages.length + (_isTyping ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (_isTyping && index == _messages.length) {
-                      return _TypingIndicator();
-                    }
-                    return _MessageBubble(message: _messages[index]);
-                  },
-                ),
+                child: _initError != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Text(
+                            AppStrings.t('chat_load_failed'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: context.textSecondary),
+                          ),
+                        ),
+                      )
+                    : (uid == null || _chatId == null)
+                    ? const Center(child: CircularProgressIndicator())
+                    : StreamBuilder<List<ChatMessage>>(
+                        stream: _messaging.watchMessages(_chatId!),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            debugPrint(
+                              'live chat watchMessages failed: ${snapshot.error}',
+                            );
+                            return Center(
+                              child: Text(
+                                AppStrings.t('chat_load_failed'),
+                                style: TextStyle(color: context.textSecondary),
+                              ),
+                            );
+                          }
+                          if (!snapshot.hasData) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          final messages = snapshot.data!;
+                          if (messages.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 40,
+                                ),
+                                child: Text(
+                                  AppStrings.t('live_chat_empty'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: context.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          WidgetsBinding.instance.addPostFrameCallback(
+                            (_) => _scrollToBottom(),
+                          );
+                          return ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            itemCount: messages.length,
+                            itemBuilder: (context, index) => _MessageBubble(
+                              message: messages[index],
+                              isMine: messages[index].senderId == uid,
+                              timeLabel: _formattedTime(messages[index].sentAt),
+                            ),
+                          );
+                        },
+                      ),
               ),
 
               // Input area
@@ -236,7 +325,7 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
-                      onTap: _sendMessage,
+                      onTap: _sending ? null : _sendMessage,
                       child: Container(
                         width: 44,
                         height: 44,
@@ -244,11 +333,21 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
                           gradient: AppTheme.parentGradient,
                           borderRadius: BorderRadius.circular(22),
                         ),
-                        child: const Icon(
-                          Icons.send_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        child: _sending
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.send_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                       ),
                     ),
                   ],
@@ -262,40 +361,32 @@ class _LiveChatScreenState extends State<LiveChatScreen> {
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Message data model
-// ──────────────────────────────────────────────────────────────────────────────
-class _ChatMessage {
-  final String text;
-  final bool isSupport;
-  final String time;
-
-  const _ChatMessage({
-    required this.text,
-    required this.isSupport,
-    required this.time,
-  });
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Message bubble widget
-// ──────────────────────────────────────────────────────────────────────────────
 class _MessageBubble extends StatelessWidget {
-  final _ChatMessage message;
-  const _MessageBubble({required this.message});
+  final ChatMessage message;
+  final bool isMine;
+  final String timeLabel;
+
+  const _MessageBubble({
+    required this.message,
+    required this.isMine,
+    required this.timeLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isSupport = message.isSupport;
+    // "Mine" (the signed-in user) aligns right, exactly as before; the
+    // other side (support, whichever admin replies) aligns left — same
+    // visual language as the driver chat, just keyed off a real senderId
+    // comparison instead of a hardcoded isSupport flag.
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isSupport
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
+        mainAxisAlignment: isMine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (isSupport) ...[
+          if (!isMine) ...[
             Container(
               width: 30,
               height: 30,
@@ -311,9 +402,9 @@ class _MessageBubble extends StatelessWidget {
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment: isSupport
-                  ? CrossAxisAlignment.start
-                  : CrossAxisAlignment.end,
+              crossAxisAlignment: isMine
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -321,22 +412,22 @@ class _MessageBubble extends StatelessWidget {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    gradient: isSupport ? null : AppTheme.parentGradient,
-                    color: isSupport ? context.cardBgElevated : null,
+                    gradient: isMine ? AppTheme.parentGradient : null,
+                    color: isMine ? null : context.cardBgElevated,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isSupport ? 4 : 16),
-                      bottomRight: Radius.circular(isSupport ? 16 : 4),
+                      bottomLeft: Radius.circular(isMine ? 16 : 4),
+                      bottomRight: Radius.circular(isMine ? 4 : 16),
                     ),
-                    border: isSupport
-                        ? Border.all(color: context.surfaceBorder)
-                        : null,
+                    border: isMine
+                        ? null
+                        : Border.all(color: context.surfaceBorder),
                   ),
                   child: Text(
                     message.text,
                     style: TextStyle(
-                      color: isSupport ? context.textPrimary : Colors.white,
+                      color: isMine ? Colors.white : context.textPrimary,
                       fontSize: 13,
                       height: 1.4,
                     ),
@@ -344,112 +435,10 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  message.time,
+                  timeLabel,
                   style: TextStyle(color: context.textTertiary, fontSize: 10),
                 ),
               ],
-            ),
-          ),
-          if (!isSupport) const SizedBox(width: 4),
-        ],
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Typing indicator
-// ──────────────────────────────────────────────────────────────────────────────
-class _TypingIndicator extends StatefulWidget {
-  @override
-  State<_TypingIndicator> createState() => _TypingIndicatorState();
-}
-
-class _TypingIndicatorState extends State<_TypingIndicator>
-    with TickerProviderStateMixin {
-  late final List<AnimationController> _controllers;
-  late final List<Animation<double>> _anims;
-
-  @override
-  void initState() {
-    super.initState();
-    _controllers = List.generate(3, (i) {
-      final c = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 400),
-      );
-      Future.delayed(Duration(milliseconds: i * 150), () {
-        if (mounted) c.repeat(reverse: true);
-      });
-      return c;
-    });
-    _anims = _controllers
-        .map(
-          (c) => Tween<double>(
-            begin: 0,
-            end: -6,
-          ).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)),
-        )
-        .toList();
-  }
-
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              gradient: AppTheme.parentGradient,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text('💬', style: TextStyle(fontSize: 14)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: context.cardBgElevated,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
-              ),
-              border: Border.all(color: context.surfaceBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) {
-                return AnimatedBuilder(
-                  animation: _anims[i],
-                  builder: (_, _) => Transform.translate(
-                    offset: Offset(0, _anims[i].value),
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.parentPurple,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                );
-              }),
             ),
           ),
         ],

@@ -373,16 +373,45 @@ service cloud.firestore {
     // ── chat ────────────────────────────────────────────────────────────────
 
     match /chats/{chatId} {
-      allow read: if signedIn() && uid() in resource.data.participants;
+      // `|| isAdmin()` is what "Live Chat" support needs and every other
+      // thread already had no use for: a support thread's participants are
+      // `[realUserUid, 'support']` — 'support' is a fixed sentinel, not a
+      // specific admin's uid (a regular user has no rule-permitted way to
+      // look up which uid(s) are admins to address one directly — see
+      // `kSupportParticipantId`'s doc comment in `transit_core`). So
+      // for a support thread specifically, no real admin uid is ever *in*
+      // `participants`, and without this clause no admin could read or
+      // reply to any of them. It's a no-op for ordinary driver↔parent
+      // threads, where both real participants already satisfy the
+      // membership check on their own.
+      //
+      // `!exists(...)` first is load-bearing, not defensive style — same
+      // reasoning as the identical guard on `ride_requests`:
+      // `MessagingRepository.ensureThread()` reads this doc *before* it
+      // exists, to check whether a thread needs creating. On a nonexistent
+      // document `resource` is null, and `resource.data.x` on null throws
+      // inside rule evaluation, which Firestore treats as denied, not as
+      // "false". Without this guard, that pre-check read fails
+      // permission-denied for every single user's very first "Live Chat"
+      // open (their support thread never exists before then) — which is
+      // exactly what crashed the app: the exception surfaces inside
+      // `_init()`, unhandled. This only leaks whether a doc exists, never
+      // its contents, to any signed-in user.
+      allow read: if signedIn()
+                  && (!exists(/databases/$(database)/documents/chats/$(chatId))
+                      || uid() in resource.data.participants
+                      || isAdmin());
 
       allow create: if signedIn() && uid() in request.resource.data.participants;
 
-      allow update: if signedIn() && uid() in resource.data.participants;
+      allow update: if signedIn()
+                    && (uid() in resource.data.participants || isAdmin());
 
       match /messages/{messageId} {
         function inThread() {
           return uid() in get(/databases/$(database)/documents/chats/$(chatId))
-                            .data.participants;
+                            .data.participants
+                 || isAdmin();
         }
 
         allow read: if signedIn() && inThread();
@@ -410,6 +439,23 @@ service cloud.firestore {
 
       allow create: if signedIn()
                     && request.resource.data.raterId == uid()
+                    && request.resource.data.rating >= 1
+                    && request.resource.data.rating <= 5;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ── app feedback ─────────────────────────────────────────────────────────
+    //
+    // "Rate the App" submissions. Write-only from any client's point of view —
+    // nobody in the app reads this back, only the admin panel does — so, unlike
+    // `ratings`, there is no `allow read` for the submitting user at all.
+
+    match /app_feedback/{feedbackId} {
+      allow read: if isAdmin();
+
+      allow create: if signedIn()
+                    && request.resource.data.userId == uid()
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5;
 

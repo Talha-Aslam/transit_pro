@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
+import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../app/student_data_service.dart';
@@ -778,12 +779,16 @@ class _StudentProfileState extends State<StudentProfile> {
                             desc: LanguageProvider.instance.lang,
                             onTap: () => context.push('/student/language'),
                           ),
-                          _SettingTile(
-                            icon: '🔐',
-                            label: AppStrings.t('change_password'),
-                            onTap: () =>
-                                context.push('/student/change-password'),
-                          ),
+                          // A Google-only account has no password to
+                          // change here — see the same guard on
+                          // `parent_profile.dart`'s Change Password entry.
+                          if (AuthService.instance.hasPasswordProvider)
+                            _SettingTile(
+                              icon: '🔐',
+                              label: AppStrings.t('change_password'),
+                              onTap: () =>
+                                  context.push('/student/change-password'),
+                            ),
                           _SettingTile(
                             icon: '📞',
                             label: AppStrings.t('emergency_contacts'),

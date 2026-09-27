@@ -20,6 +20,7 @@ dependencies:
   firebase_core: ^4.7.0
   cloud_firestore: ^6.3.0
   firebase_auth: ^6.4.0
+  firebase_messaging: ^16.0.4
   firebase_database: ^12.1.0
   google_sign_in: 6.2.1
   mapbox_maps_flutter: ^2.28.3

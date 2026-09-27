@@ -215,6 +215,11 @@ class AppStrings {
     'type_message': 'Type your message here...',
     'send': 'Send Message',
     'message_sent': "Message sent! We'll reply within 24h.",
+    'message_send_failed': 'Could not send. Please try again.',
+    'chat_load_failed': 'Could not load the conversation. Please try again.',
+    'live_chat_empty':
+        "Send a message and our support team will get back to you\nduring "
+        'business hours.',
     'driver_chat_title': 'Driver Chat',
     'driver_chat_subtitle': 'Chat with the selected driver',
     'selected_driver': 'Selected Driver',
@@ -283,6 +288,9 @@ class AppStrings {
     'review_hint': 'Share your experience...',
     'submit_rating': 'Submit Rating',
     'submit_review': 'Submit Review',
+    'feedback_submitted': 'Thank you for your feedback!',
+    'feedback_submit_failed':
+        'Could not submit your feedback. Please try again.',
     'thank_you': 'Thank You!',
     'review_submitted': 'Your feedback helps us improve',
     'you_rated': 'You rated us {stars} star{plural}.',
@@ -937,6 +945,10 @@ class AppStrings {
     'type_message': 'پیغام ٹائپ کریں...',
     'send': 'پیغام بھیجیں',
     'message_sent': 'پیغام بھیج دیا گیا! ہم 24 گھنٹے میں جواب دیں گے۔',
+    'message_send_failed': 'بھیجا نہیں جا سکا۔ دوبارہ کوشش کریں۔',
+    'chat_load_failed': 'گفتگو لوڈ نہیں ہو سکی۔ دوبارہ کوشش کریں۔',
+    'live_chat_empty':
+        'پیغام بھیجیں اور ہماری سپورٹ ٹیم کام کے اوقات میں\nآپ سے رابطہ کرے گی۔',
     'driver_chat_title': 'ڈرائیور چیٹ',
     'driver_chat_subtitle': 'منتخب ڈرائیور سے چیٹ کریں',
     'selected_driver': 'منتخب ڈرائیور',
@@ -1005,6 +1017,8 @@ class AppStrings {
     'review_hint': 'اپنا تجربہ شیئر کریں...',
     'submit_rating': 'درجہ بندی جمع کرائیں',
     'submit_review': 'جائزہ جمع کرائیں',
+    'feedback_submitted': 'آپ کی رائے کے لیے شکریہ!',
+    'feedback_submit_failed': 'آپ کی رائے جمع نہیں ہو سکی۔ دوبارہ کوشش کریں۔',
     'thank_you': 'شکریہ!',
     'review_submitted': 'آپ کی رائے ہمیں بہتر بنانے میں مدد دیتی ہے',
     'you_rated': 'آپ نے ہمیں {stars} اسٹار دیے ہیں۔',

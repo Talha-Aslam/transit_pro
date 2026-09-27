@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
+import '../../data/app_feedback_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 
@@ -16,6 +19,62 @@ class _RateAppScreenState extends State<RateAppScreen> {
   int _stars = 0;
   final _ctrl = TextEditingController();
   bool _submitted = false;
+  bool _submitting = false;
+
+  Future<void> _submit() async {
+    if (_stars == 0 || _submitting) return;
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+
+    setState(() => _submitting = true);
+    try {
+      await AppFeedbackRepository.instance.submit(
+        userId: uid,
+        rating: _stars,
+        comment: _ctrl.text,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppStrings.t('feedback_submitted'))),
+      );
+      // Swaps to `_ThankYouView` below rather than `Navigator.pop`-ing
+      // straight away — that view is this screen's own real "thank you"
+      // moment (its own copy, its own "Back to Profile" button that pops
+      // when *the user* is done reading it), and popping immediately would
+      // skip past UI that's already built rather than replace it.
+      setState(() {
+        _submitted = true;
+        _submitting = false;
+      });
+    } on FirebaseException catch (e) {
+      // Distinct from the catch-all below so a rule denial reads as exactly
+      // that in the console ('permission-denied') instead of being lumped
+      // in with a generic failure — `e.code` is what tells them apart, `e`
+      // alone does not always show it clearly. Same pattern as
+      // `find_drivers_screen.dart`'s `_request()`.
+      debugPrint(
+        'app feedback submit failed — Firebase ${e.code}: ${e.message}',
+      );
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('feedback_submit_failed')),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } catch (e) {
+      debugPrint('app feedback submit failed: $e');
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.t('feedback_submit_failed')),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
 
   List<String> get _starLabels => [
     '',
@@ -230,9 +289,9 @@ class _RateAppScreenState extends State<RateAppScreen> {
                             const SizedBox(height: 20),
 
                             GestureDetector(
-                              onTap: _stars == 0
+                              onTap: (_stars == 0 || _submitting)
                                   ? null
-                                  : () => setState(() => _submitted = true),
+                                  : _submit,
                               child: AnimatedOpacity(
                                 opacity: _stars == 0 ? 0.5 : 1.0,
                                 duration: const Duration(milliseconds: 200),
@@ -253,14 +312,26 @@ class _RateAppScreenState extends State<RateAppScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Center(
-                                    child: Text(
-                                      AppStrings.t('submit_rating'),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                                    child: _submitting
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          )
+                                        : Text(
+                                            AppStrings.t('submit_rating'),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ),

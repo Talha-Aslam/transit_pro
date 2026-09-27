@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
@@ -694,12 +695,22 @@ class _ParentProfileState extends State<ParentProfile> {
                                 onTap: () =>
                                     context.push('/parent/emergency-contacts'),
                               ),
-                              _MenuItem(
-                                icon: '🔐',
-                                label: AppStrings.t('change_password'),
-                                onTap: () =>
-                                    context.push('/parent/change-password'),
-                              ),
+                              // A Google-only account has no password to
+                              // change here — Firebase's email/password
+                              // reset flow doesn't apply to it, and
+                              // `AuthService.changePassword()` already
+                              // refuses with "you sign in with Google" if
+                              // reached some other way. Hiding the entry
+                              // point is the honest version of that same
+                              // fact, not a separate check that could
+                              // drift from it.
+                              if (AuthService.instance.hasPasswordProvider)
+                                _MenuItem(
+                                  icon: '🔐',
+                                  label: AppStrings.t('change_password'),
+                                  onTap: () =>
+                                      context.push('/parent/change-password'),
+                                ),
                               _MenuItem(
                                 icon: '🌐',
                                 label: AppStrings.t('language'),
