@@ -721,6 +721,107 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — reverted: real weekday names + past-day lock/grayscale on the attendance toggle
+
+A request to show the actual weekday name (via `intl`'s `DateFormat
+('EEEE')`) instead of "Today"/"Tomorrow", and to lock + grayscale
+(`ColorFiltered` with `ColorFilter.mode(Colors.grey, BlendMode.saturation)`)
+the attendance toggle for a past day, was implemented and then explicitly
+reverted by the user immediately after. `lib/screens/parent
+/parent_schedule.dart` and `pubspec.yaml` (which had gained an `intl`
+dependency for this) are back to exactly the prior entry's state — the
+strict 7:01 AM Today/Tomorrow-only cutoff, decoupled from `_selectedDay`.
+Recorded here so the reversal itself isn't lost, without leaving a
+superseded implementation's details in this log as if still current.
+
+### 2026-09-27 — Attendance toggle: replaced the pickup-time-based shift with a strict 7:01 AM cutoff
+
+**Request:** rather than shifting once the child's *actual* Morning Pickup
+time passes (previous entry), the toggle should shift on one fixed clock
+time — before 7:01 AM asks about Today, from 7:01 AM onward asks about
+Tomorrow, resetting at the next morning's 7:01 AM.
+
+This supersedes the previous entry's per-day, per-driver pickup-time
+comparison with a simpler, always-on rule that doesn't depend on a driver
+or schedule being assigned at all.
+
+- `lib/screens/parent/parent_schedule.dart`:
+  - Replaced `_attendanceDayIndex(schedule)` (indexed into the visible
+    Mon–Sat schedule array, capped at Saturday) with `_attendanceTargetDate`
+    — a plain `DateTime` getter comparing `TimeOfDay.fromDateTime
+    (DateTime.now())` against a fixed `_kAttendanceCutoff = TimeOfDay(hour:
+    7, minute: 1)`, returning `DateTime.now()` or `DateTime.now().add
+    (Duration(days: 1))`. No longer tied to the schedule array or
+    `_weekDates`, so the previous "stuck on Saturday" edge case is gone —
+    "Tomorrow" can now correctly land on a Sunday.
+  - That Sunday case exposed a latent bug: `_submitAttendance`'s snackbar
+    message indexed `_fullWeekDays` (Mon–Sat only, 6 entries) by
+    `date.weekday - 1`, which is `6` for Sunday — an out-of-range crash
+    that could never previously be reached (attendance dates used to come
+    only from the Mon–Sat day selector) but now can, since "Tomorrow" is a
+    real calendar date. Fixed by adding a full 7-day `_kAllWeekdayNames`
+    used only for this message, leaving the display-only `_fullWeekDays`
+    untouched.
+  - The attendance card's label now reads literally "Today"/"Tomorrow"
+    (`dayLabel: 'Tomorrow'`, `isToday` gated on `_attendanceTargetDate`
+    matching today) rather than a weekday name.
+
+`flutter analyze`: `transit_pro` unchanged at the 4-issue baseline. No
+`firestore.rules` change needed — the write still goes through last
+entry's `students/{id}/attendance/{dateKey}` path and rule, only the date
+key it's computed from changed.
+
+### 2026-09-27 — Attendance toggle auto-shifts past a passed pickup time, and now writes real per-day Firestore history
+
+**Request:** the daily attendance toggle should stop asking about today
+once today's Morning Pickup time has passed, shifting to ask about the
+next school day instead, and the write should go to a per-date Firestore
+key so a daily history is kept, not one generic boolean.
+
+**What I found first:** `AttendanceService.updateAttendance` was a
+declared mock — it never touched Firestore at all (just a `debugPrint`),
+though its own doc comment already sketched the real replacement: one
+document per student per day, keyed by `Trip.dateKeyFor(date)`
+(`students/{id}/attendance/{dateKey}`), not a flat `attendance_2026_09_27`
+field on the student document as the request suggested. Implemented the
+already-sketched shape rather than a new flat-field scheme, and made it a
+real write. This is a **different** collection from the existing
+`AttendanceRecord` (`trips/{tripId}/attendance/{studentId}`) — that one is
+the driver's record of who boarded a specific route run; this is the
+family's own advance notice, sent before the trip exists.
+
+- `lib/app/attendance_service.dart` — `updateAttendance` now does a real
+  `Db.fs.collection('students').doc(id).collection('attendance')
+  .doc(dateKey).set({'isAttending': ..., 'updatedAt': Db.now})` instead of
+  a `debugPrint`.
+- `firestore.rules` — new nested `students/{studentId}/attendance/{dateKey}`
+  rule: read by the owning family, the driver, or an admin; write only by
+  the owning family (`ownsStudent()`, reusing the existing helper).
+- `lib/app/driver_data_service.dart` — added `parseTimeOfDay()`, the
+  inverse of the existing `formatTimeOfDay()`, so both this feature and
+  `EditWeeklyScheduleScreen` (refactored to use it, dropping its own
+  private duplicate) share one `'7:15 AM'` <-> `TimeOfDay` conversion.
+- `lib/screens/parent/parent_schedule.dart` — new `_attendanceDayIndex
+  (schedule)`: resolves to today's index normally, or the next index in
+  this week's Mon–Sat range once `parseTimeOfDay(schedule[todayIdx]
+  .pickup)` has already passed the current wall-clock time (compared via
+  `TimeOfDay.fromDateTime(DateTime.now())`). Deliberately **independent**
+  of `_selectedDay` (the day the day-selector row is manually browsing) —
+  computed once in `build()` and threaded into `_buildBody` as
+  `attendanceDayIndex`, so tapping around the week to look at other days'
+  schedules never changes which day the attendance card itself is asking
+  about.
+
+**Known gap, called out rather than silently left:** if today is already
+Saturday (the last day this screen's week covers) and its pickup has
+passed, there is no further day within the visible range to shift to, so
+the card keeps asking about Saturday rather than rolling into next
+Monday — the schedule view only ever renders the current calendar week.
+
+`flutter analyze`: `transit_pro` unchanged at the 4-issue baseline.
+`firestore.rules` change confirmed with the user and **deployed** to
+`transitpro-db` via `firebase deploy --only firestore:rules`.
+
 ### 2026-09-27 — parent Schedule screen: added Saturday, and it now syncs live with `EditWeeklyScheduleScreen`
 
 **Request:** add Saturday to the Mon–Fri day selector, make the header date

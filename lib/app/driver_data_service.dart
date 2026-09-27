@@ -146,6 +146,20 @@ String formatTimeOfDay(TimeOfDay time) {
   return '$hour:$minute $period';
 }
 
+/// Inverse of [formatTimeOfDay] -- `'7:15 AM'` -> `TimeOfDay(hour: 7, minute:
+/// 15)`. Returns null for anything that isn't exactly that shape (a blank
+/// field, or the '—' placeholder shown when no time has been set yet).
+TimeOfDay? parseTimeOfDay(String? formatted) {
+  if (formatted == null || formatted.isEmpty) return null;
+  final match = RegExp(
+    r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
+  ).firstMatch(formatted.trim());
+  if (match == null) return null;
+  var hour = int.parse(match.group(1)!) % 12;
+  if (match.group(3) == 'PM') hour += 12;
+  return TimeOfDay(hour: hour, minute: int.parse(match.group(2)!));
+}
+
 /// Driver-facing view of the live session.
 ///
 /// Keeps the `ValueNotifier` surface the driver screens already bind to and

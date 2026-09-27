@@ -87,7 +87,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
       final name = child.name.isEmpty ? 'Your child' : child.name;
       final dayLabel = _dateOnly(date) == _dateOnly(DateTime.now())
           ? 'today'
-          : 'on ${_fullWeekDays[date.weekday - 1]}';
+          : 'on ${_kAllWeekdayNames[date.weekday - 1]}';
       final message = attending
           ? 'Driver notified: $name is attending $dayLabel.'
           : 'Driver notified: $name will be absent $dayLabel.';
@@ -115,6 +115,20 @@ class _ParentScheduleState extends State<ParentSchedule> {
     'Thursday',
     'Friday',
     'Saturday',
+  ];
+
+  /// All 7 days, for formatting an arbitrary [DateTime.weekday] (1..7) --
+  /// unlike [_fullWeekDays] (Mon–Sat only, this schedule's display range),
+  /// `_attendanceTargetDate` can legitimately land on a Sunday (a Saturday
+  /// evening's "Tomorrow"), which would index [_fullWeekDays] out of range.
+  static const _kAllWeekdayNames = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   /// Lowercase full day names, matching the keys
@@ -155,6 +169,35 @@ class _ParentScheduleState extends State<ParentSchedule> {
   /// selector just asks this method per date.
   bool _isAbsentOn(ChildInfo? child, DateTime date) =>
       !_isAttending(child, date);
+
+  /// The fixed cutoff the attendance toggle shifts on -- the school pickup
+  /// window, not any particular driver's or child's actual timing slot.
+  /// Deliberately a strict clock time rather than reading `DriverTimingSlots`
+  /// or `Student.requestedSchedule` (which the day-detail card above still
+  /// does): this toggle needs one rule that never depends on whether a
+  /// driver has been assigned yet.
+  static const _kAttendanceCutoff = TimeOfDay(hour: 7, minute: 1);
+
+  /// Whether [time], as a time of day today, has already passed the current
+  /// wall-clock time.
+  static bool _isPast(TimeOfDay time) {
+    final now = TimeOfDay.fromDateTime(DateTime.now());
+    return now.hour * 60 + now.minute >= time.hour * 60 + time.minute;
+  }
+
+  /// Which calendar date the attendance toggle should ask about right now:
+  /// today, until [_kAttendanceCutoff] (7:01 AM); tomorrow from that moment
+  /// on, for the rest of the day, until the cutoff resets at the next
+  /// morning's 7:01 AM.
+  ///
+  /// Deliberately independent of [_selectedDay] (the day the parent is
+  /// manually browsing in the day selector above): tapping "Wed" to look at
+  /// Wednesday's schedule on a Monday shouldn't change which date this card
+  /// is asking the parent to confirm.
+  DateTime get _attendanceTargetDate {
+    final now = DateTime.now();
+    return _isPast(_kAttendanceCutoff) ? now.add(const Duration(days: 1)) : now;
+  }
 
   /// The selected child's assigned driver, resolved the same way
   /// `ParentDashboard._timingSlotsFor` does: `child.driver` is the driver's
@@ -342,6 +385,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   statusLabel: statusLabel,
                   stopLabel: stopLabel,
                   myStopId: SessionService.instance.selectedChild?.stopId,
+                  attendanceTargetDate: _attendanceTargetDate,
                 );
               },
             );
@@ -363,6 +407,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
     required String statusLabel,
     required String stopLabel,
     required String? myStopId,
+    required DateTime attendanceTargetDate,
   }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -825,21 +870,30 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   },
                 ),
 
-                // ── Attendance for the selected date ────────────────────────
+                // ── Attendance -- auto-shifts to "Tomorrow" at 7:01 AM ──────
                 // Replaces the old "Upcoming Holidays" block. Only shown
                 // once a driver is actually linked (`hasBus`) -- with no
-                // driver assigned there is nobody to notify.
+                // driver assigned there is nobody to notify. Targets
+                // `attendanceTargetDate`, not `_selectedDay` -- see
+                // `_attendanceTargetDate`'s doc comment for why the two are
+                // independent.
                 if (hasBus && child != null)
                   _AttendanceToggleCard(
                     childName: child.name.isEmpty ? 'your child' : child.name,
-                    date: _weekDates[_selectedDay],
-                    dayLabel: _fullWeekDays[_selectedDay],
-                    isToday: sel.status == 'today',
-                    attending: _isAttending(child, _weekDates[_selectedDay]),
+                    date: attendanceTargetDate,
+                    // `isToday: true` makes the card render "Today" itself
+                    // regardless of `dayLabel` (see `_AttendanceToggleCard`
+                    // below) -- 'Tomorrow' only ever shows once the 7:01 AM
+                    // cutoff has passed, i.e. exactly when `isToday` is false.
+                    dayLabel: 'Tomorrow',
+                    isToday:
+                        _dateOnly(attendanceTargetDate) ==
+                        _dateOnly(DateTime.now()),
+                    attending: _isAttending(child, attendanceTargetDate),
                     submitting: _submittingAttendanceFor == child.id,
                     onToggle: (attending) => _onAttendanceToggle(
                       child,
-                      _weekDates[_selectedDay],
+                      attendanceTargetDate,
                       attending,
                     ),
                   ),

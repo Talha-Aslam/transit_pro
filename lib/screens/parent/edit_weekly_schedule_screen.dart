@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/driver_data_service.dart' show formatTimeOfDay;
+import '../../app/driver_data_service.dart'
+    show formatTimeOfDay, parseTimeOfDay;
 import '../../app/parent_data_service.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
@@ -73,21 +74,10 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
     final saved = student?.requestedSchedule ?? {};
     for (final day in _kWeekdays) {
       final times = saved[day];
-      _morning[day] = _parseTimeOfDay(times?['morningPickup']);
-      _evening[day] = _parseTimeOfDay(times?['eveningDropoff']);
+      _morning[day] = parseTimeOfDay(times?['morningPickup']);
+      _evening[day] = parseTimeOfDay(times?['eveningDropoff']);
     }
     if (mounted) setState(() => _loading = false);
-  }
-
-  static TimeOfDay? _parseTimeOfDay(String? formatted) {
-    if (formatted == null || formatted.isEmpty) return null;
-    final match = RegExp(
-      r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
-    ).firstMatch(formatted.trim());
-    if (match == null) return null;
-    var hour = int.parse(match.group(1)!) % 12;
-    if (match.group(3) == 'PM') hour += 12;
-    return TimeOfDay(hour: hour, minute: int.parse(match.group(2)!));
   }
 
   Future<void> _pickTime(String day, {required bool morning}) async {

@@ -167,6 +167,16 @@ service cloud.firestore {
                     && (resource.data.parentId == uid()
                         || studentId == uid()
                         || isAdmin());
+
+      // The family's own advance notice -- "my child is/isn't riding on
+      // {date}" -- one document per day, never overwritten history. A
+      // driver may read it (it's their pickup roster for that date) but
+      // never write it; only the owning family sends it.
+      match /attendance/{dateKey} {
+        allow read: if signedIn()
+                    && (ownsStudent(studentId) || isDriver() || isAdmin());
+        allow write: if signedIn() && ownsStudent(studentId);
+      }
     }
 
     // ── drivers ─────────────────────────────────────────────────────────────
