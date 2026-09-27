@@ -641,7 +641,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 children: [
                                   _ScheduleItem(
                                     icon: '🌅',
-                                    label: 'Pickup',
+                                    label: 'School Time',
                                     time: formatTimeOfDay(
                                       slots.morningPickupFromHome,
                                     ),
@@ -653,22 +653,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                         : AppTheme.warning,
                                   ),
                                   _ScheduleItem(
-                                    icon: '🏫',
-                                    label: 'At School',
-                                    time: formatTimeOfDay(
-                                      slots.morningDropoffAtSchool,
-                                    ),
-                                    status:
-                                        _isPast(slots.morningDropoffAtSchool)
-                                        ? 'Done'
-                                        : 'Upcoming',
-                                    color: _isPast(slots.morningDropoffAtSchool)
-                                        ? AppTheme.success
-                                        : AppTheme.warning,
-                                  ),
-                                  _ScheduleItem(
                                     icon: '🌇',
-                                    label: 'Drop Off',
+                                    label: 'Off Time',
                                     time: formatTimeOfDay(
                                       slots.afternoonDropoffAtHome,
                                     ),

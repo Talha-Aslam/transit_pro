@@ -53,6 +53,13 @@ class AppStrings {
     'pickup': 'Pickup',
     'at_school': 'At School',
     'drop_off': 'Drop Off',
+    // Distinct from 'pickup'/'drop_off' above -- those are shared with the
+    // trip history screens (student_trip_history_screen.dart,
+    // trip_history_screen.dart), so renaming them there would have silently
+    // relabeled those too. These two are only for the Home "Today's
+    // Schedule" card's two remaining chips.
+    'school_time_label': 'School Time',
+    'off_time_label': 'Off Time',
     'done': 'Done',
     'pending': 'Pending',
     'total_trips': 'Total Trips',
@@ -793,6 +800,8 @@ class AppStrings {
     'pickup': 'پک اپ',
     'at_school': 'اسکول میں',
     'drop_off': 'ڈراپ آف',
+    'school_time_label': 'اسکول کا وقت',
+    'off_time_label': 'واپسی کا وقت',
     'done': 'مکمل',
     'pending': 'زیر التواء',
     'total_trips': 'کل سفر',

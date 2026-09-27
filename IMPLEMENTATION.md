@@ -721,6 +721,61 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — parent Home "Today's Schedule" card: dropped "At School", renamed the other two
+
+**Same request as the previous entry, this time for the other dashboard.**
+The previous entry's task was clarified to mean `student_dashboard.dart`
+(a vertical `Column`); this one's wording — "Row... MainAxisAlignment
+.spaceEvenly" — matches `parent_dashboard.dart`'s card instead, which really
+is a horizontal `Row` of 3 `_ScheduleChip`s. Implemented directly on that
+one without re-asking, since the layout description in this request
+unambiguously points at it.
+
+- `lib/app/language_provider.dart` — new `school_time_label`/
+  `off_time_label` keys (English + Urdu). Deliberately **not** reusing the
+  existing `pickup`/`at_school`/`drop_off` keys: those are shared with
+  `trip_history_screen.dart` and `student_trip_history_screen.dart`, so
+  changing their values would have silently relabeled those screens too.
+- `lib/screens/parent/parent_dashboard.dart` — removed the middle
+  `_ScheduleChip` (`at_school`, `assets/images/schedule/at_school.png`)
+  from the "Today's Schedule" card entirely; the remaining two now use
+  `school_time_label`/`off_time_label`.
+- **No `mainAxisAlignment` added**: `_ScheduleChip` already wraps itself in
+  `Expanded`, so with 2 or 3 of them in the `Row` they always fill its
+  width equally on their own — `MainAxisAlignment.spaceEvenly` only
+  affects non-flexible children, so it would be a no-op here. Left a
+  comment explaining this rather than adding dead configuration.
+- **Navigation already worked**: same as the previous entry, this card's
+  "View All" already calls `widget.onNavigate(2)` (jumps to the Schedule
+  tab) — nothing to add.
+
+`flutter analyze`: unchanged at the 4-issue baseline.
+
+### 2026-09-27 — student Home "Today's Schedule" card: dropped "At School", renamed the other two
+
+**Request:** remove the middle "At School" block, rename "Pickup" ->
+"School Time" and "Drop Off" -> "Off Time", keep the remaining two
+cleanly spaced, and make "View All" actually navigate.
+
+**Found first:** two dashboards have a card matching this description —
+`parent_dashboard.dart` (a horizontal Row of 3 side-by-side chips,
+translated labels) and `student_dashboard.dart` (a vertical Column of 3
+full-width rows, with the exact literal labels `'Pickup'`/`'At School'`/
+`'Drop Off'` quoted in the request). Confirmed with the user: the student
+one. Also found the "View All" button on **both** dashboards already
+navigates correctly (`onTap: () => widget.onNavigate(2)`, jumping to the
+Schedule tab) — nothing to fix there, so that part of the request was
+already satisfied.
+
+- `lib/screens/student/student_dashboard.dart` — removed the middle
+  `_ScheduleItem(icon: '🏫', label: 'At School', ...)` entirely; renamed
+  the remaining two to `'School Time'` (was `'Pickup'`) and `'Off Time'`
+  (was `'Drop Off'`). No `MainAxisAlignment` change needed — `_ScheduleItem`
+  rows are stacked in a plain `Column`, not spread across a `Row`, so
+  dropping one just leaves a clean 2-row stack.
+
+`flutter analyze`: unchanged at the 4-issue baseline.
+
 ### 2026-09-27 — Attendance toggle: real weekday name, re-coupled to the day selector (no lock this time)
 
 **Request:** show the actual weekday name (via `intl`'s `DateFormat

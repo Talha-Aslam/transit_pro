@@ -743,12 +743,20 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     ],
                                   ),
                                   const SizedBox(height: 14),
+                                  // `_ScheduleChip` already wraps itself in
+                                  // `Expanded`, so the two remaining chips
+                                  // fill the Row's width equally on their
+                                  // own -- an explicit `mainAxisAlignment`
+                                  // would be a no-op here since there are no
+                                  // non-flexible children left to space out.
                                   Row(
                                     children: [
                                       _ScheduleChip(
                                         icon:
                                             'assets/images/schedule/waiting_for_bus_transparent.png',
-                                        label: AppStrings.t('pickup'),
+                                        label: AppStrings.t(
+                                          'school_time_label',
+                                        ),
                                         time: slots == null
                                             ? '—'
                                             : formatTimeOfDay(
@@ -762,23 +770,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                       const SizedBox(width: 8),
                                       _ScheduleChip(
                                         icon:
-                                            'assets/images/schedule/at_school.png',
-                                        label: AppStrings.t('at_school'),
-                                        time: slots == null
-                                            ? '—'
-                                            : formatTimeOfDay(
-                                                slots.morningDropoffAtSchool,
-                                              ),
-                                        status: slots == null
-                                            ? null
-                                            : AppStrings.t('done'),
-                                        color: AppTheme.success,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      _ScheduleChip(
-                                        icon:
                                             'assets/images/schedule/drop_off_transparent.png',
-                                        label: AppStrings.t('drop_off'),
+                                        label: AppStrings.t('off_time_label'),
                                         time: slots == null
                                             ? '—'
                                             : formatTimeOfDay(
