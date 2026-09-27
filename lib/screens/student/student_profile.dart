@@ -241,6 +241,7 @@ class _StudentProfileState extends State<StudentProfile> {
                           label:
                               '${SubscriptionProvider.instance.planDisplayName} Plan · ${AppStrings.t('active')}',
                           color: AppTheme.studentAmber,
+                          onTap: () => context.push('/student/subscription'),
                         ),
                       ],
                     ),
@@ -992,24 +993,38 @@ class _EditInfoButton extends StatelessWidget {
 class _SubscriptionChip extends StatelessWidget {
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _SubscriptionChip({required this.label, required this.color});
+  const _SubscriptionChip({
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+    final radius = BorderRadius.circular(20);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: radius,
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );

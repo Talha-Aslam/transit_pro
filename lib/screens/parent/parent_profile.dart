@@ -434,39 +434,54 @@ class _ParentProfileState extends State<ParentProfile> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.parentPurple.withValues(
-                                  alpha: 0.15,
-                                ),
+                            // Shortcut to Subscription: tapping this badge
+                            // is the same destination as the "Subscription"
+                            // menu item further down -- `InkWell`/`Material`
+                            // for the ripple this task asked for, matching
+                            // the `_SubscriptionChip` treatment on the
+                            // student profile's equivalent badge.
+                            Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                              child: InkWell(
+                                onTap: () =>
+                                    context.push('/parent/subscription'),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: AppTheme.parentPurple.withValues(
-                                    alpha: 0.3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 5,
                                   ),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    '⭐',
-                                    style: TextStyle(fontSize: 10),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    '${SubscriptionProvider.instance.planDisplayName} · ${children.length} ${children.length == 1 ? 'child' : 'children'}',
-                                    style: const TextStyle(
-                                      color: AppTheme.parentAccent,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.parentPurple.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: AppTheme.parentPurple.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
-                                ],
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '⭐',
+                                        style: TextStyle(fontSize: 10),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        '${SubscriptionProvider.instance.planDisplayName} · ${children.length} ${children.length == 1 ? 'child' : 'children'}',
+                                        style: const TextStyle(
+                                          color: AppTheme.parentAccent,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),

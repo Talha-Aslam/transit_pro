@@ -721,6 +721,30 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — subscription-tier badge on parent + student profile now taps through to Subscription
+
+**Confirmed the premise:** both `parent_profile.dart` (the "⭐ Premium Plan
+· 2 children" pill under the parent's name) and `student_profile.dart`
+(`_SubscriptionChip`, "Premium Plan · Active") render this tag as a plain
+`Container` with no tap handler at all — matches the request exactly on
+both dashboards this pattern appears on.
+
+- `lib/screens/parent/parent_profile.dart` — wrapped the badge's
+  `Container` in `Material(color: Colors.transparent) > InkWell` (for the
+  ripple) with `onTap: () => context.push('/parent/subscription')` — the
+  same route the existing "Subscription" menu item further down this
+  screen already uses.
+- `lib/screens/student/student_profile.dart` — `_SubscriptionChip` gained
+  an optional `onTap` (`Material`/`InkWell` internally, same ripple
+  treatment), wired at its one call site to
+  `() => context.push('/student/subscription')`.
+- Used this app's actual routing (`go_router`'s `context.push`, already
+  used throughout both files) rather than `Navigator.push()` as the task
+  suggested, consistent with how every other in-app link in this project
+  navigates.
+
+`flutter analyze`: unchanged at the 4-issue baseline.
+
 ### 2026-09-27 — parent's own profile photo now actually persists
 
 **Confirmed the premise:** `ParentProfile._pickImage()` only ever wrote the
