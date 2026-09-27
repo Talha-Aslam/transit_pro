@@ -349,9 +349,17 @@ service cloud.firestore {
 
       allow create: if signedIn() && request.resource.data.requestedBy == uid();
 
-      // The requester may cancel; a driver may accept or decline.
+      // The requester may cancel, or accept/reject a pending bid, on their
+      // own request. A driver may start viewing a request nobody has
+      // claimed yet (`assignedDriverId` unset), or send/withdraw a bid on
+      // one already assigned to them — never touch a request another
+      // driver is already negotiating.
       allow update: if signedIn()
-                    && (resource.data.requestedBy == uid() || isDriver() || isAdmin());
+                    && (resource.data.requestedBy == uid()
+                        || isAdmin()
+                        || (isDriver()
+                            && (resource.data.assignedDriverId == null
+                                || resource.data.assignedDriverId == uid())));
 
       allow delete: if isAdmin();
     }

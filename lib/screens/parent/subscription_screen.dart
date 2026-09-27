@@ -1,9 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../app/language_provider.dart';
+import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+
+const _monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+String _formatDate(DateTime d) =>
+    '${_monthNames[d.month - 1]} ${d.day}, ${d.year}';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({super.key});
@@ -13,16 +34,26 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
-  late String _selected;
+  // Guards the expiry dialog so it pops once per visit to this screen
+  // rather than every time `_onUserChanged` fires a rebuild.
+  bool _shownExpiredDialog = false;
 
   void _onProviderChanged() => setState(() {});
+
+  void _onUserChanged() {
+    setState(() {});
+    _maybeShowExpiredDialog();
+  }
 
   @override
   void initState() {
     super.initState();
-    _selected = SubscriptionProvider.instance.plan;
     SubscriptionProvider.instance.addListener(_onProviderChanged);
     LanguageProvider.instance.addListener(_onLangChanged);
+    SessionService.instance.user.addListener(_onUserChanged);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeShowExpiredDialog(),
+    );
   }
 
   void _onLangChanged() => setState(() {});
@@ -31,7 +62,43 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   void dispose() {
     SubscriptionProvider.instance.removeListener(_onProviderChanged);
     LanguageProvider.instance.removeListener(_onLangChanged);
+    SessionService.instance.user.removeListener(_onUserChanged);
     super.dispose();
+  }
+
+  void _maybeShowExpiredDialog() {
+    if (_shownExpiredDialog || !mounted) return;
+    final user = SessionService.instance.user.value;
+    final trialEndDate = user?.trialEndDate;
+    final expired =
+        user?.subscriptionStatus == 'trial' &&
+        trialEndDate != null &&
+        DateTime.now().isAfter(trialEndDate);
+    if (!expired) return;
+    _shownExpiredDialog = true;
+    showDialog(context: context, builder: (_) => const _TrialExpiredDialog());
+  }
+
+  Future<void> _buySubscription() async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+    SubscriptionProvider.instance.setPlan('premium');
+    await UserRepository.instance.updateUser(uid, {
+      'subscriptionStatus': 'active',
+      'trialEndDate': DateTime.now().add(const Duration(days: 30)),
+    });
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          '${AppStrings.t('buy_subscription')}: ${SubscriptionProvider.instance.planDisplayName}',
+        ),
+        backgroundColor: AppTheme.parentPurple,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -92,199 +159,154 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Current plan banner
-                      GlassCard(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.parentPurple.withValues(alpha: 0.3),
-                            AppTheme.parentIndigo.withValues(alpha: 0.15),
-                          ],
-                        ),
-                        borderColor: AppTheme.parentPurple.withValues(alpha: 0.4),
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Row(
+                  child: Builder(
+                    builder: (context) {
+                      final user = SessionService.instance.user.value;
+                      final isTrial = user?.subscriptionStatus != 'active';
+                      final periodDate = user?.trialEndDate;
+                      final statusTitle = isTrial
+                          ? AppStrings.t('free_trial_status')
+                          : AppStrings.t('active_subscription_status');
+                      final statusSubtitle = periodDate == null
+                          ? ''
+                          : '${isTrial ? AppStrings.t('trial_ends_label') : AppStrings.t('renews_label')} ${_formatDate(periodDate)}';
+                      final badgeColor = isTrial
+                          ? AppTheme.warning
+                          : AppTheme.success;
+                      final badgeLabel = isTrial
+                          ? AppStrings.t('trial_badge')
+                          : AppStrings.t('active');
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Current plan banner — reads live subscription
+                          // state off `SessionService.instance.user` (the
+                          // Firestore-backed record) rather than the purely
+                          // local `SubscriptionProvider`, so it reflects what
+                          // was actually granted at sign-up or bought, not
+                          // just this session's UI selection.
+                          GlassCard(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppTheme.parentPurple.withValues(alpha: 0.3),
+                                AppTheme.parentIndigo.withValues(alpha: 0.15),
+                              ],
+                            ),
+                            borderColor: AppTheme.parentPurple.withValues(
+                              alpha: 0.4,
+                            ),
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
                               children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    gradient: AppTheme.parentGradient,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Center(
-                                    child: Image.asset(
-                                      'assets/images/profile_page/premium.png',
-                                      width: 36,
-                                      height: 36,
-                                      filterQuality: FilterQuality.high,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '${SubscriptionProvider.instance.planDisplayName} Plan',
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800,
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        gradient: AppTheme.parentGradient,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Center(
+                                        child: Image.asset(
+                                          'assets/images/profile_page/premium.png',
+                                          width: 36,
+                                          height: 36,
+                                          filterQuality: FilterQuality.high,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        AppStrings.t('active_renews'),
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 12,
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            statusTitle,
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            statusSubtitle,
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: badgeColor.withValues(
+                                            alpha: 0.4,
+                                          ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.success.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: AppTheme.success.withValues(alpha: 0.4),
+                                      child: Text(
+                                        badgeLabel,
+                                        style: TextStyle(
+                                          color: badgeColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                  child: Text(
-                                    AppStrings.t('active'),
-                                    style: const TextStyle(
-                                      color: AppTheme.success,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                          ),
+                          const SizedBox(height: 12),
 
-                      Text(
-                        AppStrings.t('change_plan'),
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Plan cards
-                      _PlanCard(
-                        id: 'trial',
-                        selected: _selected == 'trial',
-                        name: AppStrings.t('plan_trial_name'),
-                        price: 'Rs. 0/mo',
-                        badge: SubscriptionProvider.instance.plan == 'trial'
-                            ? AppStrings.t('starter_badge')
-                            : null,
-                        features: [
-                          AppStrings.t('feat_enjoy_free_trial'),
-                          AppStrings.t('feat_no_payment_required'),
-                          AppStrings.t('feat_pickup_dropoff_notifications'),
-                          AppStrings.t('feat_upgrade_after_trial'),
-                        ],
-                        color: AppTheme.success,
-                        onTap: () => setState(() => _selected = 'trial'),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Plan cards
-                      _PlanCard(
-                        id: 'premium',
-                        selected: _selected == 'premium',
-                        name: AppStrings.t('plan_premium_name'),
-                        price: 'Rs. 299/mo',
-                        badge: SubscriptionProvider.instance.plan == 'premium'
-                            ? AppStrings.t('current_badge')
-                            : null,
-                        features: [
-                          AppStrings.t('feat_live_gps'),
-                          AppStrings.t('feat_3_profiles'),
-                          AppStrings.t('feat_push_sms'),
-                          AppStrings.t('feat_trip_history'),
-                          AppStrings.t('feat_emergency'),
-                        ],
-                        color: AppTheme.parentPurple,
-                        onTap: () => setState(() => _selected = 'premium'),
-                      ),
-                      const SizedBox(height: 8),
-                      _PlanCard(
-                        id: 'family',
-                        selected: _selected == 'family',
-                        name: AppStrings.t('plan_family_name'),
-                        price: 'Rs. 499/mo',
-                        badge: SubscriptionProvider.instance.plan == 'family'
-                            ? AppStrings.t('best_value')
-                            : null,
-                        features: [
-                          AppStrings.t('feat_everything_premium'),
-                          AppStrings.t('feat_unlimited_profiles'),
-                          AppStrings.t('feat_priority_support'),
-                          AppStrings.t('feat_route_custom'),
-                          AppStrings.t('feat_driver_chat'),
-                        ],
-                        color: AppTheme.warning,
-                        onTap: () => setState(() => _selected = 'family'),
-                      ),
-                      if (_selected != SubscriptionProvider.instance.plan) ...[
-                        const SizedBox(height: 10),
-                        GestureDetector(
-                          onTap: () {
-                            SubscriptionProvider.instance.setPlan(_selected);
-                            final messenger = ScaffoldMessenger.of(context);
-                            messenger.clearSnackBars();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${AppStrings.t('switch_plan')}: ${SubscriptionProvider.instance.planDisplayName}',
-                                ),
-                                backgroundColor: AppTheme.parentPurple,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            margin: const EdgeInsets.only(top: 10),
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.parentGradient,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: Text(
-                                AppStrings.t('switch_plan'),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                          Text(
+                            AppStrings.t('change_plan'),
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                      ],
-                    ],
+                          const SizedBox(height: 8),
+
+                          // Single plan card — nothing to select between anymore,
+                          // so tapping it directly buys/activates the plan
+                          // instead of staging a choice for a separate confirm
+                          // button.
+                          _PlanCard(
+                            name: AppStrings.t('buy_subscription'),
+                            price: 'Rs. 299/mo',
+                            badge: isTrial
+                                ? null
+                                : AppStrings.t('current_badge'),
+                            features: [
+                              AppStrings.t('feat_live_gps'),
+                              AppStrings.t('feat_3_profiles'),
+                              AppStrings.t('feat_push_sms'),
+                              AppStrings.t('feat_trip_history'),
+                              AppStrings.t('feat_emergency'),
+                            ],
+                            color: AppTheme.parentPurple,
+                            onTap: isTrial ? _buySubscription : null,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -296,17 +318,76 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 }
 
+class _TrialExpiredDialog extends StatelessWidget {
+  const _TrialExpiredDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: context.cardBgElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.timer_off_outlined,
+                color: AppTheme.warning,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              AppStrings.t('trial_expired_title'),
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              AppStrings.t('trial_expired_message'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.parentPurple,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: Text(AppStrings.t('buy_subscription')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PlanCard extends StatelessWidget {
-  final String id, name, price;
+  final String name, price;
   final String? badge;
-  final bool selected;
   final List<String> features;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _PlanCard({
-    required this.id,
-    required this.selected,
     required this.name,
     required this.price,
     required this.features,
@@ -323,82 +404,53 @@ class _PlanCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : context.cardBgElevated,
+          color: context.cardBgElevated,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? color : context.surfaceBorder,
-            width: selected ? 1.5 : 1,
-          ),
+          border: Border.all(color: color),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            name,
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (badge != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                badge!,
-                                style: TextStyle(
-                                  color: color,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      Text(
-                        price,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                Text(
+                  name,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? color : Colors.transparent,
-                    border: Border.all(
-                      color: selected ? color : context.surfaceBorder,
-                      width: 2,
+                if (badge != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  child: selected
-                      ? const Icon(Icons.check, size: 12, color: Colors.white)
-                      : null,
-                ),
+                ],
               ],
+            ),
+            Text(
+              price,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 10),
             ...features.map(

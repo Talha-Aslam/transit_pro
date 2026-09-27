@@ -39,11 +39,20 @@ class MissedBusService {
   /// session.
   final driverIncomingRequests = ValueNotifier<List<MissedBusRequest>>([]);
 
+  /// The request this driver is currently viewing or has a bid pending on.
+  /// Null once the requester accepts/rejects it (or the driver withdraws).
+  /// Mirrors [studentActiveRequest]'s "one active thing at a time" shape,
+  /// on the driver's side of the same negotiation.
+  final driverActiveBid = ValueNotifier<MissedBusRequest?>(null);
+
   StreamSubscription<core.MissedBusRequest?>? _activeSub;
   String? _watchingStudentId;
 
   StreamSubscription<List<core.MissedBusRequest>>? _openSub;
   bool _watchingQueue = false;
+
+  StreamSubscription<core.MissedBusRequest?>? _myBidSub;
+  String? _watchingDriverId;
 
   // ── Stop list ──────────────────────────────────────────────────────────────
 
@@ -65,21 +74,26 @@ class MissedBusService {
     if (user == null) {
       _stopWatchingActive();
       _stopWatchingQueue();
+      _stopWatchingMyBid();
       return;
     }
     switch (user.role) {
       case core.UserRole.student:
         _stopWatchingQueue();
+        _stopWatchingMyBid();
         _watchActiveFor(_session.student.value?.id ?? '');
       case core.UserRole.parent:
         _stopWatchingQueue();
+        _stopWatchingMyBid();
         _watchActiveFor(_session.selectedChild?.id ?? '');
       case core.UserRole.driver:
         _stopWatchingActive();
         _startWatchingQueue();
+        _watchMyBidFor(user.uid);
       case core.UserRole.admin:
         _stopWatchingActive();
         _stopWatchingQueue();
+        _stopWatchingMyBid();
     }
   }
 
@@ -92,10 +106,13 @@ class MissedBusService {
       studentActiveRequest.value = null;
       return;
     }
-    _activeSub = _repo.watchActiveForStudent(studentId).listen(
-      (req) => studentActiveRequest.value = req == null ? null : _toLocal(req),
-      onError: (Object e) => debugPrint('missed bus watch failed: $e'),
-    );
+    _activeSub = _repo
+        .watchActiveForStudent(studentId)
+        .listen(
+          (req) =>
+              studentActiveRequest.value = req == null ? null : _toLocal(req),
+          onError: (Object e) => debugPrint('missed bus watch failed: $e'),
+        );
   }
 
   void _stopWatchingActive() {
@@ -119,6 +136,31 @@ class MissedBusService {
     _openSub?.cancel();
     _openSub = null;
     driverIncomingRequests.value = [];
+  }
+
+  void _watchMyBidFor(String driverId) {
+    if (driverId == _watchingDriverId) return;
+    _myBidSub?.cancel();
+    _watchingDriverId = driverId;
+    if (driverId.isEmpty) {
+      _myBidSub = null;
+      driverActiveBid.value = null;
+      return;
+    }
+    _myBidSub = _repo
+        .watchMyActiveBid(driverId)
+        .listen(
+          (req) => driverActiveBid.value = req == null ? null : _toLocal(req),
+          onError: (Object e) =>
+              debugPrint('missed bus active bid watch failed: $e'),
+        );
+  }
+
+  void _stopWatchingMyBid() {
+    _myBidSub?.cancel();
+    _myBidSub = null;
+    _watchingDriverId = null;
+    driverActiveBid.value = null;
   }
 
   // ── Requester side ─────────────────────────────────────────────────────────
@@ -170,10 +212,10 @@ class MissedBusService {
 
   // ── Driver side ────────────────────────────────────────────────────────────
 
-  /// Throws [StateError] with a user-safe message if this driver has no bus
-  /// assigned yet — [MissedBusRepository.acceptRequest] needs a real
-  /// [core.Bus] to record who is coming, and a pilot driver may not have one.
-  Future<void> acceptRequest(String id) async {
+  /// Guard shared by every driver-initiated step below. Throws [StateError]
+  /// with a user-safe message if this driver has no bus assigned yet, or
+  /// isn't approved — a pilot driver may have neither.
+  void _requireDriverReady() {
     final driver = _session.driver.value;
     final bus = _session.bus.value;
     if (driver == null || bus == null) {
@@ -188,35 +230,70 @@ class MissedBusService {
         'accept pickups yet.',
       );
     }
-    await _repo.acceptRequest(requestId: id, driver: driver, bus: bus);
   }
 
-  Future<void> declineRequest(String id) => _repo.declineRequest(id);
+  /// Step 1: a driver taps a request in the open queue to look at it.
+  Future<void> startViewing(String requestId) async {
+    _requireDriverReady();
+    final driver = _session.driver.value!;
+    final bus = _session.bus.value!;
+    await _repo.markViewing(requestId: requestId, driver: driver, bus: bus);
+  }
+
+  /// Step 2: the viewing driver sends a fare offer.
+  Future<void> sendBid({required String requestId, required int farePaisa}) =>
+      _repo.sendBid(requestId: requestId, farePaisa: farePaisa);
+
+  /// A driver backs out of a request they're viewing or have bid on, before
+  /// the requester has decided — same Firestore effect as the requester
+  /// rejecting it: the request reopens for other drivers.
+  Future<void> withdrawBid() async {
+    final req = driverActiveBid.value;
+    if (req == null) return;
+    await _repo.rejectOffer(req.id);
+  }
+
+  // ── Requester side: reviewing a bid ─────────────────────────────────────────
+
+  Future<void> acceptOffer() async {
+    final req = studentActiveRequest.value;
+    if (req == null) return;
+    await _repo.confirmOffer(req.id);
+  }
+
+  Future<void> rejectOffer() async {
+    final req = studentActiveRequest.value;
+    if (req == null) return;
+    await _repo.rejectOffer(req.id);
+  }
 
   // ── Mapping ────────────────────────────────────────────────────────────────
 
   MissedBusRequest _toLocal(core.MissedBusRequest r) => MissedBusRequest(
-        id: r.id,
-        studentName: r.studentName,
-        studentId: r.studentId,
-        missedBusNumber: r.missedBusNumber,
-        assignedRoute: r.assignedRouteName,
-        currentStop: r.currentStopName,
-        destination: r.destinationStopName,
-        timestamp: r.createdAt ?? DateTime.now(),
-        status: _toLocalStatus(r.status),
-        assignedDriverName: r.assignedDriverName,
-        assignedBusNumber: r.assignedBusNumber,
-        assignedDriverPhone: r.assignedDriverPhone,
-        assignedETA: r.etaMinutes == null ? null : '~${r.etaMinutes} min',
-        fareDisplay: r.displayFare,
-      );
+    id: r.id,
+    studentName: r.studentName,
+    studentId: r.studentId,
+    missedBusNumber: r.missedBusNumber,
+    assignedRoute: r.assignedRouteName,
+    currentStop: r.currentStopName,
+    destination: r.destinationStopName,
+    timestamp: r.createdAt ?? DateTime.now(),
+    status: _toLocalStatus(r.status),
+    assignedDriverName: r.assignedDriverName,
+    assignedBusNumber: r.assignedBusNumber,
+    assignedDriverPhone: r.assignedDriverPhone,
+    assignedDriverPhotoUrl: r.assignedDriverPhotoUrl,
+    assignedETA: r.etaMinutes == null ? null : '~${r.etaMinutes} min',
+    fareDisplay: r.displayFare,
+  );
 
   RequestStatus _toLocalStatus(core.MissedBusStatus s) => switch (s) {
-        core.MissedBusStatus.searching => RequestStatus.searching,
-        core.MissedBusStatus.accepted => RequestStatus.accepted,
-        core.MissedBusStatus.declined => RequestStatus.declined,
-        core.MissedBusStatus.noDrivers => RequestStatus.noDrivers,
-        core.MissedBusStatus.cancelled => RequestStatus.cancelled,
-      };
+    core.MissedBusStatus.searching => RequestStatus.searching,
+    core.MissedBusStatus.viewing => RequestStatus.viewing,
+    core.MissedBusStatus.bidOffered => RequestStatus.bidOffered,
+    core.MissedBusStatus.accepted => RequestStatus.accepted,
+    core.MissedBusStatus.declined => RequestStatus.declined,
+    core.MissedBusStatus.noDrivers => RequestStatus.noDrivers,
+    core.MissedBusStatus.cancelled => RequestStatus.cancelled,
+  };
 }

@@ -721,6 +721,175 @@ its note above — pick a real id whenever you're ready and it can be redone.
 
 ## 📝 Changelog
 
+### 2026-09-27 — Missed Bus: turned single-shot accept/decline into a live bidding flow
+
+Replaced the old "driver taps Accept, fare is whatever they'd already set
+under My Service" flow with a real negotiation, matching the Uber/InDrive
+shape asked for: `searching → viewing → bidOffered → accepted` (with
+`declined`/`cancelled`/`noDrivers` unchanged from before). Rejecting a bid
+returns the request to `searching` rather than a new terminal status —
+only that one driver's offer was unacceptable, not the request itself.
+
+**Schema** (`transit_core`): `MissedBusStatus` gained `viewing` and
+`bidOffered` (`enums.dart`); `MissedBusRequest` gained
+`assignedDriverPhotoUrl` (`models/missed_bus.dart`), denormalised the same
+way `assignedDriverName`/`assignedBusNumber` already were. `farePaisa`'s
+doc comment now describes it as the bid amount, frozen once accepted,
+rather than only "the accepting driver's flat rate" — one field still,
+just filled in earlier in the lifecycle than before.
+
+**Writes** (`MissedBusRepository`): `acceptRequest` (single combined
+accept) is gone, replaced by four narrower steps mirroring the state
+machine: `markViewing` (driver opens a request — denormalises driver +
+bus identity immediately, not just at accept time), `sendBid` (driver
+proposes a fare), `confirmOffer` (requester accepts — driver/bus/fare are
+already on the doc, so this only flips status), `rejectOffer` (requester
+rejects, or a driver withdraws — same effect: clears the assignment and
+reopens the request to `searching`). Added `watchMyActiveBid(driverId)`
+alongside the existing `watchOpenRequests()` — a driver's own
+viewing/bidding request is no longer visible in the shared open queue
+once claimed, so a second driver can't bid on a request someone else is
+already negotiating.
+
+**`MissedBusService`**: new `driverActiveBid` `ValueNotifier`, watched off
+`SessionService` the same way `driverIncomingRequests` already was.
+`startViewing`/`sendBid`/`withdrawBid` (driver side) and
+`acceptOffer`/`rejectOffer` (requester side) replace the old
+`acceptRequest`/`declineRequest`. Kept the existing driver-readiness guard
+(`_requireDriverReady`, was inline in the old `acceptRequest`) — a driver
+with no bus assigned yet, or not yet admin-approved, is stopped before
+`startViewing` rather than after a bid is already in flight.
+
+**Requester UI** (`parent_missed_bus_screen.dart` + student's
+`missed_bus_screen.dart`, kept as the two separate near-duplicate
+implementations they already were): the searching view now shows
+"{driver} is viewing your request…" once `status == viewing` (was static
+"Alerting nearby drivers…" throughout). A new offer-review card appears
+for `bidOffered` — driver photo/name/bus, the requested fare in a
+highlighted panel, and side-by-side **Reject**/**Accept** buttons wired to
+`rejectOffer`/`acceptOffer`.
+
+**Driver UI** (`driver_pickup_requests_screen.dart`): the old binary
+Decline/Accept Pickup buttons and `_ConfirmSheet` (a static "you'll be
+paid your preset rate" notice) are gone. A single **View & Send Offer**
+button calls `startViewing` then opens a new `_BidSheet` — a fare
+`TextField` pre-filled from the driver's `missedBusFarePaisa` preset but
+editable per-request, with a **Send Offer** button. Once sent, the sheet
+switches to a live "waiting for {student}" view fed by `driverActiveBid`,
+and auto-closes if the requester accepts/rejects while it's still open.
+Dropped "Decline" outright rather than keep a per-driver version of it:
+the shared queue is a broadcast, and any decline was a global `status:
+declined` write that would have killed the request for every other driver
+too (a pre-existing bug in the single-accept model that a many-drivers
+bidding model can no longer tolerate) — a driver who isn't interested now
+just leaves the request for someone else, same as Uber/InDrive.
+
+**Rules & indexes** (deployed to `transitpro-db` after confirming):
+`firestore.rules`'s `missedBusRequests` update rule narrowed — a driver
+may now only write to a request that's unclaimed (`assignedDriverId ==
+null`) or already assigned to them, closing the gap where any signed-in
+driver could previously overwrite another driver's in-progress bid or the
+requester's own decision. Added a composite index on
+`(assignedDriverId, status, createdAt)` for the new
+`watchMyActiveBid` query.
+
+**Known gap, deliberately out of scope for this pass**: the new rule
+checks *which* driver may write, not *which fields* — a driver assigned to
+a request can still technically write any field on it (e.g. forge
+`farePaisa` after the requester has already accepted), matching the
+looseness the previous rule already had for the requester's own side. True
+field-level enforcement would need `request.resource.data.diff(...)`
+work; flagged here rather than silently scoped down.
+
+`flutter analyze` in both `transit_pro/` and `transit_core/`: 4
+pre-existing issues in `transit_pro` (unchanged), 0 in `transit_core`, no
+new issues in either.
+
+### 2026-09-27 — removed the duplicate map icon on parent's Missed Bus "Destination" field
+
+`parent_missed_bus_screen.dart`'s Destination field wrapped its
+`MapPointField` (which already renders its own grey `suffixIcon` map
+glyph) in a `Row` alongside a separate 48×48 `GestureDetector` button with
+a second, purple `Icons.map` — a "jump to Google Maps for the current
+stop" shortcut that put two map icons side by side. Deleted that button
+and the now-unnecessary `Row`/`Expanded` wrapper entirely, so the
+Destination field is now a single `MapPointField` at full width — the
+same widget, same styling, as the "Current Stop" field directly above it
+(`missed_bus_screen.dart`'s student variant already looked like this;
+only the parent screen had the extra button). Also dropped the
+now-unused `url_launcher/url_launcher_string.dart` import that button was
+the only user of.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
+### 2026-09-27 — free-trial lifecycle: signup grant, live status header, expiry dialog
+
+Three pieces, spanning both the shared package and the app:
+
+1. **New persisted fields.** `AppUser` (`transit_core/lib/src/models/user.dart`)
+   gained `subscriptionStatus` (`'trial'` | `'active'`, defaults to `'trial'`)
+   and `trialEndDate` (`DateTime?`), wired through `fromMap`/`toMap`/`copyWith`
+   the same way every other date field in this codebase is (a plain
+   `DateTime` in the map, `asDateOrNull` on read — see `AppFeedback.timestamp`
+   for the same idiom). `trialEndDate` does double duty: while `trial`, it's
+   the trial's end date; once `active`, it's repurposed as the next renewal
+   date — one field, not two near-duplicates.
+
+2. **Signup grant.** `OnboardingService.provision()` — the single place a
+   profile document is ever written (per its own doc comment) — now stamps
+   every brand-new account with `subscriptionStatus: 'trial'` and
+   `trialEndDate: DateTime.now().add(const Duration(days: 30))`, so every
+   signup path (email/password and the Google profile-completion screen)
+   gets the same 30-day trial with no separate code to keep in sync.
+
+3. **`subscription_screen.dart` now reads and writes that real record**
+   instead of showing a hardcoded "Premium Plan": the banner reads
+   `SessionService.instance.user.value` (live off Firestore, not the local
+   `SubscriptionProvider`) and shows "Free Trial" / "Ends {date}" while
+   `subscriptionStatus == 'trial'`, or "Active Subscription" / "Renews
+   {date}" once it's `'active'`. Tapping "Buy Subscription" now calls
+   `UserRepository.updateUser` to actually flip `subscriptionStatus` to
+   `'active'` and push `trialEndDate` out another 30 days (previously
+   `setPlan('premium')` only changed in-memory UI state and touched
+   Firestore not at all). A new `_TrialExpiredDialog` — styled after
+   `driver_dashboard.dart`'s `_VerificationRequiredDialog`, the existing
+   house pattern for a blocking modal — pops once per screen visit
+   (`_shownExpiredDialog` guards against re-showing on every listener-driven
+   rebuild) whenever `subscriptionStatus == 'trial'` and `trialEndDate` has
+   passed, telling the user to buy a subscription to continue.
+
+Added `free_trial_status`, `active_subscription_status`, `trial_ends_label`,
+`renews_label`, `trial_badge`, `trial_expired_title`, `trial_expired_message`
+to both locale maps in `language_provider.dart` (English + Urdu).
+
+`flutter analyze` in both `transit_pro/` and `transit_core/`: 4 pre-existing
+issues in `transit_pro` (unchanged), 0 in `transit_core`, no new issues in
+either.
+
+### 2026-09-27 — collapsed the Subscription screen to a single plan
+
+`subscription_screen.dart` offered three tiers (`trial`/`premium`/`family`),
+each a selectable `_PlanCard` toggled via a `_selected` state variable and
+a radio-style checkmark circle, with a separate "Switch Plan" button that
+only appeared once `_selected` differed from the active
+`SubscriptionProvider` plan. Removed the trial and family `_PlanCard`s
+entirely, along with `_selected` (there's nothing left to select between)
+and the radio circle + `id`/`selected` fields on `_PlanCard` itself (its
+`onTap` is now nullable so a card representing the already-active plan
+can simply not respond to taps, instead of needing a "selected" concept
+to disable itself against).
+
+Renamed the one remaining card from `plan_premium_name` ("Premium") to a
+new `buy_subscription` string (added to both `language_provider.dart`
+locale maps: "Buy Subscription" / "سبسکرپشن خریدیں"), and folded the old
+"Switch Plan" confirm button's action directly into the card's `onTap` —
+tapping it now calls `SubscriptionProvider.instance.setPlan('premium')`
+and shows the confirmation snackbar immediately, since with only one plan
+there's no longer a separate "staged choice vs. active plan" step to
+confirm.
+
+`flutter analyze`: 4 pre-existing issues, no new ones.
+
 ### 2026-09-27 — made the "Add Contact" bottom sheet theme-aware
 
 The Emergency Contacts "Add Contact"/"Edit Contact" bottom sheet

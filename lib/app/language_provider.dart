@@ -312,6 +312,14 @@ class AppStrings {
     'best_value': 'Best Value',
     'current_badge': 'Current',
     'active_renews': 'Active · Renews Apr 8, 2026',
+    'free_trial_status': 'Free Trial',
+    'active_subscription_status': 'Active Subscription',
+    'trial_ends_label': 'Ends',
+    'renews_label': 'Renews',
+    'trial_badge': 'Trial',
+    'trial_expired_title': 'Trial expired',
+    'trial_expired_message':
+        'Your free trial has expired. Please buy a subscription to continue using Transit Pro.',
 
     // Language
     'language_title': 'Language',
@@ -669,6 +677,7 @@ class AppStrings {
     'plan_premium_name': 'Premium',
     'plan_family_name': 'Family',
     'plan_basic_name': 'Basic',
+    'buy_subscription': 'Buy Subscription',
     'feat_live_gps': 'Live GPS tracking',
     'feat_3_profiles': 'Up to 3 child profiles',
     'feat_push_sms': 'Push + SMS alerts',
@@ -1041,6 +1050,14 @@ class AppStrings {
     'best_value': 'بہترین قیمت',
     'current_badge': 'موجودہ',
     'active_renews': 'فعال · 8 اپریل 2026 کو تجدید',
+    'free_trial_status': 'فری ٹرائل',
+    'active_subscription_status': 'فعال سبسکرپشن',
+    'trial_ends_label': 'ختم ہو گا',
+    'renews_label': 'تجدید',
+    'trial_badge': 'ٹرائل',
+    'trial_expired_title': 'ٹرائل ختم ہو گیا',
+    'trial_expired_message':
+        'آپ کا فری ٹرائل ختم ہو چکا ہے۔ ٹرانزٹ پرو استعمال جاری رکھنے کے لیے براہ کرم سبسکرپشن خریدیں۔',
 
     // Language
     'language_title': 'زبان',
@@ -1380,6 +1397,7 @@ class AppStrings {
     'plan_premium_name': 'پریمیم',
     'plan_family_name': 'فیملی',
     'plan_basic_name': 'بیسک',
+    'buy_subscription': 'سبسکرپشن خریدیں',
     'feat_live_gps': 'لائیو GPS ٹریکنگ',
     'feat_3_profiles': '3 بچوں کے پروفائل',
     'feat_push_sms': 'پش + SMS الرٹس',

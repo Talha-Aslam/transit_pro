@@ -32,22 +32,28 @@ class _DriverPickupRequestsScreenState
 
   void _rebuild() => setState(() {});
 
-  Future<void> _confirmAccept(MissedBusRequest req) async {
-    final accepted = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ConfirmSheet(
-        request: req,
-        onConfirm: () => Navigator.pop(context, true),
-      ),
-    );
-    if (accepted != true || !mounted) return;
+  Future<void> _openRequest(MissedBusRequest req) async {
     try {
-      await _service.acceptRequest(req.id);
+      await _service.startViewing(req.id);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      return;
     }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      // The sheet is dismissible by tapping outside it, not just the
+      // buttons inside — mirrored by `onDismissed` below withdrawing the
+      // bid, so a driver who backs out this way doesn't leave the request
+      // stuck on "viewing" forever.
+      builder: (_) => _BidSheet(request: req),
+    ).then((_) {
+      final stillPending = _service.driverActiveBid.value?.id == req.id;
+      if (stillPending) _service.withdrawBid();
+    });
   }
 
   @override
@@ -86,8 +92,11 @@ class _DriverPickupRequestsScreenState
                           border: Border.all(color: context.inputBorder),
                         ),
                         child: Center(
-                          child: Icon(Icons.arrow_back,
-                              color: context.textPrimary, size: 16),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: context.textPrimary,
+                            size: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -108,7 +117,9 @@ class _DriverPickupRequestsScreenState
                             Text(
                               '${requests.length} student${requests.length > 1 ? 's' : ''} waiting',
                               style: TextStyle(
-                                  color: AppTheme.warningLight, fontSize: 12),
+                                color: AppTheme.warningLight,
+                                fontSize: 12,
+                              ),
                             ),
                         ],
                       ),
@@ -116,7 +127,9 @@ class _DriverPickupRequestsScreenState
                     if (requests.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.error.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
@@ -124,9 +137,10 @@ class _DriverPickupRequestsScreenState
                         child: Text(
                           '${requests.length}',
                           style: const TextStyle(
-                              color: AppTheme.error,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14),
+                            color: AppTheme.error,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                   ],
@@ -138,16 +152,13 @@ class _DriverPickupRequestsScreenState
                 child: requests.isEmpty
                     ? _EmptyState()
                     : ListView.builder(
-                        padding:
-                            const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                         itemCount: requests.length,
                         itemBuilder: (_, i) => Padding(
                           padding: const EdgeInsets.only(bottom: 14),
                           child: _RequestCard(
                             request: requests[i],
-                            onAccept: () => _confirmAccept(requests[i]),
-                            onDecline: () =>
-                                _service.declineRequest(requests[i].id),
+                            onView: () => _openRequest(requests[i]),
                           ),
                         ),
                       ),
@@ -163,14 +174,9 @@ class _DriverPickupRequestsScreenState
 // ─── Request Card ─────────────────────────────────────────────────────────────
 class _RequestCard extends StatelessWidget {
   final MissedBusRequest request;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
+  final VoidCallback onView;
 
-  const _RequestCard({
-    required this.request,
-    required this.onAccept,
-    required this.onDecline,
-  });
+  const _RequestCard({required this.request, required this.onView});
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +193,8 @@ class _RequestCard extends StatelessWidget {
             height: 4,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                  colors: [AppTheme.error, AppTheme.warning]),
+                colors: [AppTheme.error, AppTheme.warning],
+              ),
             ),
           ),
           Padding(
@@ -206,8 +213,8 @@ class _RequestCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: const Center(
-                          child:
-                              Text('🧒', style: TextStyle(fontSize: 20))),
+                        child: Text('🧒', style: TextStyle(fontSize: 20)),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -225,15 +232,18 @@ class _RequestCard extends StatelessWidget {
                           Text(
                             'ID: ${request.studentId}  ·  ${request.missedBusNumber}',
                             style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 11),
+                              color: context.textSecondary,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.warning.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
@@ -241,10 +251,11 @@ class _RequestCard extends StatelessWidget {
                       child: Text(
                         'MISSED BUS',
                         style: TextStyle(
-                            color: AppTheme.warningLight,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5),
+                          color: AppTheme.warningLight,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ],
@@ -264,46 +275,60 @@ class _RequestCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('FROM',
-                                style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.7)),
+                            Text(
+                              'FROM',
+                              style: TextStyle(
+                                color: context.textTertiary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.7,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            Text(request.currentStop,
-                                style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13),
-                                overflow: TextOverflow.ellipsis),
+                            Text(
+                              request.currentStop,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
                       Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.arrow_forward_rounded,
-                            color: AppTheme.driverCyan, size: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          color: AppTheme.driverCyan,
+                          size: 18,
+                        ),
                       ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('TO',
-                                style: TextStyle(
-                                    color: context.textTertiary,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.7)),
+                            Text(
+                              'TO',
+                              style: TextStyle(
+                                color: context.textTertiary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.7,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            Text(request.destination,
-                                textAlign: TextAlign.end,
-                                style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13),
-                                overflow: TextOverflow.ellipsis),
+                            Text(
+                              request.destination,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -315,74 +340,61 @@ class _RequestCard extends StatelessWidget {
                 // Route info
                 Row(
                   children: [
-                    Icon(Icons.route_rounded,
-                        color: AppTheme.driverCyan, size: 14),
+                    Icon(
+                      Icons.route_rounded,
+                      color: AppTheme.driverCyan,
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
-                    Text(request.assignedRoute,
-                        style: TextStyle(
-                            color: context.textSecondary, fontSize: 12)),
+                    Text(
+                      request.assignedRoute,
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 14),
 
-                // Action buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: onDecline,
-                        child: Container(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 11),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppTheme.error.withValues(alpha: 0.5)),
-                          ),
-                          child: Center(
-                            child: Text('Decline',
-                                style: TextStyle(
-                                    color: AppTheme.error,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13)),
-                          ),
+                // Action button — a driver who isn't interested just leaves
+                // it in the shared queue for someone else, rather than
+                // declining it away from every other driver too.
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: onView,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppTheme.driverCyan, AppTheme.driverTeal],
                         ),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: GestureDetector(
-                        onTap: onAccept,
-                        child: Container(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 11),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [
-                              AppTheme.success,
-                              Color(0xFF10B981),
-                            ]),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_circle_rounded,
-                                    color: Colors.white, size: 16),
-                                SizedBox(width: 6),
-                                Text('Accept Pickup',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13)),
-                              ],
+                      child: const Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.visibility_outlined,
+                              color: Colors.white,
+                              size: 16,
                             ),
-                          ),
+                            SizedBox(width: 6),
+                            Text(
+                              'View & Send Offer',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -393,16 +405,86 @@ class _RequestCard extends StatelessWidget {
   }
 }
 
-// ─── Confirm Sheet ────────────────────────────────────────────────────────────
-class _ConfirmSheet extends StatelessWidget {
+// ─── Bid Sheet ────────────────────────────────────────────────────────────────
+/// Opened once [MissedBusService.startViewing] has already flipped the
+/// request to `viewing` (see `_openRequest` above). Lets the driver type in
+/// a fare and send it; once sent, switches to a "waiting for the family"
+/// view fed live by [MissedBusService.driverActiveBid] — driven off that
+/// notifier rather than a local flag, so it also reacts if the requester
+/// accepts or rejects while this sheet is still open.
+class _BidSheet extends StatefulWidget {
   final MissedBusRequest request;
-  final VoidCallback onConfirm;
+  const _BidSheet({required this.request});
 
-  const _ConfirmSheet(
-      {required this.request, required this.onConfirm});
+  @override
+  State<_BidSheet> createState() => _BidSheetState();
+}
+
+class _BidSheetState extends State<_BidSheet> {
+  late final TextEditingController _fareCtrl;
+  final _service = MissedBusService.instance;
+  bool _sending = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final presetPaisa =
+        SessionService.instance.driver.value?.missedBusFarePaisa ?? 0;
+    _fareCtrl = TextEditingController(
+      text: presetPaisa > 0 ? (presetPaisa / 100).round().toString() : '',
+    );
+    _service.driverActiveBid.addListener(_onBidChanged);
+  }
+
+  @override
+  void dispose() {
+    _service.driverActiveBid.removeListener(_onBidChanged);
+    _fareCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onBidChanged() {
+    if (!mounted) return;
+    // Null means the requester rejected it (or another path cleared it);
+    // `accepted` means they took it. Either way there's nothing left for
+    // this sheet to do.
+    final bid = _service.driverActiveBid.value;
+    if (bid == null || bid.status == RequestStatus.accepted) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() {});
+  }
+
+  Future<void> _sendOffer() async {
+    final rupees = int.tryParse(_fareCtrl.text.trim());
+    if (rupees == null || rupees <= 0) {
+      setState(() => _error = 'Enter a valid fare amount');
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      await _service.sendBid(
+        requestId: widget.request.id,
+        farePaisa: rupees * 100,
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final request = widget.request;
+    final bid = _service.driverActiveBid.value;
+    final offerSent = bid?.status == RequestStatus.bidOffered;
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
@@ -423,102 +505,94 @@ class _ConfirmSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Text('🚌', style: TextStyle(fontSize: 48)),
+          Text(offerSent ? '🕒' : '🚌', style: const TextStyle(fontSize: 48)),
           const SizedBox(height: 12),
-          Text('Accept Pickup?',
-              style: TextStyle(
-                  color: context.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800)),
+          Text(
+            offerSent ? 'Offer sent' : 'Send a fare offer',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
-            'You\'ll pick up ${request.studentName} from ${request.currentStop} heading to ${request.destination}.',
+            offerSent
+                ? 'Waiting for ${request.studentName} to accept or reject '
+                      'Rs.${bid?.fareDisplay?.replaceFirst('Rs.', '') ?? int.tryParse(_fareCtrl.text) ?? ''}.'
+                : 'Pickup for ${request.studentName}: ${request.currentStop} '
+                      '→ ${request.destination}.',
             textAlign: TextAlign.center,
-            style:
-                TextStyle(color: context.textSecondary, fontSize: 13),
+            style: TextStyle(color: context.textSecondary, fontSize: 13),
           ),
-          const SizedBox(height: 14),
-          Builder(
-            builder: (_) {
-              final farePaisa =
-                  SessionService.instance.driver.value?.missedBusFarePaisa ??
-                      0;
-              final hasFare = farePaisa > 0;
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: (hasFare ? AppTheme.success : AppTheme.warning)
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: (hasFare ? AppTheme.success : AppTheme.warning)
-                        .withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Text(
-                  hasFare
-                      ? 'The family will be shown a fare of Rs.${(farePaisa / 100).round()}, payable to you directly.'
-                      : "You haven't set a pickup fare — the family won't "
-                          'see one. Set it under My Service before accepting '
-                          'if you want to charge for this.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: hasFare
-                        ? AppTheme.successLight
-                        : AppTheme.warningLight,
-                    fontSize: 12,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    decoration: BoxDecoration(
-                      color: context.cardBgElevated,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: context.surfaceBorder),
-                    ),
-                    child: Center(
-                      child: Text('Cancel',
-                          style: TextStyle(
-                              color: context.textSecondary,
-                              fontWeight: FontWeight.w600)),
-                    ),
+          const SizedBox(height: 18),
+          if (offerSent)
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(AppTheme.driverCyan),
+              ),
+            )
+          else ...[
+            Container(
+              decoration: BoxDecoration(
+                color: context.inputFill,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: context.inputBorder),
+              ),
+              child: TextField(
+                controller: _fareCtrl,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: context.textPrimary, fontSize: 16),
+                decoration: InputDecoration(
+                  prefixText: 'Rs. ',
+                  prefixStyle: TextStyle(color: context.textPrimary),
+                  hintText: 'Charges',
+                  hintStyle: TextStyle(color: context.textTertiary),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: GestureDetector(
-                  onTap: onConfirm,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                          colors: [AppTheme.success, Color(0xFF10B981)]),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Center(
-                      child: Text('Yes, Accept',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14)),
-                    ),
-                  ),
-                ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppTheme.error, fontSize: 12),
               ),
             ],
-          ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: GestureDetector(
+                onTap: _sending ? null : _sendOffer,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.driverCyan, AppTheme.driverTeal],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _sending ? 'Sending…' : 'Send Offer',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -535,15 +609,19 @@ class _EmptyState extends StatelessWidget {
         children: [
           const Text('✅', style: TextStyle(fontSize: 52)),
           const SizedBox(height: 16),
-          Text('No Pending Requests',
-              style: TextStyle(
-                  color: context.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            'No Pending Requests',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text('All clear! No students need a pickup.',
-              style:
-                  TextStyle(color: context.textSecondary, fontSize: 13)),
+          Text(
+            'All clear! No students need a pickup.',
+            style: TextStyle(color: context.textSecondary, fontSize: 13),
+          ),
         ],
       ),
     );

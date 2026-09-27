@@ -69,6 +69,11 @@ class OnboardingService {
       phone: draft.phone.trim(),
       photoUrl: draft.photoUrl,
       profileComplete: true,
+      // Every new account starts on a free trial — see
+      // `subscription_screen.dart` for where this is surfaced and checked
+      // for expiry.
+      subscriptionStatus: 'trial',
+      trialEndDate: DateTime.now().add(const Duration(days: 30)),
     );
     batch.set(Db.users.doc(uid), profile, SetOptions(merge: true));
 

@@ -7,7 +7,6 @@ import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/profile_form_fields.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 class ParentMissedBusScreen extends StatefulWidget {
   const ParentMissedBusScreen({super.key});
@@ -171,14 +170,12 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                                 destinationCoord: _destinationCoord,
                                 onCurrentStopPicked: (p) =>
                                     setState(() => _currentStopCoord = p),
-                                onCurrentStopAddressResolved: (a) => setState(
-                                  () => _currentStopAddress = a,
-                                ),
+                                onCurrentStopAddressResolved: (a) =>
+                                    setState(() => _currentStopAddress = a),
                                 onDestinationPicked: (p) =>
                                     setState(() => _destinationCoord = p),
-                                onDestinationAddressResolved: (a) => setState(
-                                  () => _destinationAddress = a,
-                                ),
+                                onDestinationAddressResolved: (a) =>
+                                    setState(() => _destinationAddress = a),
                                 onSubmit: _submitRequest,
                               )
                             : _ParentStatusView(
@@ -187,6 +184,8 @@ class _ParentMissedBusScreenState extends State<ParentMissedBusScreen>
                                 pulse: _pulse,
                                 onCancel: _service.cancelRequest,
                                 onClear: _service.clearRequest,
+                                onAcceptOffer: _service.acceptOffer,
+                                onRejectOffer: _service.rejectOffer,
                               ),
                       ),
               ),
@@ -359,55 +358,11 @@ class _ParentRequestForm extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: MapPointField(
-                placeholder: 'Tap to pin where they need to go',
-                value: destinationCoord,
-                onPicked: onDestinationPicked,
-                onAddressResolved: onDestinationAddressResolved,
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Jumps to the picked current stop in Google Maps — useful once
-            // a pin exists; before that there's nothing meaningful to open,
-            // so this just nudges the parent to pin the current stop first.
-            GestureDetector(
-              onTap: () async {
-                final coord = currentStopCoord;
-                if (coord == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pin the current stop first'),
-                    ),
-                  );
-                  return;
-                }
-                final messenger = ScaffoldMessenger.of(context);
-                final url =
-                    'https://www.google.com/maps/search/?api=1&query=${coord.lat},${coord.lng}';
-                if (await canLaunchUrlString(url)) {
-                  await launchUrlString(url);
-                } else {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Could not open Maps')),
-                  );
-                }
-              },
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: context.cardBgElevated,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.surfaceBorder),
-                ),
-                child: Icon(Icons.map, color: AppTheme.purple, size: 18),
-              ),
-            ),
-          ],
+        MapPointField(
+          placeholder: 'Tap to pin where they need to go',
+          value: destinationCoord,
+          onPicked: onDestinationPicked,
+          onAddressResolved: onDestinationAddressResolved,
         ),
         const SizedBox(height: 32),
 
@@ -461,6 +416,8 @@ class _ParentStatusView extends StatelessWidget {
   final Animation<double> pulse;
   final VoidCallback onCancel;
   final VoidCallback onClear;
+  final VoidCallback onAcceptOffer;
+  final VoidCallback onRejectOffer;
 
   const _ParentStatusView({
     required this.request,
@@ -468,17 +425,26 @@ class _ParentStatusView extends StatelessWidget {
     required this.pulse,
     required this.onCancel,
     required this.onClear,
+    required this.onAcceptOffer,
+    required this.onRejectOffer,
   });
 
   @override
   Widget build(BuildContext context) {
     switch (request.status) {
       case RequestStatus.searching:
+      case RequestStatus.viewing:
         return _ParentSearchingView(
           request: request,
           child: child,
           pulse: pulse,
           onCancel: onCancel,
+        );
+      case RequestStatus.bidOffered:
+        return _ParentOfferReviewView(
+          request: request,
+          onAccept: onAcceptOffer,
+          onReject: onRejectOffer,
         );
       case RequestStatus.accepted:
         return _ParentAcceptedView(request: request, onDone: onClear);
@@ -491,7 +457,7 @@ class _ParentStatusView extends StatelessWidget {
   }
 }
 
-// ─── Searching ────────────────────────────────────────────────────────────────
+// ─── Searching / Viewing ───────────────────────────────────────────────────────
 class _ParentSearchingView extends StatelessWidget {
   final MissedBusRequest request;
   final ChildInfo child;
@@ -504,6 +470,8 @@ class _ParentSearchingView extends StatelessWidget {
     required this.pulse,
     required this.onCancel,
   });
+
+  bool get _isViewing => request.status == RequestStatus.viewing;
 
   @override
   Widget build(BuildContext context) {
@@ -525,15 +493,21 @@ class _ParentSearchingView extends StatelessWidget {
                   width: 2,
                 ),
               ),
-              child: const Center(
-                child: Text('🔍', style: TextStyle(fontSize: 40)),
+              child: Center(
+                child: Text(
+                  _isViewing ? '👀' : '🔍',
+                  style: const TextStyle(fontSize: 40),
+                ),
               ),
             ),
           ),
         ),
         const SizedBox(height: 20),
         Text(
-          'Searching for ${child.name.split(' ').first}\'s bus…',
+          _isViewing
+              ? '${request.assignedDriverName ?? 'A driver'} is viewing your request…'
+              : 'Searching for ${child.name.split(' ').first}\'s bus…',
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: context.textPrimary,
             fontSize: 16,
@@ -542,7 +516,9 @@ class _ParentSearchingView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Looking for buses on ${request.assignedRoute}',
+          _isViewing
+              ? 'Waiting for them to send a fare offer'
+              : 'Looking for buses on ${request.assignedRoute}',
           textAlign: TextAlign.center,
           style: TextStyle(color: context.textSecondary, fontSize: 13),
         ),
@@ -567,7 +543,9 @@ class _ParentSearchingView extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Alerting nearby drivers…',
+                    _isViewing
+                        ? '${request.assignedDriverName ?? 'Driver'} is viewing your request…'
+                        : 'Alerting nearby drivers…',
                     style: TextStyle(
                       color: AppTheme.purple.withValues(alpha: 0.8),
                       fontSize: 12,
@@ -596,6 +574,192 @@ class _ParentSearchingView extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Offer Review ──────────────────────────────────────────────────────────────
+class _ParentOfferReviewView extends StatelessWidget {
+  final MissedBusRequest request;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+
+  const _ParentOfferReviewView({
+    required this.request,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        Text(
+          'Offer Received',
+          style: TextStyle(
+            color: context.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Review the driver\'s offer before confirming',
+          style: TextStyle(color: context.textSecondary, fontSize: 13),
+        ),
+        const SizedBox(height: 20),
+        GlassCard(
+          enableBlur: false,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppTheme.driverCyan.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      image: request.assignedDriverPhotoUrl == null
+                          ? null
+                          : DecorationImage(
+                              image: NetworkImage(
+                                request.assignedDriverPhotoUrl!,
+                              ),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    child: request.assignedDriverPhotoUrl == null
+                        ? const Center(
+                            child: Text('🚍', style: TextStyle(fontSize: 22)),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request.assignedDriverName ?? 'Driver',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        Text(
+                          request.assignedBusNumber ?? '—',
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppTheme.warning.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'REQUESTED CHARGES',
+                      style: TextStyle(
+                        color: context.textTertiary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      request.fareDisplay ?? '—',
+                      style: const TextStyle(
+                        color: AppTheme.warningLight,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _JourneyRow(from: request.currentStop, to: request.destination),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: onReject,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppTheme.error.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Reject',
+                      style: TextStyle(
+                        color: AppTheme.error,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: onAccept,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.success, Color(0xFF10B981)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Accept',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
