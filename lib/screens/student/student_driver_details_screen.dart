@@ -4,8 +4,10 @@ import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import 'student_driver_chat.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentDriverDetailsScreen extends StatefulWidget {
   final StudentInfo student;
@@ -155,8 +157,14 @@ class _StudentDriverDetailsScreenState
                             gradient: AppTheme.parentGradient,
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: const Center(
-                            child: Text(
+                          child: AvatarImage(
+                            localFile: null,
+                            photoUrl: SessionService.instance
+                                .driverFor(widget.student.driverId)
+                                ?.photoUrl,
+                            size: 72,
+                            borderRadius: BorderRadius.circular(18),
+                            fallback: const Text(
                               '🧑‍✈️',
                               style: TextStyle(fontSize: 34),
                             ),
@@ -368,6 +376,7 @@ class _StudentDriverDetailsScreenState
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => StudentDriverChat(
+                          driverId: widget.student.driverId,
                           driverName: widget.student.driverName,
                           busNumber: widget.student.busNumber,
                         ),
@@ -428,7 +437,7 @@ class _InfoTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
+            AppGlyph(icon, size: 18),
             const SizedBox(height: 8),
             Text(
               label,

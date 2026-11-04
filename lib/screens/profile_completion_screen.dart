@@ -95,6 +95,14 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   /// than "later, from your profile" is the difference between a driver who gets
   /// requests and one who waits indefinitely wondering why nobody calls.
   final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+  /// The institute names the driver has typed in the step above, for the
+  /// round cards to offer as chips. Blank cards are skipped — a half-typed
+  /// area is not something to tick a round against.
+  List<String> get _instituteNames => [
+    for (final a in _serviceAreas)
+      if (a.nameCtrl.text.trim().isNotEmpty) a.nameCtrl.text.trim(),
+  ];
+
   final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
   double _serviceRadiusKm = 5;
   GeoCoord? _baseLocation;
@@ -1004,6 +1012,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         key: ValueKey(e.value),
         index: e.key,
         data: e.value,
+        availableInstitutes: _instituteNames,
         canRemove: _rounds.length > 1,
         onRemove: () => setState(() {
           _rounds[e.key].dispose();

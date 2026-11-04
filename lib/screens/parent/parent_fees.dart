@@ -184,7 +184,9 @@ class _StudentFeesState extends State<StudentFees> {
                     onTap: () => context.push(
                       '/parent/payment',
                       extra: {
-                        'amount': due == null ? '' : paisaToDisplay(due.amountPaisa),
+                        'amount': due == null
+                            ? ''
+                            : paisaToDisplay(due.amountPaisa),
                         'month': due == null ? '' : monthLabel(due.monthKey),
                         // The downstream screens only read `amount` and
                         // `month` and ignore anything else, so carrying the

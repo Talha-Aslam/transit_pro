@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../services/cloudinary_service.dart';
 import '../data/payment_repository.dart';
 import '../data/trip_repository.dart';
 import '../data/user_repository.dart';
@@ -32,6 +34,13 @@ class StudentInfo {
   /// `driverName`/`driverPhone` fields rather than overloading either.
   String driverId;
 
+  /// Where the ride ends and begins — `Student.dropoffLocation` and
+  /// `.pickupLocation`. Flattened through here so the dashboard can ask
+  /// `LiveBusService` for a road ETA to the right end of the round: without
+  /// a destination there is a live position but no time to show against it.
+  final GeoCoord? dropoff;
+  final GeoCoord? pickup;
+
   StudentInfo({
     this.name = '',
     this.studentId = '',
@@ -43,6 +52,8 @@ class StudentInfo {
     this.driverName = '',
     this.driverPhone = '',
     this.driverId = '',
+    this.dropoff,
+    this.pickup,
   });
 
   StudentInfo copyWith({
@@ -56,6 +67,8 @@ class StudentInfo {
     String? driverName,
     String? driverPhone,
     String? driverId,
+    GeoCoord? dropoff,
+    GeoCoord? pickup,
   }) => StudentInfo(
     name: name ?? this.name,
     studentId: studentId ?? this.studentId,
@@ -67,6 +80,8 @@ class StudentInfo {
     driverName: driverName ?? this.driverName,
     driverPhone: driverPhone ?? this.driverPhone,
     driverId: driverId ?? this.driverId,
+    dropoff: dropoff ?? this.dropoff,
+    pickup: pickup ?? this.pickup,
   );
 }
 
@@ -93,6 +108,48 @@ class StudentDataService {
     SessionService.instance.onRoleData(_rebuild);
   }
   static final StudentDataService instance = StudentDataService._();
+
+  /// True while a profile photo is being uploaded, so the avatar can show a
+  /// spinner instead of looking saved before it is.
+  final uploadingPhoto = ValueNotifier<bool>(false);
+
+  /// Uploads [image] and writes the URL onto `students/{uid}`, which is
+  /// what the driver's roster, attendance list and seat requests read.
+  ///
+  /// The caller still sets `ProfileService.studentImage` so the student's
+  /// own screen updates immediately; this is the half that makes the photo
+  /// leave the device. Without it the picture existed only in this app's
+  /// memory, and the driver carrying them saw an emoji.
+  Future<void> updateStudentPhoto(File image) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+
+    if (!CloudinaryService.instance.isConfigured) {
+      debugPrint('Cloudinary not configured — student photo kept locally.');
+      return;
+    }
+
+    uploadingPhoto.value = true;
+    try {
+      final result = await CloudinaryService.instance.uploadProfilePhoto(
+        image,
+        uid,
+      );
+      await UserRepository.instance.updateStudent(uid, {
+        'photoUrl': result.secureUrl,
+      });
+      // The user document carries it too — the same split
+      // `DriverDataService.updateDriverPhoto` keeps, so whichever record a
+      // screen happens to read has the photo.
+      await UserRepository.instance.updateUser(uid, {
+        'photoUrl': result.secureUrl,
+      });
+    } catch (e) {
+      debugPrint('student photo upload failed: $e');
+    } finally {
+      uploadingPhoto.value = false;
+    }
+  }
 
   /// Notification toggles stay device-local, same as
   /// `ParentDataService.paymentReminders` — this is a per-phone notification
@@ -169,6 +226,8 @@ class StudentDataService {
       driverName: driver?.name ?? '',
       driverPhone: driver?.phone ?? '',
       driverId: driverId,
+      dropoff: student?.dropoffLocation,
+      pickup: student?.pickupLocation,
     );
 
     _loadGuardian(student?.parentId);
@@ -215,8 +274,9 @@ class StudentDataService {
     _statsForRouteId = routeId;
 
     try {
-      final records = await TripRepository.instance
-          .fetchAttendanceForStudent(student.id);
+      final records = await TripRepository.instance.fetchAttendanceForStudent(
+        student.id,
+      );
 
       final boarded = records
           .where((r) => r.status == AttendanceStatus.boarded)
@@ -227,8 +287,9 @@ class StudentDataService {
       // Phase 3 safety layer writes incidents, these two are equal — which is
       // honest, rather than the prototype's unexplained 42 vs 38.
       safeRides.value = boarded;
-      onTimeRate.value =
-          records.isEmpty ? 0 : ((boarded / records.length) * 100).round();
+      onTimeRate.value = records.isEmpty
+          ? 0
+          : ((boarded / records.length) * 100).round();
 
       // Monday 00:00 of the current week through now. `markedAt` is null for
       // a record that was written but never actually marked (shouldn't

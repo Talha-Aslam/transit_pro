@@ -10,6 +10,7 @@ import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Mock driver payment data (in a real app this comes from a backend)
@@ -195,8 +196,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                                     ),
                                   ),
                                   Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.end,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
                                         AppStrings.t('month_lbl'),
@@ -283,13 +283,15 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                         accentColor: AppTheme.success,
                         badgeLabel: AppStrings.t('requires_approval'),
                         badgeColor: AppTheme.warning,
-                        onTap: () => _openMethod(() => context.push(
-                          '/parent/payment/cash',
-                          extra: {
-                            'amount': widget.amount,
-                            'month': widget.month,
-                          },
-                        )),
+                        onTap: () => _openMethod(
+                          () => context.push(
+                            '/parent/payment/cash',
+                            extra: {
+                              'amount': widget.amount,
+                              'month': widget.month,
+                            },
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
 
@@ -336,13 +338,15 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                         accentColor: AppTheme.parentPurple,
                         badgeLabel: 'Visa · Mastercard',
                         badgeColor: AppTheme.parentPurple,
-                        onTap: () => _openMethod(() => context.push(
-                          '/parent/payment/card',
-                          extra: {
-                            'amount': widget.amount,
-                            'month': widget.month,
-                          },
-                        )),
+                        onTap: () => _openMethod(
+                          () => context.push(
+                            '/parent/payment/card',
+                            extra: {
+                              'amount': widget.amount,
+                              'month': widget.month,
+                            },
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: 24),
@@ -1609,7 +1613,7 @@ class _MethodCard extends StatelessWidget {
                 border: Border.all(color: accentColor.withValues(alpha: 0.25)),
               ),
               child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 22)),
+                child: AppGlyph(icon, size: 22, color: accentColor),
               ),
             ),
             const SizedBox(width: 14),
@@ -2086,9 +2090,7 @@ class _SubmittedConfirmation extends StatelessWidget {
                 width: 2,
               ),
             ),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 36)),
-            ),
+            child: Center(child: AppGlyph(icon, size: 36, color: accentColor)),
           ),
           const SizedBox(height: 18),
           Text(

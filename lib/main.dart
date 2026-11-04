@@ -7,11 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:geolocator/geolocator.dart';
-// Only MapboxOptions is needed here; `hide` avoids colliding with
-// geolocator's own Position/LocationSettings types (both packages export
-// same-named classes with unrelated shapes).
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart'
-    hide Position, LocationSettings;
 import 'package:transit_core/transit_core.dart';
 
 import 'app/auth_service.dart';
@@ -68,12 +63,53 @@ Future<void> busTrackingBackground() async {
 
 // ─── App entry point ──────────────────────────────────────────────────────────
 
+/// Keeps an uncaught error on screen instead of taking the app down.
+///
+/// A crash in the middle of a round is the worst moment this app has: the
+/// driver is driving, the families are watching a map, and the only thing
+/// anybody learns is that the app closed. Two handlers, because Flutter
+/// splits them — one for errors raised while building or laying out a
+/// widget, one for everything else that escapes an `async` gap.
+///
+/// Neither swallows anything: the error and its stack still go to the log,
+/// which is what `flutter run` and `adb logcat` print. What changes is that
+/// the process survives, and a release build shows a readable message where
+/// it would otherwise have shown a grey rectangle.
+void _installErrorHandlers() {
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('uncaught widget error: ${details.exception}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('uncaught error: $error');
+    debugPrintStack(stackTrace: stack);
+    return true;
+  };
+
+  ErrorWidget.builder = (details) => Material(
+    color: const Color(0xFF111827),
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          kDebugMode
+              ? '${details.exception}'
+              : 'Something went wrong on this screen.'
+                    ' Go back and try again.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Color(0xFFE5E7EB), fontSize: 13),
+        ),
+      ),
+    ),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Must happen before any MapWidget is built. A missing token isn't a crash
-  // here — the native side just fails to load tiles later — so this is safe
-  // to call unconditionally even with an empty AppConfig.mapboxAccessToken.
-  MapboxOptions.setAccessToken(AppConfig.mapboxAccessToken);
+  _installErrorHandlers();
+  // google_maps_flutter needs no Dart-side init — the API key lives in
+  // AndroidManifest.xml's <meta-data> entry instead.
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Initialise notifications for the foreground (UI) process.

@@ -50,7 +50,10 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
   /// at 50 records per child.
   Future<List<_Trip>> _loadTrips() async {
     final children = ParentDataService.instance.children.value;
-    final childIds = children.map((c) => c.id).where((id) => id.isNotEmpty).toList();
+    final childIds = children
+        .map((c) => c.id)
+        .where((id) => id.isNotEmpty)
+        .toList();
     if (childIds.isEmpty) return const [];
     final childrenById = {for (final c in children) c.id: c};
 
@@ -66,12 +69,15 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
       }
     }
 
-    final resolved =
-        allRecords.where((r) => r.status != AttendanceStatus.pending).toList();
+    final resolved = allRecords
+        .where((r) => r.status != AttendanceStatus.pending)
+        .toList();
     if (resolved.isEmpty) return const [];
 
-    final tripIds =
-        resolved.map((r) => r.tripId).where((id) => id.isNotEmpty).toSet();
+    final tripIds = resolved
+        .map((r) => r.tripId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
     final trips = <String, Trip>{};
     if (tripIds.isNotEmpty) {
       final fetched = await Future.wait(
@@ -91,7 +97,8 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
     return resolved.map((r) {
       final trip = trips[r.tripId];
       final isMorning = trip?.type != TripType.afternoon;
-      final date = trip?.startedAt ??
+      final date =
+          trip?.startedAt ??
           r.markedAt ??
           DateTime.tryParse(r.dateKey) ??
           DateTime.now();
@@ -123,7 +130,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
       return _Trip(
         date: date,
         type: AppStrings.t(
-          isMorning ? 'trip_type_morning_pickup' : 'trip_type_afternoon_dropoff',
+          isMorning
+              ? 'trip_type_morning_pickup'
+              : 'trip_type_afternoon_dropoff',
         ),
         from: isMorning ? stop : school,
         to: isMorning ? school : stop,
@@ -500,7 +509,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                   .toList();
               final onTime = presentTrips.where((t) => t.statusOk).length;
               final late = presentTrips.length - onTime;
-              final present = filteredTrips.where((t) => t.attendancePresent).length;
+              final present = filteredTrips
+                  .where((t) => t.attendancePresent)
+                  .length;
               final absent = filteredTrips.length - present;
 
               return Column(
@@ -637,10 +648,11 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                                 duration: const Duration(
                                                   milliseconds: 200,
                                                 ),
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 7,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 7,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   gradient: selected
                                                       ? AppTheme.parentGradient
@@ -679,8 +691,9 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                           height: 36,
                                           decoration: BoxDecoration(
                                             color: context.cardBgElevated,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             border: Border.all(
                                               color: context.surfaceBorder,
                                             ),
@@ -827,9 +840,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                           ),
                                         )
                                       else
-                                        ...absentTrips.asMap().entries.map((
-                                          e,
-                                        ) {
+                                        ...absentTrips.asMap().entries.map((e) {
                                           final t = e.value;
                                           final isLast =
                                               e.key == absentTrips.length - 1;

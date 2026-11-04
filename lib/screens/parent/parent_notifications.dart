@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
 import '../../theme/app_theme.dart';
@@ -67,6 +69,20 @@ class _ParentNotificationsState extends State<ParentNotifications> {
       if (!seen.contains(n.date)) seen.add(n.date);
     }
     return seen;
+  }
+
+
+  /// Where tapping [n] should take the user, or null to just mark it read.
+  ///
+  /// A notification is a pointer, not the thing itself. A chat alert that
+  /// only marked itself read left the family reading a 140-character preview
+  /// with no way to answer; a confirmed seat left them hunting through tabs
+  /// for the driver it was about. Senders already put a `route` in the
+  /// payload for the latter, so that is honoured first.
+  String? _destinationFor(AppNotification n) {
+    if (n.kind == NotificationType.chat) return '/parent/driver-chat';
+    final route = n.data['route'];
+    return (route is String && route.startsWith('/')) ? route : null;
   }
 
   @override
@@ -190,13 +206,15 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: active
-                                        ? AppTheme.parentPurple.withValues(alpha: 0.2)
+                                        ? AppTheme.parentPurple.withValues(
+                                            alpha: 0.2,
+                                          )
                                         : Colors.white.withValues(alpha: 0.05),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
                                       color: active
-                                          ? AppTheme.parentPurple.withValues(alpha: 
-                                              0.5,
+                                          ? AppTheme.parentPurple.withValues(
+                                              alpha: 0.5,
                                             )
                                           : Colors.white.withValues(alpha: 0.1),
                                     ),
@@ -264,6 +282,8 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                                       // notification comes back unread on the
                                       // next Firestore snapshot.
                                       _svc.markRead(n);
+                                      final to = _destinationFor(n);
+                                      if (to != null) context.push(to);
                                     },
                                   ),
                                 ),
@@ -350,7 +370,9 @@ class _NotifCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: notif.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: notif.color.withValues(alpha: 0.25)),
+                    border: Border.all(
+                      color: notif.color.withValues(alpha: 0.25),
+                    ),
                   ),
                   child: Center(
                     child: Text(
@@ -422,4 +444,3 @@ class _NotifCard extends StatelessWidget {
     );
   }
 }
-

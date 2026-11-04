@@ -1,8 +1,18 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../theme/theme_provider.dart';
 
-/// A glassmorphism card with BackdropFilter blur.
+/// An opaque surface card.
+///
+/// Kept its name and its whole API — it is used on 150-odd call sites — but
+/// it no longer blurs anything. A `BackdropFilter` behind every card meant
+/// each one sampled and blurred the frame beneath it on every repaint, and
+/// the pale fill it carried only read as a surface over the old purple
+/// gradient; over a map, a photo header or another card it was just a wash.
+/// Now: a real fill, one hairline border, and a shadow in light mode only.
+///
+/// [enableBlur] and [blurSigma] are accepted and ignored, so the call sites
+/// that pass them keep compiling.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -11,7 +21,22 @@ class GlassCard extends StatelessWidget {
   final Gradient? gradient;
   final Color? borderColor;
   final double borderWidth;
+
+  /// Marks the card as belonging to one status or role: a 3px bar down the
+  /// leading edge, plus the standard [AppTheme.accentWash] over the surface
+  /// and a border in the same colour.
+  ///
+  /// This is what separates a card that is *about* something — a live route,
+  /// an alert, a payment due — from the plain surfaces around it. Tinting
+  /// the whole card instead, which is what these call sites used to do, says
+  /// the same thing much more loudly and stops reading as a card at all once
+  /// several of them stack up on one screen.
+  final Color? accent;
+
+  /// Ignored. See the class comment.
   final double blurSigma;
+
+  /// Ignored. See the class comment.
   final bool enableBlur;
   final List<BoxShadow>? boxShadow;
   final VoidCallback? onTap;
@@ -26,6 +51,7 @@ class GlassCard extends StatelessWidget {
     this.gradient,
     this.borderColor,
     this.borderWidth = 1,
+    this.accent,
     this.blurSigma = 20,
     this.enableBlur = true,
     this.boxShadow,
@@ -43,51 +69,71 @@ class GlassCard extends StatelessWidget {
     // animation tick, rather than relying on some ancestor rebuilding the
     // whole tree around it.
     final blend = ThemeBlendScope.of(context);
+    final radius = BorderRadius.circular(borderRadius);
+
+    // A [gradient] used to BE the card: 27 call sites pass a two-stop accent
+    // wash at 15%/5% alpha, which over the old purple backdrop looked like a
+    // tinted pane of glass. On a flat ground the same wash is simply a
+    // washed-out card. So the gradient is now painted ON the solid surface
+    // rather than instead of it — the card stays opaque and the accent reads
+    // as a tint, which is what those call sites wanted all along.
+    final wash =
+        gradient ?? (accent == null ? null : AppTheme.accentWash(accent!));
+
+    Widget inner = Padding(padding: padding ?? EdgeInsets.zero, child: child);
+    if (wash != null) {
+      inner = DecoratedBox(
+        decoration: BoxDecoration(gradient: wash, borderRadius: radius),
+        child: inner,
+      );
+    }
+    if (accent != null) {
+      // The content is the Stack's one NON-positioned child, so it is what
+      // the Stack takes its size from. With everything positioned — which is
+      // what `Positioned.fill` makes it — the Stack has nothing to measure
+      // and collapses to the smallest size allowed, which took every card on
+      // the parent and student dashboards down to a hairline.
+      inner = Stack(
+        children: [
+          inner,
+          PositionedDirectional(
+            start: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(width: 3, color: accent),
+          ),
+        ],
+      );
+    }
+
     Widget content = Container(
-      padding: padding,
       decoration: BoxDecoration(
-        color: gradient == null
-            ? (backgroundColor ??
-                  Color.lerp(
-                    Colors.white,
-                    Colors.white.withValues(alpha: 0.06),
-                    blend,
-                  ))
-            : null,
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(borderRadius),
+        color:
+            backgroundColor ??
+            Color.lerp(
+              AppTheme.lightSurfaceCard,
+              AppTheme.darkSurfaceCard,
+              blend,
+            ),
+        borderRadius: radius,
         border: Border.all(
           color:
               borderColor ??
-              Color.lerp(
-                const Color(0xFFE2E8F0),
-                Colors.white.withValues(alpha: 0.10),
-                blend,
-              )!,
+              (accent != null
+                  ? accent!.withValues(alpha: 0.22)
+                  : Color.lerp(
+                      AppTheme.lightSurfaceBorder,
+                      AppTheme.darkSurfaceBorder,
+                      blend,
+                    )!),
           width: borderWidth,
         ),
-        boxShadow:
-            boxShadow ??
-            [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04 * (1 - blend)),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        boxShadow: boxShadow ?? AppTheme.cardShadowFor(blend),
       ),
-      child: child,
+      child: inner,
     );
 
-    Widget card = ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: (enableBlur && !ThemeProvider.instance.isAnimating)
-          ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-              child: content,
-            )
-          : content,
-    );
+    Widget card = ClipRRect(borderRadius: radius, child: content);
 
     if (onTap != null) {
       return GestureDetector(onTap: onTap, child: card);
@@ -96,7 +142,7 @@ class GlassCard extends StatelessWidget {
   }
 }
 
-/// A simple toggle switch styled to match the app's dark glassmorphism theme.
+/// A simple toggle switch styled to match the app's surface palette.
 class AppSwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -123,14 +169,14 @@ class AppSwitch extends StatelessWidget {
           color: value
               ? activeColor
               : Color.lerp(
-                  const Color(0xFFE2E8F0),
-                  Colors.white.withValues(alpha: 0.12),
+                  AppTheme.lightSurfaceRaised,
+                  AppTheme.darkSurfaceRaised,
                   blend,
                 ),
           border: Border.all(
             color: Color.lerp(
-              const Color(0xFFCBD5E1),
-              Colors.white.withValues(alpha: 0.1),
+              AppTheme.lightInputBorder,
+              AppTheme.darkInputBorder,
               blend,
             )!,
           ),

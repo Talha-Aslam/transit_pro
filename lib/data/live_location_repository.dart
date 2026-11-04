@@ -74,10 +74,12 @@ class LiveLocationRepository {
         if (value is! Map) return <LiveLocation>[];
         return value.entries
             .where((e) => e.value is Map)
-            .map((e) => LiveLocation.fromMap(
-                  e.key.toString(),
-                  (e.value as Map).map((k, v) => MapEntry(k.toString(), v)),
-                ))
+            .map(
+              (e) => LiveLocation.fromMap(
+                e.key.toString(),
+                (e.value as Map).map((k, v) => MapEntry(k.toString(), v)),
+              ),
+            )
             .toList();
       });
 }

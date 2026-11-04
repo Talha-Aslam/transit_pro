@@ -12,7 +12,14 @@
     <application
         android:label="transit_pro"
         android:name=".MainApplication"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
+        <!-- Google Maps SDK for Android. Same key as AppConfig.googleMapsApiKey,
+             hardcoded separately here because manifest merging can't read
+             String.fromEnvironment — both places must be updated together. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyAc2JMLA82cKn94emZXfQQ9P0PNfppHIuY" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -132,62 +132,70 @@ class ThemedDropdown extends StatelessWidget {
   }
 }
 
-// ── School autocomplete ─────────────────────────────────────────────────────
+// ── Place autocomplete ──────────────────────────────────────────────────────
 
-/// Searchable school/campus picker backed by Mapbox's Search Box API — the
-/// same suggest→retrieve, session-tokened flow [MapPickerScreen] uses for
-/// its own search box (see `RouteService.searchPlaces`). Filters on the
-/// `education` family of POI categories so "punjab col..." surfaces actual
-/// campuses (with the branch address to disambiguate — e.g. "Airline
-/// Campus" vs "Township Campus") instead of generic address matches.
+/// Searchable place picker backed by Places API (New) — Autocomplete then
+/// Place Details, the same two-step, session-tokened flow [MapPickerScreen]
+/// uses for its own search box (see `RouteService.searchPlaces`).
 ///
-/// [onLocationSelected] fires with the resolved campus coordinates whenever
-/// a real suggestion (not a manual entry) is picked, so a caller can drop a
-/// pin on a map or stash the point for later without a second lookup.
+/// [poiCategory] is passed straight through as Places' `includedPrimaryTypes`.
+/// Leave it null — the default — for an unrestricted search, which is what a
+/// "where do you live" field wants: streets, sectors, neighbourhoods and
+/// landmarks all qualify. [SchoolSearchField] below sets it to the education
+/// types so "punjab col..." surfaces actual campuses (with the branch address
+/// to disambiguate — e.g. "Airline Campus" vs "Township Campus") rather than
+/// generic address matches.
 ///
-/// The sentinel `__manual__:` option — always pinned to the bottom of the
-/// results — is how a user registers at a school Mapbox has never heard of,
-/// same fallback the old hardcoded-list version offered. [kSchoolList] is
-/// kept as a last-resort local fallback merged in only when the live search
-/// comes back empty (no token configured, offline, or genuinely no match).
-class SchoolSearchField extends StatefulWidget {
+/// [onLocationSelected] fires with the resolved coordinates whenever a real
+/// suggestion (not a manual entry) is picked, so a caller can drop a pin on a
+/// map or stash the point for later without a second lookup.
+///
+/// The sentinel "+ Add … manually" option — always pinned to the bottom of
+/// the results — is how a user enters a place Google has never heard of.
+/// [localFallback] is a last-resort list of coordinate-less names merged in
+/// only when the live search comes back empty (no key configured, offline, or
+/// genuinely no match).
+class PlaceSearchField extends StatefulWidget {
   final TextEditingController controller;
   final bool isCustom;
   final void Function(bool) onCustomChanged;
   final Color accentColor;
+  final String hintText;
 
-  /// Biases results toward this point (Mapbox's `proximity`) — pass the
+  /// Places' `includedPrimaryTypes`, comma-separated. Null means no type
+  /// filter at all.
+  final String? poiCategory;
+
+  /// Names shown only when the live search returns nothing.
+  final List<String> localFallback;
+
+  /// Biases results toward this point (Places' `locationBias`) — pass the
   /// family's home/city location when known so "Punjab College" resolves to
   /// the nearby campus first.
   final GeoCoord? near;
 
-  /// Called with the campus's coordinates when a live search result (not a
+  /// Called with the place's coordinates when a live search result (not a
   /// manual entry, which has no known location) is selected.
   final ValueChanged<GeoCoord>? onLocationSelected;
 
-  const SchoolSearchField({
+  const PlaceSearchField({
     super.key,
     required this.controller,
     required this.isCustom,
     required this.onCustomChanged,
+    required this.hintText,
     this.accentColor = AppTheme.parentAccent,
+    this.poiCategory,
+    this.localFallback = const [],
     this.near,
     this.onLocationSelected,
   });
 
   @override
-  State<SchoolSearchField> createState() => _SchoolSearchFieldState();
+  State<PlaceSearchField> createState() => _PlaceSearchFieldState();
 }
 
-class _SchoolSearchFieldState extends State<SchoolSearchField> {
-  // Mapbox canonical POI category ids, confirmed against the live
-  // /list/category endpoint — 'education' alone only matches POIs tagged
-  // with that exact parent category, not its more specific children below,
-  // which is how real campuses are actually tagged.
-  static const _poiCategory =
-      'school,college,university,high_school,elementary_school,'
-      'kindergarten,community_college';
-
+class _PlaceSearchFieldState extends State<PlaceSearchField> {
   final _layerLink = LayerLink();
   final _overlayController = OverlayPortalController();
   final _focusNode = FocusNode();
@@ -228,9 +236,10 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
     }
 
     _overlayController.show();
-    // First keystroke of a search opens a Search Box API session; reused for
-    // every suggest/retrieve call until the field goes back to empty, per
-    // Mapbox's per-session billing model (mirrors MapPickerScreen).
+    // First keystroke of a search opens a Places Autocomplete session;
+    // reused for every autocomplete/details call until the field goes back
+    // to empty, per Google's per-session billing model (mirrors
+    // MapPickerScreen).
     final token = _sessionToken ??= RouteService.newSessionToken();
     setState(() => _searching = true);
     _debounce = Timer(const Duration(milliseconds: 400), () async {
@@ -238,7 +247,7 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
         trimmed,
         sessionToken: token,
         near: widget.near,
-        poiCategory: _poiCategory,
+        poiCategory: widget.poiCategory,
       );
       // The field may have moved on to a different query while this was in
       // flight — never let a slow, stale response overwrite it.
@@ -250,12 +259,12 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
     });
   }
 
-  /// Local, coordinate-less matches from the static list — only used when
-  /// the live API genuinely found nothing (commonly: no Mapbox token
-  /// configured on this build, or the device is offline).
+  /// Local, coordinate-less matches from [PlaceSearchField.localFallback] —
+  /// only used when the live API genuinely found nothing (commonly: no Google
+  /// Maps API key configured on this build, or the device is offline).
   List<GeocodeResult> _localFallback(String query) {
     final lower = query.toLowerCase();
-    return kSchoolList
+    return widget.localFallback
         .where((s) => s.toLowerCase().contains(lower))
         .map((s) => GeocodeResult(label: s, coord: const GeoCoord(0, 0)))
         .toList();
@@ -266,7 +275,7 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
     widget.controller.text = name;
     widget.onCustomChanged(false);
     // The local fallback path has no real coordinate — only forward a point
-    // that actually came back from Mapbox.
+    // that actually came back from Google.
     if (result.placeFormatted != null || result.name != null) {
       widget.onLocationSelected?.call(result.coord);
     }
@@ -317,7 +326,7 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
               },
               style: TextStyle(color: context.textPrimary, fontSize: 15),
               decoration: InputDecoration(
-                hintText: AppStrings.t('search_school_hint'),
+                hintText: widget.hintText,
                 suffixIcon: _searching
                     ? const Padding(
                         padding: EdgeInsets.all(14),
@@ -419,6 +428,52 @@ class _SchoolSearchFieldState extends State<SchoolSearchField> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── School autocomplete ─────────────────────────────────────────────────────
+
+/// [PlaceSearchField] narrowed to schools/campuses.
+///
+/// [kSchoolList] is kept as the local fallback for when the live search comes
+/// back empty, same as the old hardcoded-list version offered.
+class SchoolSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final bool isCustom;
+  final void Function(bool) onCustomChanged;
+  final Color accentColor;
+  final GeoCoord? near;
+  final ValueChanged<GeoCoord>? onLocationSelected;
+
+  // Google place types, sent as Places API (New) `includedPrimaryTypes`.
+  // Capped at 5 by Google. There is no "college" type — colleges are indexed
+  // as `university` or `school`, so those two cover them.
+  static const _poiCategory =
+      'school,primary_school,secondary_school,university';
+
+  const SchoolSearchField({
+    super.key,
+    required this.controller,
+    required this.isCustom,
+    required this.onCustomChanged,
+    this.accentColor = AppTheme.parentAccent,
+    this.near,
+    this.onLocationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PlaceSearchField(
+      controller: controller,
+      isCustom: isCustom,
+      onCustomChanged: onCustomChanged,
+      accentColor: accentColor,
+      near: near,
+      onLocationSelected: onLocationSelected,
+      hintText: AppStrings.t('search_school_hint'),
+      poiCategory: _poiCategory,
+      localFallback: kSchoolList,
     );
   }
 }
@@ -990,48 +1045,63 @@ class RoundFormData {
   final String id;
   final labelCtrl = TextEditingController();
   final seatsCtrl = TextEditingController();
-  ScheduleDirection direction;
-  TimeOfDay? start;
-  TimeOfDay? end;
+
+  /// Home → institute. Null means this round does not run that leg, which is
+  /// how a driver describes an evening-only academy run.
+  TimeOfDay? pickupStart;
+  TimeOfDay? pickupEnd;
+
+  /// Institute → home.
+  TimeOfDay? dropoffStart;
+  TimeOfDay? dropoffEnd;
+
+  /// Which institutes this round drops at. A single round routinely serves
+  /// more than one — half the children at a university, the rest at a
+  /// college on the same run — so this is a set, not a choice.
+  final Set<String> institutes;
+
   final int bookedSeats;
 
   RoundFormData({
     required this.id,
     String label = '',
     String seats = '',
-    this.direction = ScheduleDirection.pickup,
-    this.start,
-    this.end,
+    this.pickupStart,
+    this.pickupEnd,
+    this.dropoffStart,
+    this.dropoffEnd,
+    Set<String>? institutes,
     this.bookedSeats = 0,
-  }) {
+  }) : institutes = institutes ?? <String>{} {
     labelCtrl.text = label;
     seatsCtrl.text = seats;
   }
 
   /// A fresh round. The id is minted here, once, and must survive editing — it
   /// is what accepted requests and student records point at.
-  factory RoundFormData.fresh({
-    required int ordinal,
-    ScheduleDirection direction = ScheduleDirection.pickup,
-    int seats = 0,
-  }) => RoundFormData(
-    id:
-        'r${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
-        '$ordinal',
-    label: 'Round $ordinal',
-    seats: seats > 0 ? '$seats' : '',
-    direction: direction,
-  );
+  factory RoundFormData.fresh({required int ordinal, int seats = 0}) =>
+      RoundFormData(
+        id:
+            'r${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+            '$ordinal',
+        label: 'Round $ordinal',
+        seats: seats > 0 ? '$seats' : '',
+      );
 
   factory RoundFormData.from(DriverSchedule s) => RoundFormData(
     id: s.id,
     label: s.label,
     seats: s.totalSeats > 0 ? '${s.totalSeats}' : '',
-    direction: s.direction,
-    start: _parseTime(s.startTime),
-    end: _parseTime(s.endTime),
+    pickupStart: _parseTime(s.pickupStart),
+    pickupEnd: _parseTime(s.pickupEnd),
+    dropoffStart: _parseTime(s.dropoffStart),
+    dropoffEnd: _parseTime(s.dropoffEnd),
+    institutes: s.institutes.toSet(),
     bookedSeats: s.bookedSeats,
   );
+
+  /// True once the driver has given this round at least one leg to run.
+  bool get hasAnyLeg => pickupStart != null || dropoffStart != null;
 
   static TimeOfDay? _parseTime(String hhmm) {
     final parts = hhmm.split(':');
@@ -1050,9 +1120,11 @@ class RoundFormData {
   DriverSchedule toModel() => DriverSchedule(
     id: id,
     label: labelCtrl.text.trim().isEmpty ? 'Round' : labelCtrl.text.trim(),
-    direction: direction,
-    startTime: _formatTime(start),
-    endTime: _formatTime(end),
+    pickupStart: _formatTime(pickupStart),
+    pickupEnd: _formatTime(pickupEnd),
+    dropoffStart: _formatTime(dropoffStart),
+    dropoffEnd: _formatTime(dropoffEnd),
+    institutes: institutes.toList(),
     totalSeats: int.tryParse(seatsCtrl.text.trim()) ?? 0,
     bookedSeats: bookedSeats,
   );
@@ -1071,6 +1143,11 @@ class RoundCard extends StatelessWidget {
   final VoidCallback onChanged;
   final Color accentColor;
 
+  /// The institutes the driver has listed on their profile, offered here as
+  /// chips. Empty while they are still filling in the step above, in which
+  /// case the picker explains that rather than showing nothing.
+  final List<String> availableInstitutes;
+
   const RoundCard({
     super.key,
     required this.index,
@@ -1078,23 +1155,113 @@ class RoundCard extends StatelessWidget {
     required this.canRemove,
     required this.onRemove,
     required this.onChanged,
+    this.availableInstitutes = const [],
     this.accentColor = AppTheme.driverCyan,
   });
 
-  Future<void> _pickTime(BuildContext context, {required bool isStart}) async {
+  Future<void> _pickTime(
+    BuildContext context,
+    TimeOfDay? current,
+    TimeOfDay fallback,
+    void Function(TimeOfDay) assign,
+  ) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          (isStart ? data.start : data.end) ??
-          const TimeOfDay(hour: 6, minute: 30),
+      initialTime: current ?? fallback,
     );
     if (picked == null) return;
-    if (isStart) {
-      data.start = picked;
-    } else {
-      data.end = picked;
-    }
+    assign(picked);
     onChanged();
+  }
+
+  /// One leg of the round: a heading, the two times, and a way to clear it.
+  ///
+  /// Clearing matters. A round that only brings children home, or an academy
+  /// run that only goes out in the evening, is described by *leaving a leg
+  /// empty* — without a Clear there would be no way back from a mis-tapped
+  /// time picker, and the driver would be advertising a trip they do not run.
+  Widget _leg(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required TimeOfDay? start,
+    required TimeOfDay? end,
+    required TimeOfDay fallbackStart,
+    required String startHint,
+    required String endHint,
+    required void Function(TimeOfDay?) setStart,
+    required void Function(TimeOfDay?) setEnd,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (start != null || end != null)
+              GestureDetector(
+                onTap: () {
+                  setStart(null);
+                  setEnd(null);
+                  onChanged();
+                },
+                child: Text(
+                  'Clear',
+                  style: TextStyle(
+                    color: context.textTertiary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: TextStyle(color: context.textTertiary, fontSize: 11),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _TimeBox(
+                value: RoundFormData._formatTime(start),
+                placeholder: startHint,
+                onTap: () => _pickTime(
+                  context,
+                  start,
+                  fallbackStart,
+                  (t) => setStart(t),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _TimeBox(
+                value: RoundFormData._formatTime(end),
+                placeholder: endHint,
+                onTap: () => _pickTime(
+                  context,
+                  end,
+                  start ?? fallbackStart,
+                  (t) => setEnd(t),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -1172,84 +1339,72 @@ class RoundCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const FieldLabel('DIRECTION', important: true),
+            const FieldLabel('WHERE THIS ROUND GOES', important: true),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                for (final d in ScheduleDirection.values) ...[
-                  Expanded(
-                    child: GestureDetector(
+            if (availableInstitutes.isEmpty)
+              Text(
+                'Add the schools, colleges or universities you serve above, '
+                'then come back and tick the ones this round covers.',
+                style: TextStyle(color: context.textTertiary, fontSize: 11),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final name in availableInstitutes)
+                    _ChoiceChip(
+                      label: name,
+                      selected: data.institutes.contains(name),
+                      accentColor: accentColor,
                       onTap: () {
-                        data.direction = d;
+                        if (!data.institutes.remove(name)) {
+                          data.institutes.add(name);
+                        }
                         onChanged();
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 11),
-                        decoration: BoxDecoration(
-                          color: data.direction == d
-                              ? accentColor.withValues(alpha: 0.22)
-                              : context.cardBgElevated,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: data.direction == d
-                                ? accentColor
-                                : context.inputBorder,
-                          ),
-                        ),
-                        child: Text(
-                          d == ScheduleDirection.pickup
-                              ? 'Pickup (home → institute)'
-                              : 'Drop-off (institute → home)',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: data.direction == d
-                                ? context.textPrimary
-                                : context.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
                     ),
-                  ),
-                  if (d != ScheduleDirection.values.last)
-                    const SizedBox(width: 8),
                 ],
-              ],
+              ),
+            const SizedBox(height: 6),
+            Text(
+              'One round can drop at more than one place — tick every '
+              'institute you pass on this run.',
+              style: TextStyle(color: context.textTertiary, fontSize: 11),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const FieldLabel('STARTS', important: true),
-                      const SizedBox(height: 6),
-                      _TimeBox(
-                        value: RoundFormData._formatTime(data.start),
-                        placeholder: '06:30',
-                        onTap: () => _pickTime(context, isStart: true),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const FieldLabel('ENDS'),
-                      const SizedBox(height: 6),
-                      _TimeBox(
-                        value: RoundFormData._formatTime(data.end),
-                        placeholder: '07:00',
-                        onTap: () => _pickTime(context, isStart: false),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            const SizedBox(height: 14),
+            // Two legs, not a direction. The same children ride out and back
+            // with this driver on one seat, so the round carries both times;
+            // a run that only goes one way simply leaves the other blank.
+            _leg(
+              context,
+              title: 'TAKING THEM  \u2192',
+              subtitle: 'From home to the institute',
+              start: data.pickupStart,
+              end: data.pickupEnd,
+              fallbackStart: const TimeOfDay(hour: 6, minute: 30),
+              startHint: '06:30',
+              endHint: '07:30',
+              setStart: (t) => data.pickupStart = t,
+              setEnd: (t) => data.pickupEnd = t,
+            ),
+            const SizedBox(height: 14),
+            _leg(
+              context,
+              title: 'BRINGING THEM BACK  \u2190',
+              subtitle: 'From the institute back home',
+              start: data.dropoffStart,
+              end: data.dropoffEnd,
+              fallbackStart: const TimeOfDay(hour: 13, minute: 30),
+              startHint: '13:30',
+              endHint: '14:30',
+              setStart: (t) => data.dropoffStart = t,
+              setEnd: (t) => data.dropoffEnd = t,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Leave a side blank if this round only runs one way.',
+              style: TextStyle(color: context.textTertiary, fontSize: 11),
             ),
             const SizedBox(height: 12),
             const FieldLabel('SEATS ON THIS ROUND', important: true),
@@ -1338,6 +1493,63 @@ class StepDot extends StatelessWidget {
         border: Border.all(
           color: active ? color : Colors.white.withValues(alpha: 0.2),
           width: 2,
+        ),
+      ),
+    );
+  }
+}
+
+
+/// A tick-on/tick-off chip. Small enough that pulling in a Material
+/// `FilterChip` would fight this form's styling rather than save anything.
+class _ChoiceChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  const _ChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? accentColor.withValues(alpha: 0.22)
+              : context.cardBgElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? accentColor : context.inputBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.circle_outlined,
+              size: 15,
+              color: selected ? accentColor : context.textTertiary,
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? context.textPrimary : context.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

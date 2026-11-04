@@ -62,10 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
   /// builds a fresh [LoginScreen] per navigation, so this always reflects the
   /// role actually showing on screen.
   UserRole get _role => switch (widget.role) {
-        'driver' => UserRole.driver,
-        'student' => UserRole.student,
-        _ => UserRole.parent,
-      };
+    'driver' => UserRole.driver,
+    'student' => UserRole.student,
+    _ => UserRole.parent,
+  };
 
   void _onLangChanged() => setState(() {});
 

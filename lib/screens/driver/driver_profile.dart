@@ -5,17 +5,21 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/auth_service.dart';
+import '../../app/active_trip_service.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
+import '../../data/user_repository.dart';
 import '../../app/session_service.dart';
-import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
+import '../../widgets/app_glyph.dart';
+import 'driver_documents_screen.dart';
 
 class DriverProfile extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -45,10 +49,15 @@ class _DriverProfileState extends State<DriverProfile> {
   /// today" apart from "completed one three weeks ago".
   List<Trip> _trips = const [];
 
-  /// Whether a real trip is currently running — mirrors
-  /// `driver_dashboard.dart`'s `_routeStarted`, which is the fix that
-  /// replaced this screen's hardcoded "Active - On Route" chip.
-  bool _routeStarted = false;
+  /// Whether a real trip is currently running, read from
+  /// `trips/{id}.status` like every other driver screen.
+  ///
+  /// This chip was hardcoded to "Active - On Route", then derived from
+  /// `TrackingService.route != null` — which is a device-local leftover, not
+  /// a trip. It stayed green for a driver who had ended the round from the
+  /// Route tab, and it read "Not Started" for a round that was genuinely
+  /// running but had been started before the app was last killed.
+  bool get _routeStarted => ActiveTripService.instance.isOnRoute;
 
   /// `Not Started` / `On Route` / `Completed` for today, derived from real
   /// tracking + trip state rather than a permanently-green "Active - On
@@ -86,38 +95,43 @@ class _DriverProfileState extends State<DriverProfile> {
   @override
   void initState() {
     super.initState();
+    final driverId = SessionService.instance.uid;
+    if (driverId != null) {
+      _documentsSub = UserRepository.instance
+          .watchDriverDocuments(driverId)
+          .listen((docs) {
+            if (mounted) setState(() => _documents = docs);
+          });
+    }
     LanguageProvider.instance.addListener(_onLangChanged);
     _svc.locationSharing.addListener(_onLocationSharingChanged);
     // The two service rows summarise live Firestore state (seats free, requests
     // waiting), so they have to follow the streams rather than showing whatever
     // was true when the screen opened.
     SessionService.instance.driver.addListener(_onLangChanged);
+    _svc.uploadingPhoto.addListener(_onLangChanged);
     SessionService.instance.rideRequests.addListener(_onLangChanged);
     SessionService.instance.addListener(_ensureTripCountSubscription);
     _ensureTripCountSubscription();
-    _routeStarted = TrackingService.instance.route != null;
-    TrackingService.instance.isSimulating.addListener(_onTrackingChanged);
-    TrackingService.instance.isLive.addListener(_onTrackingChanged);
+    ActiveTripService.instance.trip.addListener(_onTrackingChanged);
   }
 
   @override
   void dispose() {
+    _documentsSub?.cancel();
     LanguageProvider.instance.removeListener(_onLangChanged);
     _svc.locationSharing.removeListener(_onLocationSharingChanged);
     SessionService.instance.driver.removeListener(_onLangChanged);
+    _svc.uploadingPhoto.removeListener(_onLangChanged);
     SessionService.instance.rideRequests.removeListener(_onLangChanged);
     SessionService.instance.removeListener(_ensureTripCountSubscription);
-    TrackingService.instance.isSimulating.removeListener(_onTrackingChanged);
-    TrackingService.instance.isLive.removeListener(_onTrackingChanged);
+    ActiveTripService.instance.trip.removeListener(_onTrackingChanged);
     _tripCountSub?.cancel();
     super.dispose();
   }
 
   void _onTrackingChanged() {
-    final started = TrackingService.instance.route != null;
-    if (started != _routeStarted && mounted) {
-      setState(() => _routeStarted = started);
-    }
+    if (mounted) setState(() {});
   }
 
   /// (Re)subscribes to this driver's real trips whenever the signed-in uid
@@ -203,19 +217,98 @@ class _DriverProfileState extends State<DriverProfile> {
     return '$pct% on-time rate';
   }
 
-  /// Subtitle + color for the "Documents & License" row. Was the hardcoded
-  /// `documents_license_desc` string ("All verified ✓") shown even for a
-  /// brand-new driver still sitting in `DriverStatus.pendingVerification` —
-  /// same real `Driver.isApproved` gate `driver_performance_screen.dart`
-  /// uses for its own new-account state, not a separate invented field.
-  bool get _documentsVerified =>
-      SessionService.instance.driver.value?.isApproved ?? false;
+  /// The documents themselves, newest-per-type, from the same stream
+  /// `driver_documents_screen.dart` reads. Empty until the first snapshot
+  /// lands, which the summary below reports as "not uploaded" rather than
+  /// guessing.
+  List<DriverDocument> _documents = const [];
+  StreamSubscription<List<DriverDocument>>? _documentsSub;
 
-  String get _documentsSummary =>
-      _documentsVerified ? 'All verified ✓' : 'Pending verification';
+  /// The newest document of each type wins — the repository keeps rejected
+  /// and superseded uploads, so the latest one is the live status.
+  Map<DocumentType, DriverDocument> get _latestByType {
+    final latest = <DocumentType, DriverDocument>{};
+    for (final d in _documents) {
+      final held = latest[d.type];
+      // `uploadedAt` is null until the server timestamp resolves, which is
+      // the case for the upload that just happened — treat that as newest,
+      // since it is.
+      final mine = d.uploadedAt;
+      final theirs = held?.uploadedAt;
+      if (held == null ||
+          theirs == null ||
+          mine == null ||
+          mine.isAfter(theirs)) {
+        latest[d.type] = d;
+      }
+    }
+    return latest;
+  }
 
-  Color get _documentsColor =>
-      _documentsVerified ? AppTheme.success : AppTheme.warning;
+  int _countWith(DocumentStatus status) => kRequiredDriverDocuments
+      .where((t) => _latestByType[t]?.status == status)
+      .length;
+
+  /// Required documents the driver has not submitted at all.
+  int get _missingCount => kRequiredDriverDocuments
+      .where((t) => !_latestByType.containsKey(t))
+      .length;
+
+  /// Subtitle + colour for the "Documents & License" row.
+  ///
+  /// Was `Driver.isApproved` — the admin's verdict on the *account*. An
+  /// admin can approve a driver while one of their documents is still
+  /// pending, and this row then read "All verified ✓" while the screen it
+  /// opens showed a pending document. It describes the documents now.
+  (String, Color) get _documentsStatus {
+    final pending = _countWith(DocumentStatus.pending);
+    final rejected = _countWith(DocumentStatus.rejected);
+    final verified = _countWith(DocumentStatus.verified);
+
+    if (rejected > 0) {
+      return (
+        '$rejected need${rejected == 1 ? 's' : ''} re-uploading',
+        AppTheme.error,
+      );
+    }
+    if (pending > 0) {
+      return ('$verified verified · $pending pending', AppTheme.warning);
+    }
+    if (verified == 0) return ('Not uploaded yet', AppTheme.warning);
+    // "All verified" has to mean *all of them*. This counted only the
+    // documents that happened to exist, so a driver who had uploaded one of
+    // the four and had it approved read as fully checked out while three
+    // were still missing.
+    final missing = _missingCount;
+    if (missing > 0) {
+      return (
+        '$verified of ${kRequiredDriverDocuments.length} verified · '
+            '$missing not uploaded',
+        AppTheme.warning,
+      );
+    }
+    return ('All verified ✓', AppTheme.success);
+  }
+
+  /// How many families are waiting on an answer about their timings.
+  String _timetablesSummary() {
+    final session = SessionService.instance;
+    final roster = <String, Student>{
+      for (final s in session.roster.value) s.id: s,
+      for (final s in session.routeStudents.value) s.id: s,
+    };
+    final waiting = roster.values
+        .where(
+          (s) => s.scheduleRequestStatus == ScheduleRequestStatus.pending,
+        )
+        .length;
+    return waiting == 0
+        ? 'Pickup and drop-off times they asked for'
+        : '$waiting waiting on your answer';
+  }
+
+  String get _documentsSummary => _documentsStatus.$1;
+  Color get _documentsColor => _documentsStatus.$2;
 
   Future<void> _pickImage() async {
     final source = await showImageSourceSheet(
@@ -228,7 +321,12 @@ class _DriverProfileState extends State<DriverProfile> {
       imageQuality: 85,
     );
     if (picked != null) {
-      ProfileService.instance.driverImage.value = File(picked.path);
+      final file = File(picked.path);
+      // Shown straight away on this screen...
+      ProfileService.instance.driverImage.value = file;
+      // ...and uploaded, so it reaches the families this driver carries.
+      // Without this second half the photo never left the phone.
+      unawaited(DriverDataService.instance.updateDriverPhoto(file));
     }
   }
 
@@ -312,25 +410,34 @@ class _DriverProfileState extends State<DriverProfile> {
                               ),
                             ],
                           ),
+                          // Local file first (so a just-picked photo shows
+                          // immediately), then the uploaded URL off the
+                          // driver document. The URL half was missing, which
+                          // is the whole reason the photo vanished on every
+                          // restart: it was being uploaded and saved
+                          // correctly, just never read back.
                           child: ValueListenableBuilder<File?>(
                             valueListenable:
                                 ProfileService.instance.driverImage,
-                            builder: (_, file, _) => file != null
-                                ? ClipRRect(
+                            builder: (_, file, _) =>
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: _svc.uploadingPhoto,
+                                  builder: (_, uploading, _) => AvatarImage(
+                                    localFile: file,
+                                    photoUrl: SessionService
+                                        .instance
+                                        .driver
+                                        .value
+                                        ?.photoUrl,
+                                    size: 84,
+                                    uploading: uploading,
                                     borderRadius: BorderRadius.circular(23),
-                                    child: Image.file(
-                                      file,
-                                      width: 84,
-                                      height: 84,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Text(
+                                    fallback: const Text(
                                       '👨',
                                       style: TextStyle(fontSize: 44),
                                     ),
                                   ),
+                                ),
                           ),
                         ),
                         Positioned(
@@ -634,6 +741,18 @@ class _DriverProfileState extends State<DriverProfile> {
                             label: 'Seat Requests',
                             desc: _requestsSummary(),
                             onTap: () => context.push('/driver/ride-requests'),
+                          ),
+                          _MenuItem(
+                            icon: '🗓️',
+                            label: 'Family Timings',
+                            desc: _timetablesSummary(),
+                            onTap: () => context.push('/driver/timetables'),
+                          ),
+                          _MenuItem(
+                            icon: '💬',
+                            label: AppStrings.t('messages_title'),
+                            desc: 'Chat with the families you carry',
+                            onTap: () => context.push('/driver/messages'),
                           ),
                           _MenuItem(
                             icon: '💳',
@@ -1014,7 +1133,7 @@ class _InfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 16, height: 1)),
+          AppGlyph(icon, size: 16),
           const SizedBox(height: 2),
           Text(
             label,
@@ -1106,7 +1225,7 @@ class _MenuItem extends StatelessWidget {
                         size: 18,
                         color: labelColor ?? context.textPrimary,
                       )
-                    : Text(icon!, style: const TextStyle(fontSize: 18)),
+                    : AppGlyph(icon!, size: 18),
               ),
             ),
             const SizedBox(width: 14),

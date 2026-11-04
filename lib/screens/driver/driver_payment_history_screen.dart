@@ -85,21 +85,25 @@ class _DriverPaymentHistoryScreenState
                   valueListenable: session.state,
                   builder: (context, state, _) =>
                       ValueListenableBuilder<List<Student>>(
-                    valueListenable: session.roster,
-                    builder: (context, roster, _) =>
-                        ValueListenableBuilder<List<Student>>(
-                      valueListenable: session.routeStudents,
-                      builder: (context, routeStudents, _) =>
-                          ValueListenableBuilder<List<Payment>>(
-                        valueListenable: session.payments,
-                        builder: (context, payments, _) => _buildBody(
-                          state: state,
-                          payments: payments,
-                          students: _studentsById(roster, routeStudents),
-                        ),
+                        valueListenable: session.roster,
+                        builder: (context, roster, _) =>
+                            ValueListenableBuilder<List<Student>>(
+                              valueListenable: session.routeStudents,
+                              builder: (context, routeStudents, _) =>
+                                  ValueListenableBuilder<List<Payment>>(
+                                    valueListenable: session.payments,
+                                    builder: (context, payments, _) =>
+                                        _buildBody(
+                                          state: state,
+                                          payments: payments,
+                                          students: _studentsById(
+                                            roster,
+                                            routeStudents,
+                                          ),
+                                        ),
+                                  ),
+                            ),
                       ),
-                    ),
-                  ),
                 ),
               ),
             ],
@@ -312,10 +316,7 @@ class _DriverPaymentHistoryScreenState
           return GestureDetector(
             onTap: () => setState(() => _filter = filter),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 gradient: selected ? AppTheme.driverGradient : null,
                 color: selected ? null : context.cardBg,
@@ -377,9 +378,7 @@ class _DriverPaymentHistoryScreenState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        children: [
-          for (final payment in visible) _buildRow(payment, students),
-        ],
+        children: [for (final payment in visible) _buildRow(payment, students)],
       ),
     );
   }

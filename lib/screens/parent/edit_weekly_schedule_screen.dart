@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:transit_core/transit_core.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/driver_data_service.dart'
     show formatTimeOfDay, parseTimeOfDay;
 import '../../app/parent_data_service.dart';
+import '../../app/push_sender.dart';
+import '../../app/session_service.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -95,6 +98,35 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
     });
   }
 
+  /// Tells the driver there is something waiting for them.
+  ///
+  /// Best-effort: the request is already saved and shows on the driver's
+  /// timetable screen either way, so a failed alert is a late answer rather
+  /// than a lost one.
+  Future<void> _askDriver(String studentId) async {
+    try {
+      final student = SessionService.instance.children.value
+          .where((c) => c.id == studentId)
+          .firstOrNull;
+      final driverId = student?.driverId ?? '';
+      if (driverId.isEmpty) return;
+      await PushSender.instance.notifyOne(
+        driverId,
+        UserNotification(
+          id: '',
+          type: NotificationType.rideRequest,
+          title: 'New timings requested',
+          body:
+              '${student?.name ?? 'A family'} has asked for different '
+              'pickup or drop-off times. Tap to answer.',
+          data: {'studentId': studentId, 'route': '/driver/timetables'},
+        ),
+      );
+    } catch (e) {
+      debugPrint('schedule request alert failed: $e');
+    }
+  }
+
   Future<void> _save() async {
     final studentId = _studentId;
     if (studentId == null) return;
@@ -114,11 +146,20 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
       };
       await UserRepository.instance.updateStudent(studentId, {
         'requestedSchedule': requestedSchedule,
+        // Saved times are a request, not an arrangement: a driver running
+        // four rounds cannot absorb a new 07:15 pickup because one parent
+        // typed it. Re-saving reopens the question, which is right — the
+        // driver agreed to the old times, not these.
+        'scheduleRequestStatus': ScheduleRequestStatus.pending.name,
+        'scheduleRequestNote': null,
       });
+      await _askDriver(studentId);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Weekly schedule saved.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sent to your driver for approval.'),
+          ),
+        );
         context.pop();
       }
     } finally {

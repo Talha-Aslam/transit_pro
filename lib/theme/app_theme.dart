@@ -22,61 +22,158 @@ extension AppColors on BuildContext {
 
   // Background decoration
   BoxDecoration get scaffoldBg => BoxDecoration.lerp(
-        AppTheme.lightBgDecoration,
-        AppTheme.bgDecoration,
-        _themeBlend,
-      )!;
+    AppTheme.lightBgDecoration,
+    AppTheme.bgDecoration,
+    _themeBlend,
+  )!;
 
   // Text
-  Color get textPrimary =>
-      Color.lerp(const Color(0xFF1E293B), Colors.white, _themeBlend)!;
-  Color get textSecondary =>
-      Color.lerp(const Color(0xFF64748B), Colors.white70, _themeBlend)!;
-  Color get textTertiary =>
-      Color.lerp(const Color(0xFF94A3B8), Colors.white38, _themeBlend)!;
+  Color get textPrimary => Color.lerp(
+    AppTheme.lightTextPrimary,
+    AppTheme.darkTextPrimary,
+    _themeBlend,
+  )!;
+  Color get textSecondary => Color.lerp(
+    AppTheme.lightTextSecondary,
+    AppTheme.darkTextSecondary,
+    _themeBlend,
+  )!;
+  Color get textTertiary => Color.lerp(
+    AppTheme.lightTextTertiary,
+    AppTheme.darkTextTertiary,
+    _themeBlend,
+  )!;
   Color get textHint =>
-      Color.lerp(const Color(0xFFCBD5E1), Colors.white24, _themeBlend)!;
+      Color.lerp(AppTheme.lightTextHint, AppTheme.darkTextHint, _themeBlend)!;
 
   // Surfaces / cards
+  //
+  // Opaque on both sides now. These used to be white at 6-10% alpha in dark
+  // mode, which only ever looked like a surface because a `BackdropFilter`
+  // blurred the purple gradient behind it; over anything else — a photo, a
+  // map, another card — the "card" was simply a pale wash. A real fill plus
+  // a real border reads as an object on any background and costs no blur.
   Color get cardBg => Color.lerp(
-        Colors.white,
-        Colors.white.withValues(alpha: 0.06),
-        _themeBlend,
-      )!;
+    AppTheme.lightSurfaceCard,
+    AppTheme.darkSurfaceCard,
+    _themeBlend,
+  )!;
   Color get cardBgElevated => Color.lerp(
-        const Color(0xFFF1F5F9),
-        Colors.white.withValues(alpha: 0.10),
-        _themeBlend,
-      )!;
+    AppTheme.lightSurfaceRaised,
+    AppTheme.darkSurfaceRaised,
+    _themeBlend,
+  )!;
   Color get surfaceBorder => Color.lerp(
-        const Color(0xFFE2E8F0),
-        Colors.white.withValues(alpha: 0.10),
-        _themeBlend,
-      )!;
+    AppTheme.lightSurfaceBorder,
+    AppTheme.darkSurfaceBorder,
+    _themeBlend,
+  )!;
+
+  /// Lift for a card, and only in light mode: against #F5F6F8 a white card
+  /// needs the shadow to separate, while on the dark ground the step from
+  /// #121417 to #1C1F24 does that job on its own and a shadow would just
+  /// muddy it. Fades out as the theme blends toward dark.
+  List<BoxShadow> get cardShadow => AppTheme.cardShadowFor(_themeBlend);
 
   // Inputs
   Color get inputFill => Color.lerp(
-        const Color(0xFFF1F5F9),
-        Colors.white.withValues(alpha: 0.05),
-        _themeBlend,
-      )!;
+    AppTheme.lightSurfaceRaised,
+    AppTheme.darkInputFill,
+    _themeBlend,
+  )!;
   Color get inputBorder => Color.lerp(
-        const Color(0xFFE2E8F0),
-        Colors.white.withValues(alpha: 0.12),
-        _themeBlend,
-      )!;
+    AppTheme.lightInputBorder,
+    AppTheme.darkInputBorder,
+    _themeBlend,
+  )!;
 }
 
 class AppTheme {
-  // ── Background ────────────────────────────────────────────────────────────
-  static const Color bgDarkest = Color.fromARGB(255, 16, 9, 44);
-  static const Color bgDark = Color.fromARGB(255, 39, 14, 83);
-  static const Color bgDarkBlue = Color.fromARGB(255, 42, 41, 94);
+  // ── Surfaces ──────────────────────────────────────────────────────────────
+  //
+  // Neutral charcoal and neutral grey, replacing the deep-purple gradient
+  // (#10092C → #270E53 → #2A295E) and the blue-indigo light gradient the app
+  // shipped with. The old backgrounds were part of the glassmorphism recipe:
+  // translucent cards needed something colourful behind them to look like
+  // anything at all. With opaque cards that tint only fought the role accents
+  // (cyan, purple, amber, emerald) sitting on top of it.
+  //
+  // The three dark names are kept — nine screens reference `bgDark` and
+  // `bgDarkBlue` for sheet and dropdown fills — so re-pointing them here
+  // moves every one of those to the new palette at once.
+  static const Color bgDarkest = darkSurfaceBg;
+  static const Color bgDark = darkSurfaceCard;
+  static const Color bgDarkBlue = darkSurfaceRaised;
+
+  // Dark ramp
+  static const Color darkSurfaceBg = Color(0xFF121417);
+  static const Color darkSurfaceCard = Color(0xFF1C1F24);
+  static const Color darkSurfaceRaised = Color(0xFF23272E);
+  static const Color darkSurfaceBorder = Color(0xFF2A2E35);
+  static const Color darkInputFill = Color(0xFF1F2329);
+  static const Color darkInputBorder = Color(0xFF30353D);
+  static const Color darkTextPrimary = Color(0xFFE8EAED);
+  static const Color darkTextSecondary = Color(0xFF9AA0A6);
+  static const Color darkTextTertiary = Color(0xFF6E757E);
+  static const Color darkTextHint = Color(0xFF565C64);
+
+  // Light ramp
+  static const Color lightSurfaceBg = Color(0xFFF5F6F8);
+  static const Color lightSurfaceCard = Color(0xFFFFFFFF);
+  static const Color lightSurfaceRaised = Color(0xFFF1F3F6);
+  static const Color lightSurfaceBorder = Color(0xFFE6E8EC);
+  static const Color lightInputBorder = Color(0xFFDFE2E7);
+  static const Color lightTextPrimary = Color(0xFF1A1D21);
+  static const Color lightTextSecondary = Color(0xFF646B75);
+  static const Color lightTextTertiary = Color(0xFF8A919B);
+  static const Color lightTextHint = Color(0xFFB4BAC2);
+
+  // ── Greeting ──────────────────────────────────────────────────────────────
+  //
+  // One colour for "Good Morning" on every dashboard, rather than each role's
+  // own accent: the greeting is the app talking, not the role. The light
+  // value is the same hue pulled down until it clears 4.5:1 against the pale
+  // end of the header scrim — #4FC3F7 itself is a 64%-lightness sky blue and
+  // all but vanishes over a morning sky.
+  static const Color greetingDark = Color(0xFF4FC3F7);
+  static const Color greetingLight = Color(0xFF0B73A8);
+
+  /// The standard two-stop accent wash painted over a card surface.
+  ///
+  /// Every dashboard used to pick its own alphas — the driver 0.15/0.05, the
+  /// parent 0.20/0.08, the student 0.12/0.04 — so the same design read as
+  /// three different weights of tint depending on who was logged in. The
+  /// parent's cards in particular came out as saturated purple blocks rather
+  /// than cards with a hint of purple in them.
+  static LinearGradient accentWash(Color accent) => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [accent.withValues(alpha: 0.10), accent.withValues(alpha: 0.03)],
+  );
+
+  /// Card lift, light mode only — see `AppColors.cardShadow`.
+  /// [blend] is 0 in light, 1 in dark.
+  static List<BoxShadow> cardShadowFor(double blend) {
+    final strength = 1 - blend;
+    if (strength <= 0) return const [];
+    return [
+      BoxShadow(
+        color: const Color(0xFF101418).withValues(alpha: 0.06 * strength),
+        blurRadius: 2,
+        offset: const Offset(0, 1),
+      ),
+      BoxShadow(
+        color: const Color(0xFF101418).withValues(alpha: 0.05 * strength),
+        blurRadius: 16,
+        offset: const Offset(0, 6),
+      ),
+    ];
+  }
 
   // ── Light backgrounds ─────────────────────────────────────────────────────
-  static const Color lightBg1 = Color(0xFFF8FAFC);
-  static const Color lightBg2 = Color(0xFFEEF2FF);
-  static const Color lightBg3 = Color(0xFFF0F9FF);
+  static const Color lightBg1 = lightSurfaceBg;
+  static const Color lightBg2 = lightSurfaceBg;
+  static const Color lightBg3 = lightSurfaceBg;
 
   // ── Parent (purple) ───────────────────────────────────────────────────────
   static const Color parentPurple = Color(0xFF7C3AED);
@@ -143,18 +240,20 @@ class AppTheme {
     colors: [purple, info],
   );
 
+  // Flat, not a gradient: the screen is a plain ground that the cards and the
+  // dashboard header sit on. Still expressed as a one-colour LinearGradient
+  // so `BoxDecoration.lerp` keeps animating the light/dark transition exactly
+  // as it did before.
   static const LinearGradient backgroundGradient = LinearGradient(
     begin: Alignment(-0.3, -1),
     end: Alignment(0.5, 1),
-    colors: [bgDarkest, bgDark, bgDarkBlue],
-    stops: [0.0, 0.45, 1.0],
+    colors: [darkSurfaceBg, darkSurfaceBg],
   );
 
   static const LinearGradient lightBackgroundGradient = LinearGradient(
     begin: Alignment(-0.3, -1),
     end: Alignment(0.5, 1),
-    colors: [lightBg1, lightBg2, lightBg3],
-    stops: [0.0, 0.45, 1.0],
+    colors: [lightSurfaceBg, lightSurfaceBg],
   );
 
   // ── Decorations ───────────────────────────────────────────────────────────
@@ -164,38 +263,16 @@ class AppTheme {
   static BoxDecoration get lightBgDecoration =>
       const BoxDecoration(gradient: lightBackgroundGradient);
 
-  static BoxDecoration glassDecoration({
-    double radius = 20,
-    Color? color,
-    Color? borderColor,
-    double borderWidth = 1.0,
-    List<BoxShadow>? shadows,
-    Gradient? gradient,
-  }) {
-    return BoxDecoration(
-      color: gradient == null
-          ? (color ?? Colors.white.withValues(alpha: 0.06))
-          : null,
-      gradient: gradient,
-      borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: borderColor ?? Colors.white.withValues(alpha: 0.10),
-        width: borderWidth,
-      ),
-      boxShadow: shadows,
-    );
-  }
-
   // ── Dark theme ────────────────────────────────────────────────────────────
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: bgDarkest,
+      scaffoldBackgroundColor: darkSurfaceBg,
       colorScheme: const ColorScheme.dark(
         primary: parentPurple,
         secondary: driverCyan,
-        surface: bgDark,
+        surface: darkSurfaceCard,
       ),
       textTheme: const TextTheme(
         headlineLarge: TextStyle(

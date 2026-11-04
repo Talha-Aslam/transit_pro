@@ -34,6 +34,14 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   final _session = SessionService.instance;
 
   List<ServiceAreaFormData> _areas = [];
+  /// The institute names the driver has typed in the step above, for the
+  /// round cards to offer as chips. Blank cards are skipped — a half-typed
+  /// area is not something to tick a round against.
+  List<String> get _instituteNames => [
+    for (final a in _areas)
+      if (a.nameCtrl.text.trim().isNotEmpty) a.nameCtrl.text.trim(),
+  ];
+
   List<RoundFormData> _rounds = [];
   double _radiusKm = 5;
   GeoCoord? _base;
@@ -100,31 +108,39 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
-    final areas =
-        _areas.where((a) => !a.isBlank).map((a) => a.toModel()).toList();
+    final areas = _areas
+        .where((a) => !a.isBlank)
+        .map((a) => a.toModel())
+        .toList();
     final rounds = _rounds.map((r) => r.toModel()).toList();
 
     // Same two invariants the sign-up validator enforces, restated here because
     // a driver can otherwise *remove* their last school or round after sign-up
     // and end up invisible with a profile that still reads as complete.
     if (areas.isEmpty) {
-      setState(() => _error =
-          'Add at least one school, college or university, or no parent can '
-          'find you.');
+      setState(
+        () => _error =
+            'Add at least one school, college or university, or no parent can '
+            'find you.',
+      );
       return;
     }
     if (rounds.isEmpty) {
-      setState(() => _error =
-          'Add at least one round, or there is nothing for a family to book.');
+      setState(
+        () => _error =
+            'Add at least one round, or there is nothing for a family to book.',
+      );
       return;
     }
     final gap = rounds.firstWhere(
-      (r) => r.startTime.isEmpty || r.totalSeats <= 0,
+      (r) => (!r.hasPickup && !r.hasDropoff) || r.totalSeats <= 0,
       orElse: () => const DriverSchedule(id: '', label: ''),
     );
     if (gap.id.isNotEmpty) {
-      setState(() => _error =
-          '"${gap.label}" needs both a start time and a seat count.');
+      setState(
+        () =>
+            _error = '"${gap.label}" needs both a start time and a seat count.',
+      );
       return;
     }
 
@@ -157,8 +173,9 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
     } catch (e) {
       debugPrint('saving driver service failed: $e');
       if (mounted) {
-        setState(() => _error =
-            'Could not save. Check your connection and try again.');
+        setState(
+          () => _error = 'Could not save. Check your connection and try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -230,8 +247,7 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                               divisions: 29,
                               activeColor: AppTheme.driverCyan,
                               label: '${_radiusKm.round()} km',
-                              onChanged: (v) =>
-                                  setState(() => _radiusKm = v),
+                              onChanged: (v) => setState(() => _radiusKm = v),
                             ),
                             const SizedBox(height: 20),
                             _heading(
@@ -276,6 +292,7 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                               (e) => RoundCard(
                                 index: e.key,
                                 data: e.value,
+                                availableInstitutes: _instituteNames,
                                 canRemove: _rounds.length > 1,
                                 onRemove: () => setState(() {
                                   _rounds[e.key].dispose();
@@ -339,10 +356,7 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
               ),
               Text(
                 'Schools you serve and the rounds you run',
-                style: TextStyle(
-                  color: context.textSecondary,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: context.textSecondary, fontSize: 12),
               ),
             ],
           ),

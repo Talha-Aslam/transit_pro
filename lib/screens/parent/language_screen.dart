@@ -130,10 +130,14 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: AppTheme.parentPurple.withValues(alpha: 0.15),
+                                color: AppTheme.parentPurple.withValues(
+                                  alpha: 0.15,
+                                ),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: AppTheme.parentPurple.withValues(alpha: 0.3),
+                                  color: AppTheme.parentPurple.withValues(
+                                    alpha: 0.3,
+                                  ),
                                 ),
                               ),
                               child: Text(
@@ -167,7 +171,9 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: selected
-                                      ? AppTheme.parentPurple.withValues(alpha: 0.08)
+                                      ? AppTheme.parentPurple.withValues(
+                                          alpha: 0.08,
+                                        )
                                       : Colors.transparent,
                                   border: isLast
                                       ? null

@@ -75,8 +75,9 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
   List<Trip> _applyFilters(List<Trip> trips) {
     var result = trips;
     if (_selectedDate != null) {
-      result =
-          result.where((t) => _isSameDay(_tripDate(t), _selectedDate!)).toList();
+      result = result
+          .where((t) => _isSameDay(_tripDate(t), _selectedDate!))
+          .toList();
     }
 
     final now = DateTime.now();
@@ -122,8 +123,9 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                         message: 'Sign in to see your trip history.',
                       )
                     : StreamBuilder<List<Trip>>(
-                        stream:
-                            TripRepository.instance.watchTripsForDriver(uid),
+                        stream: TripRepository.instance.watchTripsForDriver(
+                          uid,
+                        ),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                                   ConnectionState.waiting &&
@@ -146,7 +148,10 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                           // `_filtered` getter re-run (and re-filtered from
                           // scratch) on every widget that touches it.
                           final trips = _applyFilters(allTrips);
-                          return _buildBody(trips, everHadTrips: allTrips.isNotEmpty);
+                          return _buildBody(
+                            trips,
+                            everHadTrips: allTrips.isNotEmpty,
+                          );
                         },
                       ),
               ),
@@ -158,11 +163,14 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
   }
 
   Widget _buildBody(List<Trip> trips, {required bool everHadTrips}) {
-    final completed =
-        trips.where((t) => t.status == TripStatus.completed).toList();
+    final completed = trips
+        .where((t) => t.status == TripStatus.completed)
+        .toList();
     final onTime = completed.where((t) => t.onTime == true).length;
     final delayed = completed.where((t) => t.onTime == false).length;
-    final rate = completed.isEmpty ? 0 : (onTime / completed.length * 100).round();
+    final rate = completed.isEmpty
+        ? 0
+        : (onTime / completed.length * 100).round();
 
     return Column(
       children: [
@@ -170,10 +178,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: GlassCard(
-            padding: const EdgeInsets.symmetric(
-              vertical: 14,
-              horizontal: 16,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -241,7 +246,7 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
                   message: everHadTrips
                       ? 'No trips match this filter yet.'
                       : 'Your trip history will appear here once you '
-                          'complete your first ride.',
+                            'complete your first ride.',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
@@ -348,7 +353,8 @@ class _DriverTripHistoryScreenState extends State<DriverTripHistoryScreen> {
     );
   }
 
-  Widget _vd() => Container(width: 1, height: 30, color: context.cardBgElevated);
+  Widget _vd() =>
+      Container(width: 1, height: 30, color: context.cardBgElevated);
 }
 
 class _Stat extends StatelessWidget {
@@ -460,9 +466,8 @@ class _TripCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color:
-                      (_isMorning ? AppTheme.warningLight : AppTheme.info)
-                          .withValues(alpha: 0.15),
+                  color: (_isMorning ? AppTheme.warningLight : AppTheme.info)
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -495,11 +500,7 @@ class _TripCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Icon(
-                Icons.groups_rounded,
-                size: 14,
-                color: context.textTertiary,
-              ),
+              Icon(Icons.groups_rounded, size: 14, color: context.textTertiary),
               const SizedBox(width: 6),
               Text(
                 '${trip.studentsBoarded} boarded'

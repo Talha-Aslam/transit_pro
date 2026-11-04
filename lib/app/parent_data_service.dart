@@ -10,6 +10,8 @@ import '../data/rating_repository.dart';
 import '../data/trip_repository.dart';
 import '../data/user_repository.dart';
 import '../services/cloudinary_service.dart';
+import 'child_status_service.dart';
+import 'push_sender.dart';
 import 'session_service.dart';
 
 /// A single child, flattened for the UI.
@@ -34,7 +36,20 @@ class ChildInfo {
   String busNumber;
   String route;
   String stop;
+
+  /// The assigned driver's **uid**, not their name — four screens used to
+  /// print this straight to the user, so the chat title and the driver
+  /// header read as a raw Firebase id. Use [driverName] for display.
   String driver;
+
+  /// The assigned driver's display name, resolved through
+  /// `SessionService.driverFor`. Empty until that record loads, or when no
+  /// driver is assigned.
+  String driverName;
+
+  /// The assigned driver's profile photo, same source as [driverName].
+  String? driverPhotoUrl;
+
   String? photoUrl;
 
   /// `Student.studentIdNumber` -- the school's own roll number. Collected at
@@ -65,6 +80,8 @@ class ChildInfo {
     this.route = '',
     this.stop = '',
     this.driver = '',
+    this.driverName = '',
+    this.driverPhotoUrl,
     this.photoUrl,
     this.studentIdNumber = '',
     this.pickup,
@@ -97,6 +114,8 @@ class ChildInfo {
     String? route,
     String? stop,
     String? driver,
+    String? driverName,
+    String? driverPhotoUrl,
     String? photoUrl,
     String? studentIdNumber,
     GeoCoord? pickup,
@@ -112,6 +131,8 @@ class ChildInfo {
     route: route ?? this.route,
     stop: stop ?? this.stop,
     driver: driver ?? this.driver,
+    driverName: driverName ?? this.driverName,
+    driverPhotoUrl: driverPhotoUrl ?? this.driverPhotoUrl,
     photoUrl: photoUrl ?? this.photoUrl,
     studentIdNumber: studentIdNumber ?? this.studentIdNumber,
     pickup: pickup ?? this.pickup,
@@ -248,6 +269,10 @@ class ParentDataService {
         // here, which silently broke both the weekly rating gate and any
         // lookup keyed on "this child's driver".
         driver: bus?.driverId ?? s.driverId ?? '',
+        driverName: session.driverFor(bus?.driverId ?? s.driverId)?.name ?? '',
+        driverPhotoUrl: session
+            .driverFor(bus?.driverId ?? s.driverId)
+            ?.photoUrl,
         photoUrl: s.photoUrl,
         studentIdNumber: s.studentIdNumber,
         pickup: s.pickupLocation,
@@ -293,7 +318,7 @@ class ParentDataService {
       final list = await RatingRepository.instance.fetchByRater(uid);
       driverRatings.value = {
         for (final r in list)
-          r.driverId: DriverRatingInfo(
+          _ratingKey(r.driverId, r.studentId): DriverRatingInfo(
             rating: r.rating,
             ratedAt: r.createdAt ?? DateTime.now(),
           ),
@@ -303,8 +328,19 @@ class ParentDataService {
     }
   }
 
+  /// Keyed by driver *and* child.
+  ///
+  /// Keying on the driver alone meant a parent with two children riding
+  /// with one driver rated them once and the second child's card went quiet
+  /// for the week — though the two children's experience of the same driver
+  /// can be completely different.
+  static String _ratingKey(String driverId, String? studentId) {
+    final child = studentId?.trim() ?? '';
+    return child.isEmpty ? driverId : '${driverId}_$child';
+  }
+
   bool canRateDriver(ChildInfo child) {
-    final info = driverRatings.value[_driverKey(child)];
+    final info = driverRatingFor(child);
     if (info == null) return true;
     return !info.isSameWeek(DateTime.now());
   }
@@ -343,6 +379,9 @@ class ParentDataService {
   }
 
   DriverRatingInfo? driverRatingFor(ChildInfo child) =>
+      driverRatings.value[_ratingKey(_driverKey(child), child.id)] ??
+      // A rating given before ratings were per-child still counts against
+      // this week, so the card does not offer a second one.
       driverRatings.value[_driverKey(child)];
 
   Future<void> rateDriverForChild(ChildInfo child, double rating) async {
@@ -359,7 +398,7 @@ class ParentDataService {
     if (!accepted) return;
 
     final updated = Map<String, DriverRatingInfo>.from(driverRatings.value);
-    updated[driverId] = DriverRatingInfo(
+    updated[_ratingKey(driverId, child.id)] = DriverRatingInfo(
       rating: rating,
       ratedAt: DateTime.now(),
     );
@@ -454,6 +493,55 @@ class ParentDataService {
   ///
   /// The prototype held a `File` in memory and called it done, so the photo was
   /// gone on the next launch and no other device ever saw it.
+  /// Marks [studentId] off, or back on, for [dateKey] (`yyyy-MM-dd`).
+  ///
+  /// The driver reads the same field off their roster, so this is the whole
+  /// mechanism — no separate "leave request" to approve. A family knowing
+  /// their child is home with a fever does not need permission to say so,
+  /// and the cost of making them ask is a driver idling at a gate.
+  ///
+  /// Old days are dropped on the way past: nothing reads an absence once it
+  /// has happened, and an unbounded array on a document both sides re-read
+  /// all day is a cost with no reader.
+  Future<void> setAbsent({
+    required String studentId,
+    required String dateKey,
+    required bool absent,
+  }) async {
+    final student = SessionService.instance.children.value
+        .where((c) => c.id == studentId)
+        .firstOrNull;
+    final today = ChildStatusService.todayKey();
+    final kept = <String>{
+      for (final d in student?.absentDates ?? const <String>[])
+        if (d.compareTo(today) >= 0) d,
+    };
+    if (absent) {
+      kept.add(dateKey);
+    } else {
+      kept.remove(dateKey);
+    }
+    await UserRepository.instance.updateStudent(studentId, {
+      'absentDates': kept.toList()..sort(),
+    });
+
+    final driverId = student?.driverId ?? '';
+    if (driverId.isEmpty) return;
+    final name = student?.name ?? 'A child';
+    await PushSender.instance.notifyOne(
+      driverId,
+      UserNotification(
+        id: '',
+        type: NotificationType.absent,
+        title: absent ? 'Not riding today' : 'Riding after all',
+        body: absent
+            ? '$name will not be riding on $dateKey. No need to wait.'
+            : '$name is back on your roster for $dateKey.',
+        data: {'studentId': studentId, 'route': '/driver/attendance'},
+      ),
+    );
+  }
+
   Future<void> updateChildImage(int index, File? image) async {
     final imgs = List<File?>.from(childImages.value);
     while (imgs.length <= index) {

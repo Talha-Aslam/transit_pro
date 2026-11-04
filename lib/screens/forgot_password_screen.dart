@@ -125,8 +125,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               borderRadius: BorderRadius.circular(22),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppTheme.parentPurple.withValues(alpha: 
-                                    0.45,
+                                  color: AppTheme.parentPurple.withValues(
+                                    alpha: 0.45,
                                   ),
                                   blurRadius: 28,
                                   offset: const Offset(0, 12),
@@ -199,8 +199,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('⚠️',
-                                      style: TextStyle(fontSize: 13)),
+                                  const Text(
+                                    '⚠️',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
@@ -244,7 +246,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: AppTheme.success.withValues(alpha: 0.2),
+                                    color: AppTheme.success.withValues(
+                                      alpha: 0.2,
+                                    ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Center(

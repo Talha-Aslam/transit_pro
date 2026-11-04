@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../widgets/logout_flow.dart';
 import '../../app/language_provider.dart';
@@ -100,94 +99,87 @@ class _DriverLayoutState extends State<DriverLayout> {
           padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(40),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: context.isDark
-                      ? Colors.white.withValues(alpha: 0.10)
-                      : Colors.white.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(
-                    color: context.isDark
-                        ? Colors.white.withValues(alpha: 0.18)
-                        : Colors.white.withValues(alpha: 0.80),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 28,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                child: Row(
-                  children: List.generate(_navItems.length, (i) {
-                    final isActive = _tab == i;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => _goToTab(i),
-                        behavior: HitTestBehavior.opaque,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeInOut,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 4,
-                          ),
-                          decoration: isActive
-                              ? BoxDecoration(
-                                  color: context.isDark
-                                      ? Colors.white.withValues(alpha: 0.20)
-                                      : Colors.white.withValues(alpha: 0.72),
-                                  borderRadius: BorderRadius.circular(30),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.10,
-                                      ),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                )
-                              : null,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                _navItems[i].icon,
-                                width: isActive ? 28 : 22,
-                                height: isActive ? 28 : 22,
-                                cacheWidth: 60,
-                                cacheHeight: 60,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.medium,
+            child: Container(
+              // Shape, radius, padding, the six icons and the
+              // active-tab pill are all unchanged here on purpose — only
+              // the surface moves to the new palette, and the
+              // BackdropFilter that used to wrap this is gone. A bar
+              // pinned over every scrolling screen was the single most
+              // expensive blur in the old glass theme, and its white-at-
+              // 10%-alpha fill only looked like a bar because of it.
+              decoration: BoxDecoration(
+                color: context.cardBg,
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(color: context.surfaceBorder, width: 1.5),
+                boxShadow: context.isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF101418,
+                          ).withValues(alpha: 0.10),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: Row(
+                children: List.generate(_navItems.length, (i) {
+                  final isActive = _tab == i;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => _goToTab(i),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 4,
+                        ),
+                        decoration: isActive
+                            // The drop shadow went with the blur: on a
+                            // solid bar it read as a smudge under the pill
+                            // rather than lift.
+                            ? BoxDecoration(
+                                color: context.cardBgElevated,
+                                borderRadius: BorderRadius.circular(30),
+                              )
+                            : null,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              _navItems[i].icon,
+                              width: isActive ? 28 : 22,
+                              height: isActive ? 28 : 22,
+                              cacheWidth: 60,
+                              cacheHeight: 60,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _navItems[i].label,
+                              style: TextStyle(
+                                color: isActive
+                                    ? AppTheme.driverAccent
+                                    : context.textTertiary,
+                                fontSize: isActive ? 10 : 9,
+                                fontWeight: isActive
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _navItems[i].label,
-                                style: TextStyle(
-                                  color: isActive
-                                      ? AppTheme.driverAccent
-                                      : context.textTertiary,
-                                  fontSize: isActive ? 10 : 9,
-                                  fontWeight: isActive
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ],
-                          ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
-                ),
+                    ),
+                  );
+                }),
               ),
             ),
           ),

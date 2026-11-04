@@ -199,7 +199,9 @@ class AuthService {
       throw AuthException(_messageForFirestore(e));
     } catch (e) {
       await signOut();
-      throw AuthException('Could not finish creating your account. Please try again.');
+      throw AuthException(
+        'Could not finish creating your account. Please try again.',
+      );
     } finally {
       SessionService.instance.provisioning = false;
     }
@@ -309,8 +311,9 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final cred =
-          await _auth.signInWithCredential(credential).timeout(_authTimeout);
+      final cred = await _auth
+          .signInWithCredential(credential)
+          .timeout(_authTimeout);
       final user = cred.user;
       if (user == null) throw const AuthException('Google sign-in failed.');
 
@@ -395,9 +398,7 @@ class AuthService {
       rethrow;
     } catch (e) {
       debugPrint('Google sign-in failed: $e');
-      throw const AuthException(
-        'Google sign-in failed. Please try again.',
-      );
+      throw const AuthException('Google sign-in failed. Please try again.');
     }
   }
 
@@ -418,8 +419,7 @@ class AuthService {
   /// screen would run an `EmailAuthProvider` reauth that cannot succeed and
   /// report "Incorrect email or password" for a password that never existed.
   bool get hasPasswordProvider =>
-      _auth.currentUser?.providerData
-          .any((p) => p.providerId == 'password') ??
+      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
       false;
 
   /// Changes the password, verifying the current one first.

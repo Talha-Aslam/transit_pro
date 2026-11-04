@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import 'auth_service.dart';
 import 'session_service.dart';
 import '../screens/welcome_screen.dart';
@@ -16,12 +17,15 @@ import '../screens/parent/help_support_screen.dart';
 import '../screens/parent/live_chat_screen.dart';
 import '../screens/parent/driver_details_screen.dart';
 import '../screens/parent/driver_chat_screen.dart';
+import '../screens/student/student_driver_chat.dart';
 import '../screens/parent/trip_history_screen.dart';
 import '../screens/parent/subscription_screen.dart';
 import '../screens/parent/emergency_contacts_screen.dart';
 import '../screens/parent/edit_weekly_schedule_screen.dart';
 import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
+import '../screens/chat/conversation_screen.dart';
+import '../screens/driver/driver_timetables_screen.dart';
 import '../screens/driver/driver_layout.dart';
 import '../screens/driver/driver_trip_history_screen.dart';
 import '../screens/driver/driver_performance_screen.dart';
@@ -235,6 +239,22 @@ final appRouter = GoRouter(
       path: '/parent/driver-chat',
       builder: (context, state) => const DriverChatScreen(),
     ),
+    // Where a chat notification lands for a student. The driver's uid comes
+    // from their own record rather than the link, so a tapped alert opens
+    // the thread with whoever is actually carrying them today.
+    GoRoute(
+      path: '/student/driver-chat',
+      builder: (context, state) {
+        final student = SessionService.instance.student.value;
+        final driver = SessionService.instance.driverFor(student?.driverId);
+        return StudentDriverChat(
+          driverId: student?.driverId ?? '',
+          driverName: (driver?.name ?? '').trim(),
+          busNumber: (SessionService.instance.bus.value?.busNumber ?? '')
+              .trim(),
+        );
+      },
+    ),
     GoRoute(
       path: '/parent/trips',
       builder: (context, state) => const TripHistoryScreen(),
@@ -311,6 +331,20 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(path: '/driver', builder: (context, state) => const DriverLayout()),
+    // Every family's requested weekly timings, with an answer. Families
+    // could already save what they wanted and nothing carried it to the one
+    // person who has to make it work across four rounds.
+    GoRoute(
+      path: '/driver/timetables',
+      builder: (_, _) => const DriverTimetablesScreen(),
+    ),
+    GoRoute(
+      // Where the driver reads the messages families send them. There was
+      // no such screen before, which is why a parent could type into a
+      // chat that pretended to deliver.
+      path: '/driver/messages',
+      builder: (context, state) => const DriverConversationsScreen(),
+    ),
     GoRoute(
       path: '/driver/trips',
       builder: (context, state) => const DriverTripHistoryScreen(),
@@ -438,6 +472,10 @@ final appRouter = GoRouter(
         return LiveMapScreen(
           accentColor: AppTheme.parentPurple,
           highlightedStopName: extra['highlightedStopName'] as String?,
+          // The watching child's own points, so the family map can show
+          // "your stop" and the school next to the bus.
+          pickup: extra['pickup'] as GeoCoord?,
+          destination: extra['destination'] as GeoCoord?,
         );
       },
     ),
@@ -448,6 +486,10 @@ final appRouter = GoRouter(
         return LiveMapScreen(
           accentColor: AppTheme.studentAmber,
           highlightedStopName: extra['highlightedStopName'] as String?,
+          // The watching child's own points, so the family map can show
+          // "your stop" and the school next to the bus.
+          pickup: extra['pickup'] as GeoCoord?,
+          destination: extra['destination'] as GeoCoord?,
         );
       },
     ),

@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../../map/live_bus_map_view.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
 import '../../data/trip_repository.dart';
-import '../../map/route_map_view.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentTracking extends StatefulWidget {
   final VoidCallback onBack;
@@ -77,9 +78,9 @@ class _StudentTrackingState extends State<StudentTracking> {
     _attendanceSub = TripRepository.instance
         .watchAttendanceForStudent(trip.id, studentId)
         .listen((record) {
-      if (!mounted) return;
-      setState(() => _myAttendance = record);
-    });
+          if (!mounted) return;
+          setState(() => _myAttendance = record);
+        });
   }
 
   String _relativeStart(DateTime? startedAt) {
@@ -95,6 +96,8 @@ class _StudentTrackingState extends State<StudentTracking> {
     switch (record?.status) {
       case AttendanceStatus.boarded:
         return 'Picked up';
+      case AttendanceStatus.droppedOff:
+        return 'Dropped off';
       case AttendanceStatus.absent:
         return 'Absent';
       case AttendanceStatus.pending:
@@ -150,9 +153,16 @@ class _StudentTrackingState extends State<StudentTracking> {
                       height: 220,
                       child: Stack(
                         children: [
-                          RouteMapView(
+                          // See the matching comment in
+                          // `parent_tracking.dart`: `RouteMapView` renders
+                          // the driver's own `TrackingService` route, which
+                          // never exists on a student's device.
+                          LiveBusMapView(
                             height: 220,
-                            highlightedStopName: studentInfo.stop,
+                            pickup: studentInfo.pickup,
+                            destination: studentInfo.dropoff,
+                            accent: AppTheme.studentAmber,
+                            interactive: false,
                           ),
                           // Status overlay
                           Positioned(
@@ -200,6 +210,8 @@ class _StudentTrackingState extends State<StudentTracking> {
                                 '/student/track/map',
                                 extra: {
                                   'highlightedStopName': studentInfo.stop,
+                                  'pickup': studentInfo.pickup,
+                                  'destination': studentInfo.dropoff,
                                 },
                               ),
                               child: Container(
@@ -252,22 +264,24 @@ class _StudentTrackingState extends State<StudentTracking> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Builder(builder: (_) {
-                              final assignment = [
-                                studentInfo.busNumber,
-                                studentInfo.route,
-                              ].where((s) => s.isNotEmpty).join(' · ');
-                              return Text(
-                                assignment.isEmpty
-                                    ? 'No bus assigned yet'
-                                    : assignment,
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              );
-                            }),
+                            Builder(
+                              builder: (_) {
+                                final assignment = [
+                                  studentInfo.busNumber,
+                                  studentInfo.route,
+                                ].where((s) => s.isNotEmpty).join(' · ');
+                                return Text(
+                                  assignment.isEmpty
+                                      ? 'No bus assigned yet'
+                                      : assignment,
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                );
+                              },
+                            ),
                             const SizedBox(height: 3),
                             Text(
                               'Driver: ${studentInfo.driverName.isEmpty ? "N/A" : studentInfo.driverName}',
@@ -281,7 +295,9 @@ class _StudentTrackingState extends State<StudentTracking> {
                       ),
                       StatusBadge(
                         label: trip == null ? 'Waiting for driver' : 'On Time',
-                        color: trip == null ? AppTheme.warning : AppTheme.success,
+                        color: trip == null
+                            ? AppTheme.warning
+                            : AppTheme.success,
                       ),
                     ],
                   ),
@@ -369,30 +385,33 @@ class _StudentTrackingState extends State<StudentTracking> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        Builder(builder: (_) {
-                          final boarded =
-                              _myAttendance?.status == AttendanceStatus.boarded;
-                          return Column(
-                            children: [
-                              _StopItem(
-                                name: '$stopLabel (Your Stop)',
-                                time: '',
-                                status: boarded ? 'passed' : 'current',
-                                color: boarded
-                                    ? AppTheme.success
-                                    : AppTheme.studentAmber,
-                              ),
-                              _StopItem(
-                                name: schoolLabel,
-                                time: '',
-                                status: boarded ? 'current' : 'upcoming',
-                                color: boarded
-                                    ? AppTheme.studentAmber
-                                    : Colors.white24,
-                              ),
-                            ],
-                          );
-                        }),
+                        Builder(
+                          builder: (_) {
+                            final boarded =
+                                _myAttendance?.status ==
+                                AttendanceStatus.boarded;
+                            return Column(
+                              children: [
+                                _StopItem(
+                                  name: '$stopLabel (Your Stop)',
+                                  time: '',
+                                  status: boarded ? 'passed' : 'current',
+                                  color: boarded
+                                      ? AppTheme.success
+                                      : AppTheme.studentAmber,
+                                ),
+                                _StopItem(
+                                  name: schoolLabel,
+                                  time: '',
+                                  status: boarded ? 'current' : 'upcoming',
+                                  color: boarded
+                                      ? AppTheme.studentAmber
+                                      : Colors.white24,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -464,7 +483,7 @@ class _ETAInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 22)),
+        AppGlyph(icon, size: 22, color: color),
         const SizedBox(height: 4),
         Text(
           value,

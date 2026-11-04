@@ -7,7 +7,7 @@
 > - [`README.md`](README.md) — architecture, schema, screen docs (mobile app)
 > - [`../../transit_admin/README.md`](../../transit_admin/README.md) — admin app
 >
-> **Last updated:** 2026-09-25
+> **Last updated:** 2026-10-28
 
 ---
 
@@ -720,6 +720,104 @@ its note above — pick a real id whenever you're ready and it can be redone.
 ---
 
 ## 📝 Changelog
+
+### 2026-10-28 — Mapbox → Google Maps migration (reverses the 2026-08-18 entry)
+
+**Why.** The 2026-08-18 "Google Maps → Mapbox migration" entry switched
+providers because the Maps *Demo Key* couldn't be confirmed to render the
+native Android map without a billed key. That turned out to be correct:
+enabling "Maps SDK for Android" does demand a billing account, and the Demo
+Key program's "no credit card" framing covers only the Maps JavaScript API
+and a few Web Service APIs, not the native Android/iOS SDK. You activated a
+real billing account (Google required a one-time $30 activation payment,
+credited back to the account as usable balance), so the native SDK path is
+now open and this entry is the full switch back to Google.
+
+**Two gotchas found by testing on a real device, both now baked in:**
+1. An **"Android apps" key restriction only works for the native Maps SDK.**
+   The Directions/Geocoding/Places calls in `route_service.dart` go out as
+   plain `http.get` requests, which carry none of the package-name/cert
+   headers that restriction verifies — so every one of them came back
+   `REQUEST_DENIED`. The key must use **Application restrictions = None**,
+   with **API restrictions** (the 4 APIs listed below) as the security
+   boundary instead. This is documented in `.env.example` so it isn't rediscovered
+   the hard way a third time.
+2. An unauthorized key does **not** fail loudly — the native view still
+   renders its own chrome (Google logo, zoom buttons) and simply shows no
+   tiles. The only real signal is logcat (`Google Android Maps SDK:
+   Authorization failure`).
+
+**Config.** `AppConfig.mapboxAccessToken`/`hasMapboxToken` →
+`googleMapsApiKey`/`hasGoogleMapsKey` (same hardcoded-default +
+`--dart-define`-override pattern). The key is hardcoded a **second** time in
+`android/app/src/main/AndroidManifest.xml` as
+`com.google.android.geo.API_KEY` — manifest merging can't read
+`String.fromEnvironment`, so **both places must change together**.
+`android/build.gradle.kts`'s Mapbox private-maven block is gone entirely
+(`google_maps_flutter` resolves from `google()`/`mavenCentral()`).
+`pubspec.yaml`: `mapbox_maps_flutter` → `google_maps_flutter`;
+`flutter_polyline_points` stays (Google also returns precision-5 polylines).
+
+**No lat/lng ordering trap this time.** `LatLng(latitude, longitude)` is
+already lat-first like `GeoCoord`, so the 2026-08-18 entry's carefully
+guarded `Position(lng, lat)` trap simply doesn't exist here.
+`lib/map/mapbox_geo.dart` → `lib/map/google_geo.dart` (still the single
+conversion point, so `transit_core` stays independent of
+`google_maps_flutter` — just a much shorter file).
+`test/mapbox_geo_test.dart` → `test/google_geo_test.dart`.
+
+**The rendering rewrite inverts the hard part.** `route_map_controller.dart`
+existed to tame Mapbox's *imperative* annotation managers against a 150 ms
+bus tick. google_maps_flutter is *declarative* (`Set<Marker>`/`Set<Polyline>`
+in, diffed by the plugin), so the controller now just assembles those sets
+into two `ValueNotifier`s — same public API, same latest-wins coalescing
+kept as cheap insurance, far less machinery underneath. `route_map_view.dart`
+wraps `GoogleMap` in an `AnimatedBuilder` over
+`Listenable.merge([markers, polylines])`. `map_style.dart` returns `null`
+for light (Google's default basemap is already POI-rich) and a night-mode
+JSON string for dark. `map_icons.dart`'s rasterisation is unchanged; only
+the consumer changed, to
+`BitmapDescriptor.bytes(bytes, imagePixelRatio: dpr)`.
+
+**`map_picker_screen.dart`** lost its `_mapReady`/`_watchdog` timeout logic —
+Mapbox had `onStyleLoadedListener`/`onMapLoadErrorListener` to tell "working"
+from "failed to auth", and google_maps_flutter has no portable equivalent
+(see gotcha 2). The synchronous `hasGoogleMapsKey` check is the only guard
+left. `MapboxMap`/`CameraOptions`/`MapContentGestureContext`/
+`CameraChangedEventData`/`MapIdleEventData` → `GoogleMapController`/
+`CameraPosition`/`onTap`/`onCameraMove`/`onCameraIdle` (the last carries no
+position, so the latest target is tracked from `onCameraMove`).
+`map.flyTo(...)` → `animateCamera(CameraUpdate.newCameraPosition(...))`, and
+the manual location-puck setup is now just `myLocationEnabled: true`.
+
+**`route_service.dart`** rewritten against the **current-generation** Google
+products, not the legacy ones — Google no longer lets new projects enable the
+old Directions API or classic Places API, so this targets **Routes API**
+(`routes.googleapis.com/directions/v2:computeRoutes`) and **Places API (New)**
+(`places.googleapis.com`). Both are POST+JSON with the key in an
+`X-Goog-Api-Key` header and a mandatory `X-Goog-FieldMask` naming the
+response fields (which is also what gets billed), instead of the old
+query-string GET style. Geocoding is unchanged — it has no "new" variant.
+Every public signature stayed the same, so no caller needed touching.
+
+Notable differences absorbed inside the service: Routes API already **totals
+distance/duration across all legs** (legacy reported them per leg, which had
+to be summed), and reports duration as a protobuf string like `"165s"`.
+`forwardGeocode`/`reverseGeocode` drop the hand-rolled `_granularAddress`
+parser in favour of Google's already-well-formed `formatted_address`.
+
+**A capability regained:** Places API (New) Autocomplete supports
+`includedPrimaryTypes`, so `SchoolSearchField`'s category narrowing — lost
+when moving off Mapbox's `poi_category` — works again. `poiCategory` is now a
+comma-separated list of Google place types
+(`school,primary_school,secondary_school,university`; Google caps it at 5).
+There is no "college" type — colleges index as `university` or `school`.
+
+**Required APIs on the Cloud project** (`transitpro-db`, the same project
+Firebase already uses): Maps SDK for Android, **Routes API**, Geocoding API,
+**Places API (New)**.
+
+**Verification:** `flutter analyze` — 0 issues. `flutter test` — 3/3 pass.
 
 ### 2026-09-27 — profile avatars now open a full-screen pinch-to-zoom viewer
 

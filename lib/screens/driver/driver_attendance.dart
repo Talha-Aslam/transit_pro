@@ -5,11 +5,15 @@ import 'package:transit_core/transit_core.dart';
 
 import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
-import '../../app/notification_service.dart';
+import '../../app/chat_service.dart';
+import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../data/trip_repository.dart';
+import '../../app/child_status_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 // Bulk alert option model (top-level)
 class _BulkAlertOption {
@@ -61,16 +65,8 @@ class DriverAttendance extends StatefulWidget {
   State<DriverAttendance> createState() => _DriverAttendanceState();
 }
 
-/// `🎓` for a college or university rider, `🧒` for a school child — mirrors
-/// the convention already used on the booked-students roster.
-String _avatarFor(Student student) {
-  final type = student.instituteType.toLowerCase();
-  if (type.contains('university') || type.contains('college')) return '🎓';
-  return '🧒';
-}
 
 class _DriverAttendanceState extends State<DriverAttendance> {
-  final _notifSvc = NotificationService.instance;
   final _session = SessionService.instance;
 
   String _search = '';
@@ -123,8 +119,9 @@ class _DriverAttendanceState extends State<DriverAttendance> {
       _onActiveTrip(null);
       return;
     }
-    _tripSub =
-        TripRepository.instance.watchActiveTripForDriver(uid).listen(_onActiveTrip);
+    _tripSub = TripRepository.instance
+        .watchActiveTripForDriver(uid)
+        .listen(_onActiveTrip);
   }
 
   void _onActiveTrip(Trip? trip) {
@@ -139,8 +136,9 @@ class _DriverAttendanceState extends State<DriverAttendance> {
       _attendanceByStudent = const {};
     });
     if (trip != null) {
-      _attendanceSub =
-          TripRepository.instance.watchAttendance(trip.id).listen((records) {
+      _attendanceSub = TripRepository.instance.watchAttendance(trip.id).listen((
+        records,
+      ) {
         if (!mounted) return;
         setState(() {
           _attendanceByStudent = {
@@ -191,21 +189,22 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     final id = s.scheduleId;
     if (id == null || id.isEmpty) return 'Unassigned round';
     final round = _session.driver.value?.scheduleById(id);
-    return (round == null || round.label.isEmpty) ? 'Unassigned round' : round.label;
+    return (round == null || round.label.isEmpty)
+        ? 'Unassigned round'
+        : round.label;
   }
 
   Future<void> _toggleStatus(Student student) async {
     final trip = _activeTrip;
     if (trip == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Start your route to record attendance.'),
-        ),
+        const SnackBar(content: Text('Start your route to record attendance.')),
       );
       return;
     }
-    final next =
-        _isBoarded(student) ? AttendanceStatus.absent : AttendanceStatus.boarded;
+    final next = _isBoarded(student)
+        ? AttendanceStatus.absent
+        : AttendanceStatus.boarded;
     // Optimistic: the live `watchAttendance` stream confirms within a frame or
     // two, and a tap should not visibly wait on a round trip first.
     setState(() {
@@ -334,17 +333,63 @@ class _DriverAttendanceState extends State<DriverAttendance> {
         ],
       ),
     );
-    ctrl.dispose();
+    // Disposed after the frame, not here. `showDialog`'s future completes
+    // as the route pops, while the dialog's own exit animation is still
+    // rebuilding the `TextField` from this controller — disposing it on this
+    // line is a "used after being disposed" throw during that animation.
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
     return result;
+  }
+
+  /// Who to tell about [student]: their parent, or the student themselves
+  /// when they signed up without one. Same rule as
+  /// `driver_dashboard.dart`'s `broadcastToFamilies` — a self-registered
+  /// rider has no parent account to route through, and skipping them would
+  /// silently exclude them from every alert.
+  String _recipientFor(Student student) {
+    final parentId = student.parentId.trim();
+    return parentId.isEmpty ? student.id : parentId;
   }
 
   Future<void> _sendAlertsToPresentOf(
     _BulkAlertOption opt, {
     String? customMessage,
   }) async {
+    try {
+      await _sendAlerts(opt, customMessage: customMessage);
+    } catch (e, stack) {
+      // Nothing in here is worth taking the app down for. A Firestore rule
+      // that has not been deployed, a thread that cannot be created, a
+      // recipient with no account — each is a reason the driver needs to
+      // read, not a crash in the middle of a round.
+      debugPrint('bulk alert failed: $e');
+      debugPrintStack(stackTrace: stack);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not send that. Check your connection and try again.',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendAlerts(
+    _BulkAlertOption opt, {
+    String? customMessage,
+  }) async {
     final presentStudents = _roster.where(_isBoarded).toList();
     if (presentStudents.isEmpty) return;
 
+    final driverName = _session.driver.value?.name.trim() ?? '';
+    var reached = 0;
+
+    // One notification per family, addressed to them. This loop used to
+    // call `NotificationService.show()`, which raises a banner on *this*
+    // phone — so the driver received one alert per student sitting behind
+    // them, and not one parent was told anything.
     for (final student in presentStudents) {
       final title = opt.titleTemplate
           .replaceAll('{{name}}', student.name)
@@ -352,20 +397,52 @@ class _DriverAttendanceState extends State<DriverAttendance> {
       final body = opt.bodyTemplate
           .replaceAll('{{name}}', student.name)
           .replaceAll('{{message}}', customMessage ?? '');
-      await _notifSvc.show(
-        title: '${opt.icon} $title',
-        body: body,
-        type: opt.type,
-        icon: opt.icon,
-        color: opt.color,
+      final recipient = _recipientFor(student);
+      if (recipient.isEmpty) continue;
+
+      await PushSender.instance.notifyOne(
+        recipient,
+        UserNotification(
+          id: '',
+          type: opt.id == 'emergency'
+              ? NotificationType.emergency
+              : NotificationType.chat,
+          title: '${opt.icon} $title',
+          body: body,
+        ),
       );
+      reached++;
+
+      // A custom message is one half of a conversation, so it goes into the
+      // thread too — otherwise the family gets a notification from their
+      // driver with nowhere to reply.
+      if (opt.id == 'custom' && (customMessage ?? '').trim().isNotEmpty) {
+        final uid = _session.uid;
+        if (uid != null) {
+          try {
+            await ChatService.instance.send(
+              senderId: uid,
+              recipientId: recipient,
+              text: customMessage!.trim(),
+              senderName: driverName.isEmpty ? 'Your driver' : driverName,
+              senderRole: 'driver',
+              studentId: student.id,
+            );
+          } catch (e) {
+            debugPrint('attendance: chat copy failed — $e');
+          }
+        }
+      }
     }
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '"${opt.label}" alerts sent for ${presentStudents.length} students.',
+          reached == 0
+              ? 'Nobody on board has a family account to alert yet.'
+              : '"${opt.label}" sent to $reached '
+                    '${reached == 1 ? 'family' : 'families'}.',
         ),
       ),
     );
@@ -387,7 +464,8 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     final absentCount = roster.length - boardedCount;
 
     final filtered = roster.where((s) {
-      final matchSearch = query.isEmpty ||
+      final matchSearch =
+          query.isEmpty ||
           s.name.toLowerCase().contains(query) ||
           s.grade.toLowerCase().contains(query) ||
           s.school.toLowerCase().contains(query);
@@ -440,9 +518,10 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                     ValueListenableBuilder<DriverInfo>(
                       valueListenable: DriverDataService.instance.driverInfo,
                       builder: (_, info, _) {
-                        final assignment = [info.busNumber, info.route]
-                            .where((s) => s.isNotEmpty)
-                            .join(' · ');
+                        final assignment = [
+                          info.busNumber,
+                          info.route,
+                        ].where((s) => s.isNotEmpty).join(' · ');
                         return Text(
                           assignment.isEmpty
                               ? 'No vehicle assigned yet'
@@ -837,7 +916,7 @@ class _SummaryCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 20)),
+            AppGlyph(icon, size: 20, color: color),
             const SizedBox(height: 4),
             Text(
               '$value',
@@ -875,8 +954,16 @@ class _StudentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cfg = boarded
-        ? const _StatusConfig(color: AppTheme.success, icon: '✅', label: 'Boarded')
-        : const _StatusConfig(color: AppTheme.error, icon: '❌', label: 'Absent');
+        ? const _StatusConfig(
+            color: AppTheme.success,
+            icon: '✅',
+            label: 'Boarded',
+          )
+        : const _StatusConfig(
+            color: AppTheme.error,
+            icon: '❌',
+            label: 'Absent',
+          );
     return GlassCard(
       enableBlur: false,
       padding: const EdgeInsets.all(14),
@@ -889,8 +976,12 @@ class _StudentCard extends StatelessWidget {
               color: context.cardBgElevated,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Center(
-              child: Text(_avatarFor(student), style: const TextStyle(fontSize: 22)),
+            child: AvatarImage(
+              localFile: null,
+              photoUrl: student.photoUrl,
+              size: 44,
+              borderRadius: BorderRadius.circular(14),
+              fallback: riderGlyph(student.instituteType, size: 22),
             ),
           ),
           const SizedBox(width: 12),
@@ -916,6 +1007,30 @@ class _StudentCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.textTertiary, fontSize: 12),
                 ),
+                // The family has already said this one is not coming. Without
+                // it on the row the driver waits at a gate for a child who is
+                // at home, which is the whole point of letting them say so.
+                if (student.isAbsentOn(ChildStatusService.todayKey())) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Text(
+                      'Family marked off today',
+                      style: TextStyle(
+                        color: AppTheme.warningLight,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

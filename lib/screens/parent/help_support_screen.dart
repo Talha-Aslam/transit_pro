@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class HelpSupportScreen extends StatefulWidget {
   final Color accentColor;
@@ -359,9 +360,7 @@ class _ContactCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
-              child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 20)),
-              ),
+              child: Center(child: AppGlyph(icon, size: 20, color: color)),
             ),
             const SizedBox(height: 8),
             Text(

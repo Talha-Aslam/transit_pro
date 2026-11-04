@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -7,14 +8,17 @@ import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
 import '../../app/student_data_service.dart';
+import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/zoomable_image_viewer.dart';
 import 'student_driver_details_screen.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentProfile extends StatefulWidget {
   final VoidCallback onLogout;
@@ -57,7 +61,12 @@ class _StudentProfileState extends State<StudentProfile> {
       imageQuality: 85,
     );
     if (picked != null) {
-      ProfileService.instance.studentImage.value = File(picked.path);
+      final file = File(picked.path);
+      // Shown straight away on this screen...
+      ProfileService.instance.studentImage.value = file;
+      // ...and uploaded, so the driver carrying them can recognise them.
+      // Without this second half the photo never left the phone.
+      unawaited(StudentDataService.instance.updateStudentPhoto(file));
     }
   }
 
@@ -171,24 +180,30 @@ class _StudentProfileState extends State<StudentProfile> {
                                       ),
                                     ],
                                   ),
-                                  child: file != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            26,
-                                          ),
-                                          child: Image.file(
-                                            file,
-                                            width: 110,
-                                            height: 110,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : const Center(
-                                          child: Text(
-                                            '👩',
-                                            style: TextStyle(fontSize: 40),
-                                          ),
-                                        ),
+                                  // Local file first, then the uploaded URL
+                                  // off `students/{uid}`. The URL half was
+                                  // missing, so the photo disappeared on
+                                  // every restart — and, since nothing
+                                  // uploaded it either, nobody else ever
+                                  // saw it at all.
+                                  child: ValueListenableBuilder<bool>(
+                                    valueListenable: _svc.uploadingPhoto,
+                                    builder: (_, uploading, _) => AvatarImage(
+                                      localFile: file,
+                                      photoUrl: SessionService
+                                          .instance
+                                          .student
+                                          .value
+                                          ?.photoUrl,
+                                      size: 110,
+                                      uploading: uploading,
+                                      borderRadius: BorderRadius.circular(26),
+                                      fallback: const Text(
+                                        '👩',
+                                        style: TextStyle(fontSize: 40),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -944,7 +959,7 @@ class _QuickStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
+        AppGlyph(icon, size: 20, color: color),
         const SizedBox(height: 4),
         Text(
           value,
@@ -1061,7 +1076,7 @@ class _DetailRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
-              Text(icon, style: const TextStyle(fontSize: 16)),
+              AppGlyph(icon, size: 16),
               const SizedBox(width: 12),
               Text(
                 label,
@@ -1148,7 +1163,7 @@ class _SettingTile extends StatelessWidget {
                         size: 18,
                         color: labelColor ?? context.textPrimary,
                       )
-                    : Text(icon!, style: const TextStyle(fontSize: 18)),
+                    : AppGlyph(icon!, size: 18),
               ),
             ),
             const SizedBox(width: 14),

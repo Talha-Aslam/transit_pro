@@ -4,20 +4,23 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/user_repository.dart';
+import 'notification_service.dart';
 
 /// Registers this device for push notifications: requests OS permission,
 /// then saves the token onto `users/{uid}.fcmTokens` via
 /// `UserRepository.addFcmToken` — which already existed but had no caller
 /// until now, since nothing in the app ever ran `FirebaseMessaging`.
 ///
-/// This is only the *device* half of the push pipeline. Nothing in this
-/// project sends an actual push yet — see `NotificationService.bindToUser`'s
-/// doc comment: doing that needs a trusted sender (a Cloud Function or a
-/// server holding the FCM key), which this project doesn't have. Wiring up
-/// token collection now means real tokens are sitting in Firestore, ready
-/// for when that Cloud Function exists, instead of the two being built in
-/// the wrong order — a function with no tokens to send to would have
-/// nothing to prove it works.
+/// The sending half is the Cloudflare Worker in `push_worker/` — see its
+/// README. It holds the service account key that a client APK must never
+/// contain, reads the notification back out of Firestore, and sends it to
+/// the tokens collected here.
+///
+/// This class also listens for pushes that land while the app is running,
+/// which is what stops the same alert appearing twice: the Firestore inbox
+/// stream raises its own banner for anything new, and without telling it
+/// what FCM has already shown, a backgrounded app announces every
+/// notification once per path.
 class PushNotificationService {
   PushNotificationService._();
   static final PushNotificationService instance = PushNotificationService._();
@@ -63,6 +66,8 @@ class PushNotificationService {
       _registeredToken = token;
       await UserRepository.instance.addFcmToken(uid, token);
 
+      _listenForForegroundMessages();
+
       // Tokens rotate (reinstall, token expiry, app data cleared) — without
       // this, a device would silently stop receiving push after a rotation
       // with no error anywhere to explain why.
@@ -80,12 +85,35 @@ class PushNotificationService {
     }
   }
 
+  StreamSubscription<RemoteMessage>? _messageSub;
+
+  /// Notes every push that arrives while the app is alive.
+  ///
+  /// Android does not display an FCM `notification` payload itself while
+  /// the app is in the foreground, so the inbox stream's banner is the one
+  /// the user sees and nothing is suppressed. Backgrounded, the system tray
+  /// shows it *and* the still-live Firestore listener would raise a second
+  /// — which is the duplicate this prevents.
+  void _listenForForegroundMessages() {
+    _messageSub?.cancel();
+    _messageSub = FirebaseMessaging.onMessage.listen(
+      (message) {
+        NotificationService.instance.noteDeliveredByPush(
+          message.data['docId'] as String?,
+        );
+      },
+      onError: (Object e) => debugPrint('Push notifications: onMessage — $e'),
+    );
+  }
+
   /// Removes this device's token on sign-out, so a shared or reinstalled
   /// phone doesn't keep receiving push for an account no longer signed in
   /// on it. Mirrors `NotificationService.unbind()`'s reasoning.
   Future<void> unregisterForUser(String uid) async {
     await _refreshSub?.cancel();
     _refreshSub = null;
+    await _messageSub?.cancel();
+    _messageSub = null;
     final token = _registeredToken;
     _boundUid = null;
     _registeredToken = null;

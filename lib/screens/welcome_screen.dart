@@ -136,10 +136,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     session.state.addListener(listener);
     try {
-      await done.future.timeout(
-        const Duration(seconds: 6),
-        onTimeout: () {},
-      );
+      await done.future.timeout(const Duration(seconds: 6), onTimeout: () {});
     } finally {
       session.state.removeListener(listener);
     }
@@ -182,11 +179,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: context.isDark
-                                ? Colors.white.withValues(alpha: 
-                                    max(0.0, 0.15 - i * 0.02),
+                                ? Colors.white.withValues(
+                                    alpha: max(0.0, 0.15 - i * 0.02),
                                   )
-                                : Colors.black.withValues(alpha: 
-                                    max(0.0, 0.08 - i * 0.01),
+                                : Colors.black.withValues(
+                                    alpha: max(0.0, 0.08 - i * 0.01),
                                   ),
                             width: 1,
                           ),

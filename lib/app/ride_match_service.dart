@@ -4,6 +4,7 @@ import 'package:transit_core/transit_core.dart';
 
 import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
+import 'push_sender.dart';
 import 'session_service.dart';
 
 /// The driver ↔ family matching flow, end to end.
@@ -16,23 +17,17 @@ import 'session_service.dart';
 /// ## On notifications
 ///
 /// Every trigger point here writes a real document to
-/// `notifications/{recipientUid}/items`, which the recipient's inbox streams.
-/// That reaches their device.
-///
-/// It is **not** a push notification. Delivering FCM to another user requires a
-/// trusted sender — a Cloud Function or a server holding the FCM server key —
-/// and putting that key in the client would hand every installed APK the ability
-/// to push to any user. This project has no server component yet, so the inbox
-/// record is the real, honest mechanism available: it arrives, it persists, and
-/// it is exactly the payload a Cloud Function would later forward. When one is
-/// added, it should trigger on writes to this collection rather than duplicating
-/// the logic.
+/// `notifications/{recipientUid}/items`, which the recipient's inbox streams,
+/// and then asks the push Worker to deliver it over FCM — so a seat request
+/// reaches a driver whose phone is in their pocket, not only one who happens
+/// to have the app open. See [PushSender]; the Worker reads the document back
+/// and delivers what is stored, so nothing here can put arbitrary words on
+/// someone's lock screen.
 class RideMatchService {
   RideMatchService._();
   static final RideMatchService instance = RideMatchService._();
 
   final _requests = RideRequestRepository.instance;
-  final _messaging = MessagingRepository.instance;
 
   // ── Discovery ─────────────────────────────────────────────────────────────
 
@@ -49,7 +44,9 @@ class RideMatchService {
       // returns every driver in the city.
       return Stream.value(const []);
     }
-    return UserRepository.instance.watchDriversServing(student.school).map(
+    return UserRepository.instance
+        .watchDriversServing(student.school)
+        .map(
           (candidates) => UserRepository.instance.rankDriversForStudent(
             candidates: candidates,
             student: student,
@@ -88,7 +85,8 @@ class RideMatchService {
         id: '',
         type: NotificationType.rideRequest,
         title: 'New seat request',
-        body: '${student.name} (${student.displayCode}) asked for a seat on '
+        body:
+            '${student.name} (${student.displayCode}) asked for a seat on '
             '${schedule.label} · ${schedule.timeRange}.',
         data: {
           'requestId': request.id,
@@ -110,8 +108,40 @@ class RideMatchService {
         id: '',
         type: NotificationType.rideRequestAnswered,
         title: 'Request withdrawn',
-        body: '${request.studentName} no longer needs the seat on '
+        body:
+            '${request.studentName} no longer needs the seat on '
             '${request.scheduleLabel}.',
+        data: {'requestId': request.id, 'route': '/driver/ride-requests'},
+      ),
+    );
+  }
+
+  /// The family giving up a seat they already hold, with no approval step.
+  ///
+  /// A parent whose child has changed institute, or who has found a driver
+  /// whose timings fit better, should not have to wait for the old driver to
+  /// press a button before they can go looking. The driver is told, and their
+  /// seat count comes back on its own (see `SeatReconciler`).
+  Future<void> giveUpSeat(RideRequest request) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null || uid != request.requesterId) {
+      throw const RideRequestException('That booking is not yours to change.');
+    }
+
+    await _requests.releaseByFamily(
+      requestId: request.id,
+      studentId: request.studentId,
+    );
+
+    await _notify(
+      request.driverId,
+      UserNotification(
+        id: '',
+        type: NotificationType.rideRequestAnswered,
+        title: 'A seat is free again',
+        body:
+            '${request.studentName} has left ${request.scheduleLabel}. '
+            'The seat is back in your count.',
         data: {'requestId': request.id, 'route': '/driver/ride-requests'},
       ),
     );
@@ -152,7 +182,8 @@ class RideMatchService {
         id: '',
         type: NotificationType.pickupAssigned,
         title: 'Seat confirmed',
-        body: '${request.driverName} accepted ${request.studentName} for '
+        body:
+            '${request.driverName} accepted ${request.studentName} for '
             '${request.scheduleLabel}.',
         data: {
           'requestId': request.id,
@@ -173,7 +204,7 @@ class RideMatchService {
         title: 'Request declined',
         body: reason == null || reason.trim().isEmpty
             ? '${request.driverName} could not take ${request.studentName} on '
-                '${request.scheduleLabel}.'
+                  '${request.scheduleLabel}.'
             : '${request.driverName} declined: ${reason.trim()}',
         data: {'requestId': request.id},
       ),
@@ -199,7 +230,8 @@ class RideMatchService {
         id: '',
         type: NotificationType.rideRequestAnswered,
         title: 'Seat released',
-        body: '${request.driverName} has removed ${request.studentName} from '
+        body:
+            '${request.driverName} has removed ${request.studentName} from '
             '${request.scheduleLabel}. You can request another driver.',
         data: {'requestId': request.id},
       ),
@@ -223,7 +255,9 @@ class RideMatchService {
     final driverId = SessionService.instance.uid;
     final live = SessionService.instance.driver.value;
     if (driverId == null || live == null) {
-      throw const RideRequestException('Your driver profile is not loaded yet.');
+      throw const RideRequestException(
+        'Your driver profile is not loaded yet.',
+      );
     }
 
     final bookedById = {for (final s in live.schedules) s.id: s.bookedSeats};
@@ -288,7 +322,12 @@ class RideMatchService {
   Future<void> _notify(String uid, UserNotification notification) async {
     if (uid.isEmpty) return;
     try {
-      await _messaging.push(uid, notification);
+      // Was a bare inbox write, which only ever surfaced on a device that
+      // happened to have the app open. A driver whose phone was in their
+      // pocket learned about a seat request when they next looked at the
+      // app — which, for a request that needs answering before tomorrow
+      // morning, could be never.
+      await PushSender.instance.notifyOne(uid, notification);
     } on FirebaseException catch (e) {
       debugPrint('RideMatchService: notify $uid failed — ${e.code}');
     } catch (e) {

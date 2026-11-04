@@ -5,7 +5,10 @@ import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/child_selector.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class DriverDetailsScreen extends StatefulWidget {
   const DriverDetailsScreen({super.key});
@@ -63,6 +66,20 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
 
   void _onLangChanged() => setState(() {});
 
+  /// Everything on this screen belongs to one child, and two of those
+  /// things need a fresh read when the selection moves: the driver record
+  /// (a different child may ride with a different driver entirely) and
+  /// whether this child has ever actually ridden with them, which is what
+  /// gates the rating card.
+  void _onChildChanged() {
+    setState(() {
+      _driver = null;
+      _hasRidden = false;
+    });
+    _loadDriver();
+    _loadHasRidden();
+  }
+
   void _onRatingChanged() => setState(() {});
 
   Future<void> _submitWeeklyRating(ChildInfo child) async {
@@ -72,7 +89,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Thanks for rating ${child.driver} $_selectedRating/5 this week.',
+          'Thanks for rating ${child.driverName} $_selectedRating/5 this week.',
         ),
         backgroundColor: const Color(0xFF16A34A),
       ),
@@ -82,8 +99,8 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final child = _svc.selectedChild;
-    final driverName = child?.driver.trim().isNotEmpty == true
-        ? child!.driver.trim()
+    final driverName = child?.driverName.trim().isNotEmpty == true
+        ? child!.driverName.trim()
         : AppStrings.t('no_driver_assigned');
     final busNumber = child?.busNumber.isNotEmpty == true
         ? child!.busNumber
@@ -150,7 +167,12 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                             ),
                           ),
                           Text(
-                            AppStrings.t('selected_driver'),
+                            // Named, because this screen is about one child
+                            // and a family with two has two answers to the
+                            // same question.
+                            child == null || child.name.trim().isEmpty
+                                ? AppStrings.t('selected_driver')
+                                : '${child.name.trim()}’s driver',
                             style: TextStyle(
                               color: context.textSecondary,
                               fontSize: 13,
@@ -161,6 +183,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                     ],
                   ),
                 ),
+                ChildSelector(onChanged: _onChildChanged),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -186,8 +209,12 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                                 gradient: AppTheme.parentGradient,
                                 borderRadius: BorderRadius.circular(22),
                               ),
-                              child: const Center(
-                                child: Text(
+                              child: AvatarImage(
+                                localFile: null,
+                                photoUrl: _driver?.photoUrl,
+                                size: 76,
+                                borderRadius: BorderRadius.circular(22),
+                                fallback: const Text(
                                   '🧑‍✈️',
                                   style: TextStyle(fontSize: 34),
                                 ),
@@ -441,7 +468,7 @@ class _InfoTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 18)),
+          AppGlyph(icon, size: 18),
           const SizedBox(height: 8),
           Text(
             label,

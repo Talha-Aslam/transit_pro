@@ -295,8 +295,11 @@ class ProfileRequirements {
             final label = rounds[i].label.trim().isEmpty
                 ? 'Round ${i + 1}'
                 : rounds[i].label.trim();
-            if (rounds[i].startTime.trim().isEmpty) {
-              gaps.add('$label — start time');
+            // A round has two legs now; running neither is the gap, not
+            // leaving one of them blank (an evening-only academy run has no
+            // morning leg and is complete without one).
+            if (!rounds[i].hasPickup && !rounds[i].hasDropoff) {
+              gaps.add('$label — a pick-up or drop-off time');
             }
             if (rounds[i].totalSeats <= 0) gaps.add('$label — seats');
           }

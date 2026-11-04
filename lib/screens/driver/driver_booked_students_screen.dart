@@ -7,7 +7,9 @@ import '../../app/ride_match_service.dart';
 import '../../app/session_service.dart';
 import '../../data/ride_request_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 /// The driver's roster — everyone who has a seat on one of their rounds.
 ///
@@ -134,7 +136,8 @@ class _DriverBookedStudentsScreenState
     final round = _session.driver.value?.scheduleById(request.scheduleId);
     final confirmed = await _askConfirm(
       title: 'Remove from your roster?',
-      body: '${student.name} loses their seat on '
+      body:
+          '${student.name} loses their seat on '
           '${round?.label ?? request.scheduleLabel}, and the seat goes back to '
           'your available count. Their family is told.',
     );
@@ -483,7 +486,8 @@ class _DriverBookedStudentsScreenState
           emoji: '⚠️',
           color: AppTheme.error,
           title: 'Your roster could not be read',
-          body: 'Check your connection and try again. Nothing has been lost — '
+          body:
+              'Check your connection and try again. Nothing has been lost — '
               'the list is stored on the server.',
         ),
       ];
@@ -524,10 +528,7 @@ class _DriverBookedStudentsScreenState
       // is shown, empty or not — its seat count is information in itself.
       if (searching && onRound.isEmpty) continue;
       sections.add(
-        _RoundSection(
-          round: round,
-          rows: onRound.map(_buildRow).toList(),
-        ),
+        _RoundSection(round: round, rows: onRound.map(_buildRow).toList()),
       );
     }
 
@@ -537,9 +538,7 @@ class _DriverBookedStudentsScreenState
     // from the driver's screen is a child left standing at the roadside. Showing
     // them here is also the only way the driver learns the round needs fixing.
     final orphans = filtered
-        .where(
-          (s) => s.scheduleId == null || !roundIds.contains(s.scheduleId),
-        )
+        .where((s) => s.scheduleId == null || !roundIds.contains(s.scheduleId))
         .toList();
     if (orphans.isNotEmpty) {
       sections.add(_UnassignedSection(rows: orphans.map(_buildRow).toList()));
@@ -565,13 +564,6 @@ class _DriverBookedStudentsScreenState
   }
 }
 
-/// `🎓` for a college or university rider, `🧒` for a school child. Keeps the
-/// avatar honest for the university rounds this app also serves.
-String _avatarFor(Student student) {
-  final type = student.instituteType.toLowerCase();
-  if (type.contains('university') || type.contains('college')) return '🎓';
-  return '🧒';
-}
 
 // ── Pending prompt ──────────────────────────────────────────────────────────
 
@@ -656,7 +648,9 @@ class _RoundSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      round.label.isEmpty ? AppStrings.t('schedule') : round.label,
+                      round.label.isEmpty
+                          ? AppStrings.t('schedule')
+                          : round.label,
                       style: TextStyle(
                         color: context.textPrimary,
                         fontSize: 13,
@@ -664,7 +658,7 @@ class _RoundSection extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${round.directionLabel} · ${round.timeRange}',
+                      round.timeRange,
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 11,
@@ -682,9 +676,7 @@ class _RoundSection extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: seatColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: seatColor.withValues(alpha: 0.3),
-                  ),
+                  border: Border.all(color: seatColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   '${round.availableSeats} of ${round.totalSeats} seats free',
@@ -805,11 +797,12 @@ class _BookedPassengerCard extends StatelessWidget {
                   color: context.cardBgElevated,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Center(
-                  child: Text(
-                    _avatarFor(student),
-                    style: const TextStyle(fontSize: 22),
-                  ),
+                child: AvatarImage(
+                  localFile: null,
+                  photoUrl: student.photoUrl,
+                  size: 44,
+                  borderRadius: BorderRadius.circular(14),
+                  fallback: riderGlyph(student.instituteType, size: 22),
                 ),
               ),
               const SizedBox(width: 12),
@@ -893,7 +886,7 @@ class _BookedPassengerCard extends StatelessWidget {
                       message: removable
                           ? AppStrings.t('remove')
                           : 'Only students who booked through a seat request '
-                              'can be removed here.',
+                                'can be removed here.',
                       child: GestureDetector(
                         onTap: onRemove,
                         child: Row(
@@ -999,11 +992,12 @@ class _PassengerDetailSheet extends StatelessWidget {
                           color: AppTheme.driverCyan.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        child: Center(
-                          child: Text(
-                            _avatarFor(student),
-                            style: const TextStyle(fontSize: 26),
-                          ),
+                        child: AvatarImage(
+                          localFile: null,
+                          photoUrl: student.photoUrl,
+                          size: 54,
+                          borderRadius: BorderRadius.circular(18),
+                          fallback: riderGlyph(student.instituteType, size: 26),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -1065,13 +1059,13 @@ class _PassengerDetailSheet extends StatelessWidget {
                           label: 'Round',
                           value: round == null
                               ? 'Not assigned to a round'
-                              : '${round!.label} · ${round!.directionLabel} '
-                                  '${round!.timeRange}',
+                              : '${round!.label} · ${round!.timeRange}',
                         ),
                         if (round != null)
                           _DetailRow(
                             label: 'Seats on this round',
-                            value: '${round!.availableSeats} of '
+                            value:
+                                '${round!.availableSeats} of '
                                 '${round!.totalSeats} seats free',
                           ),
                         _DetailRow(
@@ -1086,7 +1080,8 @@ class _PassengerDetailSheet extends StatelessWidget {
                         ),
                         _DetailRow(
                           label: 'Seat status',
-                          value: request?.statusLabel ??
+                          value:
+                              request?.statusLabel ??
                               'Assigned without a seat request',
                         ),
                         if (student.medicalNotes != null &&
@@ -1187,7 +1182,8 @@ class _EmptyRoster extends StatelessWidget {
         emoji: '🚌',
         color: AppTheme.driverCyan,
         title: 'No students booked yet',
-        body: 'Accepted seat requests appear here, grouped by the round they '
+        body:
+            'Accepted seat requests appear here, grouped by the round they '
             'are on.',
       );
     }
@@ -1196,13 +1192,14 @@ class _EmptyRoster extends StatelessWidget {
       emoji: '🔎',
       color: AppTheme.warning,
       title: 'Families cannot find you yet',
-      body: [
-        if (noAreas) 'you have not listed any school, college or university',
-        if (noRounds) 'you have no rounds set up',
-      ].join(', and ').replaceFirstMapped(
-            RegExp('^.'),
-            (m) => m[0]!.toUpperCase(),
-          ),
+      body:
+          [
+                if (noAreas)
+                  'you have not listed any school, college or university',
+                if (noRounds) 'you have no rounds set up',
+              ]
+              .join(', and ')
+              .replaceFirstMapped(RegExp('^.'), (m) => m[0]!.toUpperCase()),
       actionLabel: 'Set up my service',
       onAction: () => context.push('/driver/service'),
     );
@@ -1243,7 +1240,7 @@ class _NoticeCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+              child: AppGlyph(emoji, size: 28, color: color),
             ),
             const SizedBox(height: 16),
             Text(

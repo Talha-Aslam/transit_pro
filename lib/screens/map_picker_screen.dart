@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../app/location_permissions.dart';
 import '../app/route_service.dart';
-import '../map/mapbox_geo.dart';
+import '../map/google_geo.dart';
 import '../map/map_style.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
@@ -46,16 +46,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   /// a search result and "my location" all funnel through moving the camera;
   /// this is just read back off wherever the camera ends up.
   late GeoCoord _selected;
-  MapboxMap? _map;
+  GoogleMapController? _map;
 
-  /// True once the style has actually loaded — the only reliable "is the map
-  /// working" signal Mapbox offers. Unlike the old Google-Maps-era
-  /// `getVisibleRegion()` probe (pure camera math, never fails whether tiles
-  /// loaded or not), this is driven by [onStyleLoadedListener] /
-  /// [onMapLoadErrorListener], which genuinely reflect network/token state.
-  bool _mapReady = false;
+  /// Whether a Google Maps API key is configured at all — the only signal
+  /// available up front. google_maps_flutter has no portable "style loaded"
+  /// / "tile load failed" callback the way Mapbox did, so an unauthorized
+  /// key can't be distinguished from a good one here — the native view
+  /// renders its own chrome either way and just shows no tiles.
   String? _loadError;
-  Timer? _watchdog;
 
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
@@ -65,7 +63,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _locating = false;
 
   /// The device's real GPS fix, fetched once on open — used to bias search
-  /// results (Mapbox `proximity`) toward where the user actually is rather
+  /// results (via `near`) toward where the user actually is rather
   /// than wherever the pin happens to be sitting, and to show each result's
   /// distance the way inDrive's route-entry search does. Best-effort only:
   /// left null on denied/disabled location services, in which case results
@@ -73,11 +71,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   /// screen must stay usable without location permission.
   GeoCoord? _userLocation;
 
-  /// Search Box API session token — see [RouteService.newSessionToken].
-  /// Minted on the field gaining focus or the first non-empty query
-  /// (whichever happens first) and reused for every suggest/retrieve call
-  /// until the search is cleared back to empty, per Mapbox's per-session
-  /// billing model.
+  /// Places Autocomplete session token — see
+  /// [RouteService.newSessionToken]. Minted on the field gaining focus or
+  /// the first non-empty query (whichever happens first) and reused for
+  /// every autocomplete/details call until the search is cleared back to
+  /// empty, per Google's per-session billing model.
   String? _searchSessionToken;
 
   /// Drives the pin's little "lift" animation — purely cosmetic feedback that
@@ -93,8 +91,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _resolvingAddress = false;
   Timer? _geocodeDebounce;
 
-  // Manual entry — the fallback when there is no Mapbox token at all and no
-  // map ever renders to drag a pin across.
+  // Manual entry — the fallback when there is no Google Maps API key at
+  // all and no map ever renders to drag a pin across.
   late final _manualLatCtrl = TextEditingController(
     text: _selected.lat.toStringAsFixed(6),
   );
@@ -108,18 +106,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     _selected =
         widget.initial ?? const GeoCoord(31.5204, 74.3587); // default Lahore
 
-    if (!AppConfig.hasMapboxToken) {
-      // No point even constructing the native view — it would just fail
-      // with an auth error a few hundred milliseconds later.
-      _loadError = 'no_token';
+    if (!AppConfig.hasGoogleMapsKey) {
+      // No point even constructing the native view — with no key it just
+      // renders chrome and no tiles.
+      _loadError = 'no_key';
       return;
     }
-
-    // Covers the case where neither onStyleLoaded nor onMapLoadError ever
-    // fires (a genuinely silent network failure).
-    _watchdog = Timer(const Duration(seconds: 8), () {
-      if (mounted && !_mapReady) setState(() => _loadError = 'timeout');
-    });
 
     _searchFocus.addListener(_onSearchFocusChanged);
     unawaited(_loadUserLocation());
@@ -141,7 +133,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   @override
   void dispose() {
-    _watchdog?.cancel();
     _debounce?.cancel();
     _geocodeDebounce?.cancel();
     _searchFocus.removeListener(_onSearchFocusChanged);
@@ -162,32 +153,27 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
-  Future<void> _onMapCreated(MapboxMap map) async {
+  void _onMapCreated(GoogleMapController map) {
     _map = map;
-    await map.compass.updateSettings(CompassSettings(enabled: false));
-    await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
-    await map.location.updateSettings(
-      LocationComponentSettings(enabled: true, puckBearingEnabled: true),
-    );
+    // compass/myLocation etc. are GoogleMap widget params now, not
+    // post-creation controller calls — set once in build() below.
     _scheduleReverseGeocode(immediate: true);
   }
 
-  /// Fires continuously while the camera moves (drag, pinch, `flyTo`
-  /// animation). The event already carries the camera's new center
-  /// (`CameraChangedEventData.cameraState`) — no need to turn around and
-  /// await a fresh `getCameraState()` platform call on every tick just to
-  /// read back what the event already told us.
-  void _onCameraChanged(CameraChangedEventData event) {
+  /// Fires continuously while the camera moves (drag, pinch, animated move)
+  /// — carries the new camera position directly, no need to turn around and
+  /// query it back.
+  void _onCameraMove(CameraPosition position) {
     if (_map == null) return;
     setState(() {
-      _selected = event.cameraState.center.coordinates.geoCoord;
+      _selected = position.target.geoCoord;
       _isMovingCamera = true;
     });
   }
 
   /// Fires once the camera has actually settled — the right moment to spend
   /// a real geocoding request, rather than firing one every frame of a drag.
-  void _onMapIdle(MapIdleEventData _) {
+  void _onCameraIdle() {
     if (!mounted) return;
     setState(() => _isMovingCamera = false);
     _scheduleReverseGeocode();
@@ -223,15 +209,16 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   /// can be chosen without dragging.
   Future<void> _flyTo(GeoCoord point) async {
     setState(() => _selected = point); // optimistic — feels instant
-    await _map?.flyTo(
-      CameraOptions(center: point.point, zoom: 16),
-      MapAnimationOptions(duration: 600),
+    await _map?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: point.latLng, zoom: 16),
+      ),
     );
   }
 
-  Future<void> _onTap(MapContentGestureContext context) async {
+  Future<void> _onTap(LatLng point) async {
     _searchFocus.unfocus();
-    await _flyTo(context.point.coordinates.geoCoord);
+    await _flyTo(point.geoCoord);
   }
 
   void _onSearchChanged(String query) {
@@ -283,19 +270,16 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   Future<void> _onLocateMe() async {
     setState(() => _locating = true);
     try {
-      final allowed = await ensureLocationPermission();
-      if (!allowed) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Location permission is off — enable it in your device '
-              'settings to use "My location".',
-            ),
-          ),
-        );
-        return;
-      }
+      // One message for three different refusals, and no way to act on
+      // any of them. `ensureLocationOrExplain` names the actual block and
+      // puts the right destination behind the button — the phone's
+      // location toggle, or this app's permission page.
+      if (!mounted) return;
+      final allowed = await ensureLocationOrExplain(
+        context,
+        accent: widget.accentColor,
+      );
+      if (!allowed) return;
       final position = await Geolocator.getCurrentPosition();
       if (!mounted) return;
       await _flyTo(GeoCoord(position.latitude, position.longitude));
@@ -364,29 +348,20 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         child: Stack(
           children: [
             if (_loadError == null)
-              MapWidget(
-                // Lighter Android platform-view hosting mode than the
-                // library default (Virtual Display) — see the identical
-                // comment in route_map_view.dart.
-                androidHostingMode: AndroidPlatformViewHostingMode.TLHC_HC,
-                styleUri: MapStyle.forBrightness(context.isDark),
-                cameraOptions: CameraOptions(center: _selected.point, zoom: 15),
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: _selected.latLng,
+                  zoom: 15,
+                ),
+                style: MapStyle.forBrightness(context.isDark),
                 onMapCreated: _onMapCreated,
-                onCameraChangeListener: _onCameraChanged,
-                onMapIdleListener: _onMapIdle,
-                onStyleLoadedListener: (_) {
-                  _watchdog?.cancel();
-                  if (mounted) setState(() => _mapReady = true);
-                },
-                onMapLoadErrorListener: (e) {
-                  _watchdog?.cancel();
-                  if (mounted) {
-                    setState(() {
-                      _loadError = e.message;
-                    });
-                  }
-                },
-                onTapListener: _onTap,
+                onCameraMove: _onCameraMove,
+                onCameraIdle: _onCameraIdle,
+                onTap: _onTap,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                compassEnabled: false,
+                zoomControlsEnabled: false,
               ),
             if (_loadError == null) _buildCenterPin(accent),
             if (showSearchUi)
@@ -576,7 +551,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     );
   }
 
-  /// Shown instead of the map when there is no Mapbox token at all. The old
+  /// Shown instead of the map when there is no Google Maps API key. The old
   /// version of this screen said "you can still tap below to enter
   /// coordinates manually" with nothing underneath that actually let you —
   /// this is that fallback made real.
@@ -600,7 +575,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Map tiles are unavailable — the Mapbox access token '
+                      'Map tiles are unavailable — the Google Maps API key '
                       'is not configured yet. Enter coordinates manually '
                       'instead; what gets saved is unaffected.',
                       style: TextStyle(
@@ -697,7 +672,8 @@ class _SearchBox extends StatelessWidget {
 
   /// The device's real location, when known — purely presentational here
   /// (each result's distance is computed against it); the actual proximity
-  /// bias sent to Mapbox happens in [_MapPickerScreenState._onSearchChanged].
+  /// bias sent to the search API happens in
+  /// [_MapPickerScreenState._onSearchChanged].
   final GeoCoord? userLocation;
   final ValueChanged<String> onChanged;
   final ValueChanged<GeocodeResult> onResultTap;

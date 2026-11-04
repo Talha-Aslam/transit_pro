@@ -84,20 +84,20 @@ String paymentDateLine(Payment p) {
 }
 
 Color paymentStatusColor(PaymentStatus status) => switch (status) {
-      PaymentStatus.paid => AppTheme.success,
-      PaymentStatus.pending => AppTheme.warning,
-      PaymentStatus.overdue => AppTheme.error,
-      // `refunded` had no colour anywhere before — the driver screen's switch
-      // fell through to its default cyan and the fee screens had no case at all.
-      PaymentStatus.refunded => AppTheme.info,
-    };
+  PaymentStatus.paid => AppTheme.success,
+  PaymentStatus.pending => AppTheme.warning,
+  PaymentStatus.overdue => AppTheme.error,
+  // `refunded` had no colour anywhere before — the driver screen's switch
+  // fell through to its default cyan and the fee screens had no case at all.
+  PaymentStatus.refunded => AppTheme.info,
+};
 
 String paymentStatusEmoji(PaymentStatus status) => switch (status) {
-      PaymentStatus.paid => '✅',
-      PaymentStatus.pending => '⏳',
-      PaymentStatus.overdue => '⚠️',
-      PaymentStatus.refunded => '↩️',
-    };
+  PaymentStatus.paid => '✅',
+  PaymentStatus.pending => '⏳',
+  PaymentStatus.overdue => '⚠️',
+  PaymentStatus.refunded => '↩️',
+};
 
 /// Localised status label, falling back to the enum's own English.
 ///
@@ -175,8 +175,11 @@ class PaymentTotals {
 /// on.
 Payment? nextDuePayment(List<Payment> payments) {
   final unpaid = payments
-      .where((p) =>
-          p.status == PaymentStatus.pending || p.status == PaymentStatus.overdue)
+      .where(
+        (p) =>
+            p.status == PaymentStatus.pending ||
+            p.status == PaymentStatus.overdue,
+      )
       .toList();
   if (unpaid.isEmpty) return null;
 
@@ -202,10 +205,12 @@ const paymentFilters = <String, PaymentStatus?>{
   'Overdue': PaymentStatus.overdue,
 };
 
-List<Payment> applyPaymentFilter(List<Payment> payments, PaymentStatus? status) =>
-    status == null
-        ? payments
-        : payments.where((p) => p.status == status).toList();
+List<Payment> applyPaymentFilter(
+  List<Payment> payments,
+  PaymentStatus? status,
+) => status == null
+    ? payments
+    : payments.where((p) => p.status == status).toList();
 
 // ── Shared row ──────────────────────────────────────────────────────────────
 
@@ -284,10 +289,7 @@ class PaymentRow extends StatelessWidget {
                         : '$subtitle · ${paymentDateLine(payment)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.textTertiary,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: context.textTertiary, fontSize: 11),
                   ),
                 ],
               ),
@@ -354,10 +356,7 @@ class PaymentListState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
       child: Column(
         children: [
-          Text(
-            isError ? '⚠️' : '🧾',
-            style: const TextStyle(fontSize: 30),
-          ),
+          Text(isError ? '⚠️' : '🧾', style: const TextStyle(fontSize: 30)),
           const SizedBox(height: 12),
           Text(
             isError

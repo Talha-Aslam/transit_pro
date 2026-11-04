@@ -1,17 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/driver_data_service.dart';
+import '../../app/live_bus_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
 import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
-import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/find_driver_banner.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/payment_presentation.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentDashboard extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -22,6 +25,43 @@ class StudentDashboard extends StatefulWidget {
 }
 
 class _StudentDashboardState extends State<StudentDashboard> {
+  /// The assigned driver's running trip. Null means no round under way.
+  Trip? _activeTrip;
+  StreamSubscription<Trip?>? _tripSub;
+  String? _watchedDriverId;
+
+  /// Subscribes to the assigned driver's active trip and, while one is
+  /// running, follows the bus it is on. Called from `build`, so it no-ops
+  /// unless the driver actually changed.
+  void _ensureWatching(StudentInfo info) {
+    final driverId = info.driverId;
+    if (driverId == _watchedDriverId) return;
+    _watchedDriverId = driverId;
+
+    _tripSub?.cancel();
+    _tripSub = null;
+    _activeTrip = null;
+    LiveBusService.instance.stop();
+
+    if (driverId.isEmpty) return;
+    _tripSub = TripRepository.instance
+        .watchActiveTripForDriver(driverId)
+        .listen(_onActiveTripChanged);
+  }
+
+  void _onActiveTripChanged(Trip? trip) {
+    if (!mounted) return;
+    setState(() => _activeTrip = trip);
+    if (trip == null || trip.busId.isEmpty) {
+      LiveBusService.instance.stop();
+      return;
+    }
+    LiveBusService.instance.follow(
+      busId: trip.busId,
+      destination: StudentDataService.instance.studentInfo.value.dropoff,
+    );
+  }
+
   /// Real check-in/absent history, replacing the two hardcoded "Oak Street
   /// stop" / "Arrived at school" rows this screen used to show
   /// unconditionally. Empty until the fetch below completes — a brand-new
@@ -73,8 +113,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
           (r) => _ActivityRow(
             icon: r.status == AttendanceStatus.absent ? '❌' : '✅',
             msg: r.status == AttendanceStatus.absent
-                ? 'Marked absent'
-                : 'Checked in for pickup',
+                ? AppStrings.t('marked_absent')
+                : AppStrings.t('checked_in_pickup'),
             time: _formatTime(r.markedAt),
           ),
         )
@@ -82,7 +122,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   @override
+  void dispose() {
+    _tripSub?.cancel();
+    LiveBusService.instance.stopAfterFrame();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _ensureWatching(StudentDataService.instance.studentInfo.value);
+
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? AppStrings.t('good_morning')
@@ -97,129 +146,80 @@ class _StudentDashboardState extends State<StudentDashboard> {
         child: Column(
           children: [
             // ── Header ──────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppTheme.studentAmber.withValues(alpha: 0.2),
-                    Colors.transparent,
-                  ],
+            // Same photographic banner the other dashboards open on —
+            // see `DashboardHeader`. Replaces an amber-to-transparent wash
+            // that only existed to give the greeting something to sit on.
+            DashboardHeader(
+              greeting: greeting,
+              body: ValueListenableBuilder<StudentInfo>(
+                valueListenable: StudentDataService.instance.studentInfo,
+                builder: (_, info, _) => Text(
+                  info.name,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              trailing: ValueListenableBuilder<List<AppNotification>>(
+                valueListenable: NotificationService.instance.history,
+                builder: (context, history, _) {
+                  final unread = history.where((n) => !n.read).length;
+                  return GestureDetector(
+                    onTap: () => widget.onNavigate(3),
+                    child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        Row(
-                          children: [
-                            const Text('👋', style: TextStyle(fontSize: 18)),
-                            const SizedBox(width: 8),
-                            ShaderMask(
-                              shaderCallback: (bounds) =>
-                                  AppTheme.studentGradient.createShader(
-                                    Rect.fromLTWH(
-                                      0,
-                                      0,
-                                      bounds.width,
-                                      bounds.height,
-                                    ),
-                                  ),
-                              blendMode: BlendMode.srcIn,
-                              child: Text(
-                                greeting,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ValueListenableBuilder<StudentInfo>(
-                          valueListenable:
-                              StudentDataService.instance.studentInfo,
-                          builder: (_, info, _) => Text(
-                            info.name,
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                            ),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: context.cardBgElevated,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: context.inputBorder),
+                          ),
+                          child: const Center(
+                            child: Text('🔔', style: TextStyle(fontSize: 18)),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  ValueListenableBuilder<List<AppNotification>>(
-                    valueListenable: NotificationService.instance.history,
-                    builder: (context, history, _) {
-                      final unread = history.where((n) => !n.read).length;
-                      return GestureDetector(
-                        onTap: () => widget.onNavigate(3),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: context.cardBgElevated,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: context.inputBorder),
+                        if (unread > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
                               ),
-                              child: const Center(
-                                child: Text(
-                                  '🔔',
-                                  style: TextStyle(fontSize: 18),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.error,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: context.cardBgElevated,
+                                  width: 1.4,
+                                ),
+                              ),
+                              child: Text(
+                                unread > 9 ? '9+' : '$unread',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.0,
                                 ),
                               ),
                             ),
-                            if (unread > 0)
-                              Positioned(
-                                right: -2,
-                                top: -2,
-                                child: Container(
-                                  constraints: const BoxConstraints(
-                                    minWidth: 16,
-                                    minHeight: 16,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.error,
-                                    borderRadius: BorderRadius.circular(999),
-                                    border: Border.all(
-                                      color: context.cardBgElevated,
-                                      width: 1.4,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    unread > 9 ? '9+' : '$unread',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
 
@@ -229,13 +229,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 children: [
                   // ── Bus status card ───────────────────────────
                   GlassCard(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.success.withValues(alpha: 0.15),
-                        AppTheme.success.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderColor: AppTheme.success.withValues(alpha: 0.25),
+                    accent: AppTheme.success,
                     padding: const EdgeInsets.all(18),
                     child: Row(
                       children: [
@@ -278,7 +272,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                                 .join(' · ');
                                         return Text(
                                           assignment.isEmpty
-                                              ? 'No bus assigned yet'
+                                              ? AppStrings.t('no_bus_assigned')
                                               : assignment,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -291,54 +285,57 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // `route` is null until a driver actually
-                                  // starts a trip — this used to show
-                                  // "On Route" unconditionally, even for a
-                                  // brand-new account with no driver at all.
-                                  TrackingService.instance.route == null
+                                  // Whether a round is running is a fact
+                                  // about the driver's trip in Firestore.
+                                  // Read from the local `TrackingService`
+                                  // until now, which on a student's device
+                                  // is never started, so this badge said
+                                  // "Not on route" straight through a live
+                                  // trip.
+                                  _activeTrip == null
                                       ? StatusBadge(
-                                          label: 'Not on route',
+                                          label: AppStrings.t('not_on_route'),
                                           color: AppTheme.warning,
                                         )
                                       : StatusBadge(
-                                          label: '● On Route',
+                                          label:
+                                              '● ${AppStrings.t('on_route')}',
                                           color: AppTheme.success,
                                         ),
                                 ],
                               ),
                               const SizedBox(height: 4),
-                              ValueListenableBuilder<int>(
+                              // Read `TrackingService.etaMinutes` and
+                              // `.route` until now — both local to whichever
+                              // device owns them, and on a student's phone
+                              // `route` is always null, so this line said
+                              // "Route not started yet" straight through a
+                              // running trip. It follows the bus's own pings
+                              // now; see `LiveBusService`.
+                              ValueListenableBuilder<int?>(
                                 valueListenable:
-                                    TrackingService.instance.etaMinutes,
+                                    LiveBusService.instance.etaMinutes,
                                 builder: (_, eta, _) {
-                                  final route = TrackingService.instance.route;
-                                  // `etaMinutes` keeps whatever value the last
-                                  // live trip left it at — without this
-                                  // guard, "Arriving in X min" kept showing
-                                  // for an account with no bus assigned at
-                                  // all, since eta is never reset to a
-                                  // not-applicable state on its own.
-                                  if (route == null) {
-                                    return Text(
-                                      'Route not started yet',
-                                      style: TextStyle(
-                                        color: context.textSecondary,
-                                        fontSize: 12,
-                                      ),
-                                    );
+                                  final stopLabel = StudentDataService
+                                      .instance
+                                      .studentInfo
+                                      .value
+                                      .stop;
+                                  final String line;
+                                  if (_activeTrip == null) {
+                                    line = AppStrings.t('route_not_started');
+                                  } else if (eta == null) {
+                                    line = AppStrings.t('waiting_for_bus');
+                                  } else {
+                                    line =
+                                        '${AppStrings.t('arriving_in')} '
+                                        '$eta ${AppStrings.t('min_short')}'
+                                        '${stopLabel.isEmpty ? '' : ' · $stopLabel'}';
                                   }
-                                  final stopName = route.currentStop?.name;
-                                  final stopLabel =
-                                      (stopName != null && stopName.isNotEmpty)
-                                      ? stopName
-                                      : StudentDataService
-                                            .instance
-                                            .studentInfo
-                                            .value
-                                            .stop;
                                   return Text(
-                                    'Arriving in $eta min'
-                                    '${stopLabel.isEmpty ? '' : ' · $stopLabel'}',
+                                    line,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: context.textSecondary,
                                       fontSize: 12,
@@ -358,15 +355,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   GestureDetector(
                     onTap: () => widget.onNavigate(1),
                     child: GlassCard(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.studentAmber.withValues(alpha: 0.15),
-                          AppTheme.studentOrange.withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderColor: AppTheme.studentAmber.withValues(
-                        alpha: 0.25,
-                      ),
+                      accent: AppTheme.studentAmber,
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -384,20 +373,19 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                ValueListenableBuilder<int>(
+                                ValueListenableBuilder<int?>(
                                   valueListenable:
-                                      TrackingService.instance.etaMinutes,
-                                  // `etaMinutes` holds whatever the last live
-                                  // trip left it at — it is never reset just
-                                  // because there is no active route, so this
-                                  // must be gated the same way as the header
-                                  // "Arriving in X min" line above.
+                                      LiveBusService.instance.etaMinutes,
+                                  // Same source as the line in the header,
+                                  // so the two can never disagree.
                                   builder: (_, eta, _) {
-                                    final route =
-                                        TrackingService.instance.route;
-                                    if (route == null) {
+                                    if (_activeTrip == null || eta == null) {
                                       return Text(
-                                        'Not started yet',
+                                        _activeTrip == null
+                                            ? AppStrings.t('not_started_yet')
+                                            : AppStrings.t(
+                                                'waiting_for_bus_short',
+                                              ),
                                         style: TextStyle(
                                           color: context.textSecondary,
                                           fontSize: 15,
@@ -441,21 +429,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 ),
                                 Builder(
                                   builder: (_) {
-                                    final route =
-                                        TrackingService.instance.route;
-                                    if (route == null) {
+                                    if (_activeTrip == null) {
                                       return const SizedBox.shrink();
                                     }
-                                    final stopName = route.currentStop?.name;
-                                    final stopLabel =
-                                        (stopName != null &&
-                                            stopName.isNotEmpty)
-                                        ? stopName
-                                        : StudentDataService
-                                              .instance
-                                              .studentInfo
-                                              .value
-                                              .stop;
+                                    final stopLabel = StudentDataService
+                                        .instance
+                                        .studentInfo
+                                        .value
+                                        .stop;
                                     return Text(
                                       stopLabel.isEmpty
                                           ? ''
@@ -505,13 +486,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   GestureDetector(
                     onTap: () => context.push('/student/missed-bus'),
                     child: GlassCard(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.error.withValues(alpha: 0.15),
-                          AppTheme.warning.withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderColor: AppTheme.error.withValues(alpha: 0.25),
+                      accent: AppTheme.error,
                       padding: const EdgeInsets.all(18),
                       child: Row(
                         children: [
@@ -641,7 +616,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 children: [
                                   _ScheduleItem(
                                     icon: '🌅',
-                                    label: 'School Time',
+                                    label: AppStrings.t('school_time'),
                                     time: formatTimeOfDay(
                                       slots.morningPickupFromHome,
                                     ),
@@ -654,7 +629,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                   ),
                                   _ScheduleItem(
                                     icon: '🌇',
-                                    label: 'Off Time',
+                                    label: AppStrings.t('off_time'),
                                     time: formatTimeOfDay(
                                       slots.afternoonDropoffAtHome,
                                     ),
@@ -717,7 +692,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         valueListenable: StudentDataService.instance.feesPaid,
                         builder: (_, fees, _) => _StatCard(
                           icon: '💰',
-                          label: 'Fees Paid',
+                          label: AppStrings.t('fees_paid'),
                           value: fees,
                           color: AppTheme.purple,
                         ),
@@ -735,7 +710,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         Row(
                           children: [
                             Text(
-                              'Recent Activity',
+                              AppStrings.t('recent_activity'),
                               style: TextStyle(
                                 color: context.textPrimary,
                                 fontSize: 15,
@@ -812,7 +787,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                             }
                             if (rows.isEmpty) {
                               return Text(
-                                'No recent activity yet',
+                                AppStrings.t('no_recent_activity'),
                                 style: TextStyle(
                                   color: context.textTertiary,
                                   fontSize: 13,
@@ -859,7 +834,7 @@ class _ScheduleItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 20)),
+            AppGlyph(icon, size: 20, color: color),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -900,12 +875,8 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GlassCard(
-      enableBlur: false,
       padding: const EdgeInsets.all(12),
-      gradient: LinearGradient(
-        colors: [color.withValues(alpha: 0.12), color.withValues(alpha: 0.04)],
-      ),
-      borderColor: color.withValues(alpha: 0.2),
+      accent: color,
       child: Row(
         children: [
           Container(
@@ -915,9 +886,7 @@ class _StatCard extends StatelessWidget {
               color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 18)),
-            ),
+            child: Center(child: AppGlyph(icon, size: 18, color: color)),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -965,7 +934,7 @@ class _ActivityRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
+            AppGlyph(icon, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

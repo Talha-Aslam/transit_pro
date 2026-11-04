@@ -8,6 +8,7 @@ import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
+import '../../data/trip_repository.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -214,7 +215,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
     DriverTimingSlots? slots,
     Map<String, Map<String, String>>? requestedSchedule,
   ) {
-    final todayWeekday = DateTime.now().weekday; // 1=Mon..7=Sun
+    final now = DateTime.now();
+    final todayWeekday = now.weekday; // 1=Mon..7=Sun
     final defaultPickup = slots == null
         ? '—'
         : formatTimeOfDay(slots.morningPickupFromHome);
@@ -222,16 +224,41 @@ class _ParentScheduleState extends State<ParentSchedule> {
         ? '—'
         : formatTimeOfDay(slots.afternoonDropoffAtHome);
     final schedules = driver?.schedules ?? const [];
+    // Monday of the week on screen. On a Sunday that is tomorrow's Monday,
+    // because a Sunday belongs to the week that is about to start — the old
+    // code read Sunday as weekday 7 and marked every day of the week behind
+    // it as done, all at once.
+    final monday = todayWeekday == DateTime.sunday
+        ? DateUtils.dateOnly(now).add(const Duration(days: 1))
+        : DateUtils.dateOnly(now).subtract(Duration(days: todayWeekday - 1));
 
     return List.generate(_weekDays.length, (i) {
       final weekday = i + 1; // Mon=1..Sat=6
       final runsThisDay =
           schedules.isEmpty || schedules.any((s) => s.runsOn(weekday));
-      final status = weekday == todayWeekday
-          ? 'today'
-          : weekday < todayWeekday
-          ? 'done'
-          : 'upcoming';
+      final date = monday.add(Duration(days: i));
+      final dateKey = _dateKey(date);
+      final isToday = todayWeekday != DateTime.sunday &&
+          weekday == todayWeekday;
+      final isPast = date.isBefore(DateUtils.dateOnly(now));
+
+      // What actually happened, from the attendance the driver recorded.
+      // Nothing recorded on a day that has passed is not the same as
+      // "completed": it means no trip ran, or nobody marked it.
+      final String status;
+      if (isToday) {
+        status = 'today';
+      } else if (!isPast) {
+        status = 'upcoming';
+      } else {
+        status = switch (_rideHistory[dateKey]) {
+          AttendanceStatus.boarded ||
+          AttendanceStatus.droppedOff => 'done',
+          AttendanceStatus.absent => 'absent',
+          _ => 'none',
+        };
+      }
+
       final override = requestedSchedule?[kWeekdayKeys[i]];
       return _DaySchedule(
         day: _weekDays[i],
@@ -241,6 +268,40 @@ class _ParentScheduleState extends State<ParentSchedule> {
         note: (driver != null && !runsThisDay) ? 'No pickup this day' : '',
       );
     });
+  }
+
+  static String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  /// What the driver recorded for this child, by `yyyy-MM-dd`.
+  ///
+  /// One fetch per child rather than a stream: this is history, it does not
+  /// change while the screen is open, and a collection-group listener per
+  /// child on a screen a family opens many times a day is a cost with no
+  /// reader.
+  Map<String, AttendanceStatus> _rideHistory = const {};
+  String? _historyFor;
+
+  Future<void> _loadHistory(String? studentId) async {
+    if (studentId == null || studentId.isEmpty || studentId == _historyFor) {
+      return;
+    }
+    _historyFor = studentId;
+    try {
+      final records = await TripRepository.instance
+          .fetchAttendanceForStudent(studentId);
+      if (!mounted) return;
+      setState(() {
+        _rideHistory = {
+          for (final r in records)
+            if (r.dateKey.isNotEmpty) r.dateKey: r.status,
+        };
+      });
+    } catch (e) {
+      debugPrint('ride history failed: $e');
+    }
   }
 
   /// `HH:mm` (24h) → `07:15 AM`, matching `RouteStop.scheduledTime`'s stored
@@ -317,6 +378,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   ? Stream<Student?>.value(null)
                   : UserRepository.instance.watchStudent(studentId),
               builder: (context, snap) {
+                _loadHistory(studentId.isEmpty ? null : studentId);
                 final schedule = _buildSchedule(
                   driver,
                   slots,
@@ -334,6 +396,17 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   case 'done':
                     statusColor = AppTheme.success;
                     statusLabel = AppStrings.t('completed_check');
+                    break;
+                  case 'absent':
+                    statusColor = AppTheme.warning;
+                    statusLabel = AppStrings.t('status_marked_absent');
+                    break;
+                  // A day that has passed with nothing recorded. Calling it
+                  // "completed" was the old behaviour and it was a claim
+                  // nobody had made.
+                  case 'none':
+                    statusColor = context.textTertiary;
+                    statusLabel = AppStrings.t('no_trip_that_day');
                     break;
                   case 'today':
                     statusColor = AppTheme.purple;
@@ -354,6 +427,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
 
                 return _buildBody(
                   context,
+                  requestStatus:
+                      snap.data?.scheduleRequestStatus ??
+                      ScheduleRequestStatus.none,
+                  requestNote: snap.data?.scheduleRequestNote,
                   children: children,
                   selectedChildIndex: safeIdx,
                   child: child,
@@ -387,6 +464,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
     required String stopLabel,
     required String? myStopId,
     required DateTime attendanceTargetDate,
+    required ScheduleRequestStatus requestStatus,
+    required String? requestNote,
   }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -435,6 +514,12 @@ class _ParentScheduleState extends State<ParentSchedule> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
+                // ── Where the requested times stand ───────────────────────
+                // Saved times used to look settled the instant they were
+                // typed, and nothing ever carried them to the driver. This
+                // says which of the two a family is looking at.
+                _ScheduleRequestBanner(status: requestStatus, note: requestNote),
+
                 // ── Child switcher (only when >1 child) ───────────────────
                 // Same pattern `parent_dashboard.dart` already uses — without
                 // this, a parent with more than one child could only ever
@@ -1070,6 +1155,82 @@ class _AttendanceToggleCard extends StatelessWidget {
               value: attending,
               activeTrackColor: AppTheme.success,
               onChanged: submitting ? null : onToggle,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Whether the family's requested timings are a wish or an arrangement.
+class _ScheduleRequestBanner extends StatelessWidget {
+  final ScheduleRequestStatus status;
+  final String? note;
+
+  const _ScheduleRequestBanner({required this.status, required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == ScheduleRequestStatus.none) return const SizedBox.shrink();
+
+    final (color, icon, key) = switch (status) {
+      ScheduleRequestStatus.pending => (
+        AppTheme.warning,
+        Icons.hourglass_top_rounded,
+        'schedule_pending',
+      ),
+      ScheduleRequestStatus.accepted => (
+        AppTheme.success,
+        Icons.check_circle_rounded,
+        'schedule_accepted',
+      ),
+      _ => (AppTheme.error, Icons.error_outline_rounded, 'schedule_rejected'),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.t(key),
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  // A decline with no reason is a dead end, so the driver's
+                  // own words come with it.
+                  if (status == ScheduleRequestStatus.rejected &&
+                      (note ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      note!.trim(),
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 11.5,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),

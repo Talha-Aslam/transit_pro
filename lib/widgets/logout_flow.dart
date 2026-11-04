@@ -27,9 +27,7 @@ Future<void> confirmAndSignOut(
     context: context,
     builder: (dialogContext) => AlertDialog(
       backgroundColor: dialogContext.cardBgElevated,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       title: Text(
         'Sign out?',
         style: TextStyle(

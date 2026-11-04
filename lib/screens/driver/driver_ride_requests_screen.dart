@@ -6,6 +6,7 @@ import '../../app/ride_match_service.dart';
 import '../../app/session_service.dart';
 import '../../data/ride_request_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 
 /// The driver's seat-request inbox: accept, decline, or release a booked seat.
@@ -516,7 +517,7 @@ class _RoundCard extends StatelessWidget {
           ),
           gap,
           Text(
-            '${r.directionLabel} · ${r.timeRange}',
+            r.timeRange,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: context.textTertiary, fontSize: 11),
@@ -737,7 +738,16 @@ class _RideRequestCard extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,
-                        child: const Text('🧒', style: TextStyle(fontSize: 20)),
+                        child: AvatarImage(
+                          localFile: null,
+                          photoUrl: request.studentPhotoUrl,
+                          size: 44,
+                          borderRadius: BorderRadius.circular(22),
+                          fallback: const Text(
+                            '🧒',
+                            style: TextStyle(fontSize: 20),
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

@@ -86,8 +86,7 @@ class ThemeBlendScope extends InheritedNotifier<Animation<double>> {
   });
 
   static double of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<ThemeBlendScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<ThemeBlendScope>();
     return scope?.notifier?.value ?? ThemeProvider.instance.blend;
   }
 }

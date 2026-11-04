@@ -1,11 +1,15 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:transit_core/transit_core.dart' hide StopStatus;
 
+import '../../app/active_trip_service.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
+import '../../app/location_permissions.dart';
 import '../../app/route_service.dart';
+import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../app/tracking_service.dart';
 import '../../app/geofence_service.dart';
@@ -15,6 +19,7 @@ import '../../map/route_map_view.dart';
 import '../../models/route_data.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class DriverRoute extends StatefulWidget {
   const DriverRoute({super.key});
@@ -33,11 +38,13 @@ class _DriverRouteState extends State<DriverRoute> {
   bool _followCamera = true;
   bool _togglingLive = false;
 
-  /// Distance from the bus to its destination stop, refreshed periodically
-  /// via `RouteService.fetchDistanceDuration` (real Mapbox directions) rather
-  /// than the '4.2 km' literal this screen used to show regardless of where
-  /// the bus actually was.
-  String? _liveDistance;
+  /// Refreshes the road-aware distance and duration from Google's Routes
+  /// API and hands them to [TrackingService], which owns both figures now.
+  ///
+  /// This screen used to keep the distance string to itself and leave the
+  /// ETA to a simulation-only estimate, so on a real GPS trip the distance
+  /// moved every eight seconds while "ETA to school" never moved at all.
+  /// Both now come from the same place, and so does the copy a parent sees.
   Timer? _distanceTimer;
 
   /// The trip this driver currently has open, or null when nothing is
@@ -47,9 +54,12 @@ class _DriverRouteState extends State<DriverRoute> {
   /// screen a moment ago and a trip still open from before the app was
   /// killed both show up the same way.
   Trip? _activeTrip;
-  StreamSubscription<Trip?>? _tripSub;
   bool _startingTrip = false;
   bool _endingTrip = false;
+
+  /// True while a hand-over batch is in flight, so a geofence that fires
+  /// `arrived` repeatedly at the gate does not repeat the write.
+  bool _handingOver = false;
 
   /// Which round is selected in the Start-Route picker (only shown when the
   /// driver runs more than one). Also remembered across a resumed trip so
@@ -69,12 +79,10 @@ class _DriverRouteState extends State<DriverRoute> {
     _tracking.busPosition.addListener(_onBusPositionChanged);
     _geofence.alerts.addListener(_onGeofenceAlert);
 
-    final uid = _session.uid;
-    if (uid != null) {
-      _tripSub = TripRepository.instance
-          .watchActiveTripForDriver(uid)
-          .listen(_onActiveTripChanged);
-    }
+    // Shared with the dashboard and the profile chip, rather than a fourth
+    // subscription to the same query that could disagree with them.
+    _activeTrip = ActiveTripService.instance.trip.value;
+    ActiveTripService.instance.trip.addListener(_onActiveTripFromService);
 
     _distanceTimer = Timer.periodic(
       const Duration(seconds: 8),
@@ -84,7 +92,21 @@ class _DriverRouteState extends State<DriverRoute> {
 
   void _onLangChanged() => setState(() {});
 
-  void _onLocationSharingChanged() => setState(() {});
+  void _onActiveTripFromService() =>
+      _onActiveTripChanged(ActiveTripService.instance.trip.value);
+
+  /// The driver's "share my location" switch applies mid-trip too: turning
+  /// it off stops the pings without ending the round, turning it back on
+  /// resumes them.
+  void _onLocationSharingChanged() {
+    setState(() {});
+    final trip = _activeTrip;
+    if (!_svc.locationSharing.value) {
+      _tracking.stopBroadcast();
+    } else if (trip != null) {
+      _startBroadcast(trip);
+    }
+  }
 
   /// Reacts to the live `trips/{tripId}` query — not just this screen's own
   /// [_startRoute]/[_endRoute] calls. A trip that was already running when
@@ -100,10 +122,16 @@ class _DriverRouteState extends State<DriverRoute> {
     final schedule = _scheduleForTrip(trip);
     if (schedule == null) return;
     _selectedSchedule = schedule;
-    _buildLiveRoute(schedule).then((liveRoute) {
+    // From the trip, not the clock: rebuilding a morning run at noon after
+    // an app relaunch must not turn it into the ride home.
+    _buildLiveRoute(
+      schedule,
+      isPickup: trip.type == TripType.morning,
+    ).then((liveRoute) async {
       if (!mounted || liveRoute == null || _activeTrip?.id != trip.id) return;
-      _tracking.start(liveRoute);
-      setState(() {});
+      await _tracking.start(liveRoute);
+      await _startBroadcast(trip);
+      if (mounted) setState(() {});
     });
   }
 
@@ -115,8 +143,99 @@ class _DriverRouteState extends State<DriverRoute> {
 
   void _onGeofenceAlert() {
     final alerts = _geofence.alerts.value;
-    if (alerts.isNotEmpty) {
-      _notifSvc.fromGeofence(alerts.last);
+    if (alerts.isEmpty) return;
+    final alert = alerts.last;
+    _notifSvc.fromGeofence(alert);
+
+    // Arriving at the far end of the leg is the hand-over. Doing it here
+    // rather than waiting for the driver to close the round is what lets a
+    // family see "Reached" while the driver is still parking.
+    if (alert.event == GeofenceEvent.arrived &&
+        alert.stop.status == StopStatus.destination) {
+      unawaited(_handOverEveryoneAboard());
+    }
+  }
+
+  /// Marks everyone still aboard as handed over, once.
+  ///
+  /// Guarded because the geofence can fire `arrived` more than once while
+  /// the bus sits at the gate, and each repeat would be a pointless batch
+  /// write against the same documents.
+  Future<void> _handOverEveryoneAboard() async {
+    final trip = _activeTrip;
+    final uid = _session.uid;
+    if (trip == null || uid == null || _handingOver) return;
+    _handingOver = true;
+    try {
+      await TripRepository.instance.markRemainingDroppedOff(
+        tripId: trip.id,
+        markedBy: uid,
+      );
+    } catch (e) {
+      debugPrint('hand-over failed: $e');
+    } finally {
+      _handingOver = false;
+    }
+  }
+
+  /// Tells the driver, and each affected family, about children nobody
+  /// recorded either way.
+  ///
+  /// Silence here used to be indistinguishable from "nothing happened": the
+  /// family was left reading "waiting to board" for a ride that had already
+  /// finished, and the driver had no idea they had skipped anyone.
+  Future<void> _reportUnmarkedAttendance(Trip trip) async {
+    final uid = _session.uid;
+    if (uid == null) return;
+    try {
+      final missing = await TripRepository.instance.unmarkedStudents(trip.id);
+      if (missing.isEmpty) return;
+
+      final roster = <String, Student>{
+        for (final s in _session.roster.value) s.id: s,
+        for (final s in _session.routeStudents.value) s.id: s,
+      };
+      final names = <String>[];
+      for (final studentId in missing) {
+        final student = roster[studentId];
+        if (student == null) continue;
+        names.add(student.name);
+        final recipient = student.parentId.trim().isEmpty
+            ? student.id
+            : student.parentId.trim();
+        unawaited(
+          PushSender.instance.notifyOne(
+            recipient,
+            UserNotification(
+              id: '',
+              type: NotificationType.absent,
+              title: 'Attendance not recorded',
+              body:
+                  'Your driver did not mark ${student.name} on or off '
+                  "today's round. Please check with them.",
+              data: {'studentId': student.id},
+            ),
+          ),
+        );
+      }
+      if (names.isEmpty) return;
+      unawaited(
+        PushSender.instance.notifyOne(
+          uid,
+          UserNotification(
+            id: '',
+            type: NotificationType.absent,
+            title: 'You missed some attendance',
+            body:
+                '${names.length} student${names.length == 1 ? '' : 's'} were '
+                'never marked on this round: ${names.join(', ')}. Their '
+                'families have been told.',
+            data: {'tripId': trip.id, 'route': '/driver/attendance'},
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('unmarked attendance report failed: $e');
     }
   }
 
@@ -137,8 +256,13 @@ class _DriverRouteState extends State<DriverRoute> {
       origin: _tracking.busPosition.value,
       destination: destination.location,
     );
+    // No key, no network, no route found: the service falls back to its own
+    // along-the-polyline estimate, which is less accurate but never stale.
     if (!mounted || result == null) return;
-    setState(() => _liveDistance = result.distance);
+    _tracking.applyRouteEstimate(
+      meters: result.meters,
+      seconds: result.seconds,
+    );
   }
 
   Future<void> _toggleLive() async {
@@ -180,9 +304,33 @@ class _DriverRouteState extends State<DriverRoute> {
     if (schedules.isEmpty) return null;
     final wantsPickup = trip.type == TripType.morning;
     for (final s in schedules) {
-      if ((s.direction == ScheduleDirection.pickup) == wantsPickup) return s;
+      if (wantsPickup ? s.hasPickup : s.hasDropoff) return s;
     }
     return schedules.first;
+  }
+
+  /// Whether the leg being driven takes the children *to* their institute.
+  ///
+  /// A round is a pair now, so this is no longer a property of the round. A
+  /// running trip records which leg it is; for one about to start, the clock
+  /// decides — a driver tapping Start at 06:40 means the morning run and the
+  /// same driver at 13:20 means the way home, and asking them would be
+  /// asking a question the time already answers.
+  bool _legIsPickup(DriverSchedule schedule) {
+    if (!schedule.hasDropoff) return true;
+    if (!schedule.hasPickup) return false;
+    final now = TimeOfDay.now();
+    final minutes = now.hour * 60 + now.minute;
+    int distanceTo(String hhmm) {
+      final parts = hhmm.split(':');
+      final h = int.tryParse(parts.first);
+      final m = parts.length > 1 ? int.tryParse(parts[1]) : 0;
+      if (h == null || m == null) return 1 << 20;
+      return (minutes - (h * 60 + m)).abs();
+    }
+
+    return distanceTo(schedule.pickupStart) <=
+        distanceTo(schedule.dropoffStart);
   }
 
   /// Builds a real [RouteData] for [schedule] from this driver's actual
@@ -190,14 +338,15 @@ class _DriverRouteState extends State<DriverRoute> {
   /// `MockRouteBuilder.buildMorningRoute()`. Returns null when there isn't
   /// enough real data to build anything meaningful (no roster, or nobody on
   /// this round has a pickup/drop-off pin).
-  Future<RouteData?> _buildLiveRoute(DriverSchedule schedule) async {
+  Future<RouteData?> _buildLiveRoute(
+    DriverSchedule schedule, {
+    required bool isPickup,
+  }) async {
     final driver = _session.driver.value;
     if (driver == null) return null;
 
     final roster = _rosterForSchedule(schedule);
     if (roster.isEmpty) return null;
-
-    final isPickup = schedule.direction == ScheduleDirection.pickup;
 
     // Where "school" is, for whichever end of the round isn't the students'
     // homes. A driver may serve several institutions; the first one with a
@@ -213,33 +362,45 @@ class _DriverRouteState extends State<DriverRoute> {
     }
     destination ??= driver.baseLocation;
 
+    // This leg's own clock. The round holds both pairs; stamping the
+    // morning times onto the way home would have every stop on the
+    // afternoon run read as hours late.
+    final legStart = isPickup ? schedule.pickupStart : schedule.dropoffStart;
+    final legEnd = isPickup ? schedule.pickupEnd : schedule.dropoffEnd;
+
     final stops = <StopData>[];
     if (!isPickup && destination != null) {
-      stops.add(StopData(
-        name: destinationName,
-        location: destination,
-        scheduledTime: schedule.startTime,
-      ));
+      stops.add(
+        StopData(
+          name: destinationName,
+          location: destination,
+          scheduledTime: legStart,
+        ),
+      );
     }
     for (final s in roster) {
       // Pickup collects a child from home; drop-off delivers them back —
       // the same point would be wrong for the other direction.
       final point = isPickup ? s.pickupLocation : s.dropoffLocation;
       if (point == null) continue;
-      stops.add(StopData(
-        name: s.name,
-        location: point,
-        scheduledTime: isPickup ? schedule.startTime : schedule.endTime,
-        studentCount: 1,
-        note: isPickup ? 'Pickup' : 'Drop-off',
-      ));
+      stops.add(
+        StopData(
+          name: s.name,
+          location: point,
+          scheduledTime: isPickup ? legStart : legEnd,
+          studentCount: 1,
+          note: isPickup ? 'Pickup' : 'Drop-off',
+        ),
+      );
     }
     if (isPickup && destination != null) {
-      stops.add(StopData(
-        name: destinationName,
-        location: destination,
-        scheduledTime: schedule.endTime,
-      ));
+      stops.add(
+        StopData(
+          name: destinationName,
+          location: destination,
+          scheduledTime: legEnd,
+        ),
+      );
     }
     if (stops.isEmpty) return null;
     // Whichever end is "school" (or, failing that, the last child) never
@@ -290,7 +451,8 @@ class _DriverRouteState extends State<DriverRoute> {
         return;
       }
 
-      final liveRoute = await _buildLiveRoute(schedule);
+      final isPickup = _legIsPickup(schedule);
+      final liveRoute = await _buildLiveRoute(schedule, isPickup: isPickup);
       if (!mounted) return;
       if (liveRoute == null) {
         _showSnack(
@@ -304,17 +466,41 @@ class _DriverRouteState extends State<DriverRoute> {
       final trip = await TripRepository.instance.startTrip(
         route: adminRoute ?? BusRoute(id: '', name: schedule.label),
         driverId: uid,
-        busId: _session.bus.value?.id ?? '',
-        type: schedule.direction == ScheduleDirection.pickup
-            ? TripType.morning
-            : TripType.afternoon,
+        // Same fallback `_startBroadcast` uses for the RTDB key, and that
+        // is the point: a watching parent resolves the bus to follow from
+        // `trip.busId`. With '' here, a self-signup driver with no admin
+        // `Bus` document broadcast under their uid while the trip pointed at
+        // nothing, so the family had no way to find the live position.
+        busId: _session.bus.value?.id ?? uid,
+        type: isPickup ? TripType.morning : TripType.afternoon,
         students: roster,
       );
 
       _selectedSchedule = schedule;
-      _tracking.start(liveRoute);
+      final live = await _tracking.start(liveRoute);
+      await _startBroadcast(trip);
       if (!mounted) return;
       setState(() => _activeTrip = trip);
+      if (!live) {
+        // Name the actual block and offer the screen that fixes it, rather
+        // than telling the driver to go hunting in settings.
+        if (mounted) {
+          await ensureLocationOrExplain(context, accent: AppTheme.driverCyan);
+        }
+      }
+    } on FirebaseException catch (e) {
+      // "Please try again" is useless advice for the one failure that
+      // actually happens here: rules that have not been deployed, or a
+      // signed-in account whose `users/{uid}.role` is not `driver`. Name it.
+      if (mounted) {
+        _showSnack(
+          e.code == 'permission-denied'
+              ? 'The server refused to open this trip. Your account may not '
+                    'be registered as a driver, or the Firestore rules need '
+                    'deploying.'
+              : 'Could not start the route (${e.code}).',
+        );
+      }
     } catch (e) {
       if (mounted) {
         _showSnack('Could not start the route. Please try again.');
@@ -324,6 +510,24 @@ class _DriverRouteState extends State<DriverRoute> {
     }
   }
 
+  /// Starts publishing this trip's position for parents and the admin fleet
+  /// map. Falls back to the driver's own uid as the key for a self-signup
+  /// driver who has no admin-assigned `Bus` document — same rule the
+  /// dashboard's sharing toggle uses.
+  ///
+  /// Only broadcasts a real fix: pushing the simulation's invented position
+  /// out to families would be worse than showing them nothing.
+  Future<void> _startBroadcast(Trip trip) async {
+    final uid = _session.uid;
+    if (uid == null || !_tracking.isLive.value) return;
+    if (!_svc.locationSharing.value) return;
+    await _tracking.startBroadcast(
+      busId: _session.bus.value?.id ?? uid,
+      driverId: uid,
+      tripId: trip.id,
+    );
+  }
+
   Future<void> _endRoute() async {
     final trip = _activeTrip;
     if (trip == null || _endingTrip) return;
@@ -331,19 +535,30 @@ class _DriverRouteState extends State<DriverRoute> {
     setState(() => _endingTrip = true);
     try {
       final schedule = _selectedSchedule ?? _scheduleForTrip(trip);
-      final verdict = schedule == null ? null : _onTimeVerdict(schedule);
+      final verdict = schedule == null
+          ? null
+          : _onTimeVerdict(
+              schedule,
+              isPickup: trip.type == TripType.morning,
+            );
+      // Anyone still marked aboard is handed over now, in case the
+      // destination had no pin for the geofence to catch.
+      await _handOverEveryoneAboard();
+      await _reportUnmarkedAttendance(trip);
       await TripRepository.instance.endTrip(
         trip.id,
         onTime: verdict?.$1,
         delayMinutes: verdict?.$2,
       );
+      // `stop()` ends the broadcast as well, so the bus disappears from
+      // every watching parent's map the moment the round is closed.
       _tracking.stop();
       _geofence.reset();
       if (!mounted) return;
       setState(() {
         _activeTrip = null;
         _selectedSchedule = null;
-        _liveDistance = null;
+
       });
     } catch (e) {
       if (mounted) {
@@ -354,10 +569,12 @@ class _DriverRouteState extends State<DriverRoute> {
     }
   }
 
-  /// `(onTime, delayMinutes)` from comparing now against [schedule]'s
-  /// scheduled end time. Null when that time can't be parsed.
-  (bool, int)? _onTimeVerdict(DriverSchedule schedule) {
-    final parts = schedule.endTime.split(':');
+  /// `(onTime, delayMinutes)` from comparing now against the scheduled end
+  /// of the leg that was actually driven. Null when that time can't be
+  /// parsed, or when the round does not time that leg.
+  (bool, int)? _onTimeVerdict(DriverSchedule schedule, {required bool isPickup}) {
+    final end = isPickup ? schedule.pickupEnd : schedule.dropoffEnd;
+    final parts = end.split(':');
     if (parts.length < 2) return null;
     final h = int.tryParse(parts[0]);
     final m = int.tryParse(parts[1]);
@@ -369,7 +586,9 @@ class _DriverRouteState extends State<DriverRoute> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -379,9 +598,22 @@ class _DriverRouteState extends State<DriverRoute> {
     _tracking.busPosition.removeListener(_onBusPositionChanged);
     _geofence.alerts.removeListener(_onGeofenceAlert);
     _distanceTimer?.cancel();
-    _tripSub?.cancel();
-    _tracking.stop();
-    _geofence.reset();
+    ActiveTripService.instance.trip.removeListener(_onActiveTripFromService);
+    // An open trip keeps tracking and broadcasting while the driver is on
+    // another tab. Stopping unconditionally here blanked the bus off every
+    // watching parent's map the moment the driver opened their messages,
+    // and only brought it back when they navigated to this screen again.
+    if (_activeTrip == null) {
+      // Deferred, not immediate: both of these publish to notifiers that
+      // other mounted screens are listening to (the dashboard's live stat
+      // cards watch `liveRevision`), and writing to them while Flutter has
+      // the element tree locked for this teardown throws
+      // "markNeedsBuild() called when widget tree was locked". The trip is
+      // already over, so a microtask later is not observable.
+      _tracking.stopAfterFrame();
+      final geofence = _geofence;
+      scheduleMicrotask(geofence.reset);
+    }
     super.dispose();
   }
 
@@ -486,18 +718,46 @@ class _DriverRouteState extends State<DriverRoute> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          // Title, both toggles and the speed read-out need
+                          // ~344px of the 294px this card gives them, so the
+                          // single Row they used to share overflowed by 50px
+                          // on every phone. Two lines: the speed stays beside
+                          // the title where it is glanced at, the toggles sit
+                          // under it.
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                AppStrings.t('live_route_map'),
-                                style: TextStyle(
-                                  color: context.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
                               Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      AppStrings.t('live_route_map'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ValueListenableBuilder<int>(
+                                    valueListenable: _tracking.avgSpeed,
+                                    builder: (_, spd, _) => Text(
+                                      '⚡ $spd km/h',
+                                      style: const TextStyle(
+                                        color: AppTheme.driverAccent,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   // Follow-camera toggle
                                   GestureDetector(
@@ -566,8 +826,8 @@ class _DriverRouteState extends State<DriverRoute> {
                                           _togglingLive
                                               ? '…'
                                               : (isLive
-                                                  ? '📡 Live GPS'
-                                                  : '🧪 Simulated'),
+                                                    ? '📡 Live GPS'
+                                                    : '🧪 Simulated'),
                                           style: TextStyle(
                                             color: isLive
                                                 ? AppTheme.success
@@ -576,22 +836,6 @@ class _DriverRouteState extends State<DriverRoute> {
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  const Text(
-                                    '⚡ ',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                  ValueListenableBuilder<int>(
-                                    valueListenable: _tracking.speed,
-                                    builder: (_, spd, _) => Text(
-                                      '$spd km/h',
-                                      style: const TextStyle(
-                                        color: AppTheme.driverAccent,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ),
@@ -685,32 +929,45 @@ class _DriverRouteState extends State<DriverRoute> {
                   const SizedBox(height: 12),
 
                   // ── Live stats bar ────────────────────────────────────
-                  Row(
-                    children: [
-                      ValueListenableBuilder<int>(
-                        valueListenable: _tracking.etaMinutes,
-                        builder: (_, eta, _) => _LiveStatCard(
-                          icon: '⏱️',
-                          label: AppStrings.t('eta_school'),
-                          value: '$eta min',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _LiveStatCard(
-                        icon: '📏',
-                        label: AppStrings.t('distance_left'),
-                        value: _liveDistance ?? '—',
-                      ),
-                      const SizedBox(width: 10),
-                      ValueListenableBuilder<int>(
-                        valueListenable: _tracking.speed,
-                        builder: (_, spd, _) => _LiveStatCard(
-                          icon: '⚡',
-                          label: AppStrings.t('avg_speed'),
-                          value: '$spd km/h',
-                        ),
-                      ),
-                    ],
+                  // One builder for all three, driven by `liveRevision` —
+                  // the notifier that fires whenever any live figure moves.
+                  // Watching `etaMinutes` instead (as this used to) meant the
+                  // distance and speed cards only repainted on the minute.
+                  ValueListenableBuilder<int>(
+                    valueListenable: _tracking.liveRevision,
+                    builder: (_, _, _) {
+                      final running = _tracking.route != null;
+                      final eta = _tracking.etaMinutes.value;
+                      return Row(
+                        children: [
+                          _LiveStatCard(
+                            icon: '⏱️',
+                            label: AppStrings.t('eta_school'),
+                            // An honest dash beats "0 min", which reads as
+                            // "you have arrived" when nothing is running.
+                            value: !running
+                                ? '—'
+                                : eta <= 0
+                                ? AppStrings.t('arriving_now')
+                                : '$eta min',
+                          ),
+                          const SizedBox(width: 10),
+                          _LiveStatCard(
+                            icon: '📏',
+                            label: AppStrings.t('distance_left'),
+                            value: _tracking.distanceLabel ?? '—',
+                          ),
+                          const SizedBox(width: 10),
+                          _LiveStatCard(
+                            icon: '⚡',
+                            label: AppStrings.t('avg_speed'),
+                            value: running
+                                ? '${_tracking.avgSpeed.value} km/h'
+                                : '—',
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
 
@@ -811,7 +1068,9 @@ class _DriverRouteState extends State<DriverRoute> {
               decoration: BoxDecoration(
                 color: AppTheme.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.error.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: AppTheme.error.withValues(alpha: 0.4),
+                ),
               ),
               child: _endingTrip
                   ? const SizedBox(
@@ -966,7 +1225,7 @@ class _LiveStatCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 16)),
+            AppGlyph(icon, size: 16),
             const SizedBox(height: 4),
             Text(
               value,

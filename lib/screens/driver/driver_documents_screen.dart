@@ -11,6 +11,17 @@ import '../../data/user_repository.dart';
 import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
+
+/// The documents a driver must have verified before they count as checked
+/// out.
+///
+/// `DocumentType` still carries `routePermit` and `schoolContract` — older
+/// submissions keep rendering in the admin app — but this project does not
+/// ask for either, so neither is offered here nor counted towards
+/// verification.
+List<DocumentType> get kRequiredDriverDocuments =>
+    _kDocMeta.keys.toList(growable: false);
 
 const _kDocMeta = <DocumentType, (String icon, String title, String hint)>{
   DocumentType.drivingLicense: (
@@ -28,20 +39,10 @@ const _kDocMeta = <DocumentType, (String icon, String title, String hint)>{
     'Insurance Certificate',
     'Upload your current insurance document',
   ),
-  DocumentType.routePermit: (
-    '📋',
-    'Route Permit',
-    'Photo of the route permit issued by authority',
-  ),
   DocumentType.medicalFitness: (
     '🩺',
     'Medical Fitness Certificate',
     'Medical fitness certificate from a registered doctor',
-  ),
-  DocumentType.schoolContract: (
-    '🏫',
-    'School Contract',
-    'Signed contract document from the school',
   ),
 };
 
@@ -69,16 +70,13 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     LanguageProvider.instance.addListener(_rebuild);
     final driverId = SessionService.instance.uid;
     if (driverId != null) {
-      _repo.watchDriverDocuments(driverId).listen(
-        (docs) {
-          if (!mounted) return;
-          setState(() {
-            _all = docs;
-            _loaded = true;
-          });
-        },
-        onError: (Object e) => debugPrint('driver documents stream: $e'),
-      );
+      _repo.watchDriverDocuments(driverId).listen((docs) {
+        if (!mounted) return;
+        setState(() {
+          _all = docs;
+          _loaded = true;
+        });
+      }, onError: (Object e) => debugPrint('driver documents stream: $e'));
     }
   }
 
@@ -97,14 +95,17 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     for (final d in _all) {
       if (d.type != type) continue;
       if (best == null ||
-          (d.uploadedAt ?? DateTime(0)).isAfter(best.uploadedAt ?? DateTime(0))) {
+          (d.uploadedAt ?? DateTime(0)).isAfter(
+            best.uploadedAt ?? DateTime(0),
+          )) {
         best = d;
       }
     }
     return best;
   }
 
-  bool get _isApproved => SessionService.instance.driver.value?.isApproved ?? false;
+  bool get _isApproved =>
+      SessionService.instance.driver.value?.isApproved ?? false;
 
   int get _verifiedCount => _kDocMeta.keys
       .where((t) => _latest(t)?.status == DocumentStatus.verified)
@@ -114,12 +115,10 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
       .where((t) => _latest(t)?.status == DocumentStatus.pending)
       .length;
 
-  int get _missingCount => _kDocMeta.keys
-      .where((t) {
-        final d = _latest(t);
-        return d == null || d.status == DocumentStatus.rejected;
-      })
-      .length;
+  int get _missingCount => _kDocMeta.keys.where((t) {
+    final d = _latest(t);
+    return d == null || d.status == DocumentStatus.rejected;
+  }).length;
 
   Future<void> _pickFile(DocumentType type) async {
     final meta = _kDocMeta[type]!;
@@ -315,7 +314,8 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                                   icon: meta.$1,
                                   title: meta.$2,
                                   hint: meta.$3,
-                                  status: doc?.status ?? DocumentStatus.notUploaded,
+                                  status:
+                                      doc?.status ?? DocumentStatus.notUploaded,
                                   fileName: doc?.fileName,
                                   uploading: _uploading.contains(type),
                                   rejectionReason: doc?.rejectionReason,
@@ -395,9 +395,7 @@ class _EligibilityBanner extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 20)),
-            ),
+            child: Center(child: AppGlyph(icon, size: 20)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -469,9 +467,7 @@ class _DocCard extends StatelessWidget {
                   color: AppTheme.driverCyan.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Center(
-                  child: Text(icon, style: const TextStyle(fontSize: 22)),
-                ),
+                child: Center(child: AppGlyph(icon, size: 22)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -904,7 +900,7 @@ class _SummaryPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
+        AppGlyph(icon, size: 20, color: color),
         const SizedBox(height: 4),
         Text(
           value,

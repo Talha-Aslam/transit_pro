@@ -78,8 +78,11 @@ class UserRepository {
 
   /// Every child belonging to one parent. This is what the parent dashboard's
   /// child selector binds to.
-  Stream<List<Student>> watchChildren(String parentId) =>
-      Db.students.where('parentId', isEqualTo: parentId).snapshots().docsList;
+  Stream<List<Student>> watchChildren(String parentId) => Db.students
+      .where('parentId', isEqualTo: parentId)
+      .snapshots()
+      .docsList
+      .map((list) => list.where((s) => !s.isDeleted).toList());
 
   Future<List<Student>> fetchChildren(String parentId) async {
     final snap = await Db.students.where('parentId', isEqualTo: parentId).get();
@@ -197,8 +200,17 @@ class UserRepository {
   /// admin-assigned route", which is empty for a driver who signed themselves up
   /// and runs their own rounds. This is the roster that actually exists in the
   /// pilot.
-  Stream<List<Student>> watchRoster(String driverId) =>
-      Db.students.where('driverId', isEqualTo: driverId).snapshots().docsList;
+  /// The children currently riding with [driverId].
+  ///
+  /// Archived children are filtered here rather than in the query: the
+  /// `driverId` equality is served by Firestore's automatic index, and
+  /// adding `isDeleted` to it would demand a composite index for a list
+  /// that holds a handful of documents.
+  Stream<List<Student>> watchRoster(String driverId) => Db.students
+      .where('driverId', isEqualTo: driverId)
+      .snapshots()
+      .docsList
+      .map((list) => list.where((s) => !s.isDeleted).toList());
 
   // ── Driver discovery ──────────────────────────────────────────────────────
 
@@ -248,6 +260,10 @@ class UserRepository {
     final from = student.pickupLocation;
 
     for (final d in candidates) {
+      // An admin archiving a driver has to mean something on this side too:
+      // without this the driver kept appearing in every family's search and
+      // could still be sent seat requests.
+      if (d.isDeleted) continue;
       if (d.status == DriverStatus.suspended) continue;
       if (!d.coversLocation(from)) continue;
 

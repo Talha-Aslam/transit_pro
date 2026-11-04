@@ -37,6 +37,14 @@ class AppNotification {
   /// Deep-link payload from the sender, e.g. `{'route': '/driver/ride-requests'}`.
   final Map<String, dynamic> data;
 
+  /// The domain type this came from, or null for a device-local item.
+  ///
+  /// [type] is one of three display buckets (`alert` / `success` / `info`),
+  /// which is all the filter chips need but not enough to act on: a chat
+  /// message and a fee reminder are both `info`, and only one of them should
+  /// open a conversation when tapped.
+  final NotificationType? kind;
+
   AppNotification({
     required this.id,
     required this.type,
@@ -49,10 +57,12 @@ class AppNotification {
     this.read = false,
     this.docId,
     this.data = const {},
+    this.kind,
   });
 
   AppNotification copyWith({bool? read}) => AppNotification(
     id: id,
+    kind: kind,
     type: type,
     icon: icon,
     title: title,
@@ -98,6 +108,16 @@ class NotificationService {
   /// Doc ids already seen on this stream, so a reconnect or an unrelated field
   /// update on an existing item never re-fires its banner.
   Set<String> _seenRemoteIds = {};
+
+  /// Doc ids FCM has already put on screen. The inbox stream skips raising
+  /// its own banner for these.
+  ///
+  /// Both paths deliver the same document: the stream sees the Firestore
+  /// write, FCM carries a push for it. While the app is backgrounded but
+  /// still running, both can land, and the user is told twice about one
+  /// event. Whichever arrives first wins; this is how the other one knows
+  /// to stay quiet.
+  final Set<String> _deliveredByPush = {};
 
   /// True until the first snapshot for the current bind has been processed.
   /// Without this, every notification already sitting in the inbox at sign-in
@@ -166,6 +186,7 @@ class NotificationService {
               for (final n in incoming) {
                 if (n.docId != null &&
                     !_seenRemoteIds.contains(n.docId) &&
+                    !_deliveredByPush.contains(n.docId) &&
                     !n.read) {
                   unawaited(_pushSystemNotification(n));
                 }
@@ -188,6 +209,19 @@ class NotificationService {
         );
   }
 
+  /// Records that FCM has shown [docId], so the inbox stream does not show
+  /// it again a moment later. Called from the `onMessage` handler.
+  void noteDeliveredByPush(String? docId) {
+    if (docId == null || docId.isEmpty) return;
+    _deliveredByPush.add(docId);
+    // The set only has to outlive the race between the two paths, which is
+    // seconds. Capping it keeps a long session from accumulating every id
+    // the account has ever received.
+    if (_deliveredByPush.length > 200) {
+      _deliveredByPush.remove(_deliveredByPush.first);
+    }
+  }
+
   /// Called on sign-out. Drops both lists: notifications are per-account, and
   /// leaving them would show one family's alerts to the next person to sign in on
   /// a shared phone.
@@ -198,6 +232,7 @@ class NotificationService {
     _remote = const [];
     _local = const [];
     _seenRemoteIds = {};
+    _deliveredByPush.clear();
     _isFirstSnapshot = true;
     _publish();
   }
@@ -208,14 +243,22 @@ class NotificationService {
   /// already in the stream that fed [_publish], so adding it again would
   /// duplicate it in the list.
   Future<void> _pushSystemNotification(AppNotification n) async {
-    const androidDetails = AndroidNotificationDetails(
-      'transit_pro_channel',
-      'Transit Pro',
-      channelDescription: 'Bus tracking notifications',
-      importance: Importance.high,
-      priority: Priority.high,
+    // An SOS gets its own channel at maximum importance, so it is louder
+    // than a fee reminder and keeps that ranking even after the user has
+    // turned the ordinary channel down — per-channel settings are the only
+    // thing Android lets them tune separately.
+    final urgent = n.kind == NotificationType.emergency;
+    final androidDetails = AndroidNotificationDetails(
+      urgent ? 'transit_pro_emergency' : 'transit_pro_channel',
+      urgent ? 'Emergencies' : 'Transit Pro',
+      channelDescription: urgent
+          ? 'SOS and emergency alerts from your driver'
+          : 'Bus tracking notifications',
+      importance: urgent ? Importance.max : Importance.high,
+      priority: urgent ? Priority.max : Priority.high,
+      category: urgent ? AndroidNotificationCategory.alarm : null,
     );
-    const details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(android: androidDetails);
     // Plugin notification ids are 32-bit; a docId's hashCode can exceed that
     // range, so fold it down rather than truncating silently.
     final notifId = n.docId.hashCode & 0x7fffffff;
@@ -241,6 +284,7 @@ class NotificationService {
           created?.millisecondsSinceEpoch ??
           DateTime.now().millisecondsSinceEpoch,
       type: _uiTypeFor(n.type),
+      kind: n.type,
       icon: icon,
       title: n.title,
       message: n.body,

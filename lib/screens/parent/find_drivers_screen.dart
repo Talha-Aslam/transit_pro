@@ -6,8 +6,11 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/ride_match_service.dart';
 import '../../app/session_service.dart';
 import '../../data/ride_request_repository.dart';
+import '../../app/round_display.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 /// Driver recommendations for one child, and the place a family asks for a seat.
 ///
@@ -139,24 +142,75 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
     }
   }
 
+  /// Withdraws a request, or gives up a seat already held.
+  ///
+  /// They are different things to the data — one has never cost the driver a
+  /// seat, the other has to hand one back — but to a parent they are the
+  /// same decision, so one button covers both and this picks the right
+  /// write. Giving up a confirmed seat asks first; withdrawing a request
+  /// nobody has answered does not need to.
   Future<void> _cancel(RideRequest request) async {
+    if (request.isAccepted) {
+      final sure = await _confirmGiveUpSeat(request);
+      if (sure != true) return;
+    }
     try {
-      await RideMatchService.instance.cancelRequest(request);
+      if (request.isAccepted) {
+        await RideMatchService.instance.giveUpSeat(request);
+      } else {
+        await RideMatchService.instance.cancelRequest(request);
+      }
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Request withdrawn.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            request.isAccepted
+                ? 'Seat given up. You can request another driver now.'
+                : 'Request withdrawn.',
+          ),
+        ),
+      );
     } catch (e) {
-      debugPrint('cancelRequest failed: $e');
+      debugPrint('cancel/giveUpSeat failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not withdraw that request.'),
+          content: Text('Could not save that. Check your connection.'),
           backgroundColor: AppTheme.error,
         ),
       );
     }
   }
+
+  Future<bool?> _confirmGiveUpSeat(RideRequest request) => showDialog<bool>(
+    context: context,
+    builder: (dCtx) => AlertDialog(
+      backgroundColor: dCtx.cardBg,
+      title: Text(
+        'Give up this seat?',
+        style: TextStyle(color: dCtx.textPrimary, fontSize: 17),
+      ),
+      content: Text(
+        '${request.studentName} will stop riding with '
+        '${request.driverName} straight away, and the seat goes back to '
+        'the driver. You can request another driver afterwards.',
+        style: TextStyle(color: dCtx.textSecondary, fontSize: 13),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dCtx, false),
+          child: const Text('Keep it'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dCtx, true),
+          child: const Text(
+            'Give up seat',
+            style: TextStyle(color: AppTheme.error),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Future<_RoundChoice?> _pickRound(DriverMatch match, Student student) {
     final noteCtrl = TextEditingController();
@@ -207,7 +261,9 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pick the round that fits their timings. '
+                    'One round covers both ways — to '
+                    '${student.school.isEmpty ? 'their institute' : student.school} '
+                    'and back home again, on one seat. '
                     '${match.driver.name} decides whether to accept.',
                     style: TextStyle(
                       color: innerCtx.textSecondary,
@@ -215,7 +271,7 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  ...match.driver.orderedSchedules.map((r) {
+                  ...roundsServing(match.driver, student.school).map((r) {
                     final free = r.hasSpace;
                     final isSelected = selected?.id == r.id;
                     return GestureDetector(
@@ -264,11 +320,12 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
-                                    '${r.directionLabel} · ${r.timeRange}',
+                                    roundSummary(r),
                                     style: TextStyle(
                                       color: innerCtx.textSecondary,
-                                      fontSize: 11,
+                                      fontSize: 11.5,
                                     ),
                                   ),
                                 ],
@@ -584,6 +641,7 @@ class _MatchList extends StatelessWidget {
             return _DriverMatchCard(
               match: match,
               accent: accent,
+              institute: student.school,
               existing: existing,
               busy: busyDriverId == match.driver.id,
               onRequest: () => onRequest(match),
@@ -595,6 +653,17 @@ class _MatchList extends StatelessWidget {
     );
   }
 }
+
+/// The rounds of [driver] that carry children to [institute].
+///
+/// A driver's rounds do not all go to the same place: one run can drop half
+/// the children at a university and the rest at a college, and the next run
+/// may serve neither. Offering a family every round would let them book a
+/// seat on a trip that never passes their child's gate. A round with no
+/// institutes listed is taken to serve all of them, which is what every
+/// round saved before the field existed looks like.
+List<DriverSchedule> roundsServing(Driver driver, String institute) =>
+    driver.orderedSchedules.where((r) => r.serves(institute)).toList();
 
 class _DriverMatchCard extends StatelessWidget {
   final DriverMatch match;
@@ -610,6 +679,10 @@ class _DriverMatchCard extends StatelessWidget {
   final VoidCallback onRequest;
   final VoidCallback? onCancel;
 
+  /// Where this child studies, so the card lists only the rounds that go
+  /// there rather than every round the driver runs.
+  final String institute;
+
   const _DriverMatchCard({
     required this.match,
     required this.accent,
@@ -617,7 +690,10 @@ class _DriverMatchCard extends StatelessWidget {
     required this.busy,
     required this.onRequest,
     required this.onCancel,
+    required this.institute,
   });
+
+  List<DriverSchedule> get _rounds => roundsServing(match.driver, institute);
 
   @override
   Widget build(BuildContext context) {
@@ -644,7 +720,13 @@ class _DriverMatchCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: const Text('🧑‍✈️', style: TextStyle(fontSize: 22)),
+                  child: AvatarImage(
+                    localFile: null,
+                    photoUrl: d.photoUrl,
+                    size: 48,
+                    borderRadius: BorderRadius.circular(24),
+                    fallback: const Text('🧑‍✈️', style: TextStyle(fontSize: 22)),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -704,7 +786,7 @@ class _DriverMatchCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            if (match.driver.orderedSchedules.isNotEmpty) ...[
+            if (_rounds.isNotEmpty) ...[
               Text(
                 'ROUNDS',
                 style: TextStyle(
@@ -718,7 +800,7 @@ class _DriverMatchCard extends StatelessWidget {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: match.driver.orderedSchedules.map((r) {
+                children: _rounds.map((r) {
                   final color = r.hasSpace ? AppTheme.success : AppTheme.error;
                   return Container(
                     padding: const EdgeInsets.symmetric(
@@ -731,7 +813,7 @@ class _DriverMatchCard extends StatelessWidget {
                       border: Border.all(color: color.withValues(alpha: 0.28)),
                     ),
                     child: Text(
-                      '${r.directionLabel} ${r.timeRange} · '
+                      '${roundSummary(r)} · '
                       '${r.hasSpace ? '${r.availableSeats} free' : 'full'}',
                       style: TextStyle(
                         color: context.textSecondary,
@@ -753,10 +835,37 @@ class _DriverMatchCard extends StatelessWidget {
                 ),
               )
             else if (booked)
-              _Banner(
-                color: AppTheme.success,
-                icon: Icons.check_circle_rounded,
-                text: 'Seat confirmed on ${existing!.scheduleLabel}',
+              Column(
+                children: [
+                  _Banner(
+                    color: AppTheme.success,
+                    icon: Icons.check_circle_rounded,
+                    text: 'Seat confirmed on ${existing!.scheduleLabel}',
+                  ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: onCancel,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.error.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: const Text(
+                        'Give up this seat',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppTheme.error,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               )
             else if (pending)
               Column(
@@ -938,7 +1047,7 @@ class _Message extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 40)),
+            AppGlyph(emoji, size: 40),
             const SizedBox(height: 16),
             Text(
               title,

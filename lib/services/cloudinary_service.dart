@@ -55,9 +55,9 @@ class CloudinaryService {
   bool get isConfigured => AppConfig.hasCloudinary;
 
   Uri _endpoint(String resourceType) => Uri.parse(
-        'https://api.cloudinary.com/v1_1/'
-        '${AppConfig.cloudinaryCloudName}/$resourceType/upload',
-      );
+    'https://api.cloudinary.com/v1_1/'
+    '${AppConfig.cloudinaryCloudName}/$resourceType/upload',
+  );
 
   /// Uploads [file] and returns its URL.
   ///
@@ -91,11 +91,14 @@ class CloudinaryService {
     request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
     try {
-      final streamed = await request.send().timeout(const Duration(seconds: 60));
+      final streamed = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
       final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final reason = _extractError(response.body) ?? 'HTTP ${response.statusCode}';
+        final reason =
+            _extractError(response.body) ?? 'HTTP ${response.statusCode}';
         throw UploadException('Upload failed: $reason');
       }
 
@@ -134,8 +137,11 @@ class CloudinaryService {
   Future<UploadResult> uploadProfilePhoto(File file, String uid) =>
       upload(file, folder: 'transitpro/profiles');
 
-  Future<UploadResult> uploadDriverDocument(File file, String driverId, String docType) =>
-      upload(file, folder: 'transitpro/driver_documents');
+  Future<UploadResult> uploadDriverDocument(
+    File file,
+    String driverId,
+    String docType,
+  ) => upload(file, folder: 'transitpro/driver_documents');
 
   Future<UploadResult> uploadPaymentSlip(File file, String paymentId) =>
       upload(file, folder: 'transitpro/payment_slips');

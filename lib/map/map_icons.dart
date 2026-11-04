@@ -8,11 +8,11 @@ import '../theme/app_theme.dart';
 /// Rasterises the bus icon and the five stop-status pins once, app-wide, and
 /// caches the PNG bytes.
 ///
-/// Mapbox's [PointAnnotationOptions.image] takes raw bitmap bytes with no
-/// scale parameter — a 52×52 PNG renders as 52 *device* pixels, not 52
-/// logical ones, so on a 3x phone the icon would come out a third of its
-/// intended size. Callers rasterise at `baseSize * devicePixelRatio` and
-/// compensate with `iconSize: 1 / devicePixelRatio`.
+/// `BitmapDescriptor.bytes` takes raw bitmap bytes plus an
+/// `imagePixelRatio` — without it a 52×52 PNG renders as 52 *device*
+/// pixels, not 52 logical ones, so on a 3x phone the icon would come out a
+/// third of its intended size. Callers rasterise at
+/// `baseSize * devicePixelRatio` and pass `dpr` as `imagePixelRatio`.
 class MapIcons {
   MapIcons._();
 
@@ -25,9 +25,9 @@ class MapIcons {
   static Future<Uint8List> bus(double dpr) =>
       _busCache.putIfAbsent(dpr, () => _drawBus(dpr));
 
-  /// A teardrop pin filled with [color], white stroke and inner dot — the
-  /// closest match to Google Maps' `defaultMarkerWithHue` pins, since Mapbox
-  /// has no built-in hue-tinted marker.
+  /// A teardrop pin filled with [color], white stroke and inner dot —
+  /// matches this app's own stop-status palette directly, rather than
+  /// `BitmapDescriptor.defaultMarkerWithHue`'s fixed hue wheel.
   static Future<Uint8List> pin(Color color, double dpr) {
     final key = '${color.toARGB32()}@$dpr';
     return _pinCache.putIfAbsent(key, () => _drawPin(color, dpr));
@@ -109,7 +109,10 @@ class MapIcons {
     return _toPng(recorder, size);
   }
 
-  static Future<Uint8List> _toPng(ui.PictureRecorder recorder, double size) async {
+  static Future<Uint8List> _toPng(
+    ui.PictureRecorder recorder,
+    double size,
+  ) async {
     final picture = recorder.endRecording();
     final sizeInt = size.isFinite && size > 0 ? size.round() : 52;
     final img = await picture.toImage(sizeInt, sizeInt);

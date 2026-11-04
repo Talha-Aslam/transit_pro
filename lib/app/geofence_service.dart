@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:transit_core/transit_core.dart';
@@ -97,6 +98,19 @@ class GeofenceService {
   }
 
   /// Reset all tracking state (e.g., when route restarts).
+
+  /// [reset], for a caller that is inside `State.dispose()`.
+  ///
+  /// Flutter locks the element tree while it tears a widget down, so writing
+  /// to a notifier another mounted builder is watching throws *"setState()
+  /// or markNeedsBuild() called when widget tree was locked"*. The same
+  /// hazard as `TrackingService.stopAfterFrame` — see that method for the
+  /// whole story. A microtask runs once the frame's synchronous work is
+  /// finished and the tree is unlocked again.
+  void resetAfterFrame() {
+    scheduleMicrotask(reset);
+  }
+
   void reset() {
     _firedApproaching.clear();
     _firedArrived.clear();

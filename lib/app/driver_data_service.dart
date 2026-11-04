@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../data/user_repository.dart';
+import 'dart:io';
+import '../services/cloudinary_service.dart';
 import 'session_service.dart';
 
 /// The driver's profile as the UI wants it: flat, pre-formatted strings.
@@ -256,6 +258,47 @@ class DriverDataService {
   /// Saves editable profile fields. Name, phone and email live on the user
   /// document; the driver document mirrors them so the admin app and parent
   /// screens can read a driver without a second lookup.
+  /// True while a profile photo is being uploaded, so the avatar can show a
+  /// spinner instead of looking saved before it is.
+  final uploadingPhoto = ValueNotifier<bool>(false);
+
+  /// Uploads [image] and writes the resulting URL onto the driver's record,
+  /// which every watching family reads through
+  /// `SessionService.driversById`.
+  ///
+  /// The local `ProfileService.driverImage` is still set by the caller so
+  /// the driver's own screen updates immediately; this is what makes the
+  /// change leave the device.
+  Future<void> updateDriverPhoto(File image) async {
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+
+    if (!CloudinaryService.instance.isConfigured) {
+      debugPrint('Cloudinary not configured — driver photo kept locally.');
+      return;
+    }
+
+    uploadingPhoto.value = true;
+    try {
+      final result = await CloudinaryService.instance.uploadProfilePhoto(
+        image,
+        uid,
+      );
+      await UserRepository.instance.updateDriver(uid, {
+        'photoUrl': result.secureUrl,
+      });
+      // The user document carries the photo too — the driver's own header
+      // and the admin fleet list read it from there.
+      await UserRepository.instance.updateUser(uid, {
+        'photoUrl': result.secureUrl,
+      });
+    } catch (e) {
+      debugPrint('driver photo upload failed: $e');
+    } finally {
+      uploadingPhoto.value = false;
+    }
+  }
+
   Future<void> updateDriverInfo(DriverInfo info) async {
     final uid = SessionService.instance.uid;
     if (uid == null) return;

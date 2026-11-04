@@ -1,21 +1,26 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart' hide MissedBusRequest;
 import '../../app/driver_data_service.dart';
+import '../../app/live_bus_service.dart';
 import '../../app/missed_bus_service.dart';
 import '../../app/notification_service.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
-import '../../app/tracking_service.dart';
 import '../../data/trip_repository.dart';
 import '../../data/user_repository.dart';
 import '../../models/missed_bus_request.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/absent_today_row.dart';
+import '../../widgets/ride_status_badge.dart';
 import '../../widgets/child_avatar_image.dart';
 import '../../widgets/find_driver_banner.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class ParentDashboard extends StatefulWidget {
   final void Function(int) onNavigate;
@@ -32,6 +37,14 @@ class ParentDashboard extends StatefulWidget {
 }
 
 class _ParentDashboardState extends State<ParentDashboard> {
+  /// The selected child's driver's running trip, straight from Firestore.
+  /// Null means no round is under way — which is a different thing from
+  /// "a round is under way but the bus has not reported in yet", and the ETA
+  /// card says so.
+  Trip? _activeTrip;
+  StreamSubscription<Trip?>? _tripSub;
+  String? _watchedDriverId;
+
   @override
   void initState() {
     super.initState();
@@ -41,10 +54,47 @@ class _ParentDashboardState extends State<ParentDashboard> {
   @override
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
+    _tripSub?.cancel();
+    LiveBusService.instance.stopAfterFrame();
     super.dispose();
   }
 
   void _onLangChanged() => setState(() {});
+
+  /// Subscribes to the assigned driver's active trip. Called from `build`,
+  /// so it must be a cheap no-op when the driver hasn't changed — same
+  /// pattern `parent_tracking.dart` uses.
+  void _ensureWatching(ChildInfo? child) {
+    final driverId = child?.driver;
+    if (driverId == _watchedDriverId) return;
+    _watchedDriverId = driverId;
+
+    _tripSub?.cancel();
+    _tripSub = null;
+    _activeTrip = null;
+    LiveBusService.instance.stop();
+
+    if (driverId == null || driverId.isEmpty) return;
+    _tripSub = TripRepository.instance
+        .watchActiveTripForDriver(driverId)
+        .listen((trip) => _onActiveTripChanged(trip, child));
+  }
+
+  void _onActiveTripChanged(Trip? trip, ChildInfo? child) {
+    if (!mounted) return;
+    setState(() => _activeTrip = trip);
+
+    if (trip == null || trip.busId.isEmpty) {
+      LiveBusService.instance.stop();
+      return;
+    }
+    // `trip.busId` is the same key the driver broadcasts under — see
+    // `_startRoute` in driver_route.dart.
+    LiveBusService.instance.follow(
+      busId: trip.busId,
+      destination: child?.dropoff,
+    );
+  }
 
   /// True once [child] is actually matched with a driver (`child.driver`
   /// holds the driver's uid) -- the signal that distinguishes a real,
@@ -111,128 +161,78 @@ class _ParentDashboardState extends State<ParentDashboard> {
                 ? 0
                 : selIdx.clamp(0, children.length - 1);
             final child = children.isEmpty ? null : children[safeIdx];
+            _ensureWatching(child);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 100),
               child: Column(
                 children: [
                   // â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppTheme.parentPurple.withValues(alpha: 0.2),
-                          Colors.transparent,
-                        ],
+                  // Same photographic banner the driver dashboard opens
+                  // on — see `DashboardHeader`. Replaces a purple-to-
+                  // transparent wash that only existed to give the greeting
+                  // something to sit on.
+                  DashboardHeader(
+                    greeting: greeting,
+                    body: ValueListenableBuilder(
+                      valueListenable: svc.parentInfo,
+                      builder: (_, info, _) => Text(
+                        info.name.split(' ').first,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ValueListenableBuilder(
-                            valueListenable: svc.parentInfo,
-                            builder: (_, info, _) => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text(
-                                      '👋',
-                                      style: TextStyle(fontSize: 18),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    ShaderMask(
-                                      shaderCallback: (bounds) =>
-                                          AppTheme.parentGradient.createShader(
-                                            Rect.fromLTWH(
-                                              0,
-                                              0,
-                                              bounds.width,
-                                              bounds.height,
-                                            ),
-                                          ),
-                                      blendMode: BlendMode.srcIn,
-                                      child: Text(
-                                        greeting,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  info.name.split(' ').first,
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
+                    trailing: GestureDetector(
+                      onTap: () => widget.onNavigate(3),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: context.cardBgElevated,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: context.inputBorder),
+                            ),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/images/notification_bell_off.png',
+                                width: 28,
+                                height: 28,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
                             ),
                           ),
-                        ),
-                        // Notification button
-                        GestureDetector(
-                          onTap: () => widget.onNavigate(3),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: context.cardBgElevated,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: context.inputBorder,
-                                  ),
+                          if (widget.unreadCount > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: const BoxDecoration(
+                                  color: AppTheme.error,
+                                  shape: BoxShape.circle,
                                 ),
                                 child: Center(
-                                  child: Image.asset(
-                                    'assets/images/notification_bell_off.png',
-                                    width: 28,
-                                    height: 28,
-                                    fit: BoxFit.contain,
-                                    filterQuality: FilterQuality.high,
+                                  child: Text(
+                                    '${widget.unreadCount}',
+                                    style: TextStyle(
+                                      color: context.textPrimary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
-                              if (widget.unreadCount > 0)
-                                Positioned(
-                                  top: -4,
-                                  right: -4,
-                                  child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: const BoxDecoration(
-                                      color: AppTheme.error,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '${widget.unreadCount}',
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                      ],
+                            ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -295,14 +295,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
 
                         // â”€â”€ Child status banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                         GlassCard(
-                          enableBlur: false,
-                          gradient: LinearGradient(
-                            colors: [
-                              AppTheme.success.withValues(alpha: 0.15),
-                              AppTheme.success.withValues(alpha: 0.05),
-                            ],
-                          ),
-                          borderColor: AppTheme.success.withValues(alpha: 0.25),
+                          accent: AppTheme.success,
                           padding: const EdgeInsets.all(18),
                           child: child == null
                               ? Center(
@@ -373,7 +366,9 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                               children: [
                                                 Text(
                                                   child.name.isEmpty
-                                                      ? 'Unnamed Child'
+                                                      ? AppStrings.t(
+                                                          'unnamed_child',
+                                                        )
                                                       : child.name,
                                                   style: TextStyle(
                                                     color: context.textPrimary,
@@ -398,25 +393,14 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          // Was hardcoded to "On the Bus"
-                                          // regardless of whether this
-                                          // child actually has a driver --
-                                          // `_isLinkedWithDriver` is the
-                                          // same real check the Live ETA
-                                          // card below already gates on.
-                                          _isLinkedWithDriver(child)
-                                              ? StatusBadge(
-                                                  label: AppStrings.t(
-                                                    'on_the_bus',
-                                                  ),
-                                                  color: AppTheme.success,
-                                                )
-                                              : StatusBadge(
-                                                  label: AppStrings.t(
-                                                    'unassigned_status',
-                                                  ),
-                                                  color: context.textTertiary,
-                                                ),
+                                          // Was "On the Bus" for any child
+                                          // who merely *had* a driver — so
+                                          // it said so at nine at night and
+                                          // an hour after the route ended.
+                                          // It now follows the driver's
+                                          // trip and the attendance marked
+                                          // on it. See ChildStatusService.
+                                          RideStatusBadge(studentId: child.id),
                                         ],
                                       ),
                                     ),
@@ -425,23 +409,21 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         ),
                         const SizedBox(height: 12),
 
+                        // ── Not riding today ───────────────────────────────
+                        if (child != null)
+                          AbsentTodayRow(
+                            studentId: child.id,
+                            childName: child.name,
+                          ),
+
                         // ── Live ETA card ──────────────────────────────────
                         // Hidden entirely until `child` is actually matched
                         // with a driver -- a new account with no ride ever
                         // arranged has no ETA to show, real or placeholder.
                         if (_isLinkedWithDriver(child)) ...[
                           GlassCard(
-                            enableBlur: false,
                             onTap: () => widget.onNavigate(1),
-                            gradient: LinearGradient(
-                              colors: [
-                                AppTheme.parentPurple.withValues(alpha: 0.2),
-                                AppTheme.parentIndigo.withValues(alpha: 0.08),
-                              ],
-                            ),
-                            borderColor: AppTheme.parentPurple.withValues(
-                              alpha: 0.25,
-                            ),
+                            accent: AppTheme.parentPurple,
                             padding: const EdgeInsets.all(13),
                             child: Row(
                               children: [
@@ -478,9 +460,18 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
+                                        // Joined with " - " unconditionally,
+                                        // so a child whose driver has no
+                                        // admin-assigned route showed
+                                        // "VBGVDBS -" with a dangling dash.
                                         child == null
                                             ? 'N/A'
-                                            : '${child.busNumber.toUpperCase()} - ${child.route.toUpperCase()}',
+                                            : [child.busNumber, child.route]
+                                                  .where(
+                                                    (p) => p.trim().isNotEmpty,
+                                                  )
+                                                  .map((p) => p.toUpperCase())
+                                                  .join(' - '),
                                         style: TextStyle(
                                           color: context.textSecondary,
                                           fontSize: 11,
@@ -502,12 +493,20 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                                     Color(0xFF60A5FA),
                                                   ],
                                                 ).createShader(b),
-                                            child: ValueListenableBuilder<int>(
-                                              valueListenable: TrackingService
+                                            // Was `TrackingService.etaMinutes`
+                                            // — a local notifier seeded with
+                                            // 8 that only the *driver's* own
+                                            // device ever advances, so this
+                                            // card read "8 min" with no trip
+                                            // running and "8 min" throughout
+                                            // one. It now reads the bus's own
+                                            // pings; see `LiveBusService`.
+                                            child: ValueListenableBuilder<int?>(
+                                              valueListenable: LiveBusService
                                                   .instance
                                                   .etaMinutes,
                                               builder: (_, eta, _) => Text(
-                                                '$eta min',
+                                                eta == null ? '--' : '$eta min',
                                                 style: TextStyle(
                                                   color: context.textPrimary,
                                                   fontSize: 30,
@@ -528,15 +527,44 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           ),
                                         ],
                                       ),
-                                      Text(
-                                        child == null
-                                            ? ''
-                                            : '\ud83d\udccd ${AppStrings.t('currently_at')} ${child.stop}',
-                                        style: TextStyle(
-                                          color: context.textSecondary,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      // Three honest states instead of one
+                                      // fixed line: no round running, round
+                                      // running but no fix yet, and a live
+                                      // fix with a distance to go.
+                                      ValueListenableBuilder<LiveLocation?>(
+                                        valueListenable:
+                                            LiveBusService.instance.position,
+                                        builder: (_, ping, _) {
+                                          final String line;
+                                          if (_activeTrip == null) {
+                                            line = AppStrings.t(
+                                              'route_not_started',
+                                            );
+                                          } else if (ping == null) {
+                                            line = AppStrings.t(
+                                              'waiting_for_bus',
+                                            );
+                                          } else {
+                                            final away = LiveBusService
+                                                .instance
+                                                .distanceLabel
+                                                .value;
+                                            line = away == null
+                                                ? AppStrings.t('on_the_move')
+                                                : '$away '
+                                                      '${AppStrings.t('away_suffix')}';
+                                          }
+                                          return Text(
+                                            line,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ],
                                   ),
@@ -585,16 +613,12 @@ class _ParentDashboardState extends State<ParentDashboard> {
                             return GestureDetector(
                               onTap: () => context.push('/parent/missed-bus'),
                               child: GlassCard(
-                                enableBlur: false,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppTheme.error.withValues(alpha: 0.15),
-                                    AppTheme.warning.withValues(alpha: 0.08),
-                                  ],
-                                ),
+                                accent: AppTheme.error,
+                                // The live alert keeps a heavier edge than
+                                // the rail gives on its own.
                                 borderColor: isActive
                                     ? AppTheme.error.withValues(alpha: 0.5)
-                                    : AppTheme.error.withValues(alpha: 0.2),
+                                    : null,
                                 padding: const EdgeInsets.all(16),
                                 child: Row(
                                   children: [
@@ -625,8 +649,12 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         children: [
                                           Text(
                                             isActive
-                                                ? 'Pickup in Progress…'
-                                                : 'Child Missed the Bus?',
+                                                ? AppStrings.t(
+                                                    'pickup_in_progress',
+                                                  )
+                                                : AppStrings.t(
+                                                    'child_missed_bus_q',
+                                                  ),
                                             style: TextStyle(
                                               color: context.textPrimary,
                                               fontSize: 14,
@@ -636,8 +664,12 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           const SizedBox(height: 2),
                                           Text(
                                             isActive
-                                                ? 'Searching for a nearby bus'
-                                                : 'Request a pickup from a nearby bus',
+                                                ? AppStrings.t(
+                                                    'searching_nearby_bus',
+                                                  )
+                                                : AppStrings.t(
+                                                    'request_nearby_pickup',
+                                                  ),
                                             style: TextStyle(
                                               color: context.textSecondary,
                                               fontSize: 11,
@@ -915,7 +947,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                         vertical: 6,
                                       ),
                                       child: Text(
-                                        'No recent alerts.',
+                                        AppStrings.t('no_recent_alerts'),
                                         style: TextStyle(
                                           color: context.textSecondary,
                                           fontSize: 12,
@@ -1303,9 +1335,7 @@ class _AlertRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: color.withValues(alpha: 0.25)),
             ),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 16)),
-            ),
+            child: Center(child: AppGlyph(icon, size: 16, color: color)),
           ),
           const SizedBox(width: 12),
           Expanded(

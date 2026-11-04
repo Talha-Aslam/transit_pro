@@ -14,11 +14,26 @@ class RatingRepository {
   RatingRepository._();
   static final RatingRepository instance = RatingRepository._();
 
+  /// The document id, and with it the one-rating-per-week rule.
+  ///
+  /// [studentId] is part of it because a parent with two children riding
+  /// with the same driver has two separate experiences to report — one
+  /// child may be collected on time every day while the other is forgotten.
+  /// Without it, rating one child used up the week's single slot and the
+  /// other child's experience had nowhere to go.
   static String idFor({
     required String driverId,
     required String raterId,
     required String weekKey,
-  }) => '${driverId}_${raterId}_$weekKey';
+    String? studentId,
+  }) {
+    final child = studentId?.trim() ?? '';
+    // Threads opened before this keep their old ids, so a rating already
+    // stored still blocks a second one for the same week.
+    return child.isEmpty
+        ? '${driverId}_${raterId}_$weekKey'
+        : '${driverId}_${raterId}_${child}_$weekKey';
+  }
 
   /// Every rating this user has given, newest first. Small by construction —
   /// one per driver per week.
@@ -61,7 +76,12 @@ class RatingRepository {
   }) async {
     final when = at ?? DateTime.now();
     final weekKey = DriverRating.weekKeyFor(when);
-    final id = idFor(driverId: driverId, raterId: raterId, weekKey: weekKey);
+    final id = idFor(
+      driverId: driverId,
+      raterId: raterId,
+      weekKey: weekKey,
+      studentId: studentId,
+    );
 
     try {
       await Db.ratings
@@ -90,11 +110,19 @@ class RatingRepository {
   Future<bool> canRate({
     required String driverId,
     required String raterId,
+    String? studentId,
     DateTime? at,
   }) async {
     final weekKey = DriverRating.weekKeyFor(at ?? DateTime.now());
     final snap = await Db.ratings
-        .doc(idFor(driverId: driverId, raterId: raterId, weekKey: weekKey))
+        .doc(
+          idFor(
+            driverId: driverId,
+            raterId: raterId,
+            weekKey: weekKey,
+            studentId: studentId,
+          ),
+        )
         .get();
     return !snap.exists;
   }

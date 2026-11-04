@@ -52,6 +52,14 @@ class _SignupScreenState extends State<SignupScreen> {
   /// `ProfileRequirements` — the two forms have to ask for the same things or one
   /// route produces accounts the other would reject.
   final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+  /// The institute names the driver has typed in the step above, for the
+  /// round cards to offer as chips. Blank cards are skipped — a half-typed
+  /// area is not something to tick a round against.
+  List<String> get _instituteNames => [
+    for (final a in _serviceAreas)
+      if (a.nameCtrl.text.trim().isNotEmpty) a.nameCtrl.text.trim(),
+  ];
+
   final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
   double _serviceRadiusKm = 5;
   GeoCoord? _baseLocation;
@@ -62,7 +70,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _studentSchoolCtrl = TextEditingController();
   bool _studentSchoolCustom = false;
   // Populated by `SchoolSearchField.onLocationSelected` when the parent/
-  // student picks a real campus from the Mapbox-backed suggestions (never
+  // student picks a real campus from the Google-backed suggestions (never
   // set for a manually-typed school, which has no known location). Not yet
   // persisted to Firestore — `students/{id}` has no school-coordinate field
   // today — but available here for a map preview or a future schema change.
@@ -995,6 +1003,7 @@ class _SignupScreenState extends State<SignupScreen> {
         key: ValueKey(e.value),
         index: e.key,
         data: e.value,
+        availableInstitutes: _instituteNames,
         canRemove: _rounds.length > 1,
         onRemove: () => setState(() {
           _rounds[e.key].dispose();

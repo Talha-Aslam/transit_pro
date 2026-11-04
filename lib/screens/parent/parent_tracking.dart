@@ -9,9 +9,10 @@ import '../../app/parent_data_service.dart';
 import '../../app/geofence_service.dart';
 import '../../app/notification_service.dart';
 import '../../data/trip_repository.dart';
-import '../../map/route_map_view.dart';
+import '../../map/live_bus_map_view.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class ParentTracking extends StatefulWidget {
   final VoidCallback onBack;
@@ -92,9 +93,9 @@ class _ParentTrackingState extends State<ParentTracking> {
     _attendanceSub = TripRepository.instance
         .watchAttendanceForStudent(trip.id, childId)
         .listen((record) {
-      if (!mounted) return;
-      setState(() => _myAttendance = record);
-    });
+          if (!mounted) return;
+          setState(() => _myAttendance = record);
+        });
   }
 
   @override
@@ -103,7 +104,7 @@ class _ParentTrackingState extends State<ParentTracking> {
     _geofence.alerts.removeListener(_onGeofenceAlert);
     _tripSub?.cancel();
     _attendanceSub?.cancel();
-    _geofence.reset();
+    _geofence.resetAfterFrame();
     super.dispose();
   }
 
@@ -120,6 +121,8 @@ class _ParentTrackingState extends State<ParentTracking> {
     switch (record?.status) {
       case AttendanceStatus.boarded:
         return 'Picked up';
+      case AttendanceStatus.droppedOff:
+        return 'Dropped off';
       case AttendanceStatus.absent:
         return 'Absent';
       case AttendanceStatus.pending:
@@ -170,9 +173,21 @@ class _ParentTrackingState extends State<ParentTracking> {
                               height: 220,
                               child: Stack(
                                 children: [
-                                  RouteMapView(
+                                  // Was `RouteMapView`, which renders the
+                                  // driver's `TrackingService` route — a
+                                  // thing that only ever exists on the
+                                  // driver's own device, so this preview was
+                                  // permanently empty on a parent's phone.
+                                  LiveBusMapView(
                                     height: 220,
-                                    highlightedStopName: child?.stop,
+                                    pickup: child?.pickup,
+                                    destination: child?.dropoff,
+                                    accent: AppTheme.parentPurple,
+                                    // The inline preview sits in a scrolling
+                                    // page; panning it would fight the page
+                                    // scroll. Tapping opens the fullscreen
+                                    // map, which is pannable.
+                                    interactive: false,
                                   ),
                                   Positioned(
                                     top: 12,
@@ -227,6 +242,8 @@ class _ParentTrackingState extends State<ParentTracking> {
                                         '/parent/track/map',
                                         extra: {
                                           'highlightedStopName': child?.stop,
+                                          'pickup': child?.pickup,
+                                          'destination': child?.dropoff,
                                         },
                                       ),
                                       child: Container(
@@ -286,12 +303,13 @@ class _ParentTrackingState extends State<ParentTracking> {
                                   children: [
                                     Builder(
                                       builder: (_) {
-                                        final assignment = [
-                                          child?.busNumber ?? '',
-                                          child?.route ?? '',
-                                        ]
-                                            .where((s) => s.isNotEmpty)
-                                            .join(' · ');
+                                        final assignment =
+                                            [
+                                                  child?.busNumber ?? '',
+                                                  child?.route ?? '',
+                                                ]
+                                                .where((s) => s.isNotEmpty)
+                                                .join(' · ');
                                         return Text(
                                           assignment.isEmpty
                                               ? 'No bus assigned yet'
@@ -339,7 +357,10 @@ class _ParentTrackingState extends State<ParentTracking> {
                             padding: const EdgeInsets.all(20),
                             child: Column(
                               children: [
-                                const Text('🚏', style: TextStyle(fontSize: 28)),
+                                const Text(
+                                  '🚏',
+                                  style: TextStyle(fontSize: 28),
+                                ),
                                 const SizedBox(height: 10),
                                 Text(
                                   "Your driver hasn't started the route yet",
@@ -418,34 +439,37 @@ class _ParentTrackingState extends State<ParentTracking> {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
-                                Builder(builder: (_) {
-                                  final boarded = _myAttendance?.status ==
-                                      AttendanceStatus.boarded;
-                                  return Column(
-                                    children: [
-                                      _StopTimelineItem(
-                                        name: child?.stop.isNotEmpty == true
-                                            ? child!.stop
-                                            : 'Your stop',
-                                        time: '',
-                                        isDone: boarded,
-                                        isCurrent: !boarded,
-                                        isLast: false,
-                                        isYourStop: true,
-                                      ),
-                                      _StopTimelineItem(
-                                        name: child?.school.isNotEmpty == true
-                                            ? child!.school
-                                            : 'School',
-                                        time: '',
-                                        isDone: false,
-                                        isCurrent: boarded,
-                                        isLast: true,
-                                        isYourStop: false,
-                                      ),
-                                    ],
-                                  );
-                                }),
+                                Builder(
+                                  builder: (_) {
+                                    final boarded =
+                                        _myAttendance?.status ==
+                                        AttendanceStatus.boarded;
+                                    return Column(
+                                      children: [
+                                        _StopTimelineItem(
+                                          name: child?.stop.isNotEmpty == true
+                                              ? child!.stop
+                                              : 'Your stop',
+                                          time: '',
+                                          isDone: boarded,
+                                          isCurrent: !boarded,
+                                          isLast: false,
+                                          isYourStop: true,
+                                        ),
+                                        _StopTimelineItem(
+                                          name: child?.school.isNotEmpty == true
+                                              ? child!.school
+                                              : 'School',
+                                          time: '',
+                                          isDone: false,
+                                          isCurrent: boarded,
+                                          isLast: true,
+                                          isYourStop: false,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -583,7 +607,7 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 22)),
+        AppGlyph(icon, size: 22, color: color),
         const SizedBox(height: 4),
         Text(
           value,
@@ -712,4 +736,3 @@ class _StopTimelineItem extends StatelessWidget {
     );
   }
 }
-

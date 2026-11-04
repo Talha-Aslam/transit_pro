@@ -81,11 +81,10 @@ class _EmergencyAlertsScreenState extends State<EmergencyAlertsScreen> {
         .toList();
     final activeAlerts = alerts.where((n) => !_isResolved(n)).toList();
     final resolvedAlerts = alerts.where(_isResolved).toList();
-    final driverName = ParentDataService.instance.selectedChild?.driver
-                .trim()
-                .isNotEmpty ==
-            true
-        ? ParentDataService.instance.selectedChild!.driver.trim()
+    final driverName =
+        ParentDataService.instance.selectedChild?.driverName.trim()
+            .isNotEmpty ==true
+        ? ParentDataService.instance.selectedChild!.driverName.trim()
         : 'Driver';
 
     return Scaffold(

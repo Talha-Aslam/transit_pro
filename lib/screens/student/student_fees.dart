@@ -7,6 +7,7 @@ import '../../app/session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/payment_presentation.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentFees extends StatefulWidget {
   const StudentFees({super.key});
@@ -211,7 +212,9 @@ class _StudentFeesState extends State<StudentFees> {
                       ),
                       child: Center(
                         child: Text(
-                          due == null ? 'Payment Methods' : AppStrings.t('pay_now'),
+                          due == null
+                              ? 'Payment Methods'
+                              : AppStrings.t('pay_now'),
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 15,
@@ -379,9 +382,7 @@ class _StudentFeesState extends State<StudentFees> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        children: [
-          for (final p in filtered) PaymentRow(payment: p),
-        ],
+        children: [for (final p in filtered) PaymentRow(payment: p)],
       ),
     );
   }
@@ -406,7 +407,7 @@ class _StatPill extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
+            AppGlyph(icon, size: 18, color: color),
             const SizedBox(height: 4),
             Text(
               value,

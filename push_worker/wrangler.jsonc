@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "transitpro-push",
+  "main": "src/index.js",
+  // Cloudflare pins runtime behaviour to this date. Kept one day behind
+  // today because the bundled `workerd` only supports dates up to its own
+  // build; a date newer than the local runtime deploys fine but breaks
+  // `wrangler dev`. Bump it deliberately, not by accident.
+  "compatibility_date": "2026-10-30",
+  "observability": {
+    // Keeps `wrangler tail` and the dashboard logs useful when a send fails.
+    "enabled": true
+  },
+  "vars": {
+    // Not a secret: it is in google-services.json and in every API URL the
+    // app already calls. The private key is the secret, and that is set with
+    // `wrangler secret put`, never here.
+    "FIREBASE_PROJECT_ID": "transitpro-db"
+  }
+}

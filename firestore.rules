@@ -153,8 +153,15 @@ service cloud.firestore {
                     && (((resource.data.parentId == uid() || studentId == uid())
                          && unchanged('parentId')
                          && unchanged('isTransportSuspended'))
+                        // A driver answering the family's requested
+                        // timings writes two more fields — the verdict and
+                        // their reason for it. Neither can reach the
+                        // child's identity, parent or suspension, which is
+                        // what this allow-list exists to protect.
                         || (isDriver()
-                            && onlyChanges(['driverId', 'scheduleId', 'busId', 'updatedAt'])
+                            && onlyChanges(['driverId', 'scheduleId', 'busId',
+                                            'scheduleRequestStatus',
+                                            'scheduleRequestNote', 'updatedAt'])
                             && (hasAcceptedRequestFor(studentId)
                                 || resource.data.driverId == uid()))
                         || isAdmin());
@@ -254,10 +261,24 @@ service cloud.firestore {
                     && (isDriver() || isAdmin() || ownsStudent(studentId));
 
         // Only the driver running this trip may mark attendance.
+        //
+        // The `!exists()` branch is not a loophole, it is the seeding case:
+        // `TripRepository.startTrip` commits the trip document and its whole
+        // attendance manifest in ONE batch, and rules evaluate every write in
+        // a batch against the state *before* the batch. The parent trip
+        // therefore does not exist yet while these rows are checked, so the
+        // `get()` below returns null and the entire Start Route commit failed
+        // with PERMISSION_DENIED. Falling back to the driverId carried on the
+        // row itself is what makes that batch legal — and a row written under
+        // a trip id that never materialises is unreachable by every query in
+        // the app.
         allow write: if signedIn()
                      && (isAdmin()
-                         || get(/databases/$(database)/documents/trips/$(tripId))
-                              .data.driverId == uid());
+                         || (exists(/databases/$(database)/documents/trips/$(tripId))
+                             && get(/databases/$(database)/documents/trips/$(tripId))
+                                  .data.driverId == uid())
+                         || (!exists(/databases/$(database)/documents/trips/$(tripId))
+                             && request.resource.data.driverId == uid()));
       }
     }
 
@@ -434,16 +455,23 @@ service cloud.firestore {
 
         allow read: if signedIn() && inThread();
 
-        // You may only send as yourself, and only ever claim to be a
-        // 'user' — 'ai'/'admin' are for the support Cloud Function
-        // (Admin SDK, bypasses these rules entirely) and a real admin's
-        // own client to set, never an ordinary participant impersonating
+        // You may only send as yourself, and only ever claim to be one of
+        // the ordinary roles — 'ai'/'admin' are for the support Cloud
+        // Function (Admin SDK, bypasses these rules entirely) and a real
+        // admin's own client to set, never a participant impersonating
         // either one in their own support thread.
+        //
+        // 'user' alone used to be the whole whitelist, which was fine while
+        // the only real thread was Live Chat support. A driver↔family
+        // thread records which side wrote each line, so the three real
+        // roles are allowed here too; the impersonation this guards
+        // against is unchanged, since 'ai' and 'admin' are still refused.
         allow create: if signedIn()
                       && inThread()
                       && request.resource.data.senderId == uid()
                       && (!('senderRole' in request.resource.data)
-                          || request.resource.data.senderRole == 'user'
+                          || request.resource.data.senderRole in
+                               ['user', 'parent', 'student', 'driver']
                           || isAdmin());
 
         // Read receipts only; message text is immutable once sent.

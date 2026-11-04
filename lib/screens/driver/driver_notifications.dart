@@ -10,6 +10,7 @@ import '../../app/missed_bus_service.dart';
 import '../../app/session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 /// Icon + accent colour for a notification, by its domain type.
 (String, Color) _appearanceFor(NotificationType type) => switch (type) {
@@ -132,11 +133,36 @@ class _DriverNotificationsState extends State<DriverNotifications> {
   }).toList();
 
   void _openMsg(UserNotification msg) {
+    // A chat notification is a pointer to a conversation, not a message in
+    // itself — opening the detail card would leave the driver reading a
+    // 140-character preview with no way to answer it.
+    if (msg.type == NotificationType.chat) {
+      _markReadOnly(msg);
+      context.push('/driver/messages');
+      return;
+    }
     setState(() => _selectedMsg = msg);
     if (msg.read) return;
     final uid = _session.uid;
     if (uid == null) return;
     // Optimistic — the live inbox stream confirms within a frame or two.
+    setState(() {
+      _notifications = _notifications
+          .map((m) => m.id == msg.id ? m.copyWith(read: true) : m)
+          .toList();
+    });
+    MessagingRepository.instance.markRead(uid, msg.id).catchError((e) {
+      debugPrint('markRead failed: $e');
+    });
+    DriverAlertsService.instance.setUnreadCount(_unread);
+  }
+
+  /// Marks [msg] read without opening the detail card — for notifications
+  /// that navigate somewhere instead.
+  void _markReadOnly(UserNotification msg) {
+    if (msg.read) return;
+    final uid = _session.uid;
+    if (uid == null) return;
     setState(() {
       _notifications = _notifications
           .map((m) => m.id == msg.id ? m.copyWith(read: true) : m)
@@ -641,9 +667,7 @@ class _DetailView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: color.withValues(alpha: 0.25)),
                   ),
-                  child: Center(
-                    child: Text(icon, style: const TextStyle(fontSize: 22)),
-                  ),
+                  child: Center(child: AppGlyph(icon, size: 22)),
                 ),
               ],
             ),

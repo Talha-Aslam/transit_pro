@@ -131,11 +131,13 @@ class RideRequestRepository {
       status: RideRequestStatus.pending,
       studentName: student.name,
       studentGrade: student.grade,
+      // The driver cannot read this child's document — they are not on the
+      // roster yet — so the photo travels with the request the same way the
+      // name does.
+      studentPhotoUrl: student.photoUrl,
       school: student.school,
       driverName: driver.name,
-      scheduleLabel:
-          '${schedule.label} · ${schedule.directionLabel} '
-          '${schedule.timeRange}',
+      scheduleLabel: '${schedule.label} · ${schedule.timeRange}',
       pickupLocation: student.pickupLocation,
       note: note,
     );
@@ -153,6 +155,37 @@ class RideRequestRepository {
   Future<void> cancel(String requestId) => _rawRequest(
     requestId,
   ).update({'status': RideRequestStatus.cancelled.name, 'respondedAt': Db.now});
+
+  /// The family giving up a seat they already hold.
+  ///
+  /// Two writes they are allowed to make: the request goes `cancelled`, and
+  /// the child stops pointing at the driver — which is what takes them off
+  /// the roster, out of the attendance list, and frees them to look for
+  /// someone else. Both happen at once, so the family is never half-detached.
+  ///
+  /// What is deliberately *not* here is the driver's `bookedSeats`. That
+  /// field lives on the driver document, which only the driver may write —
+  /// correctly, since it is the field the accept transaction guards against
+  /// two parents racing for the last seat. `SeatReconciler` puts it back in
+  /// step from the driver's own app; see that class for why the seat cannot
+  /// simply be handed back here.
+  Future<void> releaseByFamily({
+    required String requestId,
+    required String studentId,
+  }) async {
+    final batch = Db.fs.batch();
+    batch.update(_rawRequest(requestId), {
+      'status': RideRequestStatus.cancelled.name,
+      'responseNote': 'Seat given up by the family.',
+      'respondedAt': Db.now,
+    });
+    batch.update(Db.fs.collection('students').doc(studentId), {
+      'driverId': FieldValue.delete(),
+      'scheduleId': FieldValue.delete(),
+      'updatedAt': Db.now,
+    });
+    await batch.commit();
+  }
 
   // ── Driver side ───────────────────────────────────────────────────────────
 

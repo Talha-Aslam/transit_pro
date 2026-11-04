@@ -4,6 +4,7 @@ import '../../app/language_provider.dart';
 import '../../app/student_data_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentSchedule extends StatefulWidget {
   const StudentSchedule({super.key});
@@ -870,7 +871,7 @@ class _MiniTimeButton extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(icon, style: const TextStyle(fontSize: 13)),
+                AppGlyph(icon, size: 13, color: color),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -956,9 +957,7 @@ class _TimeOptionCard extends StatelessWidget {
                 color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 20)),
-              ),
+              child: Center(child: AppGlyph(icon, size: 20, color: color)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1037,9 +1036,7 @@ class _TimelineItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
-              child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 14)),
-              ),
+              child: Center(child: AppGlyph(icon, size: 14, color: color)),
             ),
             if (!isLast)
               Container(
@@ -1107,7 +1104,7 @@ class _WeekStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 22)),
+        AppGlyph(icon, size: 22, color: color),
         const SizedBox(height: 4),
         Text(
           value,

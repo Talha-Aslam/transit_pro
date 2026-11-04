@@ -9,16 +9,20 @@ import 'package:go_router/go_router.dart';
 // driver_route.dart and tracking_service.dart for the same conflict.
 import 'package:transit_core/transit_core.dart' hide StopStatus;
 import 'package:url_launcher/url_launcher.dart';
-import '../../data/live_location_repository.dart';
+import '../../app/active_trip_service.dart';
+import '../../data/incident_repository.dart';
+import '../../data/trip_repository.dart';
 import '../../app/driver_alerts_service.dart';
 import '../../app/driver_data_service.dart';
-import '../../app/notification_service.dart';
 import '../../app/language_provider.dart';
+import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../app/tracking_service.dart';
 import '../../models/route_data.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 /// The vehicle this driver actually drives, for use in messages sent to families.
 ///
@@ -37,10 +41,13 @@ String driverVehicleLabel() {
 
 /// Writes one notification into every family's inbox on this driver's roster.
 ///
-/// `NotificationService.show()` raises a notification on the *driver's own phone*
-/// and nowhere else, so every "alert all parents" button in this screen was a
-/// no-op with a success animation. This is the write that actually reaches them:
-/// `notifications/{parentUid}/items`, which each family's app streams live.
+/// This is the write that actually reaches them:
+/// `notifications/{parentUid}/items`, which each family's app streams live,
+/// and which `PushSender` then delivers to a phone with the app closed.
+/// Every "alert all parents" button in this screen used to call
+/// `NotificationService.show()` instead — a banner on the *driver's own*
+/// phone and nowhere else, so each one was a no-op with a success
+/// animation attached.
 ///
 /// Recipients come from `SessionService.roster` — the students whose ride request
 /// this driver accepted — plus `routeStudents` for anyone an admin assigned.
@@ -67,16 +74,13 @@ Future<int> broadcastToFamilies({
   }
   if (recipients.isEmpty) return 0;
 
-  try {
-    await MessagingRepository.instance.pushToMany(
-      recipients.toList(),
-      UserNotification(id: '', type: type, title: title, body: body),
-    );
-    return recipients.length;
-  } catch (e) {
-    debugPrint('broadcastToFamilies failed: $e');
-    return 0;
-  }
+  // Writes each family's inbox record *and* delivers it. The inbox half
+  // already worked; a parent whose phone was locked — which is the whole
+  // point of an emergency alert — was never told.
+  return PushSender.instance.notifyMany(
+    recipients.toList(),
+    UserNotification(id: '', type: type, title: title, body: body),
+  );
 }
 
 class DriverDashboard extends StatefulWidget {
@@ -88,38 +92,104 @@ class DriverDashboard extends StatefulWidget {
 }
 
 class _DriverDashboardState extends State<DriverDashboard> {
-  /// Whether a real trip is currently running — true only once this driver
-  /// has tapped Start Route on `driver_route.dart`, which is the only thing
-  /// that makes `TrackingService.instance.route` non-null. This used to be a
-  /// hardcoded `true`, which is why the "In Progress" badge and a fake 55%
-  /// progress bar showed for every driver, including one who never started
-  /// anything today.
-  bool _routeStarted = false;
+  /// Whether a real trip is currently running, straight off
+  /// `trips/{id}.status`. This used to be a hardcoded `true` (fake 55%
+  /// progress bar for every driver), then `TrackingService.route != null`,
+  /// which only knew about trips *this phone* had built a route for.
+  bool get _routeStarted => ActiveTripService.instance.isOnRoute;
+
+  /// How many children are marked on board on the running trip. Zero
+  /// outside one.
+  int _boardedToday = 0;
+
+  /// On-time arrivals across this driver's completed trips, as a
+  /// percentage, or null when they have none yet.
+  double? _onTimePct;
+
+  StreamSubscription<List<AttendanceRecord>>? _attendanceSub;
+  StreamSubscription<List<Trip>>? _tripsSub;
+  String? _attendanceTripId;
+  String? _tripsUid;
 
   @override
   void initState() {
     super.initState();
-    _routeStarted = TrackingService.instance.route != null;
-    // Neither `route` nor its containing `RouteData` is itself a
-    // `Listenable` — `isSimulating`/`isLive` are the notifiers that actually
-    // flip when `start()`/`stop()` run, so those are what this screen
-    // listens to in order to react to a trip starting or ending.
-    TrackingService.instance.isSimulating.addListener(_onTrackingChanged);
-    TrackingService.instance.isLive.addListener(_onTrackingChanged);
+    ActiveTripService.instance.trip.addListener(_onTrackingChanged);
+    SessionService.instance.addListener(_ensureTripsSubscription);
+    _ensureAttendanceSubscription();
+    _ensureTripsSubscription();
   }
 
   @override
   void dispose() {
-    TrackingService.instance.isSimulating.removeListener(_onTrackingChanged);
-    TrackingService.instance.isLive.removeListener(_onTrackingChanged);
+    ActiveTripService.instance.trip.removeListener(_onTrackingChanged);
+    SessionService.instance.removeListener(_ensureTripsSubscription);
+    _attendanceSub?.cancel();
+    _tripsSub?.cancel();
     super.dispose();
   }
 
   void _onTrackingChanged() {
-    final started = TrackingService.instance.route != null;
-    if (started != _routeStarted && mounted) {
-      setState(() => _routeStarted = started);
+    if (mounted) setState(() {});
+    // A new trip has its own attendance subcollection; an ended one has
+    // none worth counting.
+    _ensureAttendanceSubscription();
+  }
+
+  /// Follows the running trip's attendance, so "students picked" counts
+  /// children the driver marked aboard rather than stops the van drove past.
+  void _ensureAttendanceSubscription() {
+    final tripId = ActiveTripService.instance.trip.value?.id;
+    if (tripId == _attendanceTripId) return;
+    _attendanceTripId = tripId;
+    _attendanceSub?.cancel();
+    _attendanceSub = null;
+    if (tripId == null) {
+      if (mounted) setState(() => _boardedToday = 0);
+      return;
     }
+    _attendanceSub = TripRepository.instance.watchAttendance(tripId).listen(
+      (records) {
+        if (!mounted) return;
+        setState(() {
+          _boardedToday = records
+              .where((r) => r.status == AttendanceStatus.boarded)
+              .length;
+        });
+      },
+      onError: (Object e) => debugPrint('dashboard attendance stream: $e'),
+    );
+  }
+
+  /// This driver's trip history, for the on-time bar.
+  void _ensureTripsSubscription() {
+    final uid = SessionService.instance.uid;
+    if (uid == _tripsUid) return;
+    _tripsUid = uid;
+    _tripsSub?.cancel();
+    _tripsSub = null;
+    if (uid == null) {
+      if (mounted) setState(() => _onTimePct = null);
+      return;
+    }
+    _tripsSub = TripRepository.instance
+        .watchTripsForDriver(uid, limit: 200)
+        .listen(
+          (trips) {
+            if (!mounted) return;
+            final completed = trips
+                .where((t) => t.status == TripStatus.completed)
+                .toList();
+            setState(() {
+              _onTimePct = completed.isEmpty
+                  ? null
+                  : completed.where((t) => t.onTime == true).length /
+                        completed.length *
+                        100;
+            });
+          },
+          onError: (Object e) => debugPrint('dashboard trips stream: $e'),
+        );
   }
 
   /// `AppTheme.warningLight`/`successLight` are tuned for the dark theme's
@@ -194,10 +264,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? 'Good Morning'
+        ? AppStrings.t('good_morning')
         : hour < 17
-        ? 'Good Afternoon'
-        : 'Good Evening';
+        ? AppStrings.t('good_afternoon')
+        : AppStrings.t('good_evening');
 
     return ListenableBuilder(
       listenable: LanguageProvider.instance,
@@ -206,149 +276,105 @@ class _DriverDashboardState extends State<DriverDashboard> {
         child: Column(
           children: [
             // ── Header ───────────────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppTheme.driverCyan.withValues(alpha: 0.2),
-                    Colors.transparent,
-                  ],
-                ),
+            //
+            // Was a 20px-padded box with a cyan-to-transparent wash behind
+            // it. The wash existed to give the greeting something to sit on;
+            // the photographic banner does that job properly now, and
+            // `DashboardHeader` owns the scrim, the dissolve and the
+            // light/dark cross-fade.
+            DashboardHeader(
+              greeting: greeting,
+              body: ValueListenableBuilder<DriverInfo>(
+                valueListenable: DriverDataService.instance.driverInfo,
+                builder: (_, info, _) {
+                  // Vehicle and route are only known once an admin has
+                  // assigned them, so say so rather than showing a bus this
+                  // driver does not drive.
+                  final assignment = [
+                    info.busNumber,
+                    info.route,
+                  ].where((s) => s.isNotEmpty).join(' · ');
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        info.name,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        assignment.isEmpty
+                            ? AppStrings.t('no_vehicle_assigned')
+                            : assignment,
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text('👋', style: TextStyle(fontSize: 18)),
-                            const SizedBox(width: 8),
-                            ShaderMask(
-                              shaderCallback: (bounds) =>
-                                  AppTheme.driverGradient.createShader(
-                                    Rect.fromLTWH(
-                                      0,
-                                      0,
-                                      bounds.width,
-                                      bounds.height,
-                                    ),
-                                  ),
-                              blendMode: BlendMode.srcIn,
+              trailing: GestureDetector(
+                onTap: () => widget.onNavigate(4),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: context.cardBgElevated,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.inputBorder),
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/notification_bell.gif',
+                          width: 22,
+                          height: 22,
+                          cacheWidth: 44,
+                          cacheHeight: 44,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                      ),
+                    ),
+                    ValueListenableBuilder<int>(
+                      valueListenable: DriverAlertsService.instance.unreadCount,
+                      builder: (_, unread, _) {
+                        if (unread == 0) return const SizedBox.shrink();
+                        return Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: const BoxDecoration(
+                              color: AppTheme.error,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
                               child: Text(
-                                greeting,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
+                                '$unread',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ValueListenableBuilder<DriverInfo>(
-                          valueListenable:
-                              DriverDataService.instance.driverInfo,
-                          builder: (_, info, _) {
-                            // Vehicle and route are only known once an admin
-                            // has assigned them, so say so rather than showing
-                            // a bus this driver does not drive.
-                            final assignment = [
-                              info.busNumber,
-                              info.route,
-                            ].where((s) => s.isNotEmpty).join(' · ');
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  info.name,
-                                  style: TextStyle(
-                                    color: context.textPrimary,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  assignment.isEmpty
-                                      ? 'No vehicle assigned yet'
-                                      : assignment,
-                                  style: const TextStyle(
-                                    color: AppTheme.driverAccent,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () => widget.onNavigate(4),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: context.cardBgElevated,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: context.inputBorder),
                           ),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/images/notification_bell.gif',
-                              width: 22,
-                              height: 22,
-                              cacheWidth: 44,
-                              cacheHeight: 44,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.medium,
-                            ),
-                          ),
-                        ),
-                        ValueListenableBuilder<int>(
-                          valueListenable:
-                              DriverAlertsService.instance.unreadCount,
-                          builder: (_, unread, _) {
-                            if (unread == 0) return const SizedBox.shrink();
-                            return Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '$unread',
-                                    style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -409,7 +435,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                                     .driverInfo
                                                     .value
                                                     .route)
-                                        : 'No active route',
+                                        : AppStrings.t('no_active_route'),
                                     style: TextStyle(
                                       color: context.textPrimary,
                                       fontSize: 18,
@@ -498,8 +524,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                             // without this screen polling for them.
                             return ValueListenableBuilder<int>(
                               valueListenable:
-                                  TrackingService.instance.etaMinutes,
-                              builder: (_, eta, _) {
+                                  TrackingService.instance.liveRevision,
+                              builder: (_, _, _) {
+                                final eta =
+                                    TrackingService.instance.etaMinutes.value;
                                 final route = TrackingService.instance.route;
                                 if (route == null) {
                                   return Text(
@@ -676,8 +704,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                   }
                                   return ValueListenableBuilder<int>(
                                     valueListenable:
-                                        TrackingService.instance.etaMinutes,
-                                    builder: (_, eta, _) {
+                                        TrackingService.instance.liveRevision,
+                                    builder: (_, _, _) {
+                                      final eta = TrackingService
+                                          .instance
+                                          .etaMinutes
+                                          .value;
                                       final route =
                                           TrackingService.instance.route;
                                       if (route == null) {
@@ -778,7 +810,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 8,
                           crossAxisSpacing: 8,
-                          childAspectRatio: 2.6,
+                          // 2.6 clipped the second line of "Share Location"
+                          // and "Update Route" at every text scale.
+                          childAspectRatio: 2.2,
                           children: [
                             _QuickActionBtn(
                               icon: 'assets/images/utilities/emergency.png',
@@ -827,8 +861,14 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        Builder(
-                          builder: (context) {
+                        // Rebuilt on `liveRevision`, which moves whenever
+                        // a stop completes or the ETA shifts. This was a
+                        // plain `Builder`, listening to nothing — so both
+                        // bars froze for the whole round.
+                        ValueListenableBuilder<int>(
+                          valueListenable:
+                              TrackingService.instance.liveRevision,
+                          builder: (context, _, _) {
                             final route = TrackingService.instance.route;
                             final int studentsTotal;
                             final int studentsPicked;
@@ -837,14 +877,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 0,
                                 (sum, s) => sum + s.studentCount,
                               );
-                              studentsPicked = route.stops
-                                  .where(
-                                    (s) => s.status == StopStatus.completed,
-                                  )
-                                  .fold<int>(
-                                    0,
-                                    (sum, s) => sum + s.studentCount,
-                                  );
+                              // Children the driver has actually marked on
+                              // board, from the trip's attendance records —
+                              // not stops the van has driven past, which is
+                              // what this counted before. A child who was
+                              // off sick was "picked up" the moment the bus
+                              // passed their gate.
+                              studentsPicked = _boardedToday;
                             } else {
                               // No trip is running right now, so the honest
                               // "students" figure is this driver's own
@@ -884,16 +923,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                         suffix: '%',
                                       ),
                                 const SizedBox(height: 12),
-                                // No per-trip attendance/on-time history is
-                                // wired into this screen yet (that lives in
-                                // `TripRepository`, used by
-                                // `driver_performance_screen.dart`) — showing
-                                // a placeholder here is honest; a fabricated
-                                // percentage would not be.
-                                _StatBarPlaceholder(
-                                  label: AppStrings.t('on_time_perf'),
-                                  message: 'No data yet',
-                                ),
+                                // Real, from this driver's completed trips.
+                                // Was a permanent "No data yet" placeholder
+                                // even for a driver with months of history,
+                                // because nothing here read `TripRepository`.
+                                if (_onTimePct == null)
+                                  _StatBarPlaceholder(
+                                    label: AppStrings.t('on_time_perf'),
+                                    message: 'No completed trips yet',
+                                  )
+                                else
+                                  _StatBar(
+                                    label: AppStrings.t('on_time_perf'),
+                                    value: _onTimePct!.round(),
+                                    total: 100,
+                                    color: AppTheme.info,
+                                    suffix: '%',
+                                  ),
                               ],
                             );
                           },
@@ -995,25 +1041,25 @@ class _SeatRequestsBanner extends StatelessWidget {
         if (notSetUp) {
           accent = AppTheme.warning;
           emoji = '🗺️';
-          title = 'Parents cannot find you yet';
+          title = AppStrings.t('parents_cannot_find_you');
           subtitle = driver.serviceAreas.isEmpty
-              ? 'Add the schools you drive to and your daily rounds.'
-              : 'Add at least one round so families can book a seat.';
+              ? AppStrings.t('add_schools_and_rounds')
+              : AppStrings.t('add_one_round');
           route = '/driver/service';
         } else if (pending > 0) {
           accent = AppTheme.warning;
           emoji = '📬';
           title = '$pending seat request${pending == 1 ? '' : 's'} waiting';
-          subtitle = 'Tap to accept or decline.';
+          subtitle = AppStrings.t('tap_accept_decline');
           route = '/driver/ride-requests';
         } else {
           accent = AppTheme.success;
           emoji = '🧒';
           title = booked == 0
-              ? 'No students booked yet'
+              ? AppStrings.t('no_students_booked')
               : '$booked student${booked == 1 ? '' : 's'} on your roster';
           subtitle = driver == null
-              ? 'Loading your rounds…'
+              ? AppStrings.t('loading_your_rounds')
               : '${driver.totalAvailableSeats} of '
                     '${driver.totalSeatsOffered} seats free across '
                     '${driver.schedules.length} round'
@@ -1037,7 +1083,7 @@ class _SeatRequestsBanner extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   alignment: Alignment.center,
-                  child: Text(emoji, style: const TextStyle(fontSize: 20)),
+                  child: AppGlyph(emoji, size: 20, color: accent),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -1280,9 +1326,8 @@ class _VerificationRequiredDialog extends StatelessWidget {
   const _VerificationRequiredDialog({this.status});
 
   String get _statusLine => switch (status) {
-    DriverStatus.suspended =>
-      'Your account has been suspended. Contact support for details.',
-    _ => 'Your documents are still pending admin verification.',
+    DriverStatus.suspended => AppStrings.t('account_suspended_msg'),
+    _ => AppStrings.t('documents_pending_msg'),
   };
 
   @override
@@ -1310,7 +1355,7 @@ class _VerificationRequiredDialog extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Verification required',
+              AppStrings.t('verification_required'),
               style: TextStyle(
                 color: context.textPrimary,
                 fontSize: 16,
@@ -1348,7 +1393,7 @@ class _VerificationRequiredDialog extends StatelessWidget {
                       Navigator.pop(context);
                       context.push('/driver/documents');
                     },
-                    child: const Text('View Documents'),
+                    child: Text(AppStrings.t('view_documents')),
                   ),
                 ),
               ],
@@ -1380,19 +1425,52 @@ class _EmergencySheetState extends State<_EmergencySheet> {
     }
   }
 
+  /// Records the SOS at `incidents/{id}`, where the admin app reads it.
+  ///
+  /// Best-effort: an emergency is not the moment to block the UI on a
+  /// Firestore write, and the families have already been alerted.
+  Future<void> _fileIncident(String vehicle) async {
+    final session = SessionService.instance;
+    final uid = session.uid;
+    if (uid == null) return;
+    final here = TrackingService.instance.busPosition.value;
+    final onRoute = ActiveTripService.instance.trip.value;
+    try {
+      await IncidentRepository.instance.raise(
+        Incident(
+          id: '',
+          severity: IncidentSeverity.high,
+          title: 'SOS raised – $vehicle',
+          description:
+              'The driver triggered an emergency alert from the dashboard.',
+          driverId: uid,
+          busId: session.bus.value?.id,
+          routeId: session.route.value?.id,
+          tripId: onRoute?.id,
+          // Only meaningful while a round is running; off-route this is
+          // wherever the phone last had a fix, which is not the incident.
+          lat: onRoute == null ? null : here.lat,
+          lng: onRoute == null ? null : here.lng,
+        ),
+      );
+    } catch (e) {
+      debugPrint('SOS: incident record failed — $e');
+    }
+  }
+
   Future<void> _sendSOS() async {
     final vehicle = driverVehicleLabel();
-    await NotificationService.instance.show(
-      title: '🚨 SOS – $vehicle',
-      body: 'Driver has triggered an emergency alert. Authorities notified.',
-      type: 'alert',
-      icon: '🚨',
-      color: AppTheme.error,
-    );
-    // Reaches the families. `NotificationService.show` above only raises a
-    // notification on *this* phone, which is why an SOS previously never left the
-    // vehicle — the driver got a confirmation for an alert nobody received.
-    await broadcastToFamilies(
+    // No local banner here. This used to raise one on the driver's own
+    // phone, which is how an SOS ended up notifying the one person who
+    // already knew about it. The sheet's own "sent" state below is the
+    // driver's confirmation; the alert itself goes to the families.
+    // Filed before the broadcast, so the record exists even if the fan-out
+    // to families fails. An SOS that only sent notifications left nothing
+    // behind: no admin ever saw it, and the driver's own safety score had
+    // nothing to be computed from.
+    unawaited(_fileIncident(vehicle));
+
+    final reached = await broadcastToFamilies(
       type: NotificationType.emergency,
       title: '🚨 Emergency alert – $vehicle',
       body:
@@ -1400,6 +1478,19 @@ class _EmergencySheetState extends State<_EmergencySheet> {
           'You will be contacted shortly.',
     );
     if (!mounted) return;
+    if (reached == 0) {
+      // Worth saying out loud in an emergency: an empty roster means the
+      // SOS went nowhere, and a green tick would hide that.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You have no families on your roster yet, so this alert did not '
+            'reach anyone. Call 1122 directly.',
+          ),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    }
     setState(() => _sent = true);
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) {
@@ -1498,16 +1589,9 @@ class _AlertAllSheetState extends State<_AlertAllSheet> {
     final vehicle = driverVehicleLabel();
     final body = m.body.replaceAll('{vehicle}', vehicle);
 
-    await NotificationService.instance.show(
-      title: '${m.icon} Alert – $vehicle',
-      body: body,
-      type: 'alert',
-      icon: m.icon,
-      color: AppTheme.warning,
-    );
-
-    // The write that actually reaches the families. Without it this button only
-    // notified the driver's own phone — see [broadcastToFamilies].
+    // The write that reaches the families. This used to be preceded by a
+    // local banner on the driver's own phone, which is the notification
+    // the driver kept seeing for messages they had just sent.
     final reached = await broadcastToFamilies(
       type: NotificationType.delay,
       title: '${m.icon} $vehicle update',
@@ -1633,7 +1717,6 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
   /// trip already in live mode) depends on it staying on.
   bool _weStartedLive = false;
 
-  Timer? _publishTimer;
   String? _busId;
 
   GeoCoord get _position => TrackingService.instance.busPosition.value;
@@ -1683,25 +1766,16 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
     // Falls back to the driver's own uid so a self-signup driver with no
     // admin-assigned `Bus` document still gets a stable, unique RTDB key.
     _busId = SessionService.instance.bus.value?.id ?? uid;
-    final busId = _busId!;
 
-    await LiveLocationRepository.instance.armDisconnectCleanup(busId);
-    _publishTimer = Timer.periodic(AppConfig.locationPublishInterval, (
-      _,
-    ) async {
-      final p = TrackingService.instance.busPosition.value;
-      await LiveLocationRepository.instance.publish(
-        LiveLocation(
-          busId: busId,
-          lat: p.lat,
-          lng: p.lng,
-          heading: TrackingService.instance.busHeading.value,
-          speedKmh: TrackingService.instance.speed.value.toDouble(),
-          driverId: uid,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
-    });
+    // The publish timer lives in `TrackingService` now, so this toggle and a
+    // running trip on the Route screen share one — two timers writing the
+    // same `liveLocations/{busId}` node on separate schedules was double the
+    // bandwidth for no extra freshness, and whichever stopped first wiped
+    // the node out from under the other.
+    await TrackingService.instance.startBroadcast(
+      busId: _busId!,
+      driverId: uid,
+    );
 
     if (mounted) {
       setState(() {
@@ -1715,24 +1789,14 @@ class _ShareLocationSheetState extends State<_ShareLocationSheet> {
   /// possible — best-effort, relies on `armDisconnectCleanup`'s server-side
   /// removal as the backstop if these calls don't land before the app dies.
   void _stopSharingSync() {
-    final busId = _busId;
-    _publishTimer?.cancel();
-    _publishTimer = null;
-    if (busId != null) {
-      LiveLocationRepository.instance.clear(busId);
-      LiveLocationRepository.instance.cancelDisconnectCleanup(busId);
-    }
+    TrackingService.instance.stopBroadcast();
+    _busId = null;
     if (_weStartedLive) TrackingService.instance.toggleLive();
   }
 
   Future<void> _stopSharing() async {
-    final busId = _busId;
-    _publishTimer?.cancel();
-    _publishTimer = null;
-    if (busId != null) {
-      await LiveLocationRepository.instance.clear(busId);
-      await LiveLocationRepository.instance.cancelDisconnectCleanup(busId);
-    }
+    await TrackingService.instance.stopBroadcast();
+    _busId = null;
     if (_weStartedLive) {
       await TrackingService.instance.toggleLive();
       _weStartedLive = false;
@@ -1874,29 +1938,42 @@ class _UpdateRouteSheetState extends State<_UpdateRouteSheet> {
       icon: '🔀',
       label: 'Route Deviation',
       body:
-          'Bus #42 has taken an alternate route due to road conditions. ETA updated.',
+          '{vehicle} has taken an alternate route due to road conditions. '
+          'ETA updated.',
     ),
     (
       icon: '🛑',
       label: 'Route Suspended',
       body:
-          'Bus #42 route is temporarily suspended. Please arrange alternative transport.',
+          '{vehicle} route is temporarily suspended. Please arrange alternative transport.',
     ),
   ];
 
   Future<void> _apply() async {
     if (_selected == null) return;
     final o = _options[_selected!];
-    await NotificationService.instance.show(
-      title: '${o.icon} Route Update – Bus #42',
-      body: o.body,
-      type: _selected == 0 ? 'success' : 'alert',
-      icon: o.icon,
-      color: _selected == 0 ? AppTheme.success : AppTheme.warning,
+    final vehicle = driverVehicleLabel();
+    // This sheet never sent anything. It raised one banner on the driver's
+    // own phone, about a bus number ('#42') hardcoded into the message, and
+    // the families whose route had just changed were never told.
+    final reached = await broadcastToFamilies(
+      type: _selected == 0 ? NotificationType.delay : NotificationType.system,
+      title: '${o.icon} Route update – $vehicle',
+      body: o.body.replaceAll('{vehicle}', vehicle),
     );
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          reached == 0
+              ? 'No families on your roster yet, so this update was not sent '
+                    'to anyone.'
+              : 'Route update sent to $reached '
+                    '${reached == 1 ? 'family' : 'families'}.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -2007,7 +2084,7 @@ class _ActionRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 18)),
+            AppGlyph(icon, size: 18, color: color),
             const SizedBox(width: 12),
             Flexible(
               child: Text(

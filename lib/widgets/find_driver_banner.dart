@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../app/language_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../app/session_service.dart';
 import '../theme/app_theme.dart';
 import 'glass_card.dart';
+import 'app_glyph.dart';
 
 /// Dashboard card that reports where the family stands on transport, and leads to
 /// driver search.
@@ -56,28 +58,32 @@ class FindDriverBanner extends StatelessWidget {
           tint = AppTheme.success;
           emoji = '🧑‍✈️';
           title = driver == null
-              ? 'Driver assigned'
-              : 'Riding with ${driver.name}';
+              ? AppStrings.t('driver_assigned')
+              : '${AppStrings.t('riding_with')} ${driver.name}';
           final round = driver?.scheduleById(subject.scheduleId);
           subtitle = round == null
-              ? 'Tap to see other drivers serving ${subject.school}.'
-              : '${round.directionLabel} ${round.timeRange} · '
-                  'tap to change driver';
+              ? '${AppStrings.t('tap_other_drivers')} ${subject.school}.'
+              : '${round.timeRange} · '
+                    '${AppStrings.t('tap_change_driver')}';
         } else if (request != null && request.isPending) {
           tint = AppTheme.warning;
           emoji = '⏳';
-          title = 'Waiting on ${request.driverName}';
-          subtitle = '${request.scheduleLabel} — tap to check or withdraw.';
+          title = '${AppStrings.t('waiting_on')} ${request.driverName}';
+          subtitle =
+              '${request.scheduleLabel} — '
+              '${AppStrings.t('tap_check_withdraw')}.';
         } else if (subject.school.trim().isEmpty) {
           tint = AppTheme.info;
           emoji = '🏫';
-          title = 'Add ${subject.name}\'s school';
-          subtitle = 'Driver search matches on the school they attend.';
+          title = '${AppStrings.t('add_school_for')} ${subject.name}';
+          subtitle = AppStrings.t('driver_search_matches');
         } else {
           tint = accent;
           emoji = '🔍';
-          title = 'Find a driver for ${subject.name}';
-          subtitle = 'See drivers who already run to ${subject.school}.';
+          title = '${AppStrings.t('find_driver_for')} ${subject.name}';
+          subtitle =
+              '${AppStrings.t('see_drivers_running_to')} '
+              '${subject.school}.';
         }
 
         return Padding(
@@ -85,17 +91,8 @@ class FindDriverBanner extends StatelessWidget {
           child: GestureDetector(
             onTap: () => context.push(searchRoute),
             child: GlassCard(
-              // Sits inside a scrolling dashboard body, so it repaints (and
-              // would re-blur) on every scroll frame along with the rest.
-              enableBlur: false,
               padding: const EdgeInsets.all(16),
-              borderColor: tint.withValues(alpha: 0.35),
-              gradient: LinearGradient(
-                colors: [
-                  tint.withValues(alpha: 0.14),
-                  tint.withValues(alpha: 0.04),
-                ],
-              ),
+              accent: tint,
               child: Row(
                 children: [
                   Container(
@@ -106,7 +103,7 @@ class FindDriverBanner extends StatelessWidget {
                       borderRadius: BorderRadius.circular(13),
                     ),
                     alignment: Alignment.center,
-                    child: Text(emoji, style: const TextStyle(fontSize: 21)),
+                    child: AppGlyph(emoji, size: 21, color: accent),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -136,7 +133,10 @@ class FindDriverBanner extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded, color: context.textTertiary),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: context.textTertiary,
+                  ),
                 ],
               ),
             ),

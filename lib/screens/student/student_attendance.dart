@@ -7,6 +7,7 @@ import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../app/language_provider.dart';
+import '../../widgets/app_glyph.dart';
 
 class StudentAttendance extends StatefulWidget {
   const StudentAttendance({super.key});
@@ -71,7 +72,9 @@ class _StudentAttendanceState extends State<StudentAttendance>
     for (final r in _records) {
       final t = r.markedAt;
       if (t == null) continue;
-      if (t.year != today.year || t.month != today.month || t.day != today.day) {
+      if (t.year != today.year ||
+          t.month != today.month ||
+          t.day != today.day) {
         continue;
       }
       if ((t.hour < 12) != morning) continue;
@@ -252,8 +255,8 @@ class _StudentAttendanceState extends State<StudentAttendance>
                           boxShadow: _isScanning
                               ? [
                                   BoxShadow(
-                                    color: AppTheme.studentAmber.withValues(alpha:
-                                      glow,
+                                    color: AppTheme.studentAmber.withValues(
+                                      alpha: glow,
                                     ),
                                     blurRadius: 30,
                                     spreadRadius: 4,
@@ -433,8 +436,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       ValueListenableBuilder<int>(
-                        valueListenable:
-                            StudentDataService.instance.totalRides,
+                        valueListenable: StudentDataService.instance.totalRides,
                         builder: (_, rides, _) => _Stat(
                           val: '$rides',
                           label: AppStrings.t('total_checkins'),
@@ -442,8 +444,7 @@ class _StudentAttendanceState extends State<StudentAttendance>
                         ),
                       ),
                       ValueListenableBuilder<int>(
-                        valueListenable:
-                            StudentDataService.instance.onTimeRate,
+                        valueListenable: StudentDataService.instance.onTimeRate,
                         builder: (_, rate, _) => _Stat(
                           val: '$rate%',
                           label: 'Attendance\nRate',
@@ -558,7 +559,10 @@ class _CheckinCard extends StatelessWidget {
       enableBlur: false,
       gradient: done
           ? LinearGradient(
-              colors: [color.withValues(alpha: 0.08), color.withValues(alpha: 0.02)],
+              colors: [
+                color.withValues(alpha: 0.08),
+                color.withValues(alpha: 0.02),
+              ],
             )
           : null,
       borderColor: done ? color.withValues(alpha: 0.15) : null,
@@ -572,9 +576,7 @@ class _CheckinCard extends StatelessWidget {
               color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Center(
-              child: Text(icon, style: const TextStyle(fontSize: 20)),
-            ),
+            child: Center(child: AppGlyph(icon, size: 20, color: color)),
           ),
           const SizedBox(width: 12),
           Expanded(

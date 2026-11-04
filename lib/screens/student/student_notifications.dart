@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
 import '../../theme/app_theme.dart';
@@ -44,6 +46,20 @@ class _StudentNotificationsState extends State<StudentNotifications> {
       default:
         return all;
     }
+  }
+
+
+  /// Where tapping [n] should take the user, or null to just mark it read.
+  ///
+  /// A notification is a pointer, not the thing itself. A chat alert that
+  /// only marked itself read left the family reading a 140-character preview
+  /// with no way to answer; a confirmed seat left them hunting through tabs
+  /// for the driver it was about. Senders already put a `route` in the
+  /// payload for the latter, so that is honoured first.
+  String? _destinationFor(AppNotification n) {
+    if (n.kind == NotificationType.chat) return '/student/driver-chat';
+    final route = n.data['route'];
+    return (route is String && route.startsWith('/')) ? route : null;
   }
 
   @override
@@ -239,6 +255,12 @@ class _StudentNotificationsState extends State<StudentNotifications> {
                                         _svc.history.value,
                                       );
                                       setState(() {});
+                                      // Was missing entirely here, so every
+                                      // notification a student opened came
+                                      // back unread on the next snapshot.
+                                      _svc.markRead(notif);
+                                      final to = _destinationFor(notif);
+                                      if (to != null) context.push(to);
                                     },
                                   ),
                                 ),

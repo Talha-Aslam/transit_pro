@@ -84,18 +84,22 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
 
     List<AttendanceRecord> records;
     try {
-      records =
-          await TripRepository.instance.fetchAttendanceForStudent(studentId);
+      records = await TripRepository.instance.fetchAttendanceForStudent(
+        studentId,
+      );
     } catch (_) {
       return const [];
     }
 
-    final resolved =
-        records.where((r) => r.status != AttendanceStatus.pending).toList();
+    final resolved = records
+        .where((r) => r.status != AttendanceStatus.pending)
+        .toList();
     if (resolved.isEmpty) return const [];
 
-    final tripIds =
-        resolved.map((r) => r.tripId).where((id) => id.isNotEmpty).toSet();
+    final tripIds = resolved
+        .map((r) => r.tripId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
     final trips = <String, Trip>{};
     if (tripIds.isNotEmpty) {
       final fetched = await Future.wait(
@@ -114,13 +118,15 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
 
     final info = StudentDataService.instance.studentInfo.value;
     final stop = info.stop.isNotEmpty ? info.stop : AppStrings.t('pickup');
-    final school =
-        info.school.isNotEmpty ? info.school : AppStrings.t('at_school');
+    final school = info.school.isNotEmpty
+        ? info.school
+        : AppStrings.t('at_school');
 
     return resolved.map((r) {
       final trip = trips[r.tripId];
       final isMorning = trip?.type != TripType.afternoon;
-      final date = trip?.startedAt ??
+      final date =
+          trip?.startedAt ??
           r.markedAt ??
           DateTime.tryParse(r.dateKey) ??
           DateTime.now();
@@ -145,7 +151,9 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
       return _Trip(
         date: date,
         type: AppStrings.t(
-          isMorning ? 'trip_type_morning_pickup' : 'trip_type_afternoon_dropoff',
+          isMorning
+              ? 'trip_type_morning_pickup'
+              : 'trip_type_afternoon_dropoff',
         ),
         from: isMorning ? stop : school,
         to: isMorning ? school : stop,
@@ -661,10 +669,11 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
                                                 duration: const Duration(
                                                   milliseconds: 200,
                                                 ),
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 14,
-                                                  vertical: 7,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 7,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   gradient: selected
                                                       ? AppTheme.studentGradient
@@ -703,8 +712,9 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
                                           height: 36,
                                           decoration: BoxDecoration(
                                             color: context.cardBgElevated,
-                                            borderRadius:
-                                                BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                             border: Border.all(
                                               color: context.surfaceBorder,
                                             ),

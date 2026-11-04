@@ -7,6 +7,9 @@ import '../data/fleet_repository.dart';
 import '../data/payment_repository.dart';
 import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
+import 'active_trip_service.dart';
+import 'child_status_service.dart';
+import 'seat_reconciler.dart';
 import 'notification_service.dart';
 import 'push_notification_service.dart';
 
@@ -166,6 +169,31 @@ class SessionService extends ChangeNotifier {
     return list[selectedChildIndex.value.clamp(0, list.length - 1)];
   }
 
+  /// Live subscriptions to the drivers this account can see, keyed by uid.
+  final Map<String, StreamSubscription<Driver?>> _driverSubs = {};
+
+  /// Subscribes to any driver in [ids] not already watched, and drops the
+  /// watch on any driver no longer referenced (a reassignment).
+  void _watchDrivers(Set<String> ids) {
+    for (final id in ids) {
+      if (_driverSubs.containsKey(id)) continue;
+      _driverSubs[id] = UserRepository.instance.watchDriver(id).listen(
+        (driver) {
+          if (driver == null) return;
+          driversById.value = {...driversById.value, id: driver};
+          // The flattened per-role views hold copies of the driver's name
+          // and photo, so they have to be rebuilt too.
+          _backfillForRole();
+        },
+        onError: (Object e) => debugPrint('watch driver $id: $e'),
+      );
+    }
+    for (final id in _driverSubs.keys.toList()) {
+      if (ids.contains(id)) continue;
+      _driverSubs.remove(id)?.cancel();
+    }
+  }
+
   Bus? busFor(String? id) => id == null ? null : busesById.value[id];
   BusRoute? routeFor(String? id) => id == null ? null : routesById.value[id];
   Driver? driverFor(String? id) => id == null ? null : driversById.value[id];
@@ -284,6 +312,13 @@ class SessionService extends ChangeNotifier {
     selectedChildIndex.removeListener(_onSelectedChildChanged);
     _subscribedRole = null;
 
+    // Same per-account reasoning as the notification inbox below: a trip
+    // belongs to one driver, and leaving it bound would show the previous
+    // account's round to whoever signs in next on this phone.
+    ActiveTripService.instance.unbind();
+    SeatReconciler.instance.unbind();
+    ChildStatusService.instance.unbind();
+
     // Notifications are per-account. Leaving them would show one family's alerts
     // to the next person signing in on a shared phone.
     NotificationService.instance.unbind();
@@ -312,6 +347,10 @@ class SessionService extends ChangeNotifier {
     // driver names into the next account signed in on this device.
     busesById.value = {};
     routesById.value = {};
+    for (final sub in _driverSubs.values) {
+      sub.cancel();
+    }
+    _driverSubs.clear();
     driversById.value = {};
 
     // Push the cleared state out so the legacy notifiers empty too, rather
@@ -375,6 +414,9 @@ class SessionService extends ChangeNotifier {
         _subs.add(
           UserRepository.instance.watchChildren(uid).listen((list) {
             children.value = list;
+            // One place decides where each child is; see ChildStatusService
+            // for why four screens guessing it separately was the problem.
+            ChildStatusService.instance.watchChildren(list);
             if (selectedChildIndex.value >= list.length) {
               selectedChildIndex.value = list.isEmpty ? 0 : list.length - 1;
             }
@@ -391,6 +433,7 @@ class SessionService extends ChangeNotifier {
         _subs.add(
           UserRepository.instance.watchStudent(uid).listen((s) {
             student.value = s;
+            ChildStatusService.instance.watchChildren([?s]);
             _followVehicle(s?.busId, s?.routeId);
             _backfillForRole();
             _resolveReferences();
@@ -400,6 +443,11 @@ class SessionService extends ChangeNotifier {
         _watchPayments(PaymentRepository.instance.watchForStudent(uid));
 
       case UserRole.driver:
+        // The live trip, watched once for the whole app rather than
+        // re-derived per screen from this device's local tracking state.
+        ActiveTripService.instance.bindToDriver(uid);
+        SeatReconciler.instance.bindToDriver();
+
         _subs.add(
           UserRepository.instance.watchDriver(uid).listen((d) {
             driver.value = d;
@@ -597,6 +645,12 @@ class SessionService extends ChangeNotifier {
       }
       driversById.value = fetched;
     }
+
+    // One fetch is enough to *find* a driver; it is not enough to keep them
+    // current. A driver changing their photo or their name had no way of
+    // reaching a family's screen until that family signed in again. Watch
+    // each resolved driver from here on.
+    _watchDrivers(driverIds);
 
     if (pendingBuses.isNotEmpty ||
         pendingRoutes.isNotEmpty ||

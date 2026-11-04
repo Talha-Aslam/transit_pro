@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../../app/driver_performance.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
+import '../../data/incident_repository.dart';
 import '../../data/rating_repository.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_rating_bar.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/app_glyph.dart';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -17,10 +20,14 @@ class _MonthStat {
   final int trips;
   final double onTime;
 
-  /// Placeholder: `DriverRating` only carries a `weekKey`, not a month, and
-  /// aggregating ratings into calendar months is out of scope here — see the
-  /// comment where this list is built.
-  final double rating;
+  /// Average of the ratings actually left in that month, or null when
+  /// nobody rated this driver then.
+  ///
+  /// `DriverRating` carries a `weekKey` rather than a month, but it also
+  /// carries `createdAt`, which is what this groups by — the three
+  /// hardcoded 4.9/4.8/4.8 values that used to sit here were the same for
+  /// every driver in the app.
+  final double? rating;
 
   const _MonthStat(this.month, this.trips, this.onTime, this.rating);
 }
@@ -83,10 +90,8 @@ const _monthNames = [
 /// The three most recent calendar months (this one first), with real trip
 /// counts and a real on-time rate computed from [trips]. Replaces what used to
 /// be three fully hardcoded `_MonthStat` rows for January–March 2026.
-List<_MonthStat> _recentMonths(List<Trip> trips) {
+List<_MonthStat> _recentMonths(List<Trip> trips, List<DriverRating> ratings) {
   final now = DateTime.now();
-  // Illustrative only — there is no monthly rating table, see [_MonthStat].
-  const placeholderRatings = [4.9, 4.8, 4.8];
 
   return List.generate(3, (i) {
     final m = DateTime(now.year, now.month - i, 1);
@@ -99,11 +104,24 @@ List<_MonthStat> _recentMonths(List<Trip> trips) {
         .toList();
     final onTime = completed.where((t) => t.onTime == true).length;
     final pct = completed.isEmpty ? 0.0 : onTime / completed.length * 100;
+
+    final monthRatings = ratings
+        .where(
+          (r) =>
+              r.createdAt != null &&
+              r.createdAt!.year == m.year &&
+              r.createdAt!.month == m.month,
+        )
+        .map((r) => r.rating)
+        .toList();
+
     return _MonthStat(
       '${_monthNames[m.month - 1]} ${m.year}',
       inMonth.length,
       double.parse(pct.toStringAsFixed(1)),
-      placeholderRatings[i],
+      monthRatings.isEmpty
+          ? null
+          : monthRatings.reduce((a, b) => a + b) / monthRatings.length,
     );
   });
 }
@@ -217,7 +235,20 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                             builder: (context, ratingSnap) {
                               final ratings =
                                   ratingSnap.data ?? const <DriverRating>[];
-                              return _buildBody(context, trips, ratings);
+                              // The safety score's evidence. A driver who
+                              // has never raised an SOS has an empty list
+                              // here, which is a 100% — earned, not assumed.
+                              return StreamBuilder<List<Incident>>(
+                                stream: IncidentRepository.instance
+                                    .watchForDriver(uid),
+                                builder: (context, incidentSnap) =>
+                                    _buildBody(
+                                      context,
+                                      trips,
+                                      ratings,
+                                      incidentSnap.data ?? const <Incident>[],
+                                    ),
+                              );
                             },
                           );
                         },
@@ -234,6 +265,7 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
     BuildContext context,
     List<Trip> trips,
     List<DriverRating> ratings,
+    List<Incident> incidents,
   ) {
     final completed = trips
         .where((t) => t.status == TripStatus.completed)
@@ -256,6 +288,11 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
     final isVerified = driver?.isApproved ?? false;
     final hasTrips = trips.isNotEmpty;
     final hasData = isVerified && hasTrips;
+    final scores = computeDriverScores(
+      trips: trips,
+      ratings: ratings,
+      incidents: incidents,
+    );
     final achievements = _computeAchievements(
       isVerified: isVerified,
       completed: completed,
@@ -295,7 +332,7 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                     // new here is that a driver with nothing real behind
                     // this number no longer sees an invented one.
                     child: Text(
-                      hasData ? '96' : 'N/A',
+                      hasData ? '${scores.overall ?? 0}' : 'N/A',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
@@ -324,7 +361,7 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                       ? 'Pending Verification'
                       : !hasTrips
                       ? 'No data available'
-                      : 'Excellent Performance',
+                      : scores.label,
                   style: TextStyle(
                     color: hasData
                         ? AppTheme.successLight
@@ -346,11 +383,16 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                       onTimePct == null ? '—' : '${onTimePct.round()}%',
                       'On-Time',
                     ),
-                    // Placeholder even when `hasData` is true: no
-                    // satisfaction-survey data source exists yet. Blank for
-                    // a new/unverified driver rather than always-98% either
-                    // way.
-                    _ScorePill('😊', hasData ? '98%' : '—', 'Satisfaction'),
+                    // The families' own ratings, which is the only
+                    // satisfaction signal this app collects. Used to be a
+                    // literal 98% for every driver with one trip.
+                    _ScorePill(
+                      '😊',
+                      scores.satisfaction == null
+                          ? '—'
+                          : '${(scores.satisfaction! * 100).round()}%',
+                      'Satisfaction',
+                    ),
                   ],
                 ),
               ],
@@ -376,7 +418,7 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                 if (!hasData)
                   const _EmptyMonthlyState()
                 else
-                  for (final s in _recentMonths(trips)) _MonthRow(s),
+                  for (final s in _recentMonths(trips, ratings)) _MonthRow(s),
               ],
             ),
           ),
@@ -397,32 +439,31 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // All four are computed from real records now — see
+                // [_computeScores]. Three of them were constants (0.98,
+                // 0.99, 0.94) shown to every driver who had completed a
+                // single trip.
                 _MetricBar(
                   label: 'On-Time Arrivals',
-                  value: (onTimePct ?? 0) / 100,
+                  value: scores.onTime ?? 0,
                   color: AppTheme.driverCyan,
                 ),
                 const SizedBox(height: 12),
-                // Placeholder metrics below even when `hasData` is true: no
-                // survey, compliance-tracking or safe-driving-scoring
-                // backend exists yet. Zeroed out (empty/grey bar) for a
-                // new/unverified driver instead of always showing the same
-                // static values regardless of whether they've ever driven.
                 _MetricBar(
                   label: 'Student Satisfaction',
-                  value: hasData ? 0.98 : 0.0,
+                  value: scores.satisfaction ?? 0,
                   color: AppTheme.success,
                 ),
                 const SizedBox(height: 12),
                 _MetricBar(
                   label: 'Route Compliance',
-                  value: hasData ? 0.99 : 0.0,
+                  value: scores.compliance ?? 0,
                   color: AppTheme.driverTeal,
                 ),
                 const SizedBox(height: 12),
                 _MetricBar(
                   label: 'Safe Driving Score',
-                  value: hasData ? 0.94 : 0.0,
+                  value: scores.safety ?? 0,
                   color: AppTheme.warningLight,
                 ),
               ],
@@ -482,7 +523,7 @@ class _ScorePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(icon, style: const TextStyle(fontSize: 18)),
+        AppGlyph(icon, size: 18),
         const SizedBox(height: 4),
         Text(
           value,
@@ -574,7 +615,11 @@ class _MonthRow extends StatelessWidget {
                 const Text('⭐', style: TextStyle(fontSize: 10)),
                 const SizedBox(width: 2),
                 Text(
-                  '${stat.rating}',
+                  // A month with no ratings has no average. This used to
+                  // print one of three constants regardless.
+                  stat.rating == null
+                      ? '—'
+                      : stat.rating!.toStringAsFixed(1),
                   style: const TextStyle(
                     color: AppTheme.warningLight,
                     fontSize: 12,
@@ -654,7 +699,7 @@ class _Badge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 14)),
+          AppGlyph(icon, size: 14),
           const SizedBox(width: 6),
           Text(
             label,

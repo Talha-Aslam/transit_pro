@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
@@ -19,8 +18,11 @@ import '../../widgets/account_management_section.dart';
 import '../../widgets/child_avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
-import '../../widgets/profile_form_fields.dart' show FieldLabel, MapPointField;
+import '../../widgets/profile_form_fields.dart'
+    show FieldLabel, MapPointField, PlaceSearchField, SchoolSearchField;
 import '../../widgets/zoomable_image_viewer.dart';
+import '../map_picker_screen.dart';
+import '../../widgets/app_glyph.dart';
 
 /// Opens the full-screen pinch-to-zoom viewer for an avatar -- shared by the
 /// parent's own avatar in [_ParentProfileState] and each `_ChildCard` below,
@@ -1060,7 +1062,7 @@ class _MenuItem extends StatelessWidget {
                         size: 18,
                         color: labelColor ?? context.textPrimary,
                       )
-                    : Text(icon!, style: const TextStyle(fontSize: 18)),
+                    : AppGlyph(icon!, size: 18),
               ),
             ),
             const SizedBox(width: 14),
@@ -1643,7 +1645,6 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
   late final TextEditingController _studentIdCtrl;
   late final TextEditingController _locationCtrl;
   late final TextEditingController _instituteNameCtrl;
-  final FocusNode _instituteNameFocus = FocusNode();
 
   String? _instituteType;
 
@@ -2013,82 +2014,19 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     }
   }
 
-  // Dummy data source for the "Institute Name" autocomplete below, keyed by
-  // institute type so a College suggestion never leaks into a School search.
-  // Swapping this for a real, live source (e.g. a Firestore `institutes`
-  // collection) only means replacing `_instituteSuggestionsFor` — see its
-  // doc comment for exactly what that swap looks like.
-  final Map<String, List<String>> _institutes = {
-    'School': [
-      'Beaconhouse School System',
-      'City School',
-      'Lahore Grammar School',
-      'Roots International School',
-    ],
-    'College': [
-      'Punjab College',
-      'Punjab College Airline Campus',
-      'Punjab College Boys Campus',
-      'Government College Lahore',
-      'Kinnaird College',
-    ],
-    'University': [
-      'University of Lahore',
-      'FAST NUCES',
-      'LUMS',
-      'UET',
-      'Punjab University',
-    ],
-  };
+  // Institute types offered in the dropdown. Name suggestions come live from
+  // Google Places (see `SchoolSearchField`), not from a local list.
+  static const _instituteTypes = ['School', 'College', 'University', 'Academy'];
 
-  /// Case-insensitive, "contains anywhere" match against [_institutes]'s
-  /// dummy list for the currently selected institute type — typing "punjab"
-  /// finds "Punjab College" *and* "Punjab College Airline Campus" the same
-  /// way it would with real data.
-  ///
-  /// ── Swapping this for Firestore later ──────────────────────────────────
-  /// `RawAutocomplete.optionsBuilder` must return synchronously, so a live
-  /// backend can't just be awaited in here — the usual pattern is a
-  /// debounced query that writes into a cached `List<String>` field, which
-  /// this method then filters/returns exactly like it does today. Sketch,
-  /// assuming an `institutes` collection with `type`/`name` fields:
-  ///
-  /// ```dart
-  /// Timer? _instituteQueryDebounce;
-  /// List<String> _liveInstituteSuggestions = [];
-  ///
-  /// void _onInstituteNameChanged(String query) {
-  ///   _instituteQueryDebounce?.cancel();
-  ///   _instituteQueryDebounce = Timer(const Duration(milliseconds: 250), () async {
-  ///     if (query.trim().isEmpty || _instituteType == null) return;
-  ///     // Firestore has no server-side "contains" — only a prefix range
-  ///     // scan (`>= query` and `< query + ''`), so this only ever
-  ///     // suggests names *starting with* what's typed, not "Punjab" inside
-  ///     // "Airline Punjab College". A real substring/fuzzy search needs a
-  ///     // dedicated search service (Algolia, Typesense, etc.) behind it.
-  ///     final snap = await FirebaseFirestore.instance
-  ///         .collection('institutes')
-  ///         .where('type', isEqualTo: _instituteType)
-  ///         .orderBy('name')
-  ///         .startAt([query])
-  ///         .endAt(['$query'])
-  ///         .limit(20)
-  ///         .get();
-  ///     if (!mounted) return;
-  ///     setState(() {
-  ///       _liveInstituteSuggestions =
-  ///           snap.docs.map((d) => d.data()['name'] as String).toList();
-  ///     });
-  ///   });
-  /// }
-  /// ```
-  Iterable<String> _instituteSuggestionsFor(String query) {
-    final type = _instituteType;
-    if (type == null || query.isEmpty) return const [];
-    final pool = _institutes[type] ?? const [];
-    final needle = query.toLowerCase();
-    return pool.where((name) => name.toLowerCase().contains(needle));
-  }
+  /// Whether the institute name was typed manually (no Places match).
+  bool _customInstitute = false;
+
+  /// Same, for the "Current Location" field — true when the address was
+  /// typed by hand or only ever came back as raw coordinates.
+  bool _customLocation = false;
+
+  //''`), so this only ever
+  //'$query'])
 
   @override
   void initState() {
@@ -2140,7 +2078,6 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     _studentIdCtrl.dispose();
     _locationCtrl.dispose();
     _instituteNameCtrl.dispose();
-    _instituteNameFocus.dispose();
     super.dispose();
   }
 
@@ -2301,180 +2238,118 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     );
   }
 
-  /// Same label/field styling as [_buildTextField] — this only replaces
-  /// that field's plain `TextField` with a typeahead, everything around it
-  /// (label text, fill color, borders, the map-pin tooltip next to it)
-  /// stays exactly as it already was.
-  ///
-  /// `RawAutocomplete`, not the higher-level `Autocomplete` widget: the
-  /// latter always creates and owns its own `TextEditingController`
-  /// internally, which would orphan `_instituteNameCtrl` — every other
-  /// read of the institute name in this file (`_save`, `_openInstituteMap`,
-  /// `showBuses`, `_driversStreamFor`) would silently stop seeing typed
-  /// input. `RawAutocomplete` accepts an external controller instead, so
-  /// all of that keeps working unchanged.
+  /// Institute name with live Places suggestions. [SchoolSearchField] writes
+  /// into [_instituteNameCtrl], so `_save` and the driver search keep working.
   Widget _buildInstituteNameField() {
-    return RawAutocomplete<String>(
-      textEditingController: _instituteNameCtrl,
-      focusNode: _instituteNameFocus,
-      optionsBuilder: (TextEditingValue value) =>
-          _instituteSuggestionsFor(value.text.trim().toLowerCase()),
-      onSelected: (_) {
-        // A different institute name means whatever driver/round was
-        // picked for the old one no longer applies — same reset the plain
-        // TextField's onChanged used to do.
-        setState(() {
-          _selectedDriver = null;
-          _scheduleId = null;
-        });
-      },
-      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Institute Name",
-              style: TextStyle(
-                color: context.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: controller,
-              focusNode: focusNode,
-              onChanged: (_) {
-                setState(() {
-                  _selectedDriver = null;
-                  _scheduleId = null;
-                });
-              },
-              style: TextStyle(color: context.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: "e.g. Springfield High",
-                hintStyle: TextStyle(color: context.textHint),
-                filled: true,
-                fillColor: context.isDark
-                    ? AppTheme.bgDarkBlue
-                    : const Color(0xFFF1F5F9),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.inputBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: context.inputBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: widget.accentColor, width: 1.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-        );
-      },
-      optionsViewBuilder: (context, onSelected, options) {
-        final list = options.toList();
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(12),
-            color: context.isDark ? AppTheme.bgDark : Colors.white,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 220),
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: list.length,
-                itemBuilder: (context, index) {
-                  final option = list[index];
-                  return InkWell(
-                    onTap: () => onSelected(option),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Text(
-                        option,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Institute Name",
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 6),
+        // Google Places autocomplete (country=pk) — suggestions show in an
+        // overlay right below the field. Picking one also pins the campus
+        // as the institute location.
+        SchoolSearchField(
+          controller: _instituteNameCtrl,
+          isCustom: _customInstitute,
+          accentColor: widget.accentColor,
+          near: _dropoff ?? _pickup,
+          onCustomChanged: (v) => setState(() {
+            _customInstitute = v;
+            _selectedDriver = null;
+            _scheduleId = null;
+          }),
+          onLocationSelected: (coord) => setState(() {
+            _dropoff = coord;
+            _selectedDriver = null;
+            _scheduleId = null;
+          }),
+        ),
+        const SizedBox(height: 14),
+      ],
     );
   }
 
-  Future<void> _openInstituteMap() async {
-    final institute = _instituteNameCtrl.text.trim();
-    if (institute.isEmpty) return;
-
-    final query = [
-      institute.trim(),
-      if (_instituteType != null) _instituteType,
-    ].where((part) => part != null && part.isNotEmpty).join(' ');
-    await _openMapQuery(query);
-  }
-
-  Future<void> _openCurrentLocationMap() async {
-    final location = _locationCtrl.text.trim();
-    if (location.isEmpty) return;
-    await _openMapQuery(location);
-  }
-
-  Future<void> _openMapQuery(String rawQuery) async {
-    final query = rawQuery.trim();
-    if (query.isEmpty) return;
-
-    final encoded = Uri.encodeComponent(query);
-    final webUri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$encoded',
+  /// "Where you live", with the same live Places suggestions the institute
+  /// field has — only unfiltered, since a home address is a street/sector,
+  /// not an education POI. Writes into [_locationCtrl] (persisted as
+  /// `Student.stop`) and, when a real suggestion is picked, pins the
+  /// resolved point as the child's pickup location so driver matching has a
+  /// coordinate to measure from.
+  Widget _buildCurrentLocationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Current Location (Where you live)",
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        PlaceSearchField(
+          controller: _locationCtrl,
+          isCustom: _customLocation,
+          accentColor: widget.accentColor,
+          hintText: "e.g. Model Town, Lahore",
+          near: _pickup ?? _dropoff,
+          onCustomChanged: (v) => setState(() => _customLocation = v),
+          onLocationSelected: (coord) => setState(() => _pickup = coord),
+        ),
+        const SizedBox(height: 14),
+      ],
     );
+  }
 
-    bool opened = false;
-    if (Platform.isAndroid) {
-      final androidGeo = Uri.parse('geo:0,0?q=$encoded');
-      if (await canLaunchUrl(androidGeo)) {
-        opened = await launchUrl(
-          androidGeo,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } else if (Platform.isIOS) {
-      final iosGoogleMaps = Uri.parse('comgooglemaps://?q=$encoded');
-      if (await canLaunchUrl(iosGoogleMaps)) {
-        opened = await launchUrl(
-          iosGoogleMaps,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    }
+  /// Opens the in-app map picker (google_maps_flutter) on the institute's
+  /// current pin and stores the chosen point as the child's drop-off —
+  /// `Student.dropoffLocation` is the institute location.
+  Future<void> _pickInstituteLocation() async {
+    final result = await Navigator.of(context).push<PickedLocation?>(
+      MaterialPageRoute(
+        builder: (_) =>
+            MapPickerScreen(initial: _dropoff, accentColor: widget.accentColor),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _dropoff = result.coord);
+  }
 
-    if (!opened && await canLaunchUrl(webUri)) {
-      opened = await launchUrl(webUri, mode: LaunchMode.externalApplication);
-    }
-
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open Google Maps right now.')),
-      );
-    }
+  /// Opens the in-app map picker on the child's pickup pin and stores both
+  /// the point and its reverse-geocoded address — the address goes into
+  /// [_locationCtrl] (persisted as `Student.stop`), so pinning and typing
+  /// feed the same field. Mirrors [_pickInstituteLocation].
+  ///
+  /// This used to hand the typed text to the *external* Google Maps app via
+  /// url_launcher, which left the app, resolved nothing and brought no
+  /// coordinate back.
+  Future<void> _pickCurrentLocation() async {
+    final result = await Navigator.of(context).push<PickedLocation?>(
+      MaterialPageRoute(
+        builder: (_) =>
+            MapPickerScreen(initial: _pickup, accentColor: widget.accentColor),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _pickup = result.coord;
+      // No address came back (no key, offline, or nothing nearby) — the
+      // coordinates are still a truthful thing to store and show.
+      _customLocation = result.address == null;
+      _locationCtrl.text =
+          result.address ??
+          '${result.coord.lat.toStringAsFixed(6)}, '
+              '${result.coord.lng.toStringAsFixed(6)}';
+    });
   }
 
   @override
@@ -2535,7 +2410,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       label: "Institute Type",
                       value: _instituteType,
                       hint: "Select School / College / University",
-                      items: _institutes.keys
+                      items: _instituteTypes
                           .map(
                             (k) => DropdownMenuItem(value: k, child: Text(k)),
                           )
@@ -2551,33 +2426,25 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                           Expanded(child: _buildInstituteNameField()),
                           const SizedBox(width: 10),
                           Tooltip(
-                            message: "Open institute in Google Maps",
+                            message: "Pick institute location on the map",
                             child: GestureDetector(
-                              onTap: instituteName.isEmpty
-                                  ? null
-                                  : _openInstituteMap,
+                              onTap: _pickInstituteLocation,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 14),
                                 width: 46,
                                 height: 46,
                                 decoration: BoxDecoration(
-                                  color: instituteName.isEmpty
-                                      ? context.surfaceBorder.withValues(
-                                          alpha: 0.45,
-                                        )
-                                      : AppTheme.info.withValues(alpha: 0.12),
+                                  color: AppTheme.info.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: instituteName.isEmpty
-                                        ? context.surfaceBorder
-                                        : AppTheme.info.withValues(alpha: 0.25),
+                                    color: AppTheme.info.withValues(
+                                      alpha: 0.25,
+                                    ),
                                   ),
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.my_location_rounded,
-                                  color: instituteName.isEmpty
-                                      ? context.textTertiary
-                                      : AppTheme.info,
+                                  color: AppTheme.info,
                                   size: 22,
                                 ),
                               ),
@@ -2593,43 +2460,26 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: _buildTextField(
-                            "Current Location (Where you live)",
-                            _locationCtrl,
-                            "e.g. Oak Street",
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
+                        Expanded(child: _buildCurrentLocationField()),
                         const SizedBox(width: 10),
                         Tooltip(
-                          message: "Open location in Google Maps",
+                          message: "Pick your location on the map",
                           child: GestureDetector(
-                            onTap: _locationCtrl.text.trim().isEmpty
-                                ? null
-                                : _openCurrentLocationMap,
+                            onTap: _pickCurrentLocation,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 14),
                               width: 46,
                               height: 46,
                               decoration: BoxDecoration(
-                                color: _locationCtrl.text.trim().isEmpty
-                                    ? context.surfaceBorder.withValues(
-                                        alpha: 0.45,
-                                      )
-                                    : AppTheme.info.withValues(alpha: 0.12),
+                                color: AppTheme.info.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: _locationCtrl.text.trim().isEmpty
-                                      ? context.surfaceBorder
-                                      : AppTheme.info.withValues(alpha: 0.25),
+                                  color: AppTheme.info.withValues(alpha: 0.25),
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.my_location_rounded,
-                                color: _locationCtrl.text.trim().isEmpty
-                                    ? context.textTertiary
-                                    : AppTheme.info,
+                                color: AppTheme.info,
                                 size: 22,
                               ),
                             ),
@@ -2647,10 +2497,12 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       onPicked: (p) => setState(() => _pickup = p),
                     ),
                     const SizedBox(height: 12),
-                    const FieldLabel('DROP-OFF LOCATION (OPTIONAL)'),
+                    const FieldLabel(
+                      'INSTITUTE LOCATION / DROP-OFF (OPTIONAL)',
+                    ),
                     const SizedBox(height: 6),
                     MapPointField(
-                      placeholder: 'Tap to pin where the van drops them off',
+                      placeholder: 'Tap to pin the institute on the map',
                       value: _dropoff,
                       accentColor: widget.accentColor,
                       onPicked: (p) => setState(() => _dropoff = p),

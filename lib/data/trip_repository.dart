@@ -160,6 +160,60 @@ class TripRepository {
         'stopId': ?stopId,
       }, SetOptions(merge: true));
 
+  /// Marks everyone still aboard [tripId] as handed over.
+  ///
+  /// Called when the bus reaches the far end of the leg, and again when the
+  /// driver closes the round. Without it `boarded` is a one-way door: the
+  /// last thing a family is ever told is that their child got on, which is
+  /// why a parent dashboard said "On the bus" long after the child was
+  /// sitting in class.
+  ///
+  /// Returns how many records changed, so a caller can skip the write when
+  /// there is nothing to do.
+  Future<int> markRemainingDroppedOff({
+    required String tripId,
+    required String markedBy,
+  }) async {
+    final snap = await Db.attendance(tripId).get();
+    final aboard = snap.docs
+        .where((d) => d.data().status == AttendanceStatus.boarded)
+        .toList();
+    if (aboard.isEmpty) return 0;
+
+    final batch = Db.fs.batch();
+    for (final doc in aboard) {
+      batch.set(
+        Db.fs
+            .collection('trips')
+            .doc(tripId)
+            .collection('attendance')
+            .doc(doc.id),
+        {
+          'status': AttendanceStatus.droppedOff.name,
+          'markedAt': Db.now,
+          'markedBy': markedBy,
+        },
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+    return aboard.length;
+  }
+
+  /// Student ids on [tripId] that the driver never recorded either way.
+  ///
+  /// A missing record is not the same as an absence: it means nobody looked.
+  /// The family is left reading "waiting to board" for a ride that has
+  /// already finished, and the only person who can say what happened is the
+  /// driver, who has to be told they skipped it.
+  Future<List<String>> unmarkedStudents(String tripId) async {
+    final snap = await Db.attendance(tripId).get();
+    return [
+      for (final doc in snap.docs)
+        if (doc.data().status == AttendanceStatus.pending) doc.id,
+    ];
+  }
+
   /// A student's attendance across trips, newest first — powers
   /// parent/student trip history.
   ///
@@ -194,7 +248,10 @@ class TripRepository {
     var absent = 0;
     for (final doc in snap.docs) {
       switch (doc.data().status) {
+        // A child handed over at the other end rode the bus, so they count
+        // towards the trip's boarded total exactly as they did an hour ago.
         case AttendanceStatus.boarded:
+        case AttendanceStatus.droppedOff:
           boarded++;
         case AttendanceStatus.absent:
           absent++;
