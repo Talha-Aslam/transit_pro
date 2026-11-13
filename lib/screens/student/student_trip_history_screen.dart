@@ -160,7 +160,11 @@ class _StudentTripHistoryScreenState extends State<StudentTripHistoryScreen> {
         time: _formatTime(date),
         status: status,
         statusOk: statusOk,
-        attendancePresent: r.status == AttendanceStatus.boarded,
+        // A ride the driver closed with "dropped" was ridden: counting only
+        // `boarded` filed every finished trip as absent.
+        attendancePresent:
+            r.status == AttendanceStatus.boarded ||
+            r.status == AttendanceStatus.droppedOff,
         isMorning: isMorning,
       );
     }).toList();

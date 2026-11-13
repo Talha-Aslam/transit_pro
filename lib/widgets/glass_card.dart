@@ -240,12 +240,21 @@ class StatusBadge extends StatelessWidget {
             Text(dotIndicator!, style: const TextStyle(fontSize: 10)),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+          // `Flexible`, because a badge is given its label by whatever
+          // builds it and some of them are sentences now ("Reached
+          // Divisional Public School - Township"). Without this the pill
+          // simply grew past its parent and Flutter painted the overflow
+          // stripes over the card.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

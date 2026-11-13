@@ -116,7 +116,7 @@ class RideRequestRepository {
       );
     }
 
-    if (!schedule.hasSpace) {
+    if (!driver.roundHasSpace(schedule)) {
       throw const RideRequestException(
         'That round just filled up. Pick another round or another driver.',
       );
@@ -182,6 +182,12 @@ class RideRequestRepository {
     batch.update(Db.fs.collection('students').doc(studentId), {
       'driverId': FieldValue.delete(),
       'scheduleId': FieldValue.delete(),
+      // Accepting linked the driver's bus as well; left behind, the family's
+      // app went on resolving the driver through it and still showed them.
+      'busId': FieldValue.delete(),
+      // No seat, no fee: billing stops here.
+      'monthlyFeePaisa': FieldValue.delete(),
+      'feeStartedAt': FieldValue.delete(),
       'updatedAt': Db.now,
     });
     await batch.commit();
@@ -236,6 +242,19 @@ class RideRequestRepository {
           'That request was already closed, so it cannot be accepted.',
         );
       }
+      // A fee on the table has to be settled first: booking the seat over a
+      // fee the family has not agreed — or has turned down — would bill them
+      // for a figure they said no to.
+      if (request.feeStatus == FeeStatus.proposed) {
+        throw const RideRequestException(
+          'The family has not answered your fee yet.',
+        );
+      }
+      if (request.feeStatus == FeeStatus.rejected) {
+        throw const RideRequestException(
+          'The family turned your fee down. Send a new fee, or decline.',
+        );
+      }
 
       final driver = Driver.fromMap(driverSnap.id, driverSnap.data()!);
       final schedule = driver.scheduleById(request.scheduleId);
@@ -245,7 +264,7 @@ class RideRequestRepository {
           'Ask them to send a new request.',
         );
       }
-      if (!schedule.hasSpace) {
+      if (!driver.roundHasSpace(schedule)) {
         throw const RideRequestException(
           'That round is full. Free a seat or add capacity before accepting.',
         );
@@ -290,10 +309,43 @@ class RideRequestRepository {
     required String driverId,
     required String scheduleId,
     String? busId,
+    int monthlyFeePaisa = 0,
   }) => Db.fs.collection('students').doc(studentId).update({
     'driverId': driverId,
     'scheduleId': scheduleId,
     if (busId != null && busId.isNotEmpty) 'busId': busId,
+    // The agreed fee, and today as the first day of its first 30 days.
+    if (monthlyFeePaisa > 0) 'monthlyFeePaisa': monthlyFeePaisa,
+    if (monthlyFeePaisa > 0) 'feeStartedAt': Db.now,
+    'updatedAt': Db.now,
+  });
+
+  /// The driver names a monthly fee for a waiting request — or a new one
+  /// after the family turned the last down.
+  Future<void> proposeFee({
+    required String requestId,
+    required int feePaisa,
+    String? note,
+  }) => _rawRequest(requestId).update({
+    'feePaisa': feePaisa,
+    'feeStatus': FeeStatus.proposed.name,
+    'feeDriverNote': (note ?? '').trim().isEmpty
+        ? FieldValue.delete()
+        : note!.trim(),
+    'feeFamilyNote': FieldValue.delete(),
+    'updatedAt': Db.now,
+  });
+
+  /// The family's answer to the driver's fee, with what they want to say.
+  Future<void> answerFee({
+    required String requestId,
+    required bool accept,
+    String? note,
+  }) => _rawRequest(requestId).update({
+    'feeStatus': (accept ? FeeStatus.accepted : FeeStatus.rejected).name,
+    'feeFamilyNote': (note ?? '').trim().isEmpty
+        ? FieldValue.delete()
+        : note!.trim(),
     'updatedAt': Db.now,
   });
 
@@ -362,6 +414,12 @@ class RideRequestRepository {
     await Db.fs.collection('students').doc(studentId).update({
       'driverId': FieldValue.delete(),
       'scheduleId': FieldValue.delete(),
+      // Accepting linked the driver's bus as well; left behind, the family's
+      // app went on resolving the driver through it and still showed them.
+      'busId': FieldValue.delete(),
+      // No seat, no fee: billing stops here.
+      'monthlyFeePaisa': FieldValue.delete(),
+      'feeStartedAt': FieldValue.delete(),
       'updatedAt': Db.now,
     });
   }

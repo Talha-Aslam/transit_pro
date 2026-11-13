@@ -1,5 +1,22 @@
 import 'package:transit_core/transit_core.dart';
 
+/// Raised when a second driver opens a request the first one already took.
+///
+/// A normal outcome of two drivers watching the same queue, not a fault —
+/// which is why it carries a sentence written for the driver rather than a
+/// Firestore code.
+class RequestAlreadyTakenException implements Exception {
+  final String message;
+  const RequestAlreadyTakenException([
+    this.message =
+        'Another driver reached this one first. It has been taken off '
+        'your queue.',
+  ]);
+
+  @override
+  String toString() => message;
+}
+
 /// The missed-bus request lifecycle, now genuinely cross-device.
 ///
 /// In the prototype this worked only because every role ran in one process
@@ -80,19 +97,58 @@ class MissedBusRepository {
   /// the way the old single-step flow did), so the requester's UI can show
   /// "X is viewing your request" and, once a bid follows, a driver profile
   /// card — with no second read needed.
+  /// Claims the request for [driver], or refuses because somebody else got
+  /// there first.
+  ///
+  /// A transaction, not an update. Two drivers watching the same queue both
+  /// read "unclaimed" and both tapped; the rules cannot serialise that —
+  /// each write is individually legal — so both succeeded, the second
+  /// silently overwrote the first, and two drivers drove to the same child.
+  /// Re-reading inside the transaction is what makes the second one lose.
   Future<void> markViewing({
     required String requestId,
     required Driver driver,
     required Bus bus,
-  }) => Db.fs.collection('missedBusRequests').doc(requestId).update({
-    'status': MissedBusStatus.viewing.name,
-    'assignedDriverId': driver.id,
-    'assignedDriverName': driver.name,
-    'assignedDriverPhone': driver.phone,
-    'assignedDriverPhotoUrl': ?driver.photoUrl,
-    'assignedBusId': bus.id,
-    'assignedBusNumber': bus.busNumber,
-  });
+  }) async {
+    final ref = Db.fs.collection('missedBusRequests').doc(requestId);
+    await Db.fs.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw const RequestAlreadyTakenException(
+          'That request is no longer open.',
+        );
+      }
+      final data = snap.data() ?? const <String, dynamic>{};
+      final holder = data['assignedDriverId'] as String?;
+      if (holder != null && holder.isNotEmpty && holder != driver.id) {
+        throw const RequestAlreadyTakenException();
+      }
+      final status = asEnum(
+        data['status'],
+        MissedBusStatus.values,
+        MissedBusStatus.searching,
+      );
+      // Already answered, cancelled or resolved: opening it now would
+      // reopen a closed conversation on the requester's screen.
+      if (status != MissedBusStatus.searching &&
+          status != MissedBusStatus.viewing &&
+          status != MissedBusStatus.bidOffered) {
+        throw const RequestAlreadyTakenException(
+          'That request has already been resolved.',
+        );
+      }
+
+      tx.update(ref, {
+        'status': MissedBusStatus.viewing.name,
+        'assignedDriverId': driver.id,
+        'assignedDriverName': driver.name,
+        'assignedDriverPhone': driver.phone,
+        'assignedDriverPhotoUrl': ?driver.photoUrl,
+        'assignedBusId': bus.id,
+        'assignedBusNumber': bus.busNumber,
+      });
+    });
+  }
 
   /// Step 2: the viewing driver proposes a fare. Only the driver already on
   /// `assignedDriverId` should ever reach this — enforced by

@@ -52,6 +52,7 @@ class _SignupScreenState extends State<SignupScreen> {
   /// `ProfileRequirements` — the two forms have to ask for the same things or one
   /// route produces accounts the other would reject.
   final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+
   /// The institute names the driver has typed in the step above, for the
   /// round cards to offer as chips. Blank cards are skipped — a half-typed
   /// area is not something to tick a round against.
@@ -170,6 +171,7 @@ class _SignupScreenState extends State<SignupScreen> {
             school: c.schoolCtrl.text,
             studentIdNumber: c.studentIdCtrl.text,
             pickupLocation: c.pickup,
+            instituteLocation: c.instituteLocation,
           ),
         )
         .toList(),

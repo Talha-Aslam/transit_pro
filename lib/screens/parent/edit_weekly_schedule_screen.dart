@@ -7,6 +7,7 @@ import '../../app/driver_data_service.dart'
 import '../../app/parent_data_service.dart';
 import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
+import '../../app/weekly_times.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
@@ -29,11 +30,20 @@ const _kWeekdayLabels = [
   'Saturday',
 ];
 
-const _kDefaultMorning = TimeOfDay(hour: 7, minute: 15);
-const _kDefaultEvening = TimeOfDay(hour: 15, minute: 15);
+/// What a family records for each day, as keys of
+/// `Student.requestedSchedule[day]`: when the institute starts and ends, and
+/// the pickup and drop-off they would like from the van.
+const _kTimes = [
+  (WeeklyTimes.schoolStart, 'School starts', TimeOfDay(hour: 8, minute: 0)),
+  (WeeklyTimes.schoolEnd, 'School ends', TimeOfDay(hour: 14, minute: 0)),
+  (WeeklyTimes.pickup, 'Morning Pickup', TimeOfDay(hour: 7, minute: 15)),
+  (WeeklyTimes.dropoff, 'Evening Dropoff', TimeOfDay(hour: 15, minute: 15)),
+];
 
-/// Lets a parent record their own requested Monday–Saturday pickup/drop-off
-/// times for one child — `Student.requestedSchedule`.
+/// Lets a family record their child's Monday–Saturday timings — when the
+/// institute starts and ends, and the pickup/drop-off they would like —
+/// on `Student.requestedSchedule`. Shared by parents (for the selected
+/// child) and students (for themselves).
 ///
 /// Distinct from the read-only "Schedule" tab (`ParentSchedule`), which shows
 /// the assigned driver's real, shared `DriverTimingSlots`: that time is the
@@ -50,8 +60,9 @@ class EditWeeklyScheduleScreen extends StatefulWidget {
 }
 
 class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
-  final Map<String, TimeOfDay?> _morning = {};
-  final Map<String, TimeOfDay?> _evening = {};
+  /// Day → time key → time.
+  final Map<String, Map<String, TimeOfDay?>> _times = {};
+  String _driverId = '';
 
   bool _loading = true;
   bool _saving = false;
@@ -65,37 +76,36 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
   }
 
   Future<void> _load() async {
-    final child = ParentDataService.instance.selectedChild;
-    if (child == null || child.id.isEmpty) {
+    // A student edits their own week; a parent, the child they have selected.
+    final self = SessionService.instance.student.value;
+    final child = self == null
+        ? ParentDataService.instance.selectedChild
+        : null;
+    final id = self?.id ?? child?.id ?? '';
+    if (id.isEmpty) {
       setState(() => _loading = false);
       return;
     }
-    _studentId = child.id;
-    _childName = child.name;
+    _studentId = id;
+    _childName = self == null ? (child?.name ?? '') : '';
 
-    final student = await UserRepository.instance.fetchStudent(child.id);
+    final student = await UserRepository.instance.fetchStudent(id);
+    _driverId = student?.driverId ?? '';
     final saved = student?.requestedSchedule ?? {};
     for (final day in _kWeekdays) {
       final times = saved[day];
-      _morning[day] = parseTimeOfDay(times?['morningPickup']);
-      _evening[day] = parseTimeOfDay(times?['eveningDropoff']);
+      _times[day] = {
+        for (final t in _kTimes) t.$1: parseTimeOfDay(times?[t.$1]),
+      };
     }
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _pickTime(String day, {required bool morning}) async {
-    final current =
-        (morning ? _morning[day] : _evening[day]) ??
-        (morning ? _kDefaultMorning : _kDefaultEvening);
+  Future<void> _pickTime(String day, String key, TimeOfDay fallback) async {
+    final current = _times[day]?[key] ?? fallback;
     final picked = await showTimePicker(context: context, initialTime: current);
     if (picked == null) return;
-    setState(() {
-      if (morning) {
-        _morning[day] = picked;
-      } else {
-        _evening[day] = picked;
-      }
-    });
+    setState(() => (_times[day] ??= {})[key] = picked);
   }
 
   /// Tells the driver there is something waiting for them.
@@ -105,11 +115,11 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
   /// than a lost one.
   Future<void> _askDriver(String studentId) async {
     try {
-      final student = SessionService.instance.children.value
-          .where((c) => c.id == studentId)
-          .firstOrNull;
-      final driverId = student?.driverId ?? '';
+      final driverId = _driverId;
       if (driverId.isEmpty) return;
+      final name = _childName.isNotEmpty
+          ? _childName
+          : SessionService.instance.student.value?.name;
       await PushSender.instance.notifyOne(
         driverId,
         UserNotification(
@@ -117,7 +127,7 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
           type: NotificationType.rideRequest,
           title: 'New timings requested',
           body:
-              '${student?.name ?? 'A family'} has asked for different '
+              '${name ?? 'A family'} has asked for different '
               'pickup or drop-off times. Tap to answer.',
           data: {'studentId': studentId, 'route': '/driver/timetables'},
         ),
@@ -133,15 +143,13 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
 
     setState(() => _saving = true);
     try {
-      // Batch-writes all 6 days x 2 times as one nested map in a single
-      // Firestore update, rather than 12 separate field writes.
+      // Every day's times as one nested map in a single Firestore update.
       final requestedSchedule = <String, Map<String, String>>{
         for (final day in _kWeekdays)
           day: {
-            if (_morning[day] != null)
-              'morningPickup': formatTimeOfDay(_morning[day]!),
-            if (_evening[day] != null)
-              'eveningDropoff': formatTimeOfDay(_evening[day]!),
+            for (final t in _kTimes)
+              if (_times[day]?[t.$1] != null)
+                t.$1: formatTimeOfDay(_times[day]![t.$1]!),
           },
       };
       await UserRepository.instance.updateStudent(studentId, {
@@ -156,9 +164,7 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
       await _askDriver(studentId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sent to your driver for approval.'),
-          ),
+          const SnackBar(content: Text('Sent to your driver for approval.')),
         );
         context.pop();
       }
@@ -182,7 +188,7 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
                     : _studentId == null
                     ? Center(
                         child: Text(
-                          'No child selected.',
+                          'No student selected.',
                           style: TextStyle(color: context.textSecondary),
                         ),
                       )
@@ -194,12 +200,9 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
                               padding: const EdgeInsets.only(bottom: 12),
                               child: _DayCard(
                                 label: _kWeekdayLabels[i],
-                                morning: _morning[_kWeekdays[i]],
-                                evening: _evening[_kWeekdays[i]],
-                                onTapMorning: () =>
-                                    _pickTime(_kWeekdays[i], morning: true),
-                                onTapEvening: () =>
-                                    _pickTime(_kWeekdays[i], morning: false),
+                                times: _times[_kWeekdays[i]] ?? const {},
+                                onTap: (key, fallback) =>
+                                    _pickTime(_kWeekdays[i], key, fallback),
                               ),
                             ),
                         ],
@@ -300,18 +303,22 @@ class _EditWeeklyScheduleScreenState extends State<EditWeeklyScheduleScreen> {
 
 class _DayCard extends StatelessWidget {
   final String label;
-  final TimeOfDay? morning;
-  final TimeOfDay? evening;
-  final VoidCallback onTapMorning;
-  final VoidCallback onTapEvening;
+  final Map<String, TimeOfDay?> times;
+  final void Function(String key, TimeOfDay fallback) onTap;
 
   const _DayCard({
     required this.label,
-    required this.morning,
-    required this.evening,
-    required this.onTapMorning,
-    required this.onTapEvening,
+    required this.times,
+    required this.onTap,
   });
+
+  Widget _tile((String, String, TimeOfDay) t) => Expanded(
+    child: _TimeTile(
+      label: t.$2,
+      time: times[t.$1],
+      onTap: () => onTap(t.$1, t.$3),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -332,21 +339,17 @@ class _DayCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: _TimeTile(
-                  label: 'Morning Pickup',
-                  time: morning,
-                  onTap: onTapMorning,
-                ),
-              ),
+              _tile(_kTimes[0]),
               const SizedBox(width: 10),
-              Expanded(
-                child: _TimeTile(
-                  label: 'Evening Dropoff',
-                  time: evening,
-                  onTap: onTapEvening,
-                ),
-              ),
+              _tile(_kTimes[1]),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _tile(_kTimes[2]),
+              const SizedBox(width: 10),
+              _tile(_kTimes[3]),
             ],
           ),
         ],

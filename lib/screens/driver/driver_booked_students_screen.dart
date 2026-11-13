@@ -4,11 +4,14 @@ import 'package:transit_core/transit_core.dart';
 
 import '../../app/language_provider.dart';
 import '../../app/ride_match_service.dart';
+import '../../app/round_display.dart';
 import '../../app/session_service.dart';
+import '../../app/weekly_times.dart';
 import '../../data/ride_request_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/student_logistics.dart';
 import '../../widgets/app_glyph.dart';
 
 /// The driver's roster — everyone who has a seat on one of their rounds.
@@ -378,9 +381,9 @@ class _DriverBookedStudentsScreenState
                               driver.orderedSchedules.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             Text(
-                              '${driver.totalAvailableSeats} of '
-                              '${driver.totalSeatsOffered} seats free across '
-                              'your rounds',
+                              '${driver.bestAvailableSeats} of '
+                              '${driver.vehicleSeats} seats free on your '
+                              'emptiest round',
                               style: TextStyle(
                                 color: driver.totalAvailableSeats > 0
                                     ? AppTheme.success
@@ -563,7 +566,6 @@ class _DriverBookedStudentsScreenState
     );
   }
 }
-
 
 // ── Pending prompt ──────────────────────────────────────────────────────────
 
@@ -759,6 +761,21 @@ class _UnassignedSection extends StatelessWidget {
 
 // ── Student row ─────────────────────────────────────────────────────────────
 
+/// "Today: 8:00 AM – 2:00 PM · pickup 7:15 AM", or null when the family has
+/// set nothing for today.
+String? _todayLine(Student student) {
+  final t = WeeklyTimes.on(student);
+  if (t.isEmpty) return null;
+  final parts = [
+    if (t.schoolStartAt.isNotEmpty || t.schoolEndAt.isNotEmpty)
+      '${clock12(t.schoolStartAt).isEmpty ? '—' : clock12(t.schoolStartAt)} – '
+          '${clock12(t.schoolEndAt).isEmpty ? '—' : clock12(t.schoolEndAt)}',
+    if (t.pickupAt.isNotEmpty) 'pickup ${clock12(t.pickupAt)}',
+    if (t.dropoffAt.isNotEmpty) 'drop ${clock12(t.dropoffAt)}',
+  ];
+  return 'Today: ${parts.join(' · ')}';
+}
+
 class _BookedPassengerCard extends StatelessWidget {
   final Student student;
 
@@ -831,6 +848,29 @@ class _BookedPassengerCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (student.monthlyFeePaisa > 0)
+                      Text(
+                        'Fee: Rs.${(student.monthlyFeePaisa / 100).round()} / month',
+                        style: const TextStyle(
+                          color: AppTheme.success,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    // Today's timings at a glance, by the day of the week.
+                    if (_todayLine(student) case final today?) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        today,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.driverAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     if (!removable) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -1093,6 +1133,10 @@ class _PassengerDetailSheet extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // Where they are collected and set down, their timings,
+                  // and who to call — all from their live record.
+                  StudentLogistics(student: student),
                   const SizedBox(height: 16),
                   if (onRemove == null)
                     Text(

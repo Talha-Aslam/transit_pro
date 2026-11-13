@@ -152,3 +152,29 @@ Realistically this runs at zero.
 | TLS handshake fails right after the first deploy | The `workers.dev` certificate is still being issued. Give it a few minutes. |
 | `wrangler dev` refuses to start over `compatibility_date` | The bundled runtime only supports dates up to its own build. Keep the date a day or two behind today, or run `npm update wrangler`. |
 | Request succeeds, `sent: 0` | The recipients have no `fcmTokens`. They have not opened the app since push registration was added, or they denied the notification permission. |
+
+## Route planning (`POST /routes`)
+
+The driver app plans each round through this Worker, so the key that pays
+for routing never ships inside the app. Families never call it — they read
+the route the driver's app caches on `trips/{tripId}`.
+
+1. In Google Cloud (project `transitpro-db`) → APIs & Services → Credentials,
+   create a **new** API key. Restrict it to **Routes API** only. Leave
+   application restrictions at *None* (Cloudflare has no fixed IP); the API
+   restriction is the boundary.
+2. Store it as a secret — you are prompted for the value, nothing is echoed:
+
+   ```
+   npx wrangler secret put ROUTES_API_KEY
+   ```
+
+3. Deploy: `npx wrangler deploy`
+
+Until both are done the endpoint answers 404 (old deployment) or 501 (no
+key), and the app quietly falls back to calling the Routes API with its own
+key. Nothing breaks in between.
+
+The endpoint verifies the Firebase ID token, refuses anyone whose
+`users/{uid}.role` is not `driver`, rebuilds the request from origin,
+destination and at most 25 stops, and pins the field mask.

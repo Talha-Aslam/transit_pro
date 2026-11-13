@@ -104,6 +104,11 @@ class OnboardingService {
               // driver tell two children with the same name apart.
               publicCode: Student.publicCodeFor(ref.id),
               pickupLocation: child.pickupLocation,
+              // The far end of this child's trips, kept from the search
+              // result the family picked at sign-up. Dropping it is why
+              // the institute location read blank when they edited the
+              // child later.
+              dropoffLocation: child.instituteLocation,
             ),
           );
         }
@@ -167,6 +172,7 @@ class OnboardingService {
             // derived `serviceSchools` mirror, which is what parent-side search
             // actually queries.
             schedules: draft.schedules,
+            vehicleCapacity: draft.seatCapacity,
           ),
           SetOptions(merge: true),
         );

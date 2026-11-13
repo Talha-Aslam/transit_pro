@@ -22,6 +22,21 @@ String clock12(String hhmm) {
   return '$h12:${m.toString().padLeft(2, '0')} $period';
 }
 
+/// The name a round goes by today, as its driver last set it.
+///
+/// A ride request copies the round's label when it is sent, so a driver who
+/// renames "Round 1" to "DHA morning" afterwards would leave every family
+/// still reading the old name. The live round is asked first; the copy is
+/// only for a round the driver has since removed.
+String roundNameFor(
+  Driver? driver,
+  String? scheduleId, {
+  String fallback = '',
+}) {
+  final live = driver?.scheduleById(scheduleId)?.label.trim() ?? '';
+  return live.isNotEmpty ? live : fallback;
+}
+
 /// What this round does, in one line: `Picks up 6:30 AM · Home by 2:30 PM`.
 ///
 /// Each leg is described by the time that matters to a family — when the van
@@ -60,3 +75,14 @@ String roundSummary(DriverSchedule round) {
     leg('Leaves institute', dropFrom, dropTo),
   );
 }
+
+/// The rounds of [driver] that carry children to [institute].
+///
+/// A driver's rounds do not all go to the same place: one run can drop half
+/// the children at a university and the rest at a college, and the next run
+/// may serve neither. Offering a family every round would let them book a
+/// seat on a trip that never passes their child's gate. A round with no
+/// institutes listed is taken to serve all of them, which is what every
+/// round saved before the field existed looks like.
+List<DriverSchedule> roundsServing(Driver driver, String institute) =>
+    driver.orderedSchedules.where((r) => r.serves(institute)).toList();

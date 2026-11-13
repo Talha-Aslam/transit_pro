@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
+import '../../app/vehicle_capacity.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/child_selector.dart';
@@ -38,6 +39,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
     super.initState();
     LanguageProvider.instance.addListener(_onLangChanged);
     _svc.driverRatings.addListener(_onRatingChanged);
+    _svc.children.addListener(_onChildrenChanged);
     _svc.loadDriverRatings();
     _loadDriver();
     _loadHasRidden();
@@ -61,6 +63,7 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   void dispose() {
     LanguageProvider.instance.removeListener(_onLangChanged);
     _svc.driverRatings.removeListener(_onRatingChanged);
+    _svc.children.removeListener(_onChildrenChanged);
     super.dispose();
   }
 
@@ -81,6 +84,14 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   }
 
   void _onRatingChanged() => setState(() {});
+
+  /// A driver who removes this child is gone from here at once, not the
+  /// next time the screen is opened.
+  void _onChildrenChanged() {
+    if (!mounted) return;
+    final now = _svc.selectedChild?.driver ?? '';
+    if (now != (_driver?.id ?? '')) _onChildChanged();
+  }
 
   Future<void> _submitWeeklyRating(ChildInfo child) async {
     await _svc.rateDriverForChild(child, _selectedRating);
@@ -296,11 +307,23 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _InfoTile(
-                              label: 'Total Seats',
-                              value: meta.totalSeats,
-                              icon: '👥',
-                            ),
+                            child: _driver == null
+                                ? _InfoTile(
+                                    label: 'Total Seats',
+                                    value: meta.totalSeats,
+                                    icon: '👥',
+                                  )
+                                : FutureBuilder<int>(
+                                    future: VehicleCapacity.of(_driver!),
+                                    initialData: VehicleCapacity.current(
+                                      _driver!,
+                                    ),
+                                    builder: (_, snap) => _InfoTile(
+                                      label: 'Total Seats',
+                                      value: '${snap.data ?? meta.totalSeats}',
+                                      icon: '👥',
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -532,9 +555,8 @@ _DriverInfoMeta _driverInfoMetaFor({
         ? '${driver.experienceYears} year${driver.experienceYears == 1 ? '' : 's'}'
         : '—',
     transportNumber: resolvedTransport,
-    // Driver has no single "vehicle capacity" field — seats live per round
-    // on DriverSchedule — so this sums seats offered across every round the
-    // driver runs as the closest real proxy for "total seats".
-    totalSeats: '${driver.totalSeatsOffered}',
+    // The vehicle's own capacity. This used to sum every round, so a
+    // 12-seater running two rounds told the family it had 24 seats.
+    totalSeats: '${driver.vehicleSeats}',
   );
 }

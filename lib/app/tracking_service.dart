@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 // `route_data.dart`'s StopData/RouteData have their own StopStatus enum,
@@ -8,7 +9,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:transit_core/transit_core.dart' hide StopStatus;
 import '../data/live_location_repository.dart';
 import 'geofence_service.dart';
+import 'location_fix.dart';
 import 'location_permissions.dart';
+import '../map/geo_utils.dart';
 import '../models/route_data.dart';
 
 /// Singleton service that drives bus position along a route.
@@ -46,6 +49,24 @@ class TrackingService {
 
   /// True while this device is publishing its position for parents to watch.
   final isBroadcasting = ValueNotifier<bool>(false);
+
+  /// Whether the Realtime Database socket is up. False means the van's
+  /// position is being held on the phone and will be sent on reconnect.
+  final isConnected = ValueNotifier<bool>(true);
+
+  /// False when the phone's location switch is off mid-trip.
+  final gpsEnabled = ValueNotifier<bool>(true);
+
+  /// Set when the position stream itself failed — most often permission
+  /// revoked from the notification shade in the middle of a round.
+  final gpsError = ValueNotifier<String?>(null);
+
+  /// True while the receiver keeps reporting fixes too vague to use.
+  final weakSignal = ValueNotifier<bool>(false);
+
+  /// Every fix that survived [FixFilter], for the trip controller.
+  Stream<LocationFix> get fixes => _fixes.stream;
+  final _fixes = StreamController<LocationFix>.broadcast();
 
   /// Bumped only when a stop's [StopStatus] actually transitions — never on
   /// every 150 ms tick. The map layer listens to this (not the 6.7 Hz
@@ -85,6 +106,17 @@ class TrackingService {
 
   Timer? _simTimer;
   StreamSubscription<Position>? _gpsSub;
+  StreamSubscription<ServiceStatus>? _serviceSub;
+  StreamSubscription<bool>? _connectionSub;
+  final _filter = FixFilter();
+
+  /// The trip controller owns stop progress once it is driving the route;
+  /// the proximity guess in [_updateStopStatuses] must not fight it.
+  bool _externalStops = false;
+  double? _lastAccuracy;
+  DateTime? _lastPublishAt;
+  bool _publishing = false;
+  bool _publishPending = false;
   Timer? _publishTimer;
   String? _broadcastBusId;
   String? _broadcastDriverId;
@@ -144,6 +176,8 @@ class TrackingService {
   /// simulation, so the caller can say so.
   Future<bool> start(RouteData route, {bool preferLive = true}) async {
     _route = route;
+    _externalStops = false;
+    _filter.reset();
     _waypointIndex = 0;
     _progressIndex = 0;
     _recentSpeeds.clear();
@@ -174,6 +208,13 @@ class TrackingService {
     _simTimer = null;
     _gpsSub?.cancel();
     _gpsSub = null;
+    _serviceSub?.cancel();
+    _serviceSub = null;
+    _externalStops = false;
+    _filter.reset();
+    gpsError.value = null;
+    weakSignal.value = false;
+    gpsEnabled.value = true;
     isSimulating.value = false;
     isLive.value = false;
     _paused = false;
@@ -268,33 +309,111 @@ class TrackingService {
     isLive.value = true;
 
     await _gpsSub?.cancel();
+    gpsError.value = null;
     _gpsSub =
         Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: AppConfig.locationDistanceFilterMeters,
-          ),
-        ).listen((pos) {
-          final here = GeoCoord(pos.latitude, pos.longitude);
-          busPosition.value = here;
-          // `Position.heading` is -1 when the device can't determine a
-          // course (stationary, or no compass fix) — keep the last known
-          // bearing rather than snapping the bus marker to due north.
-          if (pos.heading >= 0) busHeading.value = pos.heading;
-          // Geolocator reports metres per second. This was assigned straight
-          // into a field rendered as "km/h", so a van doing 50 km/h showed
-          // as 14 — and published that number to every parent's screen.
-          _recordSpeed((pos.speed * 3.6).round().clamp(0, 200));
+          locationSettings: _locationSettings(),
+        ).listen(
+          _onPosition,
+          onError: (Object e) {
+            // Permission taken away mid-round, or the provider died. Said on
+            // screen rather than swallowed: the families' map has frozen.
+            debugPrint('position stream failed: $e');
+            gpsError.value = e is PermissionDeniedException
+                ? 'Location permission was turned off. Turn it back on to keep '
+                      'the families updated.'
+                : 'Location stopped updating. Check that location is on.';
+          },
+        );
 
-          // Stop progress, distance and ETA used to advance only while the
-          // *simulation* ticked, so on a real trip every stop stayed
-          // "upcoming" and the ETA stayed on its seed value from the first
-          // metre to the last.
-          _updateProgress(here);
-          _updateStopStatuses(here);
-          _updateEta();
-        });
+    await _serviceSub?.cancel();
+    try {
+      _serviceSub = Geolocator.getServiceStatusStream().listen(
+        (status) => gpsEnabled.value = status == ServiceStatus.enabled,
+        onError: (_) {},
+      );
+    } catch (_) {
+      // Not every platform reports it; the position stream's own error
+      // covers the same case there.
+    }
     return true;
+  }
+
+  /// How often and how precisely to ask for a position, per platform.
+  ///
+  /// On Android this is also what keeps tracking alive with the screen off:
+  /// the foreground notification turns the stream into a location
+  /// foreground service, which Android does not throttle the way it
+  /// throttles a backgrounded app. iOS needs background mode plus
+  /// `allowBackgroundLocationUpdates` for the same thing.
+  static LocationSettings _locationSettings() {
+    const distanceFilter = AppConfig.locationDistanceFilterMeters;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: distanceFilter,
+        intervalDuration: const Duration(seconds: 4),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Trip in progress',
+          notificationText:
+              "Sharing the van's location with families until you end the "
+              'route.',
+          notificationChannelName: 'Trip tracking',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: distanceFilter,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: distanceFilter,
+    );
+  }
+
+  void _onPosition(Position pos) {
+    gpsError.value = null;
+    final fix = LocationFix(
+      coord: GeoCoord(pos.latitude, pos.longitude),
+      at: pos.timestamp,
+      // `Position.heading` is -1 when the device can't determine a course
+      // (stationary, or no compass fix) — keep the last known bearing
+      // rather than snapping the marker to due north.
+      heading: pos.heading >= 0 ? pos.heading : null,
+      // Geolocator reports metres per second.
+      speedKmh: (pos.speed * 3.6).clamp(0, 200).toDouble(),
+      accuracy: pos.accuracy,
+    );
+    if (!_filter.accept(fix, GeoUtils.distance)) {
+      weakSignal.value = _filter.weakSignal;
+      return;
+    }
+    weakSignal.value = false;
+    _applyFix(fix);
+  }
+
+  /// One believable position: move the van, update the figures, tell the
+  /// trip controller, and send it to the families if it is time to.
+  void _applyFix(LocationFix fix) {
+    busPosition.value = fix.coord;
+    if (fix.heading != null) busHeading.value = fix.heading!;
+    _lastAccuracy = fix.accuracy;
+    _recordSpeed(fix.speedKmh.round());
+    _updateProgress(fix.coord);
+    _updateStopStatuses(fix.coord);
+    _updateEta();
+    if (!_fixes.isClosed) _fixes.add(fix);
+    _maybePublish();
   }
 
   /// Records an instantaneous speed and republishes the rolling average.
@@ -330,16 +449,71 @@ class TrackingService {
     // Server-side cleanup, so a killed app doesn't leave a ghost bus parked
     // on every parent's map.
     await LiveLocationRepository.instance.armDisconnectCleanup(busId);
-    await _publishOnce();
-    _publishTimer = Timer.periodic(
-      AppConfig.locationPublishInterval,
-      (_) => _publishOnce(),
+    await _connectionSub?.cancel();
+    _connectionSub = LiveLocationRepository.instance.watchConnection().listen((
+      connected,
+    ) {
+      final wasDown = !isConnected.value;
+      isConnected.value = connected;
+      final id = _broadcastBusId;
+      if (connected && wasDown && id != null) {
+        // A disconnect handler is spent once it fires; without re-arming,
+        // the second network drop of a round would leave a ghost van.
+        unawaited(LiveLocationRepository.instance.armDisconnectCleanup(id));
+        _maybePublish(force: true);
+      }
+    }, onError: (_) {});
+    _maybePublish(force: true);
+    // A heartbeat for the van that is standing still: the distance filter
+    // sends no fixes, and a family would otherwise read a parked van as a
+    // lost signal.
+    _publishTimer = Timer.periodic(AppConfig.locationPublishInterval, (_) {
+      final last = _lastPublishAt;
+      if (last == null ||
+          DateTime.now().difference(last) >=
+              AppConfig.locationPublishInterval) {
+        _maybePublish(force: true);
+      }
+    });
+  }
+
+  /// Sends the current position unless one went out under three seconds
+  /// ago. Latest wins: while a write is in flight — which, offline, is
+  /// until the network comes back — later fixes only replace the one
+  /// waiting, so reconnecting sends the newest position, not a backlog.
+  void _maybePublish({bool force = false}) {
+    if (_broadcastBusId == null) return;
+    final last = _lastPublishAt;
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < const Duration(seconds: 3)) {
+      return;
+    }
+    if (_publishing) {
+      _publishPending = true;
+      return;
+    }
+    _publishing = true;
+    _lastPublishAt = DateTime.now();
+    unawaited(
+      _publishOnce().whenComplete(() {
+        _publishing = false;
+        if (_publishPending) {
+          _publishPending = false;
+          _maybePublish(force: true);
+        }
+      }),
     );
   }
 
   Future<void> stopBroadcast() async {
     _publishTimer?.cancel();
     _publishTimer = null;
+    await _connectionSub?.cancel();
+    _connectionSub = null;
+    _publishPending = false;
+    _lastPublishAt = null;
+    isConnected.value = true;
     final busId = _broadcastBusId;
     _broadcastBusId = null;
     _broadcastDriverId = null;
@@ -355,6 +529,7 @@ class TrackingService {
     final driverId = _broadcastDriverId;
     if (busId == null || driverId == null) return;
     final p = busPosition.value;
+    final withAccuracy = !_accuracyRefused && _lastAccuracy != null;
     try {
       await LiveLocationRepository.instance.publish(
         LiveLocation(
@@ -363,17 +538,29 @@ class TrackingService {
           lng: p.lng,
           heading: busHeading.value,
           speedKmh: speed.value.toDouble(),
+          accuracy: withAccuracy ? _lastAccuracy : null,
           tripId: _broadcastTripId,
           driverId: driverId,
           timestamp: DateTime.now().millisecondsSinceEpoch,
         ),
       );
+    } on FirebaseException catch (e) {
+      // Database rules older than the `accuracy` field refuse the whole
+      // ping. Drop the field and resend rather than leave every family's
+      // map empty until the rules are deployed.
+      if (e.code == 'permission-denied' && withAccuracy) {
+        _accuracyRefused = true;
+        await _publishOnce();
+      }
     } catch (_) {
       // One dropped ping is not worth tearing the trip down for — the next
       // tick is 5 seconds away, and `LiveLocation.isStale` already covers a
       // gap on the watching end.
     }
   }
+
+  /// Set once the server has refused a ping carrying `accuracy`.
+  bool _accuracyRefused = false;
 
   // ── Simulation ────────────────────────────────────────────────────────────
 
@@ -410,6 +597,16 @@ class TrackingService {
       busPosition.value = next;
       busHeading.value = _bearing(prev, next);
       _recordSpeed(30 + _rand.nextInt(15));
+      if (!_fixes.isClosed) {
+        _fixes.add(
+          LocationFix(
+            coord: next,
+            at: DateTime.now(),
+            heading: busHeading.value,
+            speedKmh: speed.value.toDouble(),
+          ),
+        );
+      }
 
       // The simulation knows exactly where it is on the polyline, so it
       // sets the progress index directly instead of re-deriving it by
@@ -490,7 +687,7 @@ class TrackingService {
 
   void _updateStopStatuses(GeoCoord busPos) {
     final r = _route;
-    if (r == null) return;
+    if (r == null || _externalStops) return;
     var changed = false;
     for (final stop in r.stops) {
       final dist = _distanceBetween(busPos, stop.location);
@@ -620,6 +817,20 @@ class TrackingService {
   }
 
   double _toRad(double deg) => deg * pi / 180;
+
+  /// Takes over the route from the trip controller without restarting GPS.
+  ///
+  /// The controller re-plans as stops are resolved; the dashboard's progress
+  /// cards still read [route], so it is kept to the controller's latest
+  /// stop list and line. Stop statuses are the controller's from here on.
+  void adoptRoute(RouteData route) {
+    _route = route;
+    _externalStops = true;
+    _buildCumulativeDistances(route);
+    _progressIndex = 0;
+    stopStatusRevision.value++;
+    liveRevision.value++;
+  }
 
   /// Advance to the next stop manually (for driver "Mark Stop Done").
   void markCurrentStopDone() {

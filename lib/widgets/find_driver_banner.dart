@@ -3,6 +3,7 @@ import '../app/language_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../app/round_display.dart';
 import '../app/session_service.dart';
 import '../theme/app_theme.dart';
 import 'glass_card.dart';
@@ -63,15 +64,18 @@ class FindDriverBanner extends StatelessWidget {
           final round = driver?.scheduleById(subject.scheduleId);
           subtitle = round == null
               ? '${AppStrings.t('tap_other_drivers')} ${subject.school}.'
-              : '${round.timeRange} · '
+              : '${[if (round.label.trim().isNotEmpty) round.label.trim(), round.timeRange].join(' · ')} · '
                     '${AppStrings.t('tap_change_driver')}';
         } else if (request != null && request.isPending) {
           tint = AppTheme.warning;
           emoji = '⏳';
           title = '${AppStrings.t('waiting_on')} ${request.driverName}';
-          subtitle =
-              '${request.scheduleLabel} — '
-              '${AppStrings.t('tap_check_withdraw')}.';
+          // A fee waiting on the family is the thing to act on.
+          subtitle = request.feeStatus == FeeStatus.proposed
+              ? 'Fee Rs.${(request.feePaisa / 100).round()} / month — '
+                    'tap to accept or reject.'
+              : '${roundNameFor(SessionService.instance.driverFor(request.driverId), request.scheduleId, fallback: request.scheduleLabel)} — '
+                    '${AppStrings.t('tap_check_withdraw')}.';
         } else if (subject.school.trim().isEmpty) {
           tint = AppTheme.info;
           emoji = '🏫';

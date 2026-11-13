@@ -25,6 +25,7 @@ import '../screens/parent/edit_weekly_schedule_screen.dart';
 import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
 import '../screens/chat/conversation_screen.dart';
+import '../screens/driver/driver_trip_map_screen.dart';
 import '../screens/driver/driver_timetables_screen.dart';
 import '../screens/driver/driver_layout.dart';
 import '../screens/driver/driver_trip_history_screen.dart';
@@ -43,7 +44,8 @@ import '../screens/parent/find_drivers_screen.dart';
 import '../screens/live_map_screen.dart';
 import '../screens/driver/subscription.dart';
 import '../screens/parent/parent_missed_bus_screen.dart';
-import '../screens/parent/payment_screens.dart';
+import '../screens/payments/family_payment_screen.dart';
+import '../screens/driver/driver_payout_screen.dart';
 import '../theme/app_theme.dart';
 
 /// Routes reachable while signed out.
@@ -272,6 +274,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const EditWeeklyScheduleScreen(),
     ),
     GoRoute(
+      path: '/student/weekly-schedule',
+      builder: (context, state) => const EditWeeklyScheduleScreen(),
+    ),
+    GoRoute(
       path: '/parent/change-password',
       builder: (context, state) => const ChangePasswordScreen(),
     ),
@@ -285,50 +291,21 @@ final appRouter = GoRouter(
       builder: (context, state) =>
           const TermsScreen(accentColor: AppTheme.parentPurple),
     ),
+    // One payment screen for every family: the driver's bank and wallet
+    // details, then a screenshot of the transfer for the driver to check.
+    // The old method picker, its cash/online steps and the card form are
+    // gone — nothing in the app moves money, so a card form only pretended.
     GoRoute(
       path: '/parent/payment',
-      builder: (context, state) {
-        final extra = (state.extra as Map<String, dynamic>?) ?? {};
-        return PaymentMethodScreen(
-          amount: extra['amount'] as String? ?? 'Rs.0',
-          month: extra['month'] as String? ?? '',
-        );
-      },
+      builder: (context, state) => const FamilyPaymentScreen(),
     ),
     GoRoute(
-      path: '/parent/payment/cash',
-      builder: (context, state) {
-        final extra = (state.extra as Map<String, dynamic>?) ?? {};
-        return CashPaymentScreen(
-          amount: extra['amount'] as String? ?? 'Rs.0',
-          month: extra['month'] as String? ?? '',
-        );
-      },
+      path: '/student/payment',
+      builder: (context, state) => const FamilyPaymentScreen(),
     ),
     GoRoute(
-      path: '/parent/payment/online',
-      builder: (context, state) {
-        final extra = (state.extra as Map<String, dynamic>?) ?? {};
-        final rawChildren = extra['children'] as List<dynamic>? ?? [];
-        final children = rawChildren
-            .map((e) => Map<String, String>.from(e as Map))
-            .toList();
-        return OnlinePaymentScreen(
-          amount: extra['amount'] as String? ?? 'Rs.0',
-          month: extra['month'] as String? ?? '',
-          children: children,
-        );
-      },
-    ),
-    GoRoute(
-      path: '/parent/payment/card',
-      builder: (context, state) {
-        final extra = (state.extra as Map<String, dynamic>?) ?? {};
-        return CardPaymentScreen(
-          amount: extra['amount'] as String? ?? 'Rs.0',
-          month: extra['month'] as String? ?? '',
-        );
-      },
+      path: '/driver/payout',
+      builder: (context, state) => const DriverPayoutScreen(),
     ),
     GoRoute(path: '/driver', builder: (context, state) => const DriverLayout()),
     // Every family's requested weekly timings, with an answer. Families
@@ -478,6 +455,12 @@ final appRouter = GoRouter(
           destination: extra['destination'] as GeoCoord?,
         );
       },
+    ),
+    // The driver's own round, full screen. The inline card is 320px
+    // inside a scrolling page, which is a cramped place to read a route.
+    GoRoute(
+      path: '/driver/track/map',
+      builder: (context, state) => const DriverTripMapScreen(),
     ),
     GoRoute(
       path: '/student/track/map',

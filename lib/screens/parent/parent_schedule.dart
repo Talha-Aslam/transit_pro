@@ -7,6 +7,7 @@ import '../../app/attendance_service.dart';
 import '../../app/driver_data_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
+import '../../app/round_display.dart';
 import '../../app/session_service.dart';
 import '../../data/trip_repository.dart';
 import '../../data/user_repository.dart';
@@ -213,8 +214,12 @@ class _ParentScheduleState extends State<ParentSchedule> {
   List<_DaySchedule> _buildSchedule(
     Driver? driver,
     DriverTimingSlots? slots,
-    Map<String, Map<String, String>>? requestedSchedule,
-  ) {
+    Map<String, Map<String, String>>? requestedSchedule, {
+    String? childId,
+  }) {
+    // The driver's own estimate for this child — the round's start plus
+    // where the child falls in its order — once a seat is accepted.
+    final expected = childId == null ? null : driver?.expectedTimes[childId];
     final now = DateTime.now();
     final todayWeekday = now.weekday; // 1=Mon..7=Sun
     final defaultPickup = slots == null
@@ -238,8 +243,8 @@ class _ParentScheduleState extends State<ParentSchedule> {
           schedules.isEmpty || schedules.any((s) => s.runsOn(weekday));
       final date = monday.add(Duration(days: i));
       final dateKey = _dateKey(date);
-      final isToday = todayWeekday != DateTime.sunday &&
-          weekday == todayWeekday;
+      final isToday =
+          todayWeekday != DateTime.sunday && weekday == todayWeekday;
       final isPast = date.isBefore(DateUtils.dateOnly(now));
 
       // What actually happened, from the attendance the driver recorded.
@@ -252,18 +257,23 @@ class _ParentScheduleState extends State<ParentSchedule> {
         status = 'upcoming';
       } else {
         status = switch (_rideHistory[dateKey]) {
-          AttendanceStatus.boarded ||
-          AttendanceStatus.droppedOff => 'done',
+          AttendanceStatus.boarded || AttendanceStatus.droppedOff => 'done',
           AttendanceStatus.absent => 'absent',
           _ => 'none',
         };
       }
 
       final override = requestedSchedule?[kWeekdayKeys[i]];
+      final expectedPickup = clock12(expected?.pickup ?? '');
+      final expectedDropoff = clock12(expected?.dropoff ?? '');
       return _DaySchedule(
         day: _weekDays[i],
-        pickup: override?['morningPickup'] ?? defaultPickup,
-        dropoff: override?['eveningDropoff'] ?? defaultDropoff,
+        pickup: runsThisDay && expectedPickup.isNotEmpty
+            ? expectedPickup
+            : override?['morningPickup'] ?? defaultPickup,
+        dropoff: runsThisDay && expectedDropoff.isNotEmpty
+            ? expectedDropoff
+            : override?['eveningDropoff'] ?? defaultDropoff,
         status: status,
         note: (driver != null && !runsThisDay) ? 'No pickup this day' : '',
       );
@@ -290,8 +300,9 @@ class _ParentScheduleState extends State<ParentSchedule> {
     }
     _historyFor = studentId;
     try {
-      final records = await TripRepository.instance
-          .fetchAttendanceForStudent(studentId);
+      final records = await TripRepository.instance.fetchAttendanceForStudent(
+        studentId,
+      );
       if (!mounted) return;
       setState(() {
         _rideHistory = {
@@ -383,6 +394,7 @@ class _ParentScheduleState extends State<ParentSchedule> {
                   driver,
                   slots,
                   snap.data?.requestedSchedule,
+                  childId: studentId.isEmpty ? null : studentId,
                 );
                 final selectedIndex = _selectedDay.clamp(
                   0,
@@ -518,7 +530,10 @@ class _ParentScheduleState extends State<ParentSchedule> {
                 // Saved times used to look settled the instant they were
                 // typed, and nothing ever carried them to the driver. This
                 // says which of the two a family is looking at.
-                _ScheduleRequestBanner(status: requestStatus, note: requestNote),
+                _ScheduleRequestBanner(
+                  status: requestStatus,
+                  note: requestNote,
+                ),
 
                 // ── Child switcher (only when >1 child) ───────────────────
                 // Same pattern `parent_dashboard.dart` already uses — without
@@ -1162,7 +1177,6 @@ class _AttendanceToggleCard extends StatelessWidget {
     );
   }
 }
-
 
 /// Whether the family's requested timings are a wish or an arrangement.
 class _ScheduleRequestBanner extends StatelessWidget {

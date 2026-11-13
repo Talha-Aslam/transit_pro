@@ -5,12 +5,17 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../../app/language_provider.dart';
+import '../../app/live_bus_service.dart';
+import '../../app/family_trip_times.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/geofence_service.dart';
 import '../../app/notification_service.dart';
 import '../../data/trip_repository.dart';
 import '../../map/live_bus_map_view.dart';
+import '../../app/round_display.dart';
+import '../../app/session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/app_glyph.dart';
 
@@ -34,7 +39,10 @@ class _ParentTrackingState extends State<ParentTracking> {
   /// on its own.
   Trip? _activeTrip;
   StreamSubscription<Trip?>? _tripSub;
-  String? _watchedDriverId;
+
+  /// Driver and child together: two children with the same driver can be on
+  /// different rounds, so switching child must re-subscribe too.
+  String? _watchedKey;
 
   /// This child's own row on the active trip's attendance manifest — the
   /// only per-stop detail a parent is both allowed to read (see
@@ -64,8 +72,9 @@ class _ParentTrackingState extends State<ParentTracking> {
   /// the trip/attendance subscriptions on an actual change.
   void _ensureWatching(ChildInfo? child) {
     final driverId = child?.driver;
-    if (driverId == _watchedDriverId) return;
-    _watchedDriverId = driverId;
+    final key = '$driverId|${child?.id}';
+    if (key == _watchedKey) return;
+    _watchedKey = key;
 
     _tripSub?.cancel();
     _tripSub = null;
@@ -74,15 +83,27 @@ class _ParentTrackingState extends State<ParentTracking> {
     _activeTrip = null;
     _myAttendance = null;
 
-    if (driverId == null || driverId.isEmpty) return;
+    if (driverId == null || driverId.isEmpty || child == null) return;
     _tripSub = TripRepository.instance
-        .watchActiveTripForDriver(driverId)
-        .listen((trip) => _onActiveTripChanged(trip, child!.id));
+        .watchActiveTripForStudent(driverId, child.id)
+        .listen((trip) => _onActiveTripChanged(trip, child.id));
   }
 
   void _onActiveTripChanged(Trip? trip, String childId) {
     if (!mounted) return;
     setState(() => _activeTrip = trip);
+    // The map, the minutes and the stops on this tab are this child's. The
+    // Home tab used to be the only one pointing the live feed at a child,
+    // so switching child here left the previous child's van on the map.
+    if (trip == null || trip.busId.isEmpty) {
+      LiveBusService.instance.stop();
+    } else {
+      LiveBusService.instance.follow(
+        busId: trip.busId,
+        trip: trip,
+        studentId: childId,
+      );
+    }
 
     _attendanceSub?.cancel();
     _attendanceSub = null;
@@ -106,6 +127,29 @@ class _ParentTrackingState extends State<ParentTracking> {
     _attendanceSub?.cancel();
     _geofence.resetAfterFrame();
     super.dispose();
+  }
+
+  /// What to put on the map's corner label.
+  ///
+  /// In order: the round that is running right now, the admin route the
+  /// child is attached to, and only then the honest "nothing arranged".
+  String _routeLabel(ChildInfo? child, Trip? trip) {
+    if (trip != null) {
+      // The round a trip runs is its `scheduleId`; `routeId` is the admin
+      // route, which a driver's own round does not have — so looking the
+      // round up by it never found one, and the name never showed.
+      final label = roundNameFor(
+        SessionService.instance.driverFor(child?.driver),
+        trip.scheduleId,
+      );
+      if (label.isNotEmpty) return '📍 $label';
+      return trip.type == TripType.morning
+          ? '📍 On the way to school'
+          : '📍 On the way home';
+    }
+    final assigned = child?.route.trim() ?? '';
+    if (assigned.isNotEmpty) return '📍 $assigned';
+    return '📍 No route assigned';
   }
 
   String _relativeStart(DateTime? startedAt) {
@@ -217,9 +261,17 @@ class _ParentTrackingState extends State<ParentTracking> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        child?.route.isNotEmpty == true
-                                            ? '📍 ${child!.route}'
-                                            : '📍 No route assigned',
+                                        // `child.route` is the *admin*
+                                        // route's name, and a
+                                        // self-signed-up driver has
+                                        // none — so this read "No
+                                        // route assigned" even while
+                                        // that driver was out on a
+                                        // round. What is running right
+                                        // now is the better answer, and
+                                        // the only one that updates
+                                        // live.
+                                        _routeLabel(child, trip),
                                         style: TextStyle(
                                           color: Colors.white.withValues(
                                             alpha: 0.9,
@@ -232,8 +284,7 @@ class _ParentTrackingState extends State<ParentTracking> {
                                   // Expands to a fullscreen, pannable/
                                   // zoomable map — this 220px preview stays
                                   // gesture-locked so it doesn't fight the
-                                  // page's own scroll (see `RouteMapView`'s
-                                  // `interactive` doc comment).
+                                  // page's own scroll.
                                   Positioned(
                                     bottom: 12,
                                     right: 12,
@@ -282,6 +333,9 @@ class _ParentTrackingState extends State<ParentTracking> {
                           padding: const EdgeInsets.all(18),
                           child: Row(
                             children: [
+                              // The driver's own face. This was a bus
+                              // emoji on the card whose job is telling a
+                              // parent who is carrying their child.
                               Container(
                                 width: 52,
                                 height: 52,
@@ -289,8 +343,13 @@ class _ParentTrackingState extends State<ParentTracking> {
                                   gradient: AppTheme.studentGradient,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: const Center(
-                                  child: Text(
+                                clipBehavior: Clip.antiAlias,
+                                child: AvatarImage(
+                                  localFile: null,
+                                  photoUrl: child?.driverPhotoUrl,
+                                  size: 52,
+                                  borderRadius: BorderRadius.circular(16),
+                                  fallback: const Text(
                                     '🚌',
                                     style: TextStyle(fontSize: 26),
                                   ),
@@ -324,7 +383,13 @@ class _ParentTrackingState extends State<ParentTracking> {
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
-                                      '${AppStrings.t('driver')}: ${child?.driver ?? "N/A"}',
+                                      // `child.driver` is the driver's
+                                      // uid. Printing it put
+                                      // "Driver: mm0PyLrmAuRvZev1DJ..."
+                                      // on screen; `driverName` is the
+                                      // resolved display name.
+                                      '${AppStrings.t('driver')}: '
+                                      '${(child?.driverName ?? '').trim().isEmpty ? AppStrings.t('no_driver_assigned') : child!.driverName.trim()}',
                                       style: TextStyle(
                                         color: context.textSecondary,
                                         fontSize: 12,
@@ -438,34 +503,102 @@ class _ParentTrackingState extends State<ParentTracking> {
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(height: 20),
                                 Builder(
                                   builder: (_) {
-                                    final boarded =
-                                        _myAttendance?.status ==
-                                        AttendanceStatus.boarded;
+                                    final mark = _myAttendance?.status;
+                                    final times = FamilyTripTimes.of(
+                                      trip,
+                                      child?.id ?? '',
+                                    );
+                                    final stopName =
+                                        child?.stop.isNotEmpty == true
+                                        ? child!.stop
+                                        : 'Your stop';
+                                    final schoolName =
+                                        child?.school.isNotEmpty == true
+                                        ? child!.school
+                                        : 'School';
+                                    final headline = times.headline(
+                                      mark: mark,
+                                      school: schoolName,
+                                    );
+                                    final aboard =
+                                        mark == AttendanceStatus.boarded ||
+                                        mark == AttendanceStatus.droppedOff;
+                                    final done =
+                                        mark == AttendanceStatus.droppedOff;
+                                    final absent =
+                                        mark == AttendanceStatus.absent;
                                     return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        _StopTimelineItem(
-                                          name: child?.stop.isNotEmpty == true
-                                              ? child!.stop
-                                              : 'Your stop',
-                                          time: '',
-                                          isDone: boarded,
-                                          isCurrent: !boarded,
-                                          isLast: false,
-                                          isYourStop: true,
-                                        ),
-                                        _StopTimelineItem(
-                                          name: child?.school.isNotEmpty == true
-                                              ? child!.school
-                                              : 'School',
-                                          time: '',
-                                          isDone: false,
-                                          isCurrent: boarded,
-                                          isLast: true,
-                                          isYourStop: false,
-                                        ),
+                                        if (headline != null) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '🕒 $headline',
+                                            style: const TextStyle(
+                                              color: AppTheme.success,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 20),
+                                        // The morning runs from this
+                                        // child's gate to their institute;
+                                        // the ride home the other way.
+                                        if (times.toSchool) ...[
+                                          _StopTimelineItem(
+                                            name: stopName,
+                                            time: aboard
+                                                ? 'Picked up'
+                                                : absent
+                                                ? 'Absent'
+                                                : FamilyTripTimes.clock(
+                                                    times.pickupAt,
+                                                  ),
+                                            isDone: aboard,
+                                            isCurrent: !aboard && !absent,
+                                            isLast: false,
+                                            isYourStop: true,
+                                          ),
+                                          _StopTimelineItem(
+                                            name: schoolName,
+                                            time: done
+                                                ? 'Reached'
+                                                : FamilyTripTimes.clock(
+                                                    times.arriveAt,
+                                                  ),
+                                            isDone: done,
+                                            isCurrent: aboard && !done,
+                                            isLast: true,
+                                            isYourStop: false,
+                                          ),
+                                        ] else ...[
+                                          _StopTimelineItem(
+                                            name: schoolName,
+                                            time: 'Left',
+                                            isDone: true,
+                                            isCurrent: false,
+                                            isLast: false,
+                                            isYourStop: false,
+                                          ),
+                                          _StopTimelineItem(
+                                            name: stopName,
+                                            time: done
+                                                ? 'Dropped off'
+                                                : absent
+                                                ? 'Not on van'
+                                                : FamilyTripTimes.clock(
+                                                    times.arriveAt,
+                                                  ),
+                                            isDone: done,
+                                            isCurrent: !done && !absent,
+                                            isLast: true,
+                                            isYourStop: true,
+                                          ),
+                                        ],
                                       ],
                                     );
                                   },

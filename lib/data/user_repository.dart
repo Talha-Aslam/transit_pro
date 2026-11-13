@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
 /// Reads and writes `users/{uid}`, `drivers/{uid}` and `students/{id}`.
@@ -143,6 +144,30 @@ class UserRepository {
   Future<void> setLocationSharing(String driverId, bool enabled) =>
       updateDriver(driverId, {'locationSharing': enabled});
 
+  /// Records that this driver's app is running, and what it is doing.
+  ///
+  /// `status` was written once at onboarding and never again, so every
+  /// screen reading it — the admin's presence chip, the parent-side search
+  /// filter — was reading a field nobody maintained. `lastSeenAt` is the
+  /// half that expires on its own, for the app the OS kills before it can
+  /// write `offline`.
+  ///
+  /// Best-effort by design: a driver whose presence write fails is still
+  /// driving, and failing their sign-in over it would be absurd.
+  Future<void> touchPresence(
+    String driverId, {
+    required DriverStatus status,
+  }) async {
+    try {
+      await updateDriver(driverId, {
+        'status': status.name,
+        'lastSeenAt': Db.now,
+      });
+    } catch (e) {
+      debugPrint('presence write failed for $driverId: $e');
+    }
+  }
+
   /// Replaces a driver's bookable rounds.
   ///
   /// `bookedSeats` travels with each round, so callers must pass rounds they
@@ -157,25 +182,32 @@ class UserRepository {
     'schedules': schedules.map((s) => s.toMap()).toList(),
   });
 
-  /// Replaces a driver's service areas, keeping the query mirror in step.
+  /// Replaces a driver's service areas *and* rounds in one write.
   ///
-  /// `serviceSchools` is the normalised list Firestore matches against; writing
-  /// the display list without it would leave a driver invisible to search while
-  /// looking correctly configured in their own profile — the worst kind of bug,
-  /// because the driver has no way to see it. Derived here from the same input,
-  /// in one write, so the two cannot diverge.
-  Future<void> replaceServiceAreas(
+  /// `serviceSchools` is the normalised list Firestore matches against;
+  /// writing the display list without it would leave a driver invisible to
+  /// search while looking correctly configured in their own profile, so it
+  /// is derived here from the same input, in the same write.
+  ///
+  /// One write, not two: saving the areas and then the rounds left a driver
+  /// whose second write was refused with half an edit stored — new schools,
+  /// old rounds — and a screen that could not say which half had landed.
+  Future<void> replaceService(
     String driverId, {
     required List<ServiceArea> areas,
+    required List<DriverSchedule> schedules,
+    int? vehicleCapacity,
     double? radiusKm,
     GeoCoord? baseLocation,
     int? missedBusFarePaisa,
   }) => updateDriver(driverId, {
+    'vehicleCapacity': ?vehicleCapacity,
     'serviceAreas': areas.map((a) => a.toMap()).toList(),
     'serviceSchools': areas
         .map((a) => a.normalizedName)
         .where((n) => n.isNotEmpty)
         .toList(),
+    'schedules': schedules.map((s) => s.toMap()).toList(),
     'serviceRadiusKm': ?radiusKm,
     'baseLocation': ?baseLocation?.toMap(),
     'missedBusFarePaisa': ?missedBusFarePaisa,
@@ -278,7 +310,7 @@ class UserRepository {
           driver: d,
           distanceKm: d.distanceKmFrom(from),
           matchedAreas: matched,
-          openSchedules: d.orderedSchedules.where((s) => s.hasSpace).toList(),
+          openSchedules: d.orderedSchedules.where(d.roundHasSpace).toList(),
         ),
       );
     }

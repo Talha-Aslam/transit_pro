@@ -23,6 +23,7 @@ class RideStatusBadge extends StatelessWidget {
         RideStage.unassigned => context.textTertiary,
         RideStage.absent => context.textTertiary,
         RideStage.scheduled => AppTheme.info,
+        RideStage.arriving => AppTheme.warning,
         RideStage.onTheBus => AppTheme.success,
         RideStage.reached => AppTheme.purple,
       };

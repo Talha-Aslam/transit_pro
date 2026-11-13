@@ -15,6 +15,7 @@
         "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
         "heading": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 360" },
         "speedKmh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 200" },
+        "accuracy": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
         "ts": { ".validate": "newData.isNumber()" },
         "tripId": { ".validate": "newData.isString()" },
         "driverId": { ".validate": "newData.isString() && newData.val() === auth.uid" },

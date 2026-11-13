@@ -8,8 +8,12 @@ import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
+import '../../app/push_diagnostics.dart';
+import '../../app/ride_match_service.dart';
+import '../../app/round_display.dart';
 import '../../app/session_service.dart';
 import '../../data/institute_repository.dart';
+import '../../data/ride_request_repository.dart';
 import '../../data/user_repository.dart';
 import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
@@ -843,6 +847,12 @@ class _ParentProfileState extends State<ParentProfile> {
                               ),
                               _MenuItem(
                                 materialIcon:
+                                    Icons.notifications_active_outlined,
+                                label: 'Test notifications',
+                                onTap: () => runPushTest(context),
+                              ),
+                              _MenuItem(
+                                materialIcon:
                                     Icons.pause_circle_outline_rounded,
                                 label: 'Deactivate Account',
                                 onTap: () => confirmAndDeactivateAccount(
@@ -1263,6 +1273,16 @@ class _ChildCardState extends State<_ChildCard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        // The fee agreed with this child's driver.
+                        if (c.monthlyFeePaisa > 0)
+                          Text(
+                            'Fee: Rs.${(c.monthlyFeePaisa / 100).round()} / month',
+                            style: const TextStyle(
+                              color: AppTheme.success,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1344,6 +1364,11 @@ class _ChildCardState extends State<_ChildCard> {
           LayoutBuilder(
             builder: (context, constraints) {
               final tileWidth = (constraints.maxWidth - 8) / 2;
+              // Two facts, both of which a family can act on: which van,
+              // and who is driving it. "Route" and "Stop" came from the
+              // admin fleet, which a self-signed-up driver has none of, so
+              // they were a pair of permanent dashes — and "Driver"
+              // printed `c.driver`, the uid, not a name.
               return Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1358,22 +1383,10 @@ class _ChildCardState extends State<_ChildCard> {
                   SizedBox(
                     width: tileWidth,
                     child: _MiniCard(
-                      label: 'Route',
-                      value: c.route.isEmpty ? '—' : c.route,
-                    ),
-                  ),
-                  SizedBox(
-                    width: tileWidth,
-                    child: _MiniCard(
-                      label: 'Stop',
-                      value: c.stop.isEmpty ? '—' : c.stop,
-                    ),
-                  ),
-                  SizedBox(
-                    width: tileWidth,
-                    child: _MiniCard(
                       label: 'Driver',
-                      value: c.driver.isEmpty ? '—' : c.driver,
+                      value: c.driverName.trim().isEmpty
+                          ? '—'
+                          : c.driverName.trim(),
                     ),
                   ),
                 ],
@@ -1626,7 +1639,10 @@ class _ChildFlowSheet extends StatefulWidget {
   final String title;
   final ChildInfo initialChild;
   final Color accentColor;
-  final void Function(ChildInfo) onSave;
+
+  /// Saves the child and returns its student id, which a seat request
+  /// sent from this sheet needs — a new child has none until it is saved.
+  final Future<String?> Function(ChildInfo) onSave;
 
   const _ChildFlowSheet({
     required this.title,
@@ -1809,11 +1825,10 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                // Sum of seats offered across the driver's
-                                // rounds — Driver has no single "vehicle
-                                // capacity" field (see DriverSchedule for
-                                // why seats are per-round, not per-vehicle).
-                                '${driver.totalSeatsOffered} seats',
+                                // The vehicle's own capacity. Summing the
+                                // rounds told a family a 12-seater running
+                                // two rounds had 24 seats.
+                                '${driver.vehicleSeats} seats',
                                 style: TextStyle(
                                   color: context.textSecondary,
                                   fontSize: 12,
@@ -1964,51 +1979,22 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
 
     if (confirmed == true) {
       setState(() {
-        if (_selectedDriver?.id != driver.id) _scheduleId = null;
+        if (_selectedDriver?.id != driver.id) {
+          final open = roundsServing(
+            driver,
+            _instituteNameCtrl.text.trim(),
+          ).where(driver.roundHasSpace);
+          _scheduleId = open.isEmpty ? null : open.first.id;
+        }
         _selectedDriver = driver;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Selected ${driver.name}')));
-      // This is still only a preview, same as before: picking a driver here
-      // doesn't book a seat or link the student to them in Firestore (the
-      // real booking path is Find Drivers -> request a seat, which reserves
-      // a specific round via RideMatchService.requestSeat and notifies the
-      // driver for real). Rebuilding this picker on top of that flow is
-      // beyond this pass — the fix here is only that the driver shown and
-      // selected is now a real Firestore record instead of an invented one.
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: context.isDark
-              ? const Color(0xFF10351F)
-              : const Color(0xFFEAF8EF),
-          title: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E)),
-              const SizedBox(width: 10),
-              Text(
-                'Request Sent',
-                style: TextStyle(
-                  color: context.textPrimary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+      // Nothing is sent yet: a new child has no record for a request to
+      // name until Save creates one. Save sends it — for real — and says so.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text(
-            'Your request has been sent to ${driver.name}. They will respond shortly.',
-            style: TextStyle(color: context.textSecondary),
+            'Tap Save to send your seat request to ${driver.name}.',
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF16A34A),
-              ),
-              child: const Text('OK'),
-            ),
-          ],
         ),
       );
     }
@@ -2081,44 +2067,67 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
     super.dispose();
   }
 
-  void _save() {
+  bool _saving = false;
+
+  Future<void> _save() async {
+    if (_saving) return;
     final instituteName = _instituteNameCtrl.text.trim();
-    widget.onSave(
-      ChildInfo(
-        // Without the id, `ParentDataService.updateChild` has nothing to
-        // target in Firestore and silently skips the write (see its
-        // `if (child.id.isEmpty) return;` guard) — so this has to travel
-        // through untouched, same as `busNumber`/`route` below.
-        id: widget.initialChild.id,
-        name: _nameCtrl.text.trim(),
-        grade: _gradeCtrl.text.trim(),
-        school: instituteName.isNotEmpty
-            ? instituteName
-            : widget.initialChild.school,
-        // Was never carried out of this sheet at all -- `ParentDataService
-        // .updateChild`/`.addChild` now both persist it (see their doc
-        // comments), so a real change here actually survives a save.
-        instituteType: _instituteType ?? widget.initialChild.instituteType,
-        // Same story as instituteType above: collected at sign-up
-        // (`ChildCard`'s "SCHOOL ROLL NUMBER" field) but, until now, this
-        // sheet had no field for it at all, so any edit was silently
-        // discarded — the roll number could be set once at sign-up and
-        // never again.
-        studentIdNumber: _studentIdCtrl.text.trim(),
-        // Picking a driver in this sheet is a preview only (see
-        // _showDriverPreview) — it doesn't book a seat or assign a bus/route,
-        // so those stay whatever they already were. Only the driver id
-        // (now a real one, not an invented display name) is carried through.
-        busNumber: widget.initialChild.busNumber,
-        route: widget.initialChild.route,
-        stop: _locationCtrl.text.trim(),
-        driver: _selectedDriver?.id ?? widget.initialChild.driver,
-        photoUrl: widget.initialChild.photoUrl,
-        pickup: _pickup,
-        dropoff: _dropoff,
-        scheduleId: _scheduleId,
-      ),
-    );
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    setState(() => _saving = true);
+    final String? studentId;
+    try {
+      studentId = await widget.onSave(
+        ChildInfo(
+          // Without the id, `ParentDataService.updateChild` has nothing to
+          // target in Firestore and silently skips the write (see its
+          // `if (child.id.isEmpty) return;` guard) — so this has to travel
+          // through untouched, same as `busNumber`/`route` below.
+          id: widget.initialChild.id,
+          name: _nameCtrl.text.trim(),
+          grade: _gradeCtrl.text.trim(),
+          school: instituteName.isNotEmpty
+              ? instituteName
+              : widget.initialChild.school,
+          // Was never carried out of this sheet at all -- `ParentDataService
+          // .updateChild`/`.addChild` now both persist it (see their doc
+          // comments), so a real change here actually survives a save.
+          instituteType: _instituteType ?? widget.initialChild.instituteType,
+          // Same story as instituteType above: collected at sign-up
+          // (`ChildCard`'s "SCHOOL ROLL NUMBER" field) but, until now, this
+          // sheet had no field for it at all, so any edit was silently
+          // discarded — the roll number could be set once at sign-up and
+          // never again.
+          studentIdNumber: _studentIdCtrl.text.trim(),
+          // Picking a driver in this sheet is a preview only (see
+          // _showDriverPreview) — it doesn't book a seat or assign a bus/route,
+          // so those stay whatever they already were. Only the driver id
+          // (now a real one, not an invented display name) is carried through.
+          busNumber: widget.initialChild.busNumber,
+          route: widget.initialChild.route,
+          stop: _locationCtrl.text.trim(),
+          // The driver and round stay what the driver agreed to; a driver
+          // picked here is only asked, below.
+          driver: widget.initialChild.driver,
+          photoUrl: widget.initialChild.photoUrl,
+          pickup: _pickup,
+          dropoff: _dropoff,
+          scheduleId: widget.initialChild.scheduleId,
+        ),
+      );
+    } catch (e) {
+      debugPrint('saving child failed: $e');
+      if (mounted) setState(() => _saving = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not save. Check your connection and try again.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
+
+    final requested = await _sendSeatRequest(studentId, instituteName);
 
     // Best-effort and fire-and-forget: growing the crowdsourced institute
     // directory is a nice-to-have for future autocomplete suggestions, not
@@ -2136,7 +2145,69 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
       );
     }
 
-    Navigator.pop(context);
+    navigator.pop();
+    if (requested != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(requested),
+          backgroundColor: requested.startsWith('Request sent')
+              ? AppTheme.success
+              : AppTheme.error,
+        ),
+      );
+    }
+  }
+
+  List<DriverSchedule> _openRoundsFor(Driver driver) => roundsServing(
+    driver,
+    _instituteNameCtrl.text.trim(),
+  ).where(driver.roundHasSpace).toList();
+
+  /// Sends the seat request for the driver picked in this sheet, now that
+  /// the child has a record for it to name. Returns what to tell the parent,
+  /// or null when no new driver was picked.
+  Future<String?> _sendSeatRequest(String? studentId, String institute) async {
+    final driver = _selectedDriver;
+    if (driver == null ||
+        studentId == null ||
+        driver.id == widget.initialChild.driver) {
+      return null;
+    }
+    final open = roundsServing(
+      driver,
+      institute,
+    ).where(driver.roundHasSpace).toList();
+    final round =
+        open.where((r) => r.id == _scheduleId).firstOrNull ??
+        (open.isEmpty ? null : open.first);
+    if (round == null) {
+      return '${driver.name} has no free seat on a round to $institute.';
+    }
+    final uid = SessionService.instance.uid ?? '';
+    try {
+      await RideMatchService.instance.requestSeat(
+        student: Student(
+          id: studentId,
+          name: _nameCtrl.text.trim(),
+          parentId: uid,
+          grade: _gradeCtrl.text.trim(),
+          school: institute,
+          photoUrl: widget.initialChild.photoUrl,
+          pickupLocation: _pickup,
+          dropoffLocation: _dropoff,
+        ),
+        driver: driver,
+        schedule: round,
+      );
+      return 'Request sent to ${driver.name} for ${round.label}. '
+          "You'll be told when they answer.";
+    } on RideRequestException catch (e) {
+      return e.message;
+    } catch (e) {
+      debugPrint('seat request from child sheet failed: $e');
+      return 'The child was saved, but the request to ${driver.name} could '
+          'not be sent. Try again from Find a Driver.';
+    }
   }
 
   Widget _buildTextField(
@@ -2401,11 +2472,9 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       _nameCtrl,
                       "e.g. John Doe",
                     ),
-                    _buildTextField(
-                      "Grade / Class",
-                      _gradeCtrl,
-                      "e.g. Grade 5",
-                    ),
+                    // Type first: what "class" means depends on it, and
+                    // a university rider has a semester, not a Grade 5.
+                    // Same order as the sign-up form.
                     _buildDropdown<String>(
                       label: "Institute Type",
                       value: _instituteType,
@@ -2418,6 +2487,11 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                       onChanged: (val) {
                         setState(() => _instituteType = val);
                       },
+                    ),
+                    _buildTextField(
+                      "Class / Semester",
+                      _gradeCtrl,
+                      "e.g. Grade 5, or 3rd semester",
                     ),
                     if (_instituteType != null)
                       Row(
@@ -2626,16 +2700,16 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         },
                       ),
                       // ── Round picker ───────────────────────────────────
-                      // Only meaningful when the assigned driver actually
-                      // runs more than one round — with zero or one, there is
-                      // nothing to choose, so `Student.scheduleId` stays
-                      // whatever it already was (usually the driver's only
-                      // round, assigned at accept time).
+                      // The round the seat request asks for: only rounds
+                      // that go to this child's institute and still have
+                      // room. Hidden for the driver the child already rides
+                      // with — there is nothing to ask them.
                       if (_selectedDriver != null &&
-                          _selectedDriver!.orderedSchedules.length > 1) ...[
+                          _selectedDriver!.id != widget.initialChild.driver &&
+                          _openRoundsFor(_selectedDriver!).isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Text(
-                          'Which round does this child ride?',
+                          'Which round should we ask for?',
                           style: TextStyle(
                             color: context.textPrimary,
                             fontSize: 14,
@@ -2646,7 +2720,7 @@ class _ChildFlowSheetState extends State<_ChildFlowSheet> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: _selectedDriver!.orderedSchedules.map((s) {
+                          children: _openRoundsFor(_selectedDriver!).map((s) {
                             final selected = _scheduleId == s.id;
                             final label = s.label.isEmpty
                                 ? s.timeRange

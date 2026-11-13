@@ -26,17 +26,20 @@ void main() {
       for (var i = 0; i < lines.length; i++)
         if (lines[i] == '  };') i,
     ];
-    expect(ends.length, greaterThanOrEqualTo(2),
-        reason: 'expected an English and an Urdu map');
+    expect(
+      ends.length,
+      greaterThanOrEqualTo(2),
+      reason: 'expected an English and an Urdu map',
+    );
 
     // Several lines carry two entries, so scan every match on the line
     // rather than only the one at its start; skip commented-out entries.
     final keyPattern = RegExp(r"'([a-z0-9_]+)':");
     Set<String> keysIn(int from, int to) => {
-          for (final line in lines.sublist(from, to))
-            if (!line.trimLeft().startsWith('//'))
-              for (final m in keyPattern.allMatches(line)) m.group(1)!,
-        };
+      for (final line in lines.sublist(from, to))
+        if (!line.trimLeft().startsWith('//'))
+          for (final m in keyPattern.allMatches(line)) m.group(1)!,
+    };
 
     enKeys = keysIn(0, ends[0]);
     urKeys = keysIn(ends[0] + 1, ends[1]);
@@ -67,8 +70,11 @@ void main() {
         missing.add('$key  (used by ${users.toSet().join(', ')})');
       }
     });
-    expect(missing, isEmpty,
-        reason: 'keys with no English string:\n${missing.join('\n')}');
+    expect(
+      missing,
+      isEmpty,
+      reason: 'keys with no English string:\n${missing.join('\n')}',
+    );
   });
 
   test('every key the code asks for is translated to Urdu', () {
@@ -80,8 +86,11 @@ void main() {
         missing.add('$key  (used by ${users.toSet().join(', ')})');
       }
     });
-    expect(missing, isEmpty,
-        reason: 'keys with no Urdu translation:\n${missing.join('\n')}');
+    expect(
+      missing,
+      isEmpty,
+      reason: 'keys with no Urdu translation:\n${missing.join('\n')}',
+    );
   });
 
   test('neither map declares the same key twice', () {
@@ -108,19 +117,31 @@ void main() {
       return dupes;
     }
 
-    expect(duplicatesIn(0, ends[0]), isEmpty,
-        reason: 'duplicate English keys: '
-            '${duplicatesIn(0, ends[0]).join(', ')}');
-    expect(duplicatesIn(ends[0] + 1, ends[1]), isEmpty,
-        reason: 'duplicate Urdu keys: '
-            '${duplicatesIn(ends[0] + 1, ends[1]).join(', ')}');
+    expect(
+      duplicatesIn(0, ends[0]),
+      isEmpty,
+      reason:
+          'duplicate English keys: '
+          '${duplicatesIn(0, ends[0]).join(', ')}',
+    );
+    expect(
+      duplicatesIn(ends[0] + 1, ends[1]),
+      isEmpty,
+      reason:
+          'duplicate Urdu keys: '
+          '${duplicatesIn(ends[0] + 1, ends[1]).join(', ')}',
+    );
   });
 
   test('the Urdu map covers the English one', () {
     final untranslated = enKeys.difference(urKeys).toList()..sort();
-    expect(untranslated, isEmpty,
-        reason: 'English keys with no Urdu entry:\n'
-            '${untranslated.join('\n')}');
+    expect(
+      untranslated,
+      isEmpty,
+      reason:
+          'English keys with no Urdu entry:\n'
+          '${untranslated.join('\n')}',
+    );
   });
 
   test('no Urdu entry is left as English', () {
@@ -153,9 +174,13 @@ void main() {
       final stripped = value.replaceAll(RegExp(r'\{[^}]*\}'), '');
       if (latin.hasMatch(stripped)) suspicious.add('${m.group(1)} = $value');
     }
-    expect(suspicious, isEmpty,
-        reason: 'Urdu entries that still read as English:\n'
-            '${suspicious.join('\n')}');
+    expect(
+      suspicious,
+      isEmpty,
+      reason:
+          'Urdu entries that still read as English:\n'
+          '${suspicious.join('\n')}',
+    );
   });
 
   group('AppStrings.t at runtime', () {

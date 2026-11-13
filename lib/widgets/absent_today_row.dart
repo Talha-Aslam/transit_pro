@@ -84,10 +84,7 @@ class _AbsentTodayRowState extends State<AbsentTodayRow> {
             ),
             child: Row(
               children: [
-                Text(
-                  isOff ? '🏠' : '🤒',
-                  style: const TextStyle(fontSize: 18),
-                ),
+                Text(isOff ? '🏠' : '🤒', style: const TextStyle(fontSize: 18)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

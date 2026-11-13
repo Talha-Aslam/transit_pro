@@ -432,6 +432,130 @@ async function handleSend(request, env) {
   return json({ sent, failed, recipients: reached.length, sender: senderUid });
 }
 
+// ── Routes API proxy ───────────────────────────────────────────────────────
+
+/**
+ * The one field mask the app uses. Pinned here so a caller cannot ask for
+ * the more expensive fields (traffic on polyline, toll info) on our key.
+ */
+const ROUTES_FIELD_MASK = [
+  'routes.optimizedIntermediateWaypointIndex',
+  'routes.polyline.encodedPolyline',
+  'routes.legs.distanceMeters',
+  'routes.legs.duration',
+  'routes.legs.polyline.encodedPolyline',
+  'routes.distanceMeters',
+  'routes.duration',
+].join(',');
+
+const MAX_INTERMEDIATES = 25;
+
+/** A `{location:{latLng:{latitude,longitude}}}` waypoint, or null. */
+function cleanWaypoint(raw, stopover) {
+  const ll = raw?.location?.latLng;
+  const lat = Number(ll?.latitude);
+  const lng = Number(ll?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  const point = { location: { latLng: { latitude: lat, longitude: lng } } };
+  if (stopover) {
+    point.vehicleStopover = true;
+    point.sideOfRoad = true;
+  }
+  return point;
+}
+
+/**
+ *   POST /routes
+ *   Authorization: Bearer <Firebase ID token of a driver>
+ *   { "request": { origin, destination, intermediates?, optimizeWaypointOrder? } }
+ *
+ * Forwards one `computeRoutes` call with the server's own key, so the key
+ * that can spend money on routing never ships inside the app. The request
+ * is rebuilt from the few fields the app sends, not passed through, and
+ * only drivers may call it: families read the route the driver's app
+ * already cached on the trip.
+ */
+async function handleRoutes(request, env) {
+  const authorization = request.headers.get('authorization') ?? '';
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    return json({ error: 'Missing bearer token.' }, 401);
+  }
+  let uid;
+  try {
+    uid = await verifyIdToken(authorization.slice(7).trim(), env.FIREBASE_PROJECT_ID);
+  } catch (error) {
+    return json({ error: String(error.message ?? error) }, 401);
+  }
+
+  // 501 tells the app to use its own fallback, rather than fail the route.
+  if (!env.ROUTES_API_KEY || !env.SERVICE_ACCOUNT_JSON) {
+    return json({ error: 'Routing is not configured.' }, 501);
+  }
+
+  const accessToken = await googleAccessToken(env);
+  const user = await readDocument(env, accessToken, 'users/' + uid);
+  if (stringField(user, 'role') !== 'driver') {
+    return json({ error: 'Only drivers can plan routes.' }, 403);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: 'Body must be JSON.' }, 400);
+  }
+  const raw = payload?.request ?? {};
+  const origin = cleanWaypoint(raw.origin, false);
+  const destination = cleanWaypoint(raw.destination, true);
+  if (!origin || !destination) {
+    return json({ error: 'origin and destination are required.' }, 400);
+  }
+  const rawStops = Array.isArray(raw.intermediates) ? raw.intermediates : [];
+  if (rawStops.length > MAX_INTERMEDIATES) {
+    return json({ error: 'At most 25 stops per request.' }, 400);
+  }
+  const intermediates = rawStops.map((w) => cleanWaypoint(w, true));
+  if (intermediates.some((w) => w === null)) {
+    return json({ error: 'Every stop needs a valid latLng.' }, 400);
+  }
+
+  const body = {
+    origin,
+    destination,
+    travelMode: 'DRIVE',
+    routingPreference: 'TRAFFIC_AWARE',
+    polylineEncoding: 'ENCODED_POLYLINE',
+  };
+  if (intermediates.length > 0) body.intermediates = intermediates;
+  if (raw.optimizeWaypointOrder === true && intermediates.length > 1) {
+    body.optimizeWaypointOrder = true;
+  }
+
+  const response = await fetch(
+    'https://routes.googleapis.com/directions/v2:computeRoutes',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': env.ROUTES_API_KEY,
+        'X-Goog-FieldMask': ROUTES_FIELD_MASK,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    console.error('routes failed', response.status, text.slice(0, 300));
+    // The app falls back to a straight-line plan on any non-200.
+    return json({ error: 'Routing failed.', status: response.status }, 502);
+  }
+  return new Response(text, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -440,7 +564,9 @@ export default {
       return json({ ok: true, project: env.FIREBASE_PROJECT_ID ?? null });
     }
 
-    if (url.pathname !== '/send') return json({ error: 'Not found.' }, 404);
+    if (url.pathname !== '/send' && url.pathname !== '/routes') {
+      return json({ error: 'Not found.' }, 404);
+    }
     if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405);
 
     // Only the project id is needed to tell a real caller from a stranger;
@@ -450,11 +576,12 @@ export default {
     }
 
     try {
+      if (url.pathname === '/routes') return await handleRoutes(request, env);
       return await handleSend(request, env);
     } catch (error) {
       // Never leak the service account or a Google error body to the caller.
-      console.error('send failed', error);
-      return json({ error: 'Send failed.' }, 500);
+      console.error(url.pathname + ' failed', error);
+      return json({ error: 'Request failed.' }, 500);
     }
   },
 };

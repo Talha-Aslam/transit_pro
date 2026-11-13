@@ -199,8 +199,7 @@ class _DriverTimetablesScreenState extends State<DriverTimetablesScreen> {
                           return _TimetableCard(
                             student: student,
                             busy: _busyId == student.id,
-                            onAccept: () =>
-                                _answer(student, accept: true),
+                            onAccept: () => _answer(student, accept: true),
                             onDecline: () => _decline(student),
                           );
                         },

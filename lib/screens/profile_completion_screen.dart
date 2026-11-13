@@ -95,6 +95,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   /// than "later, from your profile" is the difference between a driver who gets
   /// requests and one who waits indefinitely wondering why nobody calls.
   final List<ServiceAreaFormData> _serviceAreas = [ServiceAreaFormData()];
+
   /// The institute names the driver has typed in the step above, for the
   /// round cards to offer as chips. Blank cards are skipped — a half-typed
   /// area is not something to tick a round against.
@@ -242,6 +243,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             school: c.schoolCtrl.text,
             studentIdNumber: c.studentIdCtrl.text,
             pickupLocation: c.pickup,
+            instituteLocation: c.instituteLocation,
           ),
         )
         .toList(),

@@ -18,7 +18,7 @@ import '../../widgets/profile_form_fields.dart';
 /// ## What this screen deliberately cannot do
 ///
 /// It cannot change `bookedSeats`. The form carries the live value through
-/// read-only and `RideMatchService.saveSchedules` merges it back from the current
+/// read-only and `RideMatchService.mergeRounds` merges it back from the current
 /// document, so editing a round's start time cannot silently un-book the families
 /// already on it. It also refuses to shrink a round below what is booked, or
 /// delete a round that still has students, rather than leaving those families
@@ -34,6 +34,7 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   final _session = SessionService.instance;
 
   List<ServiceAreaFormData> _areas = [];
+
   /// The institute names the driver has typed in the step above, for the
   /// round cards to offer as chips. Blank cards are skipped — a half-typed
   /// area is not something to tick a round against.
@@ -47,6 +48,11 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   GeoCoord? _base;
   final _fareCtrl = TextEditingController();
 
+  /// Seats in the vehicle. Every round is capped at this.
+  final _capacityCtrl = TextEditingController();
+
+  int get _capacity => int.tryParse(_capacityCtrl.text.trim()) ?? 0;
+
   /// True once the live driver document has been loaded into the form.
   ///
   /// Without this the driver stream would overwrite the form on every emission,
@@ -56,6 +62,11 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   bool _loaded = false;
   bool _saving = false;
   String _error = '';
+
+  /// Problems found on individual rounds, by round id, shown on the card.
+  Map<String, String> _roundErrors = const {};
+  final _roundKeys = <String, GlobalKey>{};
+  final _scroll = ScrollController();
 
   @override
   void initState() {
@@ -68,6 +79,8 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   void dispose() {
     _session.driver.removeListener(_onDriver);
     _fareCtrl.dispose();
+    _capacityCtrl.dispose();
+    _scroll.dispose();
     _disposeForm();
     super.dispose();
   }
@@ -99,6 +112,10 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
           ? 5
           : driver.serviceRadiusKm.clamp(1, 30);
       _base = driver.baseLocation;
+      final capacity = driver.vehicleCapacity > 0
+          ? driver.vehicleCapacity
+          : _session.bus.value?.capacity ?? 0;
+      _capacityCtrl.text = capacity > 0 ? '$capacity' : '';
       _fareCtrl.text = driver.missedBusFarePaisa <= 0
           ? ''
           : (driver.missedBusFarePaisa / 100).round().toString();
@@ -108,78 +125,157 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
+    FocusScope.of(context).unfocus();
     final areas = _areas
         .where((a) => !a.isBlank)
         .map((a) => a.toModel())
         .toList();
-    final rounds = _rounds.map((r) => r.toModel()).toList();
+    // A round keeps only the institutes still listed above: one the driver
+    // renamed or removed would otherwise stay ticked out of sight, and the
+    // round would go on promising a school the driver no longer serves.
+    final names = areas.map((a) => a.name).toSet();
+    final rounds = [
+      for (final r in _rounds)
+        () {
+          final m = r.toModel();
+          return m.copyWith(
+            institutes: m.institutes.where(names.contains).toList(),
+          );
+        }(),
+    ];
 
     // Same two invariants the sign-up validator enforces, restated here because
     // a driver can otherwise *remove* their last school or round after sign-up
     // and end up invisible with a profile that still reads as complete.
     if (areas.isEmpty) {
-      setState(
-        () => _error =
-            'Add at least one school, college or university, or no parent can '
-            'find you.',
+      return _fail(
+        'Add at least one school, college or university, or no parent can '
+        'find you.',
       );
-      return;
     }
     if (rounds.isEmpty) {
-      setState(
-        () => _error =
-            'Add at least one round, or there is nothing for a family to book.',
+      return _fail(
+        'Add at least one round, or there is nothing for a family to book.',
       );
-      return;
     }
-    final gap = rounds.firstWhere(
-      (r) => (!r.hasPickup && !r.hasDropoff) || r.totalSeats <= 0,
-      orElse: () => const DriverSchedule(id: '', label: ''),
-    );
-    if (gap.id.isNotEmpty) {
-      setState(
-        () =>
-            _error = '"${gap.label}" needs both a start time and a seat count.',
+    final capacity = _capacity;
+    if (capacity <= 0) {
+      return _fail('Enter how many seats your vehicle has.');
+    }
+    final problems = {
+      for (final r in rounds) r.id: ?roundProblem(r, capacity: capacity),
+    };
+    if (problems.isNotEmpty) {
+      setState(() => _roundErrors = problems);
+      final first = rounds.firstWhere((r) => problems.containsKey(r.id));
+      return _fail(
+        problems.length == 1
+            ? '"${first.label}": ${problems[first.id]}'
+            : '${problems.length} rounds need fixing — see the cards marked '
+                  'in red.',
+        scrollTo: first.id,
       );
-      return;
     }
 
     setState(() {
       _saving = true;
       _error = '';
+      _roundErrors = const {};
     });
 
     final fareRupees = int.tryParse(_fareCtrl.text.trim()) ?? 0;
 
     try {
-      await RideMatchService.instance.saveServiceAreas(
+      final synced = await RideMatchService.instance.saveService(
         areas: areas,
+        rounds: rounds,
+        vehicleCapacity: capacity,
         radiusKm: _radiusKm,
         baseLocation: _base,
         missedBusFarePaisa: fareRupees <= 0 ? 0 : fareRupees * 100,
       );
-      await RideMatchService.instance.saveSchedules(rounds);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Saved. Parents searching your schools will see this.'),
-          backgroundColor: AppTheme.success,
+        SnackBar(
+          content: Text(
+            synced
+                ? 'Saved. Parents searching your schools will see this.'
+                : 'Saved on this phone. It will reach parents as soon as '
+                      "you're back online.",
+          ),
+          backgroundColor: synced ? AppTheme.success : AppTheme.warning,
         ),
       );
       context.pop();
     } on RideRequestException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      _fail(e.message);
     } catch (e) {
       debugPrint('saving driver service failed: $e');
-      if (mounted) {
-        setState(
-          () => _error = 'Could not save. Check your connection and try again.',
-        );
-      }
+      _fail('Could not save. Check your connection and try again.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Says why a save did not happen, where the driver is looking: beside the
+  /// Save button, in a snackbar, and — when one round is the problem — by
+  /// scrolling that round into view. The message used to appear only at the
+  /// top of the page, out of sight of the button that caused it, so a
+  /// refused save looked exactly like a save that did nothing.
+  void _fail(String message, {String? scrollTo}) {
+    if (!mounted) return;
+    setState(() => _error = message);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppTheme.error),
+      );
+    final target = scrollTo == null ? null : _roundKeys[scrollTo];
+    final ctx = target?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        alignment: 0.1,
+      );
+    }
+  }
+
+  /// Removing a round families are booked on would strand them, so it is
+  /// refused here, at the tap, with the reason — not later at Save.
+  Future<void> _removeRound(int index) async {
+    final round = _rounds[index];
+    if (round.bookedSeats > 0) {
+      final name = round.labelCtrl.text.trim().isEmpty
+          ? 'This round'
+          : '"${round.labelCtrl.text.trim()}"';
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Students are booked on this round'),
+          content: Text(
+            '$name has ${round.bookedSeats} '
+            'student${round.bookedSeats == 1 ? '' : 's'} booked. Move or '
+            'remove them from Booked Students first, then delete the round.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _roundKeys.remove(round.id);
+      _roundErrors = {..._roundErrors}..remove(round.id);
+      _rounds.removeAt(index);
+    });
+    // Disposed after the frame, once no text field is still attached.
+    WidgetsBinding.instance.addPostFrameCallback((_) => round.dispose());
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -197,11 +293,11 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                 child: !_loaded
                     ? const Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(
+                        controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_error.isNotEmpty) _errorBanner(),
                             _heading(
                               'Where you drive',
                               'Parents search by their child\'s school, so list '
@@ -210,13 +306,17 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                             const SizedBox(height: 14),
                             ..._areas.asMap().entries.map(
                               (e) => ServiceAreaCard(
+                                key: ObjectKey(e.value),
                                 index: e.key,
                                 data: e.value,
                                 canRemove: _areas.length > 1,
-                                onRemove: () => setState(() {
-                                  _areas[e.key].dispose();
-                                  _areas.removeAt(e.key);
-                                }),
+                                onRemove: () {
+                                  final area = _areas[e.key];
+                                  setState(() => _areas.removeAt(e.key));
+                                  WidgetsBinding.instance.addPostFrameCallback(
+                                    (_) => area.dispose(),
+                                  );
+                                },
                                 onChanged: () => setState(() {}),
                               ),
                             ),
@@ -282,6 +382,33 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                             ),
                             const SizedBox(height: 20),
                             _heading(
+                              'Vehicle capacity',
+                              'How many seats your vehicle has. No round can '
+                                  'offer more than this — every round is the '
+                                  'same vehicle making the trip again.',
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _capacityCtrl,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setState(() {}),
+                              style: TextStyle(color: context.textPrimary),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 12',
+                                hintStyle: TextStyle(color: context.textHint),
+                                suffixText: 'seats',
+                                filled: true,
+                                fillColor: context.inputFill,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: context.inputBorder,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _heading(
                               'Your rounds',
                               'One round per trip. Seats are counted per round, '
                                   'so the same vehicle offers a full load on '
@@ -290,15 +417,24 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                             const SizedBox(height: 14),
                             ..._rounds.asMap().entries.map(
                               (e) => RoundCard(
+                                key: _roundKeys.putIfAbsent(
+                                  e.value.id,
+                                  GlobalKey.new,
+                                ),
                                 index: e.key,
                                 data: e.value,
                                 availableInstitutes: _instituteNames,
                                 canRemove: _rounds.length > 1,
-                                onRemove: () => setState(() {
-                                  _rounds[e.key].dispose();
-                                  _rounds.removeAt(e.key);
+                                error: _roundErrors[e.value.id],
+                                onRemove: () => _removeRound(e.key),
+                                onChanged: () => setState(() {
+                                  // An edited round is re-checked at Save;
+                                  // until then its old complaint is stale.
+                                  if (_roundErrors.containsKey(e.value.id)) {
+                                    _roundErrors = {..._roundErrors}
+                                      ..remove(e.value.id);
+                                  }
                                 }),
-                                onChanged: () => setState(() {}),
                               ),
                             ),
                             _addButton(
@@ -307,12 +443,15 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                                 _rounds.add(
                                   RoundFormData.fresh(
                                     ordinal: _rounds.length + 1,
-                                    seats: _session.bus.value?.capacity ?? 0,
+                                    seats: _capacity > 0
+                                        ? _capacity
+                                        : _session.bus.value?.capacity ?? 0,
                                   ),
                                 );
                               }),
                             ),
                             const SizedBox(height: 24),
+                            if (_error.isNotEmpty) _errorBanner(),
                             _saveButton(),
                           ],
                         ),
@@ -473,4 +612,22 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
             ),
     ),
   );
+}
+
+/// What stops [round] being saved, in words for the driver, or null when it
+/// is fine. Checked for every round before anything is written.
+String? roundProblem(DriverSchedule round, {int capacity = 0}) {
+  if (!round.hasPickup && !round.hasDropoff) {
+    return 'Set a start time for taking them, bringing them back, or both.';
+  }
+  if (round.totalSeats <= 0) return 'Enter how many seats this round has.';
+  if (capacity > 0 && round.totalSeats > capacity) {
+    return 'Your vehicle has $capacity seats, so this round cannot offer '
+        '${round.totalSeats}.';
+  }
+  if (round.totalSeats < round.bookedSeats) {
+    return '${round.bookedSeats} students are booked on this round, so seats '
+        'cannot go below ${round.bookedSeats}.';
+  }
+  return null;
 }

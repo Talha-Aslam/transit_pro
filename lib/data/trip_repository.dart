@@ -68,6 +68,61 @@ class TripRepository {
     return trip;
   }
 
+  /// A fresh trip id, for a caller that needs it before the trip is written.
+  String newTripId() => Db.trips.doc().id;
+
+  /// Writes a fully planned trip — its stops and first route included — and
+  /// its attendance manifest in one batch, the same all-or-nothing rule as
+  /// [startTrip]. Used by the trip controller, which plans before it writes
+  /// so a family's map has the route from the first snapshot.
+  Future<void> createPlannedTrip(Trip trip, List<Student> students) async {
+    final tripRef = Db.fs.collection('trips').doc(trip.id);
+    final batch = Db.fs.batch();
+    batch.set(tripRef, {
+      ...trip.toMap(),
+      'startedAt': Db.now,
+      if (trip.route != null)
+        'route': {...trip.route!.toMap(), 'computedAt': Db.now},
+    });
+    for (final s in students) {
+      batch.set(
+        tripRef.collection('attendance').doc(s.id),
+        AttendanceRecord(
+          studentId: s.id,
+          studentName: s.name,
+          stopId: s.stopId,
+          tripId: trip.id,
+          dateKey: trip.dateKey,
+          driverId: trip.driverId,
+        ).toMap(),
+      );
+    }
+    await batch.commit();
+  }
+
+  /// Saves where the round has got to: the stops (with their latest ETAs),
+  /// the route still to drive, and the phase. Every family's map reads this.
+  Future<void> saveTripProgress(
+    String tripId, {
+    required List<TripStop> stops,
+    required TripRoutePlan? route,
+    required TripPhase phase,
+  }) => Db.fs.collection('trips').doc(tripId).update({
+    'stops': [for (final s in stops) s.toMap()],
+    'route': route == null
+        ? FieldValue.delete()
+        : {...route.toMap(), 'computedAt': Db.now},
+    'phase': phase.name,
+  });
+
+  /// Every attendance mark on [tripId], by student.
+  Future<Map<String, AttendanceStatus>> fetchAttendanceMap(
+    String tripId,
+  ) async {
+    final snap = await Db.attendance(tripId).get();
+    return {for (final d in snap.docs) d.id: d.data().status};
+  }
+
   /// Closes the trip and stamps the on-time verdict.
   Future<void> endTrip(String tripId, {bool? onTime, int? delayMinutes}) async {
     final counts = await _attendanceCounts(tripId);
@@ -98,6 +153,16 @@ class TripRepository {
       .limit(1)
       .snapshots()
       .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
+
+  /// The driver's running trip, but only while it is [studentId]'s round.
+  ///
+  /// A driver with several rounds runs them one at a time; while round A is
+  /// on the road a child booked on round B has no trip at all, rather than
+  /// a view of someone else's children's stops.
+  Stream<Trip?> watchActiveTripForStudent(String driverId, String studentId) =>
+      watchActiveTripForDriver(driverId)
+          .map((t) => t != null && t.carries(studentId) ? t : null)
+          .distinct((a, b) => a == null && b == null);
 
   /// The live trip on a route — what parents and students watch.
   Stream<Trip?> watchActiveTripForRoute(String routeId) => Db.trips
@@ -170,7 +235,9 @@ class TripRepository {
   ///
   /// Returns how many records changed, so a caller can skip the write when
   /// there is nothing to do.
-  Future<int> markRemainingDroppedOff({
+  /// Returns the ids of the students it marked, so their families can be
+  /// told.
+  Future<List<String>> markRemainingDroppedOff({
     required String tripId,
     required String markedBy,
   }) async {
@@ -178,7 +245,7 @@ class TripRepository {
     final aboard = snap.docs
         .where((d) => d.data().status == AttendanceStatus.boarded)
         .toList();
-    if (aboard.isEmpty) return 0;
+    if (aboard.isEmpty) return const [];
 
     final batch = Db.fs.batch();
     for (final doc in aboard) {
@@ -197,7 +264,7 @@ class TripRepository {
       );
     }
     await batch.commit();
-    return aboard.length;
+    return [for (final d in aboard) d.id];
   }
 
   /// Student ids on [tripId] that the driver never recorded either way.
@@ -240,6 +307,24 @@ class TripRepository {
         .map((d) => AttendanceRecord.fromMap(d.id, d.data()))
         .toList();
   }
+
+  /// [fetchAttendanceForStudent], kept current: a trip the child rides
+  /// today shows up in the family's figures as the driver marks it, not the
+  /// next time the screen is opened.
+  Stream<List<AttendanceRecord>> watchAttendanceHistory(
+    String studentId, {
+    int limit = 50,
+  }) => Db.fs
+      .collectionGroup('attendance')
+      .where('studentId', isEqualTo: studentId)
+      .orderBy('dateKey', descending: true)
+      .limit(limit)
+      .snapshots()
+      .map(
+        (snap) => snap.docs
+            .map((d) => AttendanceRecord.fromMap(d.id, d.data()))
+            .toList(),
+      );
 
   /// Returns `(boarded, absent)`.
   Future<(int, int)> _attendanceCounts(String tripId) async {

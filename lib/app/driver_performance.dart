@@ -21,7 +21,12 @@ class DriverScores {
   /// On-time arrivals as a fraction, from `Trip.onTime`.
   final double? onTime;
 
-  const DriverScores({this.satisfaction, this.compliance, this.safety, this.onTime});
+  const DriverScores({
+    this.satisfaction,
+    this.compliance,
+    this.safety,
+    this.onTime,
+  });
 
   /// A single 0-100 figure, averaging whichever components exist. Null when
   /// none do, so the big circle shows "N/A" rather than a number nobody

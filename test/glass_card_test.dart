@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:transit_pro/theme/app_theme.dart';
@@ -10,10 +9,10 @@ import 'package:transit_pro/widgets/glass_card.dart';
 /// student dashboards down to a hairline.
 void main() {
   Widget host(Widget child) => MaterialApp(
-        home: Scaffold(
-          body: Center(child: SizedBox(width: 300, child: child)),
-        ),
-      );
+    home: Scaffold(
+      body: Center(child: SizedBox(width: 300, child: child)),
+    ),
+  );
 
   BoxDecoration decorationOf(WidgetTester tester) {
     final container = tester.widget<Container>(
@@ -57,8 +56,9 @@ void main() {
     expect(tester.getSize(find.byType(GlassCard)).height, 80 + 32 + 2);
   });
 
-  testWidgets('an accent card draws a 3px rail down its leading edge',
-      (tester) async {
+  testWidgets('an accent card draws a 3px rail down its leading edge', (
+    tester,
+  ) async {
     const accent = Color(0xFF7C3AED);
     await tester.pumpWidget(
       host(
@@ -85,13 +85,12 @@ void main() {
     expect(railRect.height, cardRect.height - borderWidth * 2);
   });
 
-  testWidgets('is opaque — no blur filter anywhere in the tree',
-      (tester) async {
+  testWidgets('is opaque — no blur filter anywhere in the tree', (
+    tester,
+  ) async {
     // The whole point of the redesign: a card is a surface, not a pane of
     // glass over whatever happens to be behind it.
-    await tester.pumpWidget(
-      host(const GlassCard(child: SizedBox(height: 40))),
-    );
+    await tester.pumpWidget(host(const GlassCard(child: SizedBox(height: 40))));
     expect(find.byType(BackdropFilter), findsNothing);
 
     final decoration = decorationOf(tester);
@@ -144,7 +143,10 @@ void main() {
 
     test('the dark ramp climbs: ground < card < raised', () {
       double lum(Color c) => c.computeLuminance();
-      expect(lum(AppTheme.darkSurfaceBg), lessThan(lum(AppTheme.darkSurfaceCard)));
+      expect(
+        lum(AppTheme.darkSurfaceBg),
+        lessThan(lum(AppTheme.darkSurfaceCard)),
+      );
       expect(
         lum(AppTheme.darkSurfaceCard),
         lessThan(lum(AppTheme.darkSurfaceRaised)),

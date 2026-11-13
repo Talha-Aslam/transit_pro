@@ -27,7 +27,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   void _onLangChanged() => setState(() {});
 
   Future<void> _sendReset() async {
-    if (_emailCtrl.text.trim().isEmpty) return;
+    // The button always answers: an empty or malformed address says so
+    // instead of doing nothing, which read as a button that did not work.
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Email is required.');
+      return;
+    }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      setState(() => _error = 'Enter a valid email address.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = '';
@@ -190,6 +200,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 color: context.textPrimary,
                                 fontSize: 15,
                               ),
+                              // Typing again clears the complaint.
+                              onChanged: (_) {
+                                if (_error.isNotEmpty) {
+                                  setState(() => _error = '');
+                                }
+                              },
                               decoration: InputDecoration(
                                 hintText: AppStrings.t('email_hint'),
                               ),

@@ -4,27 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../data/live_location_repository.dart';
-import 'route_service.dart';
 
 /// Follows one bus's live position on behalf of a family.
 ///
-/// The driver's app has published to `liveLocations/{busId}` since the
-/// Routes migration, but nothing on the parent or student side ever read it:
-/// both dashboards showed [TrackingService]'s `etaMinutes`, a local
-/// `ValueNotifier<int>` seeded with 8 that only the *driver's* own device
-/// ever advances. On a parent's phone it never moved off 8, so the dashboard
-/// said "8 min to school" with no trip running at all, and said "8 min" just
-/// the same while a real trip was halfway finished. This service is the
-/// missing half of that link.
+/// Reads two things and computes nothing that costs money:
 ///
-/// It owns three pieces of state and nothing else:
+///  * `liveLocations/{busId}` — where the van is, every few seconds;
+///  * the running `trips/{tripId}` document — the route the driver's app
+///    last computed, and each stop's expected arrival time.
 ///
-///  * [position] — the latest ping, or null when the bus is not broadcasting
-///    or its last ping has gone stale;
-///  * [etaMinutes] / [distanceLabel] — derived from that position against a
-///    destination, refreshed at most every [_etaInterval];
-///  * [isFollowing] — whether a bus is being watched at all, which is what
-///    separates "no route running" from "route running, waiting for a fix".
+/// The minutes a family sees come from the trip's own stop ETAs, counted
+/// down on this phone. This service used to ask Google for a fresh route
+/// from the van to the school every 30 seconds for every family watching,
+/// which cost a request per viewer per half-minute and measured the wrong
+/// thing in the morning — the van goes to *this child's door* first.
 ///
 /// Null is meaningful everywhere here: it means "not known", never "zero".
 class LiveBusService {
@@ -32,68 +25,77 @@ class LiveBusService {
   static final LiveBusService instance = LiveBusService._();
 
   /// The latest ping. Null when nothing is broadcasting, or when the last
-  /// ping is older than [LiveLocation.isStale] allows — a bus that dropped
-  /// off the network must not keep showing a position it no longer holds.
+  /// ping is older than [LiveLocation.isStale] allows.
   final position = ValueNotifier<LiveLocation?>(null);
 
-  /// Minutes to the destination by road, or null while unknown.
+  /// The last ping received on this follow, kept even after it goes stale
+  /// or the node disappears, so the map can say "last seen here, 3 min ago"
+  /// instead of the van vanishing.
+  final lastKnown = ValueNotifier<LiveLocation?>(null);
+
+  /// The trip being followed, refreshed as the driver's app re-plans.
+  final trip = ValueNotifier<Trip?>(null);
+
+  /// Minutes until the van reaches this child's stop — or, once the child
+  /// is aboard, the end of the leg. Null while unknown.
   final etaMinutes = ValueNotifier<int?>(null);
 
-  /// Road distance to the destination, e.g. "4.2 km". Null while unknown.
+  /// Road distance for the same target, e.g. "4.2 km". Null while unknown.
   final distanceLabel = ValueNotifier<String?>(null);
 
   /// True between [follow] and [stop] — a trip is running and this service
   /// is listening, whether or not a ping has arrived yet.
   final isFollowing = ValueNotifier<bool>(false);
 
-  /// How often the road ETA may be recomputed. Pings arrive every
-  /// `AppConfig.locationPublishInterval` (5s); asking the Routes API that
-  /// often would be twelve billed calls a minute per watching family for a
-  /// number that barely changes.
-  static const _etaInterval = Duration(seconds: 30);
-
-  /// How often a held position is re-checked for staleness. Without this the
-  /// UI would keep a dead ping on screen until the next one arrived, which
-  /// by definition never comes.
-  static const _stalenessInterval = Duration(seconds: 10);
+  /// How often a held position is re-checked for staleness and the ETA
+  /// counted down. Without this the UI would keep a dead ping on screen
+  /// until the next one arrived, which by definition never comes.
+  static const _tickInterval = Duration(seconds: 10);
 
   String? _busId;
-  GeoCoord? _destination;
+  String? _studentId;
   StreamSubscription<LiveLocation?>? _sub;
-  Timer? _stalenessTimer;
-  DateTime? _lastEtaAt;
-  GeoCoord? _lastEtaFrom;
+  Timer? _ticker;
 
   /// The bus currently being followed, or null.
   String? get busId => _busId;
 
-  /// Start following [busId], computing ETAs toward [destination] when one
-  /// is known. Calling it again with the same pair is a no-op, so it is safe
-  /// to call from `build`.
-  void follow({required String busId, GeoCoord? destination}) {
-    if (_busId == busId && _destination == destination) return;
+  /// The child whose stop the ETA is measured to.
+  String? get studentId => _studentId;
 
-    stop();
-    if (busId.isEmpty) return;
-
-    _busId = busId;
-    _destination = destination;
-    isFollowing.value = true;
-
-    _sub = LiveLocationRepository.instance
-        .watchBus(busId)
-        .listen(
-          _onPing,
-          onError: (_) {
-            // A dropped subscription is not an empty bus: keep following so the
-            // stream can recover, but stop claiming a position we no longer get.
-            position.value = null;
-          },
-        );
-    _stalenessTimer = Timer.periodic(_stalenessInterval, (_) => _dropIfStale());
+  /// Start following [busId]. Calling it again with the same bus only
+  /// refreshes [trip] and the child, so it is safe to call on every trip
+  /// snapshot.
+  ///
+  /// A [trip] that is not [studentId]'s round is refused: the van is out on
+  /// another round, and its stops are other families' homes.
+  void follow({required String busId, Trip? trip, String? studentId}) {
+    final foreign =
+        trip != null && studentId != null && !trip.carries(studentId);
+    if (busId.isEmpty || foreign) {
+      stop();
+      return;
+    }
+    if (_busId != busId) {
+      stop();
+      _busId = busId;
+      isFollowing.value = true;
+      _sub = LiveLocationRepository.instance
+          .watchBus(busId)
+          .listen(
+            _onPing,
+            onError: (_) {
+              // A dropped subscription is not an empty bus: keep following so
+              // the stream can recover, but stop claiming a live position.
+              position.value = null;
+            },
+          );
+      _ticker = Timer.periodic(_tickInterval, (_) => _tick());
+    }
+    _studentId = studentId;
+    this.trip.value = trip;
+    _refreshEta();
   }
-
-  /// Stop following, and clear everything derived from the bus.
 
   /// [stop], for a caller that is inside `State.dispose()`.
   ///
@@ -107,64 +109,71 @@ class LiveBusService {
     scheduleMicrotask(stop);
   }
 
+  /// Stop following, and clear everything derived from the bus.
   void stop() {
     _sub?.cancel();
     _sub = null;
-    _stalenessTimer?.cancel();
-    _stalenessTimer = null;
+    _ticker?.cancel();
+    _ticker = null;
     _busId = null;
-    _destination = null;
-    _lastEtaAt = null;
-    _lastEtaFrom = null;
+    _studentId = null;
     isFollowing.value = false;
     position.value = null;
+    lastKnown.value = null;
+    trip.value = null;
     etaMinutes.value = null;
     distanceLabel.value = null;
   }
 
   void _onPing(LiveLocation? ping) {
-    if (ping == null || ping.isStale) {
+    if (ping == null) {
+      // The node is removed when the driver's connection drops. The van has
+      // not gone anywhere: keep the last position, just not as live.
       position.value = null;
       return;
     }
-    position.value = ping;
-    _maybeRefreshEta(ping.coord);
+    lastKnown.value = ping;
+    position.value = ping.isStale ? null : ping;
   }
 
-  void _dropIfStale() {
+  void _tick() {
     final held = position.value;
-    if (held != null && held.isStale) {
-      position.value = null;
+    if (held != null && held.isStale) position.value = null;
+    _refreshEta();
+  }
+
+  /// The stop the family is waiting on: their child's, while it is still
+  /// ahead; then, in the morning, the institute *they* are set down at;
+  /// otherwise the end of the leg.
+  TripStop? targetStop() {
+    final t = trip.value;
+    if (t == null) return null;
+    final id = _studentId;
+    final mine = id == null ? null : t.childStopFor(id);
+    if (mine != null && mine.isOpen) return mine;
+    final end = id != null && t.type == TripType.morning
+        ? t.instituteStopFor(id)
+        : t.destinationStop;
+    if (end != null && end.isOpen) return end;
+    return null;
+  }
+
+  void _refreshEta() {
+    final target = targetStop();
+    final eta = target?.etaAt;
+    if (target == null || eta == null) {
       etaMinutes.value = null;
       distanceLabel.value = null;
+      return;
     }
-  }
-
-  void _maybeRefreshEta(GeoCoord from) {
-    final destination = _destination;
-    if (destination == null) return;
-
-    final now = DateTime.now();
-    final last = _lastEtaAt;
-    if (last != null && now.difference(last) < _etaInterval) return;
-
-    // Claim the slot before awaiting, so a burst of pings can't start several
-    // overlapping lookups.
-    _lastEtaAt = now;
-    _lastEtaFrom = from;
-
-    unawaited(() async {
-      final result = await RouteService.instance.fetchDistanceDuration(
-        origin: from,
-        destination: destination,
-      );
-      // The family may have switched child (and therefore destination) while
-      // this was in flight; a stale answer must not overwrite a newer one.
-      if (_lastEtaFrom != from || _destination != destination) return;
-      if (result == null) return;
-      etaMinutes.value = parseDurationMinutes(result.duration);
-      distanceLabel.value = result.distance;
-    }());
+    final seconds = eta.difference(DateTime.now()).inSeconds;
+    etaMinutes.value = seconds <= 0 ? 0 : (seconds / 60).ceil();
+    final meters = target.distanceMeters;
+    distanceLabel.value = meters == null
+        ? null
+        : meters < 1000
+        ? '$meters m'
+        : '${(meters / 1000).toStringAsFixed(1)} km';
   }
 }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,8 @@ import '../data/user_repository.dart';
 import '../services/cloudinary_service.dart';
 import 'child_status_service.dart';
 import 'push_sender.dart';
+import 'driver_link.dart';
+import 'family_contact_sync.dart';
 import 'session_service.dart';
 
 /// A single child, flattened for the UI.
@@ -70,6 +73,9 @@ class ChildInfo {
   /// none at all), in which case there is nothing to choose.
   String? scheduleId;
 
+  /// The monthly fee agreed with the driver, in paisa; 0 when none is.
+  int monthlyFeePaisa;
+
   ChildInfo({
     this.id = '',
     this.name = '',
@@ -87,6 +93,7 @@ class ChildInfo {
     this.pickup,
     this.dropoff,
     this.scheduleId,
+    this.monthlyFeePaisa = 0,
   });
 
   /// `(instituteType, grade, school)` — the one shared format every card
@@ -138,6 +145,7 @@ class ChildInfo {
     pickup: pickup ?? this.pickup,
     dropoff: dropoff ?? this.dropoff,
     scheduleId: scheduleId ?? this.scheduleId,
+    monthlyFeePaisa: monthlyFeePaisa,
   );
 }
 
@@ -227,6 +235,9 @@ class ParentDataService {
   void _rebuild() {
     final session = SessionService.instance;
     final user = session.user.value;
+    // A new child, or contacts changed on another device, reaches the
+    // driver's view of each child from here.
+    if (user?.role == UserRole.parent) unawaited(FamilyContactSync.push());
 
     if (user == null) {
       parentInfo.value = ParentInfo();
@@ -249,8 +260,10 @@ class ParentDataService {
 
     final kids = session.children.value;
     children.value = kids.map((s) {
-      final bus = session.busFor(s.busId);
+      // A bus left on the record by a released seat is no bus at all.
+      final bus = isLinkedToDriver(s) ? session.busFor(s.busId) : null;
       final route = session.routeFor(s.routeId);
+      final driverId = driverIdOf(s, bus);
       return ChildInfo(
         id: s.id,
         name: s.name,
@@ -268,16 +281,15 @@ class ParentDataService {
         // Without the fallback, a pilot family's driver id was always empty
         // here, which silently broke both the weekly rating gate and any
         // lookup keyed on "this child's driver".
-        driver: bus?.driverId ?? s.driverId ?? '',
-        driverName: session.driverFor(bus?.driverId ?? s.driverId)?.name ?? '',
-        driverPhotoUrl: session
-            .driverFor(bus?.driverId ?? s.driverId)
-            ?.photoUrl,
+        driver: driverId,
+        driverName: session.driverFor(driverId)?.name ?? '',
+        driverPhotoUrl: session.driverFor(driverId)?.photoUrl,
         photoUrl: s.photoUrl,
         studentIdNumber: s.studentIdNumber,
         pickup: s.pickupLocation,
         dropoff: s.dropoffLocation,
         scheduleId: s.scheduleId,
+        monthlyFeePaisa: s.monthlyFeePaisa,
       );
     }).toList();
 
@@ -470,13 +482,19 @@ class ParentDataService {
     });
   }
 
-  Future<void> updateChild(int index, ChildInfo child) async {
+  /// Saves the family's edits to [child] and returns its id.
+  ///
+  /// Never writes `driverId` or `scheduleId`: those are the driver's to set,
+  /// by accepting a request. The edit sheet used to write the round the
+  /// family had merely *picked*, which put a child on a round no driver had
+  /// agreed to.
+  Future<String?> updateChild(int index, ChildInfo child) async {
     final list = List<ChildInfo>.from(children.value);
-    if (index < 0 || index >= list.length) return;
+    if (index < 0 || index >= list.length) return null;
     list[index] = child;
     children.value = list;
 
-    if (child.id.isEmpty) return;
+    if (child.id.isEmpty) return null;
     await UserRepository.instance.updateStudent(child.id, {
       'name': child.name,
       'grade': child.grade,
@@ -485,8 +503,8 @@ class ParentDataService {
       'studentIdNumber': child.studentIdNumber,
       'pickupLocation': ?child.pickup?.toMap(),
       'dropoffLocation': ?child.dropoff?.toMap(),
-      'scheduleId': ?child.scheduleId,
     });
+    return child.id;
   }
 
   /// Uploads the picked photo and stores its URL on the child.
@@ -600,10 +618,11 @@ class ParentDataService {
     uploadingChildIndices.value = updated;
   }
 
-  Future<void> addChild(ChildInfo child) async {
+  /// Creates the child and returns the new student id.
+  Future<String?> addChild(ChildInfo child) async {
     final uid = SessionService.instance.uid;
-    if (uid == null) return;
-    await UserRepository.instance.addStudent(
+    if (uid == null) return null;
+    return UserRepository.instance.addStudent(
       Student(
         id: '',
         name: child.name,

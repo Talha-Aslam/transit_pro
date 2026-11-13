@@ -43,6 +43,16 @@ class LiveLocationRepository {
   Future<void> cancelDisconnectCleanup(String busId) =>
       _busRef(busId).onDisconnect().cancel();
 
+  /// Whether this device is connected to the Realtime Database right now.
+  ///
+  /// `.info/connected` is RTDB's own view of the socket. A disconnect handler
+  /// fires once and is spent, so the tracker re-arms it every time this
+  /// flips back to true.
+  Stream<bool> watchConnection() => _db
+      .ref('.info/connected')
+      .onValue
+      .map((event) => event.snapshot.value == true);
+
   // ── Parent / student side: subscribe ──────────────────────────────────────
 
   /// Emits null when the bus is not currently broadcasting.

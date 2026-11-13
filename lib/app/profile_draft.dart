@@ -33,6 +33,10 @@ class ChildDraft {
   /// driver matchmaking can only rank by name, not proximity.
   final GeoCoord? pickupLocation;
 
+  /// Where the institute is, from the search result the family picked.
+  /// The far end of every trip this child takes.
+  final GeoCoord? instituteLocation;
+
   const ChildDraft({
     this.name = '',
     this.grade = '',
@@ -40,6 +44,7 @@ class ChildDraft {
     this.school = '',
     this.studentIdNumber = '',
     this.pickupLocation,
+    this.instituteLocation,
   });
 
   bool get isBlank =>
@@ -59,6 +64,7 @@ class ChildDraft {
     String? school,
     String? studentIdNumber,
     GeoCoord? pickupLocation,
+    GeoCoord? instituteLocation,
   }) => ChildDraft(
     name: name ?? this.name,
     grade: grade ?? this.grade,
@@ -66,6 +72,7 @@ class ChildDraft {
     school: school ?? this.school,
     studentIdNumber: studentIdNumber ?? this.studentIdNumber,
     pickupLocation: pickupLocation ?? this.pickupLocation,
+    instituteLocation: instituteLocation ?? this.instituteLocation,
   );
 }
 
@@ -302,6 +309,11 @@ class ProfileRequirements {
               gaps.add('$label — a pick-up or drop-off time');
             }
             if (rounds[i].totalSeats <= 0) gaps.add('$label — seats');
+            if (d.seatCapacity > 0 && rounds[i].totalSeats > d.seatCapacity) {
+              gaps.add(
+                '$label — at most ${d.seatCapacity} seats (your vehicle)',
+              );
+            }
           }
 
           if (rounds.every((r) => r.totalSeats <= 0)) {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../../app/language_provider.dart';
+import '../../app/family_contact_sync.dart';
 import '../../app/session_service.dart';
 import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
@@ -57,6 +58,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     await UserRepository.instance.updateUser(uid, {
       'emergencyContacts': contacts.map((c) => c.toMap()).toList(),
     });
+    // And onto each child's record, which is the copy the driver can read.
+    await FamilyContactSync.push(contacts: contacts);
   }
 
   void _showAddSheet({EmergencyContact? existing, int? index}) {

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart' as core;
 import '../data/missed_bus_repository.dart';
 import '../models/missed_bus_request.dart';
+import '../data/user_repository.dart';
+import 'push_sender.dart';
 import 'session_service.dart';
 
 /// Bridges the UI's local [MissedBusRequest]/[RequestStatus] model onto the
@@ -176,7 +178,7 @@ class MissedBusService {
     core.GeoCoord? destinationCoord,
   }) async {
     final requestedBy = _session.uid ?? '';
-    await _repo.raiseRequest(
+    final id = await _repo.raiseRequest(
       core.MissedBusRequest(
         id: '',
         studentId: studentId,
@@ -190,6 +192,71 @@ class MissedBusService {
         destinationCoord: destinationCoord,
       ),
     );
+    unawaited(
+      _alertNearbyDrivers(
+        requestId: id,
+        studentName: studentName,
+        studentId: studentId,
+        currentStop: currentStop,
+        destination: destination,
+        from: currentStopCoord,
+      ),
+    );
+  }
+
+  /// Puts the request on the phone of every driver who could take it.
+  ///
+  /// Best-effort and deliberately not awaited by the caller: the request is
+  /// already in Firestore, so a failure here means a driver finds out when
+  /// they next open the queue — late, not lost. Without it, the only way
+  /// anyone learned a child was stranded was by happening to have that
+  /// screen open.
+  Future<void> _alertNearbyDrivers({
+    required String requestId,
+    required String studentName,
+    required String studentId,
+    required String currentStop,
+    required String destination,
+    core.GeoCoord? from,
+  }) async {
+    try {
+      final student =
+          _session.children.value.where((c) => c.id == studentId).firstOrNull ??
+          _session.student.value;
+      final institute = student?.school ?? '';
+      if (institute.trim().isEmpty) return;
+
+      final candidates = await UserRepository.instance.fetchDriversServing(
+        institute,
+      );
+      final origin = from ?? student?.pickupLocation;
+      final recipients = <String>[
+        for (final d in candidates)
+          // The same three tests the seat search applies, for the same
+          // reasons: an archived or suspended driver is not an option, and
+          // one whose service radius does not reach the child cannot help.
+          if (!d.isDeleted &&
+              d.status != core.DriverStatus.suspended &&
+              d.coversLocation(origin))
+            d.id,
+      ];
+      if (recipients.isEmpty) return;
+
+      await PushSender.instance.notifyMany(
+        recipients,
+        core.UserNotification(
+          id: '',
+          type: core.NotificationType.missedBus,
+          title: 'Someone has missed their bus',
+          body:
+              '$studentName is waiting at $currentStop and needs to reach '
+              '$destination. First driver to open it takes it.',
+          data: {'requestId': requestId, 'route': '/driver/pickup-requests'},
+        ),
+      );
+    } catch (e) {
+      debugPrint('missed-bus alert failed: $e');
+    }
   }
 
   Future<void> cancelRequest() async {

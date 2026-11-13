@@ -48,7 +48,6 @@ class _StudentNotificationsState extends State<StudentNotifications> {
     }
   }
 
-
   /// Where tapping [n] should take the user, or null to just mark it read.
   ///
   /// A notification is a pointer, not the thing itself. A chat alert that

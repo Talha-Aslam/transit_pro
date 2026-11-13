@@ -3,7 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../../app/language_provider.dart';
+import '../../app/fee_billing_service.dart';
+import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
+import '../../data/payment_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/payment_presentation.dart';
@@ -400,14 +403,224 @@ class _DriverPaymentHistoryScreenState
         payment: payment,
         title: monthLabel(payment.monthKey),
         subtitle: 'Former student',
+        onTap: () => _review(payment, 'Former student'),
       );
     }
 
+    final waiting = payment.status == PaymentStatus.submitted;
     return PaymentRow(
       payment: payment,
       title: student.name,
-      subtitle: monthLabel(payment.monthKey),
+      subtitle: waiting
+          ? '${monthLabel(payment.monthKey)} · tap to check'
+          : monthLabel(payment.monthKey),
+      onTap: () => _review(payment, student.name),
     );
+  }
+
+  /// The family's proof — method, amount, screenshot — and the driver's
+  /// answer once they have checked their own account.
+  Future<void> _review(Payment payment, String name) async {
+    final note = TextEditingController();
+    final decision = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: ctx.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$name · ${monthLabel(payment.monthKey)}',
+                  style: TextStyle(
+                    color: ctx.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  [
+                    paisaToDisplay(payment.amountPaisa),
+                    if ((payment.methodName ?? '').isNotEmpty)
+                      payment.methodName!,
+                    paymentStatusLabel(payment.status),
+                  ].join(' · '),
+                  style: TextStyle(color: ctx.textSecondary),
+                ),
+                if ((payment.notes ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '"${payment.notes}"',
+                    style: TextStyle(
+                      color: ctx.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                if ((payment.slipUrl ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      payment.slipUrl!,
+                      height: 260,
+                      width: double.infinity,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
+                if (payment.status == PaymentStatus.submitted) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: note,
+                    decoration: const InputDecoration(
+                      hintText: 'Note for the family (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.error,
+                            side: const BorderSide(color: AppTheme.error),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Not received'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Received'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                // A bill still owed: remind the family, or record cash in
+                // hand.
+                if (payment.isBill && payment.isOutstanding) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            try {
+                              await FeeBillingService.instance.remind(payment);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Reminder sent to $name's family.",
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              debugPrint('fee reminder failed: $e');
+                            }
+                          },
+                          icon: const Icon(Icons.notifications_active_outlined),
+                          label: const Text('Send reminder'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.warning,
+                            side: const BorderSide(color: AppTheme.warning),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.success,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Mark paid'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final text = note.text.trim();
+    // After the sheet has gone, so its field is not still listening.
+    WidgetsBinding.instance.addPostFrameCallback((_) => note.dispose());
+    if (decision == null) return;
+    final uid = SessionService.instance.uid;
+    if (uid == null) return;
+    try {
+      // A bill that was not received goes back to being owed; a payment the
+      // family sent on their own is simply marked not received.
+      if (payment.isBill) {
+        await PaymentRepository.instance.decideBill(
+          bill: payment,
+          received: decision,
+          driverId: uid,
+          note: text,
+        );
+      } else {
+        await PaymentRepository.instance.decide(
+          paymentId: payment.id,
+          received: decision,
+          driverId: uid,
+          note: text,
+        );
+      }
+      await PushSender.instance.notifyOne(
+        payment.parentId,
+        UserNotification(
+          id: '',
+          type: NotificationType.payment,
+          title: decision ? 'Payment received' : 'Payment not received',
+          body: decision
+              ? 'Your driver confirmed ${paisaToDisplay(payment.amountPaisa)} '
+                    'for $name, ${monthLabel(payment.monthKey)}.'
+              : 'Your driver could not find ${paisaToDisplay(payment.amountPaisa)} '
+                    'for $name, ${monthLabel(payment.monthKey)}'
+                    '${text.isEmpty ? '' : ': $text'}.',
+          data: {'paymentId': payment.id, 'studentId': payment.studentId},
+        ),
+      );
+    } catch (e) {
+      debugPrint('payment decision failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save. Check your connection.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildFooter(PaymentTotals totals) {

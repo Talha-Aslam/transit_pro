@@ -76,6 +76,9 @@ String paymentDateLine(Payment p) {
   if (p.status == PaymentStatus.refunded) {
     return 'Refunded ${dayLabel(p.confirmedAt ?? p.paidAt)}';
   }
+  if (p.status == PaymentStatus.rejected) {
+    return 'Driver did not receive it';
+  }
   // A slip attached but not yet confirmed is its own state, and the most
   // reassuring thing a parent can be told — it says "we have it, wait" rather
   // than leaving them looking at "Pending" and wondering if the upload worked.
@@ -90,6 +93,8 @@ Color paymentStatusColor(PaymentStatus status) => switch (status) {
   // `refunded` had no colour anywhere before — the driver screen's switch
   // fell through to its default cyan and the fee screens had no case at all.
   PaymentStatus.refunded => AppTheme.info,
+  PaymentStatus.submitted => AppTheme.info,
+  PaymentStatus.rejected => AppTheme.error,
 };
 
 String paymentStatusEmoji(PaymentStatus status) => switch (status) {
@@ -97,6 +102,8 @@ String paymentStatusEmoji(PaymentStatus status) => switch (status) {
   PaymentStatus.pending => '⏳',
   PaymentStatus.overdue => '⚠️',
   PaymentStatus.refunded => '↩️',
+  PaymentStatus.submitted => '📤',
+  PaymentStatus.rejected => '❌',
 };
 
 /// Localised status label, falling back to the enum's own English.
@@ -115,6 +122,8 @@ String paymentStatusLabel(PaymentStatus status) {
     PaymentStatus.pending => 'Pending',
     PaymentStatus.overdue => 'Overdue',
     PaymentStatus.refunded => 'Refunded',
+    PaymentStatus.submitted => 'Sent — awaiting driver',
+    PaymentStatus.rejected => 'Not received',
   };
 }
 
@@ -157,6 +166,11 @@ class PaymentTotals {
           overdue += p.amountPaisa;
         case PaymentStatus.refunded:
           refunded += p.amountPaisa;
+        // Sent but unconfirmed money is neither owed nor paid yet; a proof
+        // the driver could not find is not money at all.
+        case PaymentStatus.submitted:
+        case PaymentStatus.rejected:
+          break;
       }
     }
     return PaymentTotals(

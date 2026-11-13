@@ -8,6 +8,7 @@ import '../../app/language_provider.dart';
 import '../../app/chat_service.dart';
 import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
+import '../../app/trip_session.dart';
 import '../../data/trip_repository.dart';
 import '../../app/child_status_service.dart';
 import '../../theme/app_theme.dart';
@@ -64,7 +65,6 @@ class DriverAttendance extends StatefulWidget {
   @override
   State<DriverAttendance> createState() => _DriverAttendanceState();
 }
-
 
 class _DriverAttendanceState extends State<DriverAttendance> {
   final _session = SessionService.instance;
@@ -171,7 +171,13 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     for (final s in _session.routeStudents.value) {
       merged.putIfAbsent(s.id, () => s);
     }
-    final list = merged.values.toList();
+    // While a round is running, its own riders only: marking a child from
+    // another round wrote them on to a trip they were never part of.
+    final riders = _activeTrip?.riderIds ?? const <String>[];
+    final list = [
+      for (final s in merged.values)
+        if (riders.isEmpty || riders.contains(s.id)) s,
+    ];
     list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return list;
   }
@@ -181,6 +187,18 @@ class _DriverAttendanceState extends State<DriverAttendance> {
   /// by the real three-state `AttendanceStatus` a trip actually stores.
   bool _isBoarded(Student s) =>
       _attendanceByStudent[s.id] == AttendanceStatus.boarded;
+
+  /// What the driver has recorded for [s] on this round — nothing, until
+  /// they tap. A child not yet marked is *unmarked*, never "absent": the
+  /// screen used to show everyone who was not aboard as absent, so a child
+  /// who had just been dropped home flipped to "absent" on their own.
+  AttendanceStatus _markOf(Student s) =>
+      _attendanceByStudent[s.id] ?? AttendanceStatus.pending;
+
+  /// On the van, or carried and handed over.
+  bool _rode(Student s) =>
+      _markOf(s) == AttendanceStatus.boarded ||
+      _markOf(s) == AttendanceStatus.droppedOff;
 
   /// The round a student rides, for grouping — there is no free-text "stop
   /// name" on the real student record, so this groups by the driver's round
@@ -194,7 +212,10 @@ class _DriverAttendanceState extends State<DriverAttendance> {
         : round.label;
   }
 
-  Future<void> _toggleStatus(Student student) async {
+  /// Records exactly what the driver tapped. Nothing flips: tapping
+  /// "Boarded" on a child already aboard does nothing, and "Absent" is its
+  /// own button.
+  Future<void> _setStatus(Student student, AttendanceStatus next) async {
     final trip = _activeTrip;
     if (trip == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,20 +223,46 @@ class _DriverAttendanceState extends State<DriverAttendance> {
       );
       return;
     }
-    final next = _isBoarded(student)
-        ? AttendanceStatus.absent
-        : AttendanceStatus.boarded;
-    // Optimistic: the live `watchAttendance` stream confirms within a frame or
-    // two, and a tap should not visibly wait on a round trip first.
+    if (_markOf(student) == next) return;
+    if (_markOf(student) == AttendanceStatus.droppedOff) return;
     setState(() {
       _attendanceByStudent = {..._attendanceByStudent, student.id: next};
     });
+    // The round running on this phone owns its stops: marking through it
+    // tells the family, closes the stop and re-plans the road, exactly as
+    // the buttons on the route screen do.
+    final round = TripSession.instance.controller;
+    if (round.isRunning && round.trip?.id == trip.id) {
+      await (next == AttendanceStatus.boarded
+          ? round.markPresent(student.id)
+          : round.markAbsent(student.id));
+      return;
+    }
     try {
       await TripRepository.instance.markAttendance(
         tripId: trip.id,
         studentId: student.id,
         status: next,
         markedBy: _session.uid ?? '',
+      );
+      // No round running on this phone to tell the family, so tell them
+      // here: a mark nobody hears about is the silence parents reported.
+      final boarded = next == AttendanceStatus.boarded;
+      unawaited(
+        PushSender.instance.notifyOne(
+          _recipientFor(student),
+          UserNotification(
+            id: '',
+            type: boarded ? NotificationType.boarded : NotificationType.absent,
+            title: boarded
+                ? '${student.name} has boarded'
+                : '${student.name} was marked absent',
+            body: boarded
+                ? '${student.name} is on the van.'
+                : '${student.name} was not on the van today.',
+            data: {'studentId': student.id, 'tripId': trip.id},
+          ),
+        ),
       );
     } catch (e) {
       debugPrint('markAttendance failed: $e');
@@ -458,10 +505,11 @@ class _DriverAttendanceState extends State<DriverAttendance> {
     final query = _search.trim().toLowerCase();
 
     var boardedCount = 0;
+    var absentCount = 0;
     for (final s in roster) {
-      if (_isBoarded(s)) boardedCount++;
+      if (_rode(s)) boardedCount++;
+      if (_markOf(s) == AttendanceStatus.absent) absentCount++;
     }
-    final absentCount = roster.length - boardedCount;
 
     final filtered = roster.where((s) {
       final matchSearch =
@@ -469,10 +517,9 @@ class _DriverAttendanceState extends State<DriverAttendance> {
           s.name.toLowerCase().contains(query) ||
           s.grade.toLowerCase().contains(query) ||
           s.school.toLowerCase().contains(query);
-      final boarded = _isBoarded(s);
       final matchFilter = switch (_filter) {
-        'boarded' => boarded,
-        'absent' => !boarded,
+        'boarded' => _rode(s),
+        'absent' => _markOf(s) == AttendanceStatus.absent,
         _ => true,
       };
       return matchSearch && matchFilter;
@@ -843,8 +890,11 @@ class _DriverAttendanceState extends State<DriverAttendance> {
                             padding: const EdgeInsets.only(bottom: 8),
                             child: _StudentCard(
                               student: student,
-                              boarded: _isBoarded(student),
-                              onToggle: () => _toggleStatus(student),
+                              mark: _markOf(student),
+                              onBoarded: () =>
+                                  _setStatus(student, AttendanceStatus.boarded),
+                              onAbsent: () =>
+                                  _setStatus(student, AttendanceStatus.absent),
                             ),
                           ),
                         ),
@@ -943,27 +993,47 @@ class _SummaryCard extends StatelessWidget {
 
 class _StudentCard extends StatelessWidget {
   final Student student;
-  final bool boarded;
-  final VoidCallback onToggle;
+  final AttendanceStatus mark;
+  final VoidCallback onBoarded;
+  final VoidCallback onAbsent;
   const _StudentCard({
     required this.student,
-    required this.boarded,
-    required this.onToggle,
+    required this.mark,
+    required this.onBoarded,
+    required this.onAbsent,
   });
+
+  Widget _choice(
+    BuildContext context, {
+    required String label,
+    required Color color,
+    required bool selected,
+    required VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : color,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cfg = boarded
-        ? const _StatusConfig(
-            color: AppTheme.success,
-            icon: '✅',
-            label: 'Boarded',
-          )
-        : const _StatusConfig(
-            color: AppTheme.error,
-            icon: '❌',
-            label: 'Absent',
-          );
+    final dropped = mark == AttendanceStatus.droppedOff;
     return GlassCard(
       enableBlur: false,
       padding: const EdgeInsets.all(14),
@@ -1034,37 +1104,35 @@ class _StudentCard extends StatelessWidget {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: onToggle,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: cfg.color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: cfg.color.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                '${cfg.icon} ${cfg.label}',
-                style: TextStyle(
-                  color: cfg.color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+          // Delivered children are done; everyone else gets two plain
+          // choices, neither of them selected until the driver taps.
+          if (dropped)
+            _choice(
+              context,
+              label: '✅ Dropped',
+              color: AppTheme.success,
+              selected: true,
+              onTap: null,
+            )
+          else ...[
+            _choice(
+              context,
+              label: 'Boarded',
+              color: AppTheme.success,
+              selected: mark == AttendanceStatus.boarded,
+              onTap: onBoarded,
             ),
-          ),
+            const SizedBox(width: 6),
+            _choice(
+              context,
+              label: 'Absent',
+              color: AppTheme.error,
+              selected: mark == AttendanceStatus.absent,
+              onTap: onAbsent,
+            ),
+          ],
         ],
       ),
     );
   }
-}
-
-class _StatusConfig {
-  final Color color;
-  final String icon, label;
-  const _StatusConfig({
-    required this.color,
-    required this.icon,
-    required this.label,
-  });
 }

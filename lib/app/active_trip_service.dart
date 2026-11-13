@@ -41,19 +41,23 @@ class ActiveTripService extends ChangeNotifier {
     if (_boundUid == uid && _sub != null) return;
     unbind();
     _boundUid = uid;
-    _sub = TripRepository.instance.watchActiveTripForDriver(uid).listen(
-      (t) {
-        if (t?.id == trip.value?.id && t?.status == trip.value?.status) return;
-        trip.value = t;
-        notifyListeners();
-      },
-      onError: (Object e) {
-        debugPrint('ActiveTripService: trip stream failed — $e');
-        // Deliberately leaves the last known value alone. A dropped stream
-        // is not evidence the trip ended, and flipping the badge to "not
-        // started" mid-route would be worse than a stale one.
-      },
-    );
+    _sub = TripRepository.instance
+        .watchActiveTripForDriver(uid)
+        .listen(
+          (t) {
+            if (t?.id == trip.value?.id && t?.status == trip.value?.status) {
+              return;
+            }
+            trip.value = t;
+            notifyListeners();
+          },
+          onError: (Object e) {
+            debugPrint('ActiveTripService: trip stream failed — $e');
+            // Deliberately leaves the last known value alone. A dropped stream
+            // is not evidence the trip ended, and flipping the badge to "not
+            // started" mid-route would be worse than a stale one.
+          },
+        );
   }
 
   /// Called on sign-out. A trip belongs to one account; leaving it would

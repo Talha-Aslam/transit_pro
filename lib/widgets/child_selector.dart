@@ -93,9 +93,7 @@ class _ChildChip extends StatelessWidget {
               ? accent.withValues(alpha: 0.2)
               : context.cardBgElevated,
           borderRadius: BorderRadius.circular(23),
-          border: Border.all(
-            color: active ? accent : context.surfaceBorder,
-          ),
+          border: Border.all(color: active ? accent : context.surfaceBorder),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

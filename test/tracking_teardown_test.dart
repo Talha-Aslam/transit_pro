@@ -85,9 +85,7 @@ void main() {
   });
 
   test('the route screen does not stop tracking inline in dispose', () {
-    final src = File(
-      'lib/screens/driver/driver_route.dart',
-    ).readAsStringSync();
+    final src = File('lib/screens/driver/driver_route.dart').readAsStringSync();
     final start = src.indexOf('  void dispose() {');
     expect(start, greaterThan(-1), reason: 'dispose() not found');
     final body = src.substring(start, src.indexOf('\n  }', start));

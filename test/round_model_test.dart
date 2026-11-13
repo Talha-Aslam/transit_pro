@@ -150,10 +150,11 @@ void main() {
           DriverSchedule(id: 'eve', label: 'Academy', pickupStart: '17:00'),
         ],
       );
-      expect(
-        driver.orderedSchedules.map((s) => s.id).toList(),
-        ['early', 'late', 'eve'],
-      );
+      expect(driver.orderedSchedules.map((s) => s.id).toList(), [
+        'early',
+        'late',
+        'eve',
+      ]);
     });
   });
 }

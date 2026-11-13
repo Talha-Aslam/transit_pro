@@ -7,6 +7,7 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
+import '../../app/push_diagnostics.dart';
 import '../../app/student_data_service.dart';
 import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
@@ -16,6 +17,7 @@ import '../../widgets/account_management_section.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
+import '../../widgets/profile_form_fields.dart' show FieldLabel, MapPointField;
 import '../../widgets/zoomable_image_viewer.dart';
 import 'student_driver_details_screen.dart';
 import '../../widgets/app_glyph.dart';
@@ -74,19 +76,14 @@ class _StudentProfileState extends State<StudentProfile> {
   // are derived from the driver/route assignment (`session.bus`/`.route`),
   // not something a student hand-types, and `updateStudentInfo` never wrote
   // them back anyway. They're shown read-only in the Student ID card above.
+  /// The student's own details, including where they are picked up and
+  /// dropped off — the two pins the driver's route is built from.
   void _editStudentInfo() {
-    final info = _svc.studentInfo.value;
-    _showEditSheet(
-      title: AppStrings.t('edit_info'),
-      fields: [
-        _FieldDef(AppStrings.t('full_name'), info.name),
-        _FieldDef('Student ID', info.studentId),
-        _FieldDef(AppStrings.t('grade'), info.grade),
-        _FieldDef(AppStrings.t('school'), info.school),
-      ],
-      onSave: (v) => _svc.updateStudentInfo(
-        info.copyWith(name: v[0], studentId: v[1], grade: v[2], school: v[3]),
-      ),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _StudentInfoSheet(info: _svc.studentInfo.value),
     );
   }
 
@@ -274,57 +271,8 @@ class _StudentProfileState extends State<StudentProfile> {
                     ),
                   ),
 
-                  // ── Quick stats ────────────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: GlassCard(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 14,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _QuickStat(
-                            icon: '🚌',
-                            value: student.busNumber,
-                            label: AppStrings.t('bus_lbl'),
-                            color: AppTheme.studentAmber,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 36,
-                            color: context.cardBgElevated,
-                          ),
-                          ValueListenableBuilder<int>(
-                            valueListenable: _svc.totalRides,
-                            builder: (context, rides, _) => _QuickStat(
-                              icon: '📅',
-                              value: rides.toString(),
-                              label: AppStrings.t('rides_lbl'),
-                              color: AppTheme.info,
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            height: 36,
-                            color: context.cardBgElevated,
-                          ),
-                          ValueListenableBuilder<int>(
-                            valueListenable: _svc.onTimeRate,
-                            builder: (context, rate, _) => _QuickStat(
-                              icon: '⏱️',
-                              value: '$rate%',
-                              label: AppStrings.t('on_time'),
-                              color: AppTheme.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
+                  // Bus, rides and on-time used to repeat here what the Home
+                  // screen already shows; the profile keeps to the profile.
                   // ── Children list ─────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -391,6 +339,22 @@ class _StudentProfileState extends State<StudentProfile> {
                                               fontSize: 12,
                                             ),
                                           ),
+                                          // The fee agreed with the driver.
+                                          if ((SessionService
+                                                      .instance
+                                                      .student
+                                                      .value
+                                                      ?.monthlyFeePaisa ??
+                                                  0) >
+                                              0)
+                                            Text(
+                                              'Fee: Rs.${(SessionService.instance.student.value!.monthlyFeePaisa / 100).round()} / month',
+                                              style: const TextStyle(
+                                                color: AppTheme.success,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -839,6 +803,11 @@ class _StudentProfileState extends State<StudentProfile> {
                             onTap: () => context.push('/student/terms'),
                           ),
                           _SettingTile(
+                            materialIcon: Icons.notifications_active_outlined,
+                            label: 'Test notifications',
+                            onTap: () => runPushTest(context),
+                          ),
+                          _SettingTile(
                             materialIcon: Icons.pause_circle_outline_rounded,
                             label: 'Deactivate Account',
                             onTap: () => confirmAndDeactivateAccount(
@@ -941,39 +910,6 @@ class _StudentProfileState extends State<StudentProfile> {
           },
         );
       },
-    );
-  }
-}
-
-class _QuickStat extends StatelessWidget {
-  final String icon, value, label;
-  final Color color;
-  const _QuickStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AppGlyph(icon, size: 20, color: color),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(color: context.textTertiary, fontSize: 10),
-        ),
-      ],
     );
   }
 }
@@ -1314,6 +1250,141 @@ class _NotifSheetState extends State<_NotifSheet> {
 }
 
 // ─── Edit bottom sheet ────────────────────────────────────────────────────────
+
+/// Name, ID, semester and institute, and the two location pins.
+class _StudentInfoSheet extends StatefulWidget {
+  final StudentInfo info;
+  const _StudentInfoSheet({required this.info});
+
+  @override
+  State<_StudentInfoSheet> createState() => _StudentInfoSheetState();
+}
+
+class _StudentInfoSheetState extends State<_StudentInfoSheet> {
+  late final _name = TextEditingController(text: widget.info.name);
+  late final _id = TextEditingController(text: widget.info.studentId);
+  late final _semester = TextEditingController(text: widget.info.grade);
+  late final _institute = TextEditingController(text: widget.info.school);
+  late GeoCoord? _pickup = widget.info.pickup;
+  late GeoCoord? _dropoff = widget.info.dropoff;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _id.dispose();
+    _semester.dispose();
+    _institute.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await StudentDataService.instance.updateStudentInfo(
+        widget.info.copyWith(
+          name: _name.text.trim(),
+          studentId: _id.text.trim(),
+          grade: _semester.text.trim(),
+          school: _institute.text.trim(),
+          pickup: _pickup,
+          dropoff: _dropoff,
+        ),
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint('saving student info failed: $e');
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save. Check your connection.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _text(String label, TextEditingController c) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextField(
+      controller: c,
+      style: TextStyle(color: context.textPrimary),
+      decoration: InputDecoration(labelText: label),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                AppStrings.t('edit_info'),
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _text(AppStrings.t('full_name'), _name),
+              _text('Student ID', _id),
+              _text('Semester', _semester),
+              _text('Institute', _institute),
+              const FieldLabel('PICKUP LOCATION'),
+              const SizedBox(height: 8),
+              MapPointField(
+                placeholder: 'Tap to pin where you are picked up',
+                value: _pickup,
+                accentColor: AppTheme.studentAmber,
+                onPicked: (p) => setState(() => _pickup = p),
+              ),
+              const SizedBox(height: 14),
+              const FieldLabel('DROP-OFF LOCATION (YOUR INSTITUTE)'),
+              const SizedBox(height: 8),
+              MapPointField(
+                placeholder: 'Tap to pin where you are dropped off',
+                value: _dropoff,
+                accentColor: AppTheme.studentAmber,
+                onPicked: (p) => setState(() => _dropoff = p),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.studentAmber,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(_saving ? 'Saving…' : AppStrings.t('save')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _FieldDef {
   final String label;

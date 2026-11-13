@@ -76,9 +76,7 @@ void main() {
     });
 
     test('ActiveTripService is bound and unbound with the session', () {
-      final session = File(
-        'lib/app/session_service.dart',
-      ).readAsStringSync();
+      final session = File('lib/app/session_service.dart').readAsStringSync();
       expect(session, contains('ActiveTripService.instance.bindToDriver('));
       expect(session, contains('ActiveTripService.instance.unbind()'));
     });

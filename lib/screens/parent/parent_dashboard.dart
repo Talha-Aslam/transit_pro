@@ -9,7 +9,11 @@ import '../../app/missed_bus_service.dart';
 import '../../app/notification_service.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/language_provider.dart';
+import '../../app/child_status_service.dart';
+import '../../app/family_stats.dart';
+import '../../app/round_display.dart';
 import '../../app/session_service.dart';
+import '../../app/weekly_times.dart';
 import '../../data/trip_repository.dart';
 import '../../data/user_repository.dart';
 import '../../models/missed_bus_request.dart';
@@ -43,7 +47,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
   /// card says so.
   Trip? _activeTrip;
   StreamSubscription<Trip?>? _tripSub;
-  String? _watchedDriverId;
+
+  /// Driver and child together: two children with the same driver can be on
+  /// different rounds, so switching child must re-subscribe too.
+  String? _watchedKey;
 
   @override
   void initState() {
@@ -66,17 +73,18 @@ class _ParentDashboardState extends State<ParentDashboard> {
   /// pattern `parent_tracking.dart` uses.
   void _ensureWatching(ChildInfo? child) {
     final driverId = child?.driver;
-    if (driverId == _watchedDriverId) return;
-    _watchedDriverId = driverId;
+    final key = '$driverId|${child?.id}';
+    if (key == _watchedKey) return;
+    _watchedKey = key;
 
     _tripSub?.cancel();
     _tripSub = null;
     _activeTrip = null;
     LiveBusService.instance.stop();
 
-    if (driverId == null || driverId.isEmpty) return;
+    if (driverId == null || driverId.isEmpty || child == null) return;
     _tripSub = TripRepository.instance
-        .watchActiveTripForDriver(driverId)
+        .watchActiveTripForStudent(driverId, child.id)
         .listen((trip) => _onActiveTripChanged(trip, child));
   }
 
@@ -92,7 +100,8 @@ class _ParentDashboardState extends State<ParentDashboard> {
     // `_startRoute` in driver_route.dart.
     LiveBusService.instance.follow(
       busId: trip.busId,
-      destination: child?.dropoff,
+      trip: trip,
+      studentId: child?.id,
     );
   }
 
@@ -104,23 +113,51 @@ class _ParentDashboardState extends State<ParentDashboard> {
   bool _isLinkedWithDriver(ChildInfo? child) =>
       child != null && child.driver.isNotEmpty;
 
-  /// Which leg of the day the live ETA card should describe: "to school" for
-  /// the morning home→school run, "to home" once the afternoon school→home
-  /// run has started. Driven by the assigned driver's own real
-  /// `timingSlots` (the same schedule [_timingSlotsFor] already reads) --
-  /// the afternoon leg begins at `afternoonPickupFromSchool`, so anything at
-  /// or after that time is the ride home, not the ride in.
-  String _etaDestinationLabel(DriverTimingSlots? slots) {
-    if (slots == null) return AppStrings.t('to_school');
+  /// What the live ETA card's minutes are counting down to. It counts to
+  /// whatever `LiveBusService` measures: this child's pickup while the van
+  /// is still on its way to them, then the institute; their home on the way
+  /// back. Read off the running trip — the clock alone said "to school" at
+  /// 7 am while the van was still coming to the child's gate.
+  String _etaDestinationLabel(ChildInfo? child) {
+    final trip = _activeTrip;
+    if (trip != null) {
+      if (trip.type != TripType.morning) return AppStrings.t('to_home');
+      final mine = child == null ? null : trip.stopFor(child.id);
+      return mine != null && mine.isOpen
+          ? AppStrings.t('to_pickup')
+          : AppStrings.t('to_school');
+    }
+    final back = _minutesOf(_roundFor(child)?.dropoffStart ?? '');
     final now = TimeOfDay.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final afternoonStart =
-        slots.afternoonPickupFromSchool.hour * 60 +
-        slots.afternoonPickupFromSchool.minute;
-    return nowMinutes >= afternoonStart
+    return back != null && now.hour * 60 + now.minute >= back
         ? AppStrings.t('to_home')
         : AppStrings.t('to_school');
   }
+
+  /// The round [child] is booked on, as their driver last saved it.
+  DriverSchedule? _roundFor(ChildInfo? child) {
+    if (child == null || child.driver.isEmpty) return null;
+    return SessionService.instance
+        .driverFor(child.driver)
+        ?.scheduleById(child.scheduleId);
+  }
+
+  static int? _minutesOf(String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length < 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    return h == null || m == null ? null : h * 60 + m;
+  }
+
+  /// The badge on a Today's Schedule chip, from what actually happened.
+  (String, Color)? _legBadge(TodayLeg leg) => switch (leg) {
+    TodayLeg.upcoming => (AppStrings.t('upcoming'), AppTheme.info),
+    TodayLeg.onTheWay => (AppStrings.t('leg_on_the_way'), AppTheme.warning),
+    TodayLeg.done => (AppStrings.t('done'), AppTheme.success),
+    TodayLeg.absent => (AppStrings.t('absent'), AppTheme.error),
+    TodayLeg.unrecorded => null,
+  };
 
   /// Real per-driver pickup/drop-off times for [child], when the assigned
   /// driver's record has already been resolved by
@@ -357,50 +394,46 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(
-                                      child: Row(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  child.name.isEmpty
-                                                      ? AppStrings.t(
-                                                          'unnamed_child',
-                                                        )
-                                                      : child.name,
-                                                  style: TextStyle(
-                                                    color: context.textPrimary,
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 3),
-                                                Text(
-                                                  child.displayInfo,
-                                                  style: TextStyle(
-                                                    color:
-                                                        context.textSecondary,
-                                                    fontSize: 12,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
+                                          Text(
+                                            child.name.isEmpty
+                                                ? AppStrings.t('unnamed_child')
+                                                : child.name,
+                                            style: TextStyle(
+                                              color: context.textPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          // Wraps rather than ellipsising.
+                                          // The institute's name is the
+                                          // part a parent reads, and it was
+                                          // the part being cut off.
+                                          Text(
+                                            child.displayInfo,
+                                            style: TextStyle(
+                                              color: context.textSecondary,
+                                              fontSize: 12,
+                                              height: 1.35,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          // Was "On the Bus" for any child
-                                          // who merely *had* a driver — so
-                                          // it said so at nine at night and
-                                          // an hour after the route ended.
-                                          // It now follows the driver's
-                                          // trip and the attendance marked
-                                          // on it. See ChildStatusService.
-                                          RideStatusBadge(studentId: child.id),
+                                          const SizedBox(height: 7),
+                                          // On its own line. Sharing a row
+                                          // with the name left it 24 pixels
+                                          // wider than the card as soon as
+                                          // the label became "Reached
+                                          // <institute>".
+                                          Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: RideStatusBadge(
+                                              studentId: child.id,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -517,9 +550,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
-                                            _etaDestinationLabel(
-                                              _timingSlotsFor(child),
-                                            ),
+                                            _etaDestinationLabel(child),
                                             style: TextStyle(
                                               color: context.textSecondary,
                                               fontSize: 13,
@@ -726,148 +757,207 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         // `parent_schedule.dart` already does) is what makes
                         // a save there show up on the Home screen too, with
                         // no extra plumbing in between.
-                        StreamBuilder<Student?>(
-                          stream: (child == null || child.id.isEmpty)
-                              ? Stream<Student?>.value(null)
-                              : UserRepository.instance.watchStudent(child.id),
-                          builder: (context, snap) {
-                            // Real pickup/drop-off times, sourced from the
-                            // assigned driver's own `timingSlots` once
-                            // SessionService has resolved that driver (see
-                            // _timingSlotsFor). `slots == null` also means no
-                            // active trip yet (new account, no driver
-                            // assigned) -- the chips hide their "Done"/
-                            // "Pending" badge in that case instead of showing
-                            // a fabricated status. "Done"/"Pending" itself
-                            // stays a placeholder otherwise: turning it into a
-                            // real boarded/not-boarded flag needs today's
-                            // attendance record, which is part of the same
-                            // trip-data gap noted above the stats grid.
-                            final slots = _timingSlotsFor(child);
-                            final weekday = _todayWeekday(); // 1=Mon..7=Sun
-                            final requestedSchedule =
-                                snap.data?.requestedSchedule;
-                            // Transit doesn't run Sunday -- there's no
-                            // `kWeekdayKeys` entry for it and no driver leg
-                            // to show, so this is a distinct empty state
-                            // rather than falling through to a stale
-                            // Saturday time or a null-index crash.
-                            final isSunday = weekday == 7;
-                            final override = isSunday
-                                ? null
-                                : requestedSchedule?[kWeekdayKeys[weekday - 1]];
-                            final pickupTime =
-                                override?['morningPickup'] ??
-                                (slots == null
-                                    ? '—'
-                                    : formatTimeOfDay(
-                                        slots.morningPickupFromHome,
-                                      ));
-                            final dropoffTime =
-                                override?['eveningDropoff'] ??
-                                (slots == null
-                                    ? '—'
-                                    : formatTimeOfDay(
-                                        slots.afternoonDropoffAtHome,
-                                      ));
-                            return GlassCard(
-                              enableBlur: false,
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        AppStrings.t('todays_schedule'),
-                                        style: TextStyle(
-                                          color: context.textPrimary,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () => widget.onNavigate(2),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.parentAccent
-                                                .withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: AppTheme.parentAccent
-                                                  .withValues(alpha: 0.3),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            AppStrings.t('view_all'),
-                                            style: TextStyle(
-                                              color: AppTheme.parentAccent,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                        // Rebuilt as the driver marks attendance and trips
+                        // start or finish, so the badges move on their own.
+                        ListenableBuilder(
+                          // The driver's document too: a seat accepted
+                          // there brings this child's expected times.
+                          listenable: Listenable.merge([
+                            ChildStatusService.instance,
+                            SessionService.instance,
+                          ]),
+                          builder: (context, _) => StreamBuilder<Student?>(
+                            stream: (child == null || child.id.isEmpty)
+                                ? Stream<Student?>.value(null)
+                                : UserRepository.instance.watchStudent(
+                                    child.id,
                                   ),
-                                  const SizedBox(height: 14),
-                                  if (isSunday)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 6,
+                            builder: (context, snap) {
+                              // Real pickup/drop-off times, sourced from the
+                              // assigned driver's own `timingSlots` once
+                              // SessionService has resolved that driver (see
+                              // _timingSlotsFor). `slots == null` also means no
+                              // active trip yet (new account, no driver
+                              // assigned) -- the chips hide their "Done"/
+                              // "Pending" badge in that case instead of showing
+                              // a fabricated status. "Done"/"Pending" itself
+                              // stays a placeholder otherwise: turning it into a
+                              // real boarded/not-boarded flag needs today's
+                              // attendance record, which is part of the same
+                              // trip-data gap noted above the stats grid.
+                              // The child's own round first — that is what the
+                              // driver actually runs — and the driver's older
+                              // per-driver timings only for a child with none.
+                              final round = _roundFor(child);
+                              final slots = _timingSlotsFor(child);
+                              final weekday = _todayWeekday(); // 1=Mon..7=Sun
+                              // Transit doesn't run Sunday -- a distinct
+                              // empty state rather than a stale Saturday.
+                              final isSunday = weekday == 7;
+                              // The child's own day: when their institute
+                              // starts and lets out, as the family set it in
+                              // the weekly schedule. These used to be the
+                              // driver's pickup and drop-off times, which are
+                              // the van's day, not the child's.
+                              final today = snap.data == null
+                                  ? const WeeklyTimes()
+                                  : WeeklyTimes.on(snap.data!);
+                              // When the van is expected at this child, worked
+                              // out on the driver's phone from the round's
+                              // start and the order of its stops — the
+                              // child's own time, not the round's.
+                              final expected = child == null
+                                  ? null
+                                  : SessionService.instance
+                                        .driverFor(child.driver)
+                                        ?.expectedTimes[child.id];
+                              final pickupTime = clock12(
+                                expected?.pickup ?? '',
+                              );
+                              final dropoffTime = clock12(
+                                expected?.dropoff ?? '',
+                              );
+                              final schoolHours =
+                                  today.schoolStartAt.isEmpty &&
+                                      today.schoolEndAt.isEmpty
+                                  ? ''
+                                  : 'School ${clock12(today.schoolStartAt).isEmpty ? '—' : clock12(today.schoolStartAt)}'
+                                        ' – ${clock12(today.schoolEndAt).isEmpty ? '—' : clock12(today.schoolEndAt)}';
+                              final linked = round != null || slots != null;
+                              final morningBadge = !linked || child == null
+                                  ? null
+                                  : _legBadge(
+                                      ChildStatusService.instance.legToday(
+                                        child.id,
+                                        morning: true,
                                       ),
-                                      child: Text(
-                                        AppStrings.t('no_transit_today'),
-                                        style: TextStyle(
-                                          color: context.textTertiary,
-                                          fontSize: 13,
-                                        ),
+                                    );
+                              final homeBadge = !linked || child == null
+                                  ? null
+                                  : _legBadge(
+                                      ChildStatusService.instance.legToday(
+                                        child.id,
+                                        morning: false,
                                       ),
-                                    )
-                                  else
-                                    // `_ScheduleChip` already wraps itself in
-                                    // `Expanded`, so the two remaining chips
-                                    // fill the Row's width equally on their
-                                    // own -- an explicit `mainAxisAlignment`
-                                    // would be a no-op here since there are no
-                                    // non-flexible children left to space out.
+                                    );
+                              return GlassCard(
+                                enableBlur: false,
+                                padding: const EdgeInsets.all(18),
+                                child: Column(
+                                  children: [
                                     Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        _ScheduleChip(
-                                          icon:
-                                              'assets/images/schedule/waiting_for_bus_transparent.png',
-                                          label: AppStrings.t(
-                                            'school_time_label',
+                                        Text(
+                                          AppStrings.t('todays_schedule'),
+                                          style: TextStyle(
+                                            color: context.textPrimary,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                          time: pickupTime,
-                                          status: slots == null
-                                              ? null
-                                              : AppStrings.t('done'),
-                                          color: AppTheme.success,
                                         ),
-                                        const SizedBox(width: 8),
-                                        _ScheduleChip(
-                                          icon:
-                                              'assets/images/schedule/drop_off_transparent.png',
-                                          label: AppStrings.t('off_time_label'),
-                                          time: dropoffTime,
-                                          status: slots == null
-                                              ? null
-                                              : AppStrings.t('pending'),
-                                          color: AppTheme.warning,
+                                        GestureDetector(
+                                          onTap: () => widget.onNavigate(2),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.parentAccent
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: AppTheme.parentAccent
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              AppStrings.t('view_all'),
+                                              style: TextStyle(
+                                                color: AppTheme.parentAccent,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),
-                                ],
-                              ),
-                            );
-                          },
+                                    const SizedBox(height: 14),
+                                    if (isSunday)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
+                                        child: Text(
+                                          AppStrings.t('no_transit_today'),
+                                          style: TextStyle(
+                                            color: context.textTertiary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      // `_ScheduleChip` already wraps itself in
+                                      // `Expanded`, so the two remaining chips
+                                      // fill the Row's width equally on their
+                                      // own -- an explicit `mainAxisAlignment`
+                                      // would be a no-op here since there are no
+                                      // non-flexible children left to space out.
+                                      Column(
+                                        children: [
+                                          Row(
+                                            children: [
+                                              _ScheduleChip(
+                                                icon:
+                                                    'assets/images/schedule/waiting_for_bus_transparent.png',
+                                                label: AppStrings.t(
+                                                  'expected_pickup',
+                                                ),
+                                                time: pickupTime.isEmpty
+                                                    ? '—'
+                                                    : pickupTime,
+                                                status: morningBadge?.$1,
+                                                color:
+                                                    morningBadge?.$2 ??
+                                                    AppTheme.success,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              _ScheduleChip(
+                                                icon:
+                                                    'assets/images/schedule/drop_off_transparent.png',
+                                                label: AppStrings.t(
+                                                  'expected_dropoff',
+                                                ),
+                                                time: dropoffTime.isEmpty
+                                                    ? '—'
+                                                    : dropoffTime,
+                                                status: homeBadge?.$1,
+                                                color:
+                                                    homeBadge?.$2 ??
+                                                    AppTheme.warning,
+                                              ),
+                                            ],
+                                          ),
+                                          if (schoolHours.isNotEmpty) ...[
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              schoolHours,
+                                              style: TextStyle(
+                                                color: context.textSecondary,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 12),
 
@@ -989,11 +1079,10 @@ class _ParentDashboardState extends State<ParentDashboard> {
 /// Family-wide trip stats (total rides, on-time %, rides this week), computed
 /// from real attendance/trip data rather than the old invented trip list.
 ///
-/// Fetches once per distinct set of child ids (not on every parent-dashboard
-/// rebuild — a greeting-clock tick or notification arriving shouldn't
-/// re-query Firestore) and defaults every figure to 0 while loading or for a
-/// family with no attendance history at all, which is the actual bug this
-/// replaces.
+/// Listens once per child (not on every parent-dashboard rebuild — a
+/// greeting-clock tick or notification arriving shouldn't re-query
+/// Firestore) and defaults every figure to 0 while loading or for a family
+/// with no attendance history at all.
 class _StatsRow extends StatefulWidget {
   final List<ChildInfo> children;
 
@@ -1004,165 +1093,117 @@ class _StatsRow extends StatefulWidget {
 }
 
 class _StatsRowState extends State<_StatsRow> {
-  Future<_FamilyTripStats>? _future;
-  List<String> _lastChildIds = const [];
+  final _subs = <String, StreamSubscription<List<AttendanceRecord>>>{};
+  final _records = <String, List<AttendanceRecord>>{};
+
+  /// Trips whose on-time verdict is settled. A trip still running has none
+  /// yet and is read again when its attendance next changes.
+  final _settledTrips = <String, Trip>{};
+  FamilyTripStats _stats = const FamilyTripStats();
+  int _generation = 0;
 
   @override
   void initState() {
     super.initState();
-    _scheduleLoad();
+    _watch();
   }
 
   @override
   void didUpdateWidget(_StatsRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _scheduleLoad();
+    _watch();
   }
 
-  void _scheduleLoad() {
-    final ids = widget.children
-        .map((c) => c.id)
-        .where((id) => id.isNotEmpty)
-        .toList();
-    if (_listEquals(ids, _lastChildIds)) return;
-    _lastChildIds = ids;
-    _future = _loadFamilyTripStats(ids);
-  }
-
-  bool _listEquals(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
+  @override
+  void dispose() {
+    for (final s in _subs.values) {
+      s.cancel();
     }
-    return true;
+    super.dispose();
+  }
+
+  /// One live attendance feed per child, so a ride the driver marks today
+  /// moves the figures without the screen being reopened.
+  void _watch() {
+    final ids = {
+      for (final c in widget.children)
+        if (c.id.isNotEmpty) c.id,
+    };
+    for (final id in _subs.keys.toList()) {
+      if (ids.contains(id)) continue;
+      _subs.remove(id)?.cancel();
+      _records.remove(id);
+    }
+    for (final id in ids) {
+      if (_subs.containsKey(id)) continue;
+      _subs[id] = TripRepository.instance.watchAttendanceHistory(id).listen(
+        (records) {
+          _records[id] = records;
+          unawaited(_recompute());
+        },
+        // One unreadable child leaves their share out rather than
+        // failing the whole family's figures.
+        onError: (Object e) => debugPrint('family stats $id: $e'),
+      );
+    }
+    unawaited(_recompute());
+  }
+
+  Future<void> _recompute() async {
+    final generation = ++_generation;
+    final stats = await familyTripStats([
+      for (final list in _records.values) ...list,
+    ], tripFor: _tripFor);
+    if (!mounted || generation != _generation) return;
+    setState(() => _stats = stats);
+  }
+
+  Future<Trip?> _tripFor(String id) async {
+    final known = _settledTrips[id];
+    if (known != null) return known;
+    try {
+      final trip = await TripRepository.instance.watchTrip(id).first;
+      if (trip != null && trip.onTime != null) _settledTrips[id] = trip;
+      return trip;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_FamilyTripStats>(
-      future: _future,
-      builder: (context, snapshot) {
-        final stats = snapshot.data ?? const _FamilyTripStats();
-        return Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: 'assets/images/stats/total_trips.png',
-                label: AppStrings.t('total_trips'),
-                value: '${stats.totalTrips}',
-                color: AppTheme.purple,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatCard(
-                icon: 'assets/images/stats/on_time.png',
-                label: AppStrings.t('on_time'),
-                value: '${stats.onTimePct}%',
-                color: AppTheme.success,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatCard(
-                icon: 'assets/images/stats/calendar.png',
-                label: AppStrings.t('this_week'),
-                value: '${stats.thisWeek}',
-                color: AppTheme.info,
-              ),
-            ),
-          ],
-        );
-      },
+    final stats = _stats;
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: 'assets/images/stats/total_trips.png',
+            label: AppStrings.t('total_trips'),
+            value: '${stats.totalTrips}',
+            color: AppTheme.purple,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            icon: 'assets/images/stats/on_time.png',
+            label: AppStrings.t('on_time'),
+            value: '${stats.onTimePct}%',
+            color: AppTheme.success,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            icon: 'assets/images/stats/calendar.png',
+            label: AppStrings.t('this_week'),
+            value: '${stats.thisWeek}',
+            color: AppTheme.info,
+          ),
+        ),
+      ],
     );
   }
-}
-
-class _FamilyTripStats {
-  final int totalTrips;
-  final int onTimePct;
-  final int thisWeek;
-
-  const _FamilyTripStats({
-    this.totalTrips = 0,
-    this.onTimePct = 0,
-    this.thisWeek = 0,
-  });
-}
-
-/// Aggregates every child's attendance across the whole family — the four
-/// stat tiles above the "Today's Schedule" card summarise the household, not
-/// whichever single child is selected in the chip row.
-///
-/// `totalTrips` counts attendance records marked [AttendanceStatus.boarded] —
-/// a trip the child actually rode, not one they were merely scheduled for.
-/// `onTimePct` needs the parent [Trip]'s on-time verdict, which
-/// [AttendanceRecord] does not carry itself, so boarded trips are fetched by
-/// id (deduplicated, in parallel) to read [Trip.onTime]; a trip still in
-/// progress (verdict not yet set) is excluded from the percentage rather than
-/// counted as late. `thisWeek` prefers each trip's real [Trip.startedAt] and
-/// falls back to the attendance record's own `markedAt` when a trip fetch
-/// comes back empty.
-Future<_FamilyTripStats> _loadFamilyTripStats(List<String> childIds) async {
-  if (childIds.isEmpty) return const _FamilyTripStats();
-
-  final allRecords = <AttendanceRecord>[];
-  for (final id in childIds) {
-    try {
-      allRecords.addAll(
-        await TripRepository.instance.fetchAttendanceForStudent(id),
-      );
-    } catch (_) {
-      // Leave this child's contribution as absent rather than fail the whole
-      // family's stats over one unreadable child.
-    }
-  }
-
-  final boarded = allRecords
-      .where((r) => r.status == AttendanceStatus.boarded)
-      .toList();
-  if (boarded.isEmpty) return const _FamilyTripStats();
-
-  final tripIds = boarded
-      .map((r) => r.tripId)
-      .where((id) => id.isNotEmpty)
-      .toSet();
-  final trips = <String, Trip>{};
-  if (tripIds.isNotEmpty) {
-    final fetched = await Future.wait(
-      tripIds.map((id) async {
-        try {
-          return await TripRepository.instance.watchTrip(id).first;
-        } catch (_) {
-          return null;
-        }
-      }),
-    );
-    for (final t in fetched) {
-      if (t != null) trips[t.id] = t;
-    }
-  }
-
-  final rated = boarded.where((r) => trips[r.tripId]?.onTime != null);
-  final onTimeCount = rated
-      .where((r) => trips[r.tripId]!.onTime == true)
-      .length;
-  final ratedCount = rated.length;
-  final onTimePct = ratedCount == 0
-      ? 0
-      : ((onTimeCount / ratedCount) * 100).round();
-
-  final weekAgo = DateTime.now().subtract(const Duration(days: 7));
-  final thisWeek = boarded.where((r) {
-    final when = trips[r.tripId]?.startedAt ?? r.markedAt;
-    return when != null && when.isAfter(weekAgo);
-  }).length;
-
-  return _FamilyTripStats(
-    totalTrips: boarded.length,
-    onTimePct: onTimePct,
-    thisWeek: thisWeek,
-  );
 }
 
 class _StatCard extends StatelessWidget {

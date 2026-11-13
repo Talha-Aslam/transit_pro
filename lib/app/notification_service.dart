@@ -117,7 +117,7 @@ class NotificationService {
   /// still running, both can land, and the user is told twice about one
   /// event. Whichever arrives first wins; this is how the other one knows
   /// to stay quiet.
-  final Set<String> _deliveredByPush = {};
+  final Set<String> _bannered = {};
 
   /// True until the first snapshot for the current bind has been processed.
   /// Without this, every notification already sitting in the inbox at sign-in
@@ -144,6 +144,32 @@ class NotificationService {
     await _plugin.initialize(
       initSettings,
       onDidReceiveBackgroundNotificationResponse: _onNotificationTapBackground,
+    );
+
+    // Made up front rather than on the first local banner. A push arriving
+    // while the app is closed is drawn by Android itself, on the channel the
+    // push Worker names; a channel this phone has never created means it
+    // lands in a low-importance fallback, silently, with no heads-up — the
+    // "pickup and drop-off pushes never show" a closed app reported.
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'transit_pro_channel',
+        'Transit Pro',
+        description: 'Bus tracking notifications',
+        importance: Importance.high,
+      ),
+    );
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'transit_pro_emergency',
+        'Emergencies',
+        description: 'SOS and emergency alerts from your driver',
+        importance: Importance.max,
+      ),
     );
   }
 
@@ -182,12 +208,16 @@ class NotificationService {
             // owner to raise a banner itself, so this stream does it instead.
             // Skipped on the first snapshot after bind: that one is the existing
             // inbox catching up, not new arrivals.
-            if (!_isFirstSnapshot) {
+            //
+            // Only while the app is on screen: in the background or closed,
+            // Android draws the push itself, and a second banner from here
+            // would double it.
+            if (!_isFirstSnapshot && _inForeground) {
               for (final n in incoming) {
                 if (n.docId != null &&
                     !_seenRemoteIds.contains(n.docId) &&
-                    !_deliveredByPush.contains(n.docId) &&
-                    !n.read) {
+                    !n.read &&
+                    _claimBanner(n.docId!)) {
                   unawaited(_pushSystemNotification(n));
                 }
               }
@@ -209,17 +239,51 @@ class NotificationService {
         );
   }
 
-  /// Records that FCM has shown [docId], so the inbox stream does not show
-  /// it again a moment later. Called from the `onMessage` handler.
-  void noteDeliveredByPush(String? docId) {
-    if (docId == null || docId.isEmpty) return;
-    _deliveredByPush.add(docId);
-    // The set only has to outlive the race between the two paths, which is
-    // seconds. Capping it keeps a long session from accumulating every id
-    // the account has ever received.
-    if (_deliveredByPush.length > 200) {
-      _deliveredByPush.remove(_deliveredByPush.first);
-    }
+  bool get _inForeground =>
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  /// Whether the banner for [docId] is still this caller's to show — the
+  /// push and the inbox stream both learn of a notification, and only the
+  /// first may raise it.
+  bool _claimBanner(String docId) {
+    if (!_bannered.add(docId)) return false;
+    // Only has to outlive the race between the two paths, which is seconds.
+    if (_bannered.length > 200) _bannered.remove(_bannered.first);
+    return true;
+  }
+
+  /// A push that arrived while the app is open. Android does not draw those
+  /// itself — only a backgrounded or closed app gets a system banner from
+  /// FCM — so the app draws it, unless the inbox stream already has. This
+  /// used to only *note* the push, which then stopped the inbox from
+  /// showing it too: an open app showed no banner at all, for chat or
+  /// anything else.
+  void showForegroundPush({
+    required String? docId,
+    required String title,
+    required String body,
+    String? type,
+  }) {
+    final id = docId ?? '';
+    if (id.isNotEmpty && !_claimBanner(id)) return;
+    unawaited(
+      _pushSystemNotification(
+        AppNotification(
+          id: _nextId++,
+          type: 'info',
+          icon: '🔔',
+          title: title,
+          message: body,
+          time: '',
+          date: '',
+          color: Colors.blue,
+          docId: id.isEmpty ? null : id,
+          kind: NotificationType.values
+              .where((t) => t.name == type)
+              .firstOrNull,
+        ),
+      ),
+    );
   }
 
   /// Called on sign-out. Drops both lists: notifications are per-account, and
@@ -232,7 +296,7 @@ class NotificationService {
     _remote = const [];
     _local = const [];
     _seenRemoteIds = {};
-    _deliveredByPush.clear();
+    _bannered.clear();
     _isFirstSnapshot = true;
     _publish();
   }

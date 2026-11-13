@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../data/fleet_repository.dart';
+import '../data/payment_repository.dart';
 import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
 import 'push_sender.dart';
@@ -169,12 +173,31 @@ class RideMatchService {
 
     await _requests.accept(requestId: request.id, driverId: driverId);
 
+    final fee = request.hasAgreedFee ? request.feePaisa : 0;
     await _requests.linkStudentToDriver(
       studentId: request.studentId,
       driverId: driverId,
       scheduleId: request.scheduleId,
       busId: SessionService.instance.driver.value?.busId,
+      monthlyFeePaisa: fee,
     );
+    // The first 30 days start today, so their bill is issued now — the
+    // family sees the agreed fee as due straight away.
+    if (fee > 0) {
+      try {
+        await PaymentRepository.instance.createBill(
+          driverId: driverId,
+          studentId: request.studentId,
+          payerId: request.requesterId,
+          amountPaisa: fee,
+          periodStart: DateTime.now(),
+          period: 0,
+        );
+      } catch (e) {
+        // The billing run on this phone issues it later.
+        debugPrint('first bill not issued yet: $e');
+      }
+    }
 
     await _notify(
       request.requesterId,
@@ -187,8 +210,92 @@ class RideMatchService {
             '${request.scheduleLabel}.',
         data: {
           'requestId': request.id,
+          'studentId': request.studentId,
           'driverId': driverId,
           'route': '/parent/driver-details',
+        },
+      ),
+    );
+  }
+
+  /// Where a notification about [request] should open for the family: the
+  /// student's own screens when they asked for themselves.
+  static String _familyRoute(RideRequest request, String path) =>
+      request.requesterId == request.studentId
+      ? '/student/$path'
+      : '/parent/$path';
+
+  /// The driver names a monthly fee for [request] — or a new one after the
+  /// family turned the last down — and the family is told.
+  Future<void> proposeFee(
+    RideRequest request, {
+    required int feePaisa,
+    String? note,
+  }) async {
+    final driverId = SessionService.instance.uid;
+    if (driverId == null || driverId != request.driverId) {
+      throw const RideRequestException('That request is not yours to answer.');
+    }
+    if (feePaisa <= 0) {
+      throw const RideRequestException('Enter the fee you want per month.');
+    }
+    await _requests.proposeFee(
+      requestId: request.id,
+      feePaisa: feePaisa,
+      note: note,
+    );
+    final rupees = (feePaisa / 100).round();
+    await _notify(
+      request.requesterId,
+      UserNotification(
+        id: '',
+        type: NotificationType.rideRequestAnswered,
+        title: 'Fee for ${request.studentName}: Rs.$rupees a month',
+        body:
+            '${request.driverName} asks Rs.$rupees a month for '
+            '${request.scheduleLabel}'
+            '${(note ?? '').trim().isEmpty ? '' : ' — "${note!.trim()}"'}. '
+            'Tap to accept or reject.',
+        data: {
+          'requestId': request.id,
+          'studentId': request.studentId,
+          'route': _familyRoute(request, 'find-drivers'),
+        },
+      ),
+    );
+  }
+
+  /// The family's answer to the driver's fee, and the driver is told — with
+  /// the family's reason when they say no.
+  Future<void> answerFee(
+    RideRequest request, {
+    required bool accept,
+    String? note,
+  }) async {
+    await _requests.answerFee(
+      requestId: request.id,
+      accept: accept,
+      note: note,
+    );
+    final rupees = (request.feePaisa / 100).round();
+    final reason = (note ?? '').trim();
+    await _notify(
+      request.driverId,
+      UserNotification(
+        id: '',
+        type: NotificationType.rideRequest,
+        title: accept
+            ? 'Fee accepted for ${request.studentName}'
+            : 'Fee turned down for ${request.studentName}',
+        body: accept
+            ? 'Rs.$rupees a month is agreed. Accept the seat to book it.'
+            : 'They said no to Rs.$rupees a month'
+                  '${reason.isEmpty ? '' : ': "$reason"'}. '
+                  'Send a new fee, or decline.',
+        data: {
+          'requestId': request.id,
+          'studentId': request.studentId,
+          'route': '/driver/ride-requests',
         },
       ),
     );
@@ -206,7 +313,7 @@ class RideMatchService {
             ? '${request.driverName} could not take ${request.studentName} on '
                   '${request.scheduleLabel}.'
             : '${request.driverName} declined: ${reason.trim()}',
-        data: {'requestId': request.id},
+        data: {'requestId': request.id, 'studentId': request.studentId},
       ),
     );
   }
@@ -233,25 +340,31 @@ class RideMatchService {
         body:
             '${request.driverName} has removed ${request.studentName} from '
             '${request.scheduleLabel}. You can request another driver.',
-        data: {'requestId': request.id},
+        data: {'requestId': request.id, 'studentId': request.studentId},
       ),
     );
   }
 
   // ── Driver schedule & service-area editing ────────────────────────────────
 
-  /// Saves a driver's rounds, preserving the seats already booked on each.
+  /// Saves everything on the driver's My Service screen — schools, starting
+  /// point, radius, fare and rounds — as one write.
   ///
-  /// [edited] carries the driver's intended labels, times and seat totals.
-  /// `bookedSeats` is taken from the *live* document, matched by round id, never
-  /// from the form — a form has no business knowing how many families are on a
-  /// round, and letting it write that field would un-book everyone the moment a
-  /// driver corrected a typo in a start time.
+  /// Every check runs before anything is written (see [mergeRounds]), so a
+  /// refused save stores nothing rather than half an edit.
   ///
-  /// Refuses to shrink a round below what is already booked, which would
-  /// otherwise leave `availableSeats` clamped at 0 while the driver believes they
-  /// have space and families keep being turned away with no explanation.
-  Future<void> saveSchedules(List<DriverSchedule> edited) async {
+  /// Returns false when the write is still waiting for a connection:
+  /// Firestore keeps it on the phone and sends it when the network is back,
+  /// and the driver's own screens already show it, but the families'
+  /// screens will not until then.
+  Future<bool> saveService({
+    required List<ServiceArea> areas,
+    required List<DriverSchedule> rounds,
+    int? vehicleCapacity,
+    double? radiusKm,
+    GeoCoord? baseLocation,
+    int? missedBusFarePaisa,
+  }) async {
     final driverId = SessionService.instance.uid;
     final live = SessionService.instance.driver.value;
     if (driverId == null || live == null) {
@@ -259,8 +372,57 @@ class RideMatchService {
         'Your driver profile is not loaded yet.',
       );
     }
+    final merged = mergeRounds(live.schedules, rounds);
+    final write = UserRepository.instance.replaceService(
+      driverId,
+      areas: areas,
+      schedules: merged,
+      vehicleCapacity: vehicleCapacity,
+      radiusKm: radiusKm,
+      baseLocation: baseLocation,
+      missedBusFarePaisa: missedBusFarePaisa,
+    );
+    // The bus document carries the same number for screens that read the
+    // vehicle; best-effort, the driver's own figure is the one that counts.
+    final busId = live.busId ?? '';
+    if (vehicleCapacity != null && vehicleCapacity > 0 && busId.isNotEmpty) {
+      unawaited(
+        FleetRepository.instance
+            .updateBus(busId, {'capacity': vehicleCapacity})
+            .catchError((Object e) => debugPrint('bus capacity: $e')),
+      );
+    }
+    try {
+      await write.timeout(serviceSaveTimeout);
+      return true;
+    } on TimeoutException {
+      // Not lost: queued on the phone. Errors that arrive later still
+      // surface in the log rather than vanishing.
+      unawaited(
+        write.catchError((Object e) => debugPrint('service save failed: $e')),
+      );
+      return false;
+    }
+  }
 
-    final bookedById = {for (final s in live.schedules) s.id: s.bookedSeats};
+  /// How long a save waits for the server before it is reported as queued.
+  static const serviceSaveTimeout = Duration(seconds: 12);
+
+  /// The rounds as they should be stored: the driver's edits, with each
+  /// round's `bookedSeats` taken from the *live* document by round id —
+  /// never from the form, which has no business knowing how many families
+  /// are on a round. Letting it write that field would un-book everyone the
+  /// moment a driver corrected a typo in a start time.
+  ///
+  /// Throws [RideRequestException] instead of shrinking a round below what
+  /// is booked, or deleting a round that still has families on it — those
+  /// families' records point at the round's id, and their seat would
+  /// silently vanish from the count.
+  static List<DriverSchedule> mergeRounds(
+    List<DriverSchedule> live,
+    List<DriverSchedule> edited,
+  ) {
+    final bookedById = {for (final s in live) s.id: s.bookedSeats};
 
     final merged = <DriverSchedule>[];
     for (final s in edited) {
@@ -275,10 +437,7 @@ class RideMatchService {
       merged.add(s.copyWith(bookedSeats: booked));
     }
 
-    // A round the driver deleted still has families on it. Their student records
-    // point at a scheduleId that would no longer exist, and their seat would
-    // silently vanish from the count.
-    final removedWithBookings = live.schedules.where(
+    final removedWithBookings = live.where(
       (s) => s.bookedSeats > 0 && !edited.any((e) => e.id == s.id),
     );
     if (removedWithBookings.isNotEmpty) {
@@ -288,27 +447,7 @@ class RideMatchService {
         '${removedWithBookings.length == 1 ? 'it' : 'them'}.',
       );
     }
-
-    await UserRepository.instance.replaceSchedules(driverId, merged);
-  }
-
-  Future<void> saveServiceAreas({
-    required List<ServiceArea> areas,
-    double? radiusKm,
-    GeoCoord? baseLocation,
-    int? missedBusFarePaisa,
-  }) async {
-    final driverId = SessionService.instance.uid;
-    if (driverId == null) {
-      throw const RideRequestException('You are not signed in.');
-    }
-    await UserRepository.instance.replaceServiceAreas(
-      driverId,
-      areas: areas,
-      radiusKm: radiusKm,
-      baseLocation: baseLocation,
-      missedBusFarePaisa: missedBusFarePaisa,
-    );
+    return merged;
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────

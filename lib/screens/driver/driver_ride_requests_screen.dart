@@ -5,9 +5,13 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/ride_match_service.dart';
 import '../../app/session_service.dart';
 import '../../data/ride_request_repository.dart';
+import '../../app/round_display.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/student_logistics.dart';
+import '../../widgets/text_controller_scope.dart';
 
 /// The driver's seat-request inbox: accept, decline, or release a booked seat.
 ///
@@ -99,6 +103,28 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
     successMessage: '${request.studentName} is on your roster.',
   );
 
+  /// Asks the driver for the monthly fee to put to the family, then sends
+  /// it. Also how a new fee goes out after the family turned one down.
+  Future<void> _proposeFee(RideRequest request) async {
+    final result = await showModalBottomSheet<(int, String)>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FeeSheet(request: request),
+    );
+    if (result == null) return;
+    await _run(
+      request,
+      () => RideMatchService.instance.proposeFee(
+        request,
+        feePaisa: result.$1 * 100,
+        note: result.$2,
+      ),
+      successMessage:
+          'Fee sent. ${request.studentName}\'s family will accept or reject it.',
+    );
+  }
+
   Future<void> _decline(RideRequest request) async {
     final reason = await _askReason(
       title: 'Decline this request?',
@@ -145,113 +171,118 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
     required Color confirmColor,
     bool askForText = true,
   }) {
-    final controller = TextEditingController();
     return showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (sheetCtx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: sheetCtx.cardBg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      // See TextControllerScope: the field's controller must outlive the
+      // sheet's closing animation.
+      builder: (sheetCtx) => TextControllerScope(
+        builder: (controller) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: sheetCtx.cardBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
               ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: TextStyle(
-                  color: sheetCtx.textPrimary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                body,
-                style: TextStyle(color: sheetCtx.textSecondary, fontSize: 13),
-              ),
-              if (askForText) ...[
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  maxLines: 2,
-                  style: TextStyle(color: sheetCtx.textPrimary, fontSize: 14),
-                  decoration: const InputDecoration(
-                    hintText: 'Reason (optional)',
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.pop(sheetCtx),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: sheetCtx.surfaceBorder),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: sheetCtx.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () =>
-                          Navigator.pop(sheetCtx, controller.text.trim()),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: confirmColor,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          confirmLabel,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: sheetCtx.textPrimary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  body,
+                  style: TextStyle(color: sheetCtx.textSecondary, fontSize: 13),
+                ),
+                if (askForText) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    maxLines: 2,
+                    style: TextStyle(color: sheetCtx.textPrimary, fontSize: 14),
+                    decoration: const InputDecoration(
+                      hintText: 'Reason (optional)',
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-            ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(sheetCtx),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: sheetCtx.surfaceBorder),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: sheetCtx.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () =>
+                            Navigator.pop(sheetCtx, controller.text.trim()),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: confirmColor,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            confirmLabel,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
-    ).whenComplete(controller.dispose);
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -274,37 +305,48 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
                 pendingCount: pending.length,
                 onBack: () => context.pop(),
               ),
-              _SeatSummary(driver: driver),
-              // The round card(s) above were sitting almost flush against
-              // the "Waiting / On my roster" toggle below -- a deliberate
-              // gap here (matching the one `_Tabs` already puts under
-              // itself, `EdgeInsets.fromLTRB(16, 0, 16, 14)`) gives both
-              // blocks room to read as separate sections.
-              const SizedBox(height: 14),
-              _Tabs(
-                active: _tab,
-                pendingCount: pending.length,
-                bookedCount: booked.length,
-                onChanged: (t) => setState(() => _tab = t),
-              ),
+              // One scroll for the whole page. The rounds used to be a
+              // fixed block above an `Expanded` list, so a driver with
+              // three or four rounds left the request list a sliver tall
+              // and the empty state overflowed by 141 pixels — the new
+              // requests this screen exists for were the first thing
+              // pushed off the bottom.
               Expanded(
-                child: shown.isEmpty
-                    ? _EmptyState(tab: _tab, driver: driver)
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: shown.length,
-                        itemBuilder: (_, i) {
-                          final request = shown[i];
-                          return _RideRequestCard(
-                            request: request,
-                            schedule: driver?.scheduleById(request.scheduleId),
-                            busy: _busyId == request.id,
-                            onAccept: () => _accept(request),
-                            onDecline: () => _decline(request),
-                            onRelease: () => _release(request),
-                          );
-                        },
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 100),
+                  children: [
+                    _SeatSummary(driver: driver),
+                    const SizedBox(height: 14),
+                    _Tabs(
+                      active: _tab,
+                      pendingCount: pending.length,
+                      bookedCount: booked.length,
+                      onChanged: (t) => setState(() => _tab = t),
+                    ),
+                    if (shown.isEmpty)
+                      _EmptyState(tab: _tab, driver: driver)
+                    else
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: Column(
+                          children: [
+                            for (final request in shown)
+                              _RideRequestCard(
+                                request: request,
+                                schedule: driver?.scheduleById(
+                                  request.scheduleId,
+                                ),
+                                busy: _busyId == request.id,
+                                onAccept: () => _accept(request),
+                                onDecline: () => _decline(request),
+                                onRelease: () => _release(request),
+                                onFee: () => _proposeFee(request),
+                              ),
+                          ],
+                        ),
                       ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -430,19 +472,16 @@ class _SeatSummary extends StatelessWidget {
       );
     }
 
-    // Full-width, stacked vertically -- was a horizontal-scrolling row of
-    // fixed `width: 168` cards, which is exactly why "Round 1" looked
-    // squished and centered instead of matching the screen's own margins.
-    // `16` on both sides matches `_Header` and `_Tabs` below exactly (both
-    // `EdgeInsets.fromLTRB(16, ...)`), so the card's left/right edges line
-    // up with everything above and below it.
+    // One compact row per round. These were four-row cards, so a driver
+    // running three of them filled the screen before a single request was
+    // visible. `16` on both sides matches `_Header` and `_Tabs`.
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 11, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < rounds.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
+            if (i > 0) const SizedBox(height: 8),
             _RoundCard(round: rounds[i]),
           ],
         ],
@@ -463,80 +502,79 @@ class _RoundCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = round;
     final color = r.isFull ? AppTheme.error : AppTheme.success;
-    final filled = r.totalSeats <= 0
-        ? 0.0
-        : (r.totalSeats - r.availableSeats) / r.totalSeats;
-    // One gap size reused between every internal element (icon row → time
-    // text → progress bar → bottom label) instead of the previous 8/10/8 —
-    // uniform spacing reads as deliberate, mismatched spacing reads as
-    // sloppy even when the differences are only a couple of pixels.
-    const gap = SizedBox(height: 10);
+    // Where this round actually goes. It is the thing a driver running
+    // four rounds tells them apart by — far more use than a second copy of
+    // the times, which the line below already carries.
+    final where = r.institutes.isEmpty
+        ? r.directionHint
+        : r.institutes.join(', ');
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(8),
+          Icon(Icons.directions_bus_filled_rounded, size: 16, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        r.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (where.isNotEmpty) ...[
+                      Text(
+                        '  |  ',
+                        style: TextStyle(
+                          color: context.textTertiary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          where,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.directions_bus_filled_rounded,
-                  size: 15,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  r.label,
+                const SizedBox(height: 2),
+                Text(
+                  roundSummary(r),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: TextStyle(color: context.textTertiary, fontSize: 11),
                 ),
-              ),
-            ],
-          ),
-          gap,
-          Text(
-            r.timeRange,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: context.textTertiary, fontSize: 11),
-          ),
-          gap,
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: filled.clamp(0, 1),
-              minHeight: 6,
-              backgroundColor: color.withValues(alpha: 0.15),
-              valueColor: AlwaysStoppedAnimation(color),
+              ],
             ),
           ),
-          gap,
+          const SizedBox(width: 10),
           Text(
-            r.isFull
-                ? 'Full — ${r.totalSeats} booked'
-                : '${r.availableSeats} of ${r.totalSeats} free',
+            r.isFull ? 'Full' : '${r.availableSeats} free',
             style: TextStyle(
               color: color,
               fontSize: 12,
@@ -691,6 +729,7 @@ class _RideRequestCard extends StatelessWidget {
   final VoidCallback onAccept;
   final VoidCallback onDecline;
   final VoidCallback onRelease;
+  final VoidCallback onFee;
 
   const _RideRequestCard({
     required this.request,
@@ -699,7 +738,34 @@ class _RideRequestCard extends StatelessWidget {
     required this.onAccept,
     required this.onDecline,
     required this.onRelease,
+    required this.onFee,
   });
+
+  /// Where the fee stands, in one line for the driver — or null before any.
+  (String, Color)? get _feeLine {
+    final rupees = (request.feePaisa / 100).round();
+    return switch (request.feeStatus) {
+      FeeStatus.none => null,
+      FeeStatus.proposed => (
+        'Rs.$rupees / month sent — waiting for the family',
+        AppTheme.warning,
+      ),
+      FeeStatus.accepted => ('Rs.$rupees / month agreed ✓', AppTheme.success),
+      FeeStatus.rejected => (
+        'Rs.$rupees / month turned down'
+            '${(request.feeFamilyNote ?? '').isEmpty ? '' : ': "${request.feeFamilyNote}"'}',
+        AppTheme.error,
+      ),
+    };
+  }
+
+  /// Accept books the seat, so it waits for a fee on the table to be
+  /// settled.
+  String? get _acceptBlocker => switch (request.feeStatus) {
+    FeeStatus.proposed => 'Waiting on fee',
+    FeeStatus.rejected => 'Fee rejected',
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -813,7 +879,18 @@ class _RideRequestCard extends StatelessWidget {
                       value: request.note!,
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  // Everything needed to decide: where the child lives and
+                  // studies, the times the family set, and who to call.
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _showStudentDetails(context, request),
+                      icon: const Icon(Icons.info_outline_rounded, size: 18),
+                      label: const Text('Locations, timings & contacts'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   if (busy)
                     const Center(
                       child: Padding(
@@ -826,31 +903,73 @@ class _RideRequestCard extends StatelessWidget {
                       ),
                     )
                   else if (request.isPending)
-                    Row(
+                    Column(
                       children: [
-                        Expanded(
-                          child: _OutlineButton(
-                            label: 'Decline',
-                            color: AppTheme.error,
-                            onTap: onDecline,
+                        if (_feeLine case (final text, final color)) ...[
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: color.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Text(
+                              '💰 $text',
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _FilledButton(
-                            // A round that has filled since the request arrived
-                            // must not offer an Accept that is guaranteed to
-                            // fail. Disabling it here is cosmetic — the
-                            // transaction refuses it anyway — but it stops the
-                            // driver hunting for what they did wrong.
-                            label: schedule == null
-                                ? 'Round gone'
-                                : (schedule!.isFull ? 'Round full' : 'Accept'),
-                            color: AppTheme.success,
-                            onTap: (schedule == null || schedule!.isFull)
-                                ? null
-                                : onAccept,
-                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _OutlineButton(
+                                label: 'Decline',
+                                color: AppTheme.error,
+                                onTap: onDecline,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Ask a monthly fee — or a new one after a "no".
+                            Expanded(
+                              child: _OutlineButton(
+                                label: request.feeStatus == FeeStatus.none
+                                    ? 'Fees'
+                                    : 'New fee',
+                                color: AppTheme.warning,
+                                onTap: onFee,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _FilledButton(
+                                // A round that has filled since the request arrived
+                                // must not offer an Accept that is guaranteed to
+                                // fail. Disabling it here is cosmetic — the
+                                // transaction refuses it anyway — but it stops the
+                                // driver hunting for what they did wrong.
+                                label: schedule == null
+                                    ? 'Round gone'
+                                    : schedule!.isFull
+                                    ? 'Round full'
+                                    : _acceptBlocker ?? 'Accept',
+                                color: AppTheme.success,
+                                onTap:
+                                    (schedule == null ||
+                                        schedule!.isFull ||
+                                        _acceptBlocker != null)
+                                    ? null
+                                    : onAccept,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     )
@@ -878,6 +997,60 @@ class _RideRequestCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The child behind [request], read live off their record — the driver may
+/// read a student's record before accepting them.
+void _showStudentDetails(BuildContext context, RideRequest request) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scroll) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        decoration: BoxDecoration(
+          color: ctx.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: StreamBuilder<Student?>(
+          stream: UserRepository.instance.watchStudent(request.studentId),
+          builder: (context, snap) {
+            final student = snap.data;
+            if (student == null) {
+              return Center(
+                child: snap.connectionState == ConnectionState.waiting
+                    ? const CircularProgressIndicator()
+                    : Text(
+                        'This student could not be loaded.',
+                        style: TextStyle(color: context.textSecondary),
+                      ),
+              );
+            }
+            return ListView(
+              controller: scroll,
+              children: [
+                Text(
+                  student.name,
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                StudentLogistics(student: student),
+                const SizedBox(height: 24),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
 }
 
 class _DetailRow extends StatelessWidget {
@@ -1038,10 +1211,9 @@ class _EmptyState extends StatelessWidget {
           'here.';
     }
 
-    return Align(
-      alignment: const Alignment(0, -0.22),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 12, 32, 12),
+      child: Center(
         child: Container(
           padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
           decoration: BoxDecoration(
@@ -1098,6 +1270,120 @@ class _EmptyState extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The driver's monthly fee for one seat, and a note to go with it.
+class _FeeSheet extends StatefulWidget {
+  final RideRequest request;
+  const _FeeSheet({required this.request});
+
+  @override
+  State<_FeeSheet> createState() => _FeeSheetState();
+}
+
+class _FeeSheetState extends State<_FeeSheet> {
+  late final _amount = TextEditingController(
+    text: widget.request.feePaisa > 0
+        ? '${(widget.request.feePaisa / 100).round()}'
+        : '',
+  );
+  final _note = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final rupees = int.tryParse(_amount.text.trim()) ?? 0;
+    if (rupees <= 0) {
+      setState(() => _error = 'Enter the fee per month.');
+      return;
+    }
+    Navigator.pop(context, (rupees, _note.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.request;
+    final turnedDown = r.feeStatus == FeeStatus.rejected;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: context.cardBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Monthly fee for ${r.studentName}',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              turnedDown
+                  ? 'The family turned down Rs.${(r.feePaisa / 100).round()}'
+                        '${(r.feeFamilyNote ?? '').isEmpty ? '.' : ': "${r.feeFamilyNote}".'}'
+                        ' Send a new fee, or decline the request.'
+                  : 'The family accepts or rejects it. Billing starts the day '
+                        'you accept the seat, every 30 days.',
+              style: TextStyle(color: context.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amount,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: TextStyle(color: context.textPrimary, fontSize: 16),
+              decoration: InputDecoration(
+                prefixText: 'Rs. ',
+                suffixText: '/ month',
+                hintText: 'e.g. 4000',
+                errorText: _error,
+              ),
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _note,
+              style: TextStyle(color: context.textPrimary, fontSize: 14),
+              decoration: const InputDecoration(
+                hintText: 'Note for the family (optional)',
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _send,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.driverCyan,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Send fee'),
+              ),
+            ),
+          ],
         ),
       ),
     );

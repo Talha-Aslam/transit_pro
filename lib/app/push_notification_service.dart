@@ -96,14 +96,14 @@ class PushNotificationService {
   /// — which is the duplicate this prevents.
   void _listenForForegroundMessages() {
     _messageSub?.cancel();
-    _messageSub = FirebaseMessaging.onMessage.listen(
-      (message) {
-        NotificationService.instance.noteDeliveredByPush(
-          message.data['docId'] as String?,
-        );
-      },
-      onError: (Object e) => debugPrint('Push notifications: onMessage — $e'),
-    );
+    _messageSub = FirebaseMessaging.onMessage.listen((message) {
+      NotificationService.instance.showForegroundPush(
+        docId: message.data['docId'] as String?,
+        title: message.notification?.title ?? 'Transit Pro',
+        body: message.notification?.body ?? '',
+        type: message.data['type'] as String?,
+      );
+    }, onError: (Object e) => debugPrint('Push notifications: onMessage — $e'));
   }
 
   /// Removes this device's token on sign-out, so a shared or reinstalled

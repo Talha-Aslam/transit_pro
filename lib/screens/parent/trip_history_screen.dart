@@ -17,6 +17,9 @@ class TripHistoryScreen extends StatefulWidget {
 
 class _TripHistoryScreenState extends State<TripHistoryScreen> {
   int _filterIndex = 1;
+
+  /// Whose trips are on screen — each child has their own history.
+  int _childIndex = ParentDataService.instance.selectedChildIndex.value;
   DateTime? _selectedCalendarDate;
   late Future<List<_Trip>> _tripsFuture;
 
@@ -128,6 +131,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
       }
 
       return _Trip(
+        childId: r.studentId,
         date: date,
         type: AppStrings.t(
           isMorning
@@ -139,7 +143,11 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
         time: _formatTime(date),
         status: status,
         statusOk: statusOk,
-        attendancePresent: r.status == AttendanceStatus.boarded,
+        // Dropped off is where every finished ride ends; counting only
+        // `boarded` filed a child who rode as absent.
+        attendancePresent:
+            r.status == AttendanceStatus.boarded ||
+            r.status == AttendanceStatus.droppedOff,
         isMorning: isMorning,
       );
     }).toList();
@@ -499,7 +507,14 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                 );
               }
 
-              final trips = snapshot.data ?? const <_Trip>[];
+              final children = ParentDataService.instance.children.value;
+              final child = children.isEmpty
+                  ? null
+                  : children[_childIndex.clamp(0, children.length - 1)];
+              final trips = [
+                for (final t in snapshot.data ?? const <_Trip>[])
+                  if (child == null || t.childId == child.id) t,
+              ];
               final filteredTrips = _computeFilteredTrips(trips);
               final presentTrips = filteredTrips
                   .where((t) => t.attendancePresent)
@@ -507,8 +522,6 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
               final absentTrips = filteredTrips
                   .where((t) => !t.attendancePresent)
                   .toList();
-              final onTime = presentTrips.where((t) => t.statusOk).length;
-              final late = presentTrips.length - onTime;
               final present = filteredTrips
                   .where((t) => t.attendancePresent)
                   .length;
@@ -517,6 +530,15 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
               return Column(
                 children: [
                   _buildHeader(tripCount: trips.length),
+                  if (children.length > 1)
+                    _ChildTabs(
+                      names: [
+                        for (final c in children)
+                          c.name.isEmpty ? 'Child' : c.name,
+                      ],
+                      selected: _childIndex.clamp(0, children.length - 1),
+                      onSelected: (i) => setState(() => _childIndex = i),
+                    ),
                   Expanded(
                     child: trips.isEmpty
                         ? const _EmptyState(
@@ -571,7 +593,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                         child: Column(
                                           children: [
                                             Text(
-                                              '$onTime',
+                                              '$present',
                                               style: const TextStyle(
                                                 color: AppTheme.success,
                                                 fontSize: 24,
@@ -580,7 +602,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              AppStrings.t('on_time'),
+                                              'Present',
                                               style: TextStyle(
                                                 color: context.textSecondary,
                                                 fontSize: 11,
@@ -601,16 +623,16 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                         child: Column(
                                           children: [
                                             Text(
-                                              '$late',
+                                              '$absent',
                                               style: const TextStyle(
-                                                color: AppTheme.warning,
+                                                color: AppTheme.error,
                                                 fontSize: 24,
                                                 fontWeight: FontWeight.w800,
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              AppStrings.t('delayed'),
+                                              AppStrings.t('absent'),
                                               style: TextStyle(
                                                 color: context.textSecondary,
                                                 fontSize: 11,
@@ -791,7 +813,7 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
                                             context: context,
                                             t: t,
                                             isLast: isLast,
-                                            showStatus: true,
+                                            showStatus: false,
                                           );
                                         }),
                                     ],
@@ -872,6 +894,54 @@ class _TripHistoryScreenState extends State<TripHistoryScreen> {
 /// Honest empty state for a family with no trip history at all yet — shown
 /// instead of zeroed-out stat cards and empty sections, which used to look
 /// like a loading glitch rather than "nothing has happened yet".
+/// One tab per child, so each child's history reads on its own.
+class _ChildTabs extends StatelessWidget {
+  final List<String> names;
+  final int selected;
+  final ValueChanged<int> onSelected;
+  const _ChildTabs({
+    required this.names,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        itemCount: names.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final on = i == selected;
+          return GestureDetector(
+            onTap: () => onSelected(i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: on
+                    ? AppTheme.parentPurple
+                    : AppTheme.parentPurple.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                names[i],
+                style: TextStyle(
+                  color: on ? Colors.white : AppTheme.parentPurple,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   final String message;
   const _EmptyState({required this.message});
@@ -892,6 +962,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _Trip {
+  final String childId;
   final DateTime date;
   final String type, from, to, time, status;
   final bool statusOk;
@@ -899,6 +970,7 @@ class _Trip {
   final bool isMorning;
 
   const _Trip({
+    required this.childId,
     required this.date,
     required this.type,
     required this.from,

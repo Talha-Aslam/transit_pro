@@ -33,6 +33,63 @@ class MapIcons {
     return _pinCache.putIfAbsent(key, () => _drawPin(color, dpr));
   }
 
+  static final Map<String, Future<Uint8List>> _arrowCache = {};
+
+  /// The navigation arrow, the way a turn-by-turn map draws the vehicle.
+  ///
+  /// A bus pictogram tells a viewer *what* is moving; at the zoom a family
+  /// actually watches, what they want to know is *which way* it is facing —
+  /// whether it has turned into their street yet. An arrow carries that in
+  /// its shape, so a glance answers it without reading the map around it.
+  /// Rotated by the marker's `rotation`, which is the ping's heading.
+  static Future<Uint8List> arrow(Color color, double dpr) {
+    final key = '${color.toARGB32()}@$dpr';
+    return _arrowCache.putIfAbsent(key, () => _drawArrow(color, dpr));
+  }
+
+  static Future<Uint8List> _drawArrow(Color color, double dpr) async {
+    const baseSize = 54.0;
+    final size = baseSize * dpr;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(dpr);
+
+    const c = Offset(27, 27);
+    // A soft disc under the arrow, so it stays legible over dark map tiles
+    // and over the route line it sits on.
+    canvas.drawCircle(c, 21, Paint()..color = color.withValues(alpha: 0.18));
+    canvas.drawCircle(
+      c,
+      15,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+
+    // Pointing up: the marker is drawn `flat` and rotated to the heading,
+    // so "up" here means "the way the vehicle is travelling".
+    final path = Path()
+      ..moveTo(27, 10)
+      ..lineTo(38, 38)
+      ..lineTo(27, 31)
+      ..lineTo(16, 38)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.round(), size.round());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return bytes!.buffer.asUint8List();
+  }
+
   static Future<Uint8List> _drawBus(double dpr) async {
     const baseSize = 52.0;
     final size = baseSize * dpr;
@@ -105,6 +162,69 @@ class MapIcons {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
+
+    return _toPng(recorder, size);
+  }
+
+  static final Map<String, Future<Uint8List>> _numberCache = {};
+
+  /// A numbered stop: the visiting order on a coloured disc, so the map and
+  /// the stop list can be read against each other ("stop 2 is Ali").
+  /// [label] is drawn as given — a number, or a short glyph like a flag for
+  /// the destination.
+  static Future<Uint8List> numbered(String label, Color color, double dpr) {
+    final key = '$label|${color.toARGB32()}@$dpr';
+    return _numberCache.putIfAbsent(
+      key,
+      () => _drawNumbered(label, color, dpr),
+    );
+  }
+
+  static Future<Uint8List> _drawNumbered(
+    String label,
+    Color color,
+    double dpr,
+  ) async {
+    const baseSize = 40.0;
+    final size = baseSize * dpr;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(dpr);
+
+    // Same teardrop as [pin], tip at (20, 38), with a white face for the
+    // label instead of the dot.
+    final path = Path()
+      ..moveTo(20, 38)
+      ..lineTo(8, 20)
+      ..arcToPoint(
+        const Offset(32, 20),
+        radius: const Radius.circular(12),
+        clockwise: true,
+      )
+      ..close();
+    canvas.drawShadow(path, Colors.black, 2, false);
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+    canvas.drawCircle(const Offset(20, 16), 8.5, Paint()..color = Colors.white);
+
+    final text = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: label.length > 1 ? 9.5 : 11.5,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    text.paint(canvas, Offset(20 - text.width / 2, 16 - text.height / 2));
 
     return _toPng(recorder, size);
   }

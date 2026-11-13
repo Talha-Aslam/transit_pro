@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
-import '../../app/driver_data_service.dart';
+import '../../app/child_status_service.dart';
+import '../../app/round_display.dart';
 import '../../app/live_bus_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
 import '../../app/session_service.dart';
+import '../../app/weekly_times.dart';
 import '../../app/student_data_service.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
@@ -43,9 +45,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
     _activeTrip = null;
     LiveBusService.instance.stop();
 
-    if (driverId.isEmpty) return;
+    final studentId = SessionService.instance.uid;
+    if (driverId.isEmpty || studentId == null) return;
     _tripSub = TripRepository.instance
-        .watchActiveTripForDriver(driverId)
+        .watchActiveTripForStudent(driverId, studentId)
         .listen(_onActiveTripChanged);
   }
 
@@ -58,7 +61,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
     LiveBusService.instance.follow(
       busId: trip.busId,
-      destination: StudentDataService.instance.studentInfo.value.dropoff,
+      trip: trip,
+      studentId: SessionService.instance.student.value?.id,
     );
   }
 
@@ -69,30 +73,52 @@ class _StudentDashboardState extends State<StudentDashboard> {
   /// invented one.
   List<AttendanceRecord> _attendanceRecords = const [];
 
+  StreamSubscription<List<AttendanceRecord>>? _attendanceSub;
+
   @override
   void initState() {
     super.initState();
     _loadAttendance();
   }
 
-  Future<void> _loadAttendance() async {
+  /// Live, so a ride marked while this screen is open shows up on it.
+  void _loadAttendance() {
     final studentId = SessionService.instance.student.value?.id;
     if (studentId == null || studentId.isEmpty) return;
-    try {
-      final records = await TripRepository.instance.fetchAttendanceForStudent(
-        studentId,
-      );
-      if (!mounted) return;
-      setState(() => _attendanceRecords = records);
-    } catch (e) {
-      debugPrint('dashboard attendance load failed: $e');
-    }
+    _attendanceSub = TripRepository.instance
+        .watchAttendanceHistory(studentId)
+        .listen(
+          (records) {
+            if (mounted) setState(() => _attendanceRecords = records);
+          },
+          onError: (Object e) =>
+              debugPrint('dashboard attendance load failed: $e'),
+        );
   }
 
-  bool _isPast(TimeOfDay t) {
-    final now = TimeOfDay.now();
-    return (now.hour * 60 + now.minute) >= (t.hour * 60 + t.minute);
+  /// What the minutes on the Next Stop card count down to: this student's
+  /// pickup while the van is still coming for them, then the institute; home
+  /// on the way back. Read off the running trip — it always said "to school".
+  String _etaDestinationLabel() {
+    final trip = _activeTrip;
+    if (trip == null || trip.type == TripType.morning) {
+      final me = SessionService.instance.uid ?? '';
+      final mine = trip?.stopFor(me);
+      return mine != null && mine.isOpen
+          ? AppStrings.t('to_pickup')
+          : AppStrings.t('to_school');
+    }
+    return AppStrings.t('to_home');
   }
+
+  /// The badge on a Today's Schedule row, from what actually happened.
+  (String, Color)? _legBadge(TodayLeg leg) => switch (leg) {
+    TodayLeg.upcoming => (AppStrings.t('upcoming'), AppTheme.info),
+    TodayLeg.onTheWay => (AppStrings.t('leg_on_the_way'), AppTheme.warning),
+    TodayLeg.done => (AppStrings.t('done'), AppTheme.success),
+    TodayLeg.absent => (AppStrings.t('absent'), AppTheme.error),
+    TodayLeg.unrecorded => null,
+  };
 
   String _formatTime(DateTime? dt) {
     if (dt == null) return '';
@@ -112,9 +138,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
         .map(
           (r) => _ActivityRow(
             icon: r.status == AttendanceStatus.absent ? '❌' : '✅',
-            msg: r.status == AttendanceStatus.absent
-                ? AppStrings.t('marked_absent')
-                : AppStrings.t('checked_in_pickup'),
+            msg: switch (r.status) {
+              AttendanceStatus.absent => AppStrings.t('marked_absent'),
+              // Delivered at the other end of the ride: school in the
+              // morning, home in the afternoon.
+              AttendanceStatus.droppedOff => AppStrings.t('status_reached'),
+              _ => AppStrings.t('checked_in_pickup'),
+            },
             time: _formatTime(r.markedAt),
           ),
         )
@@ -123,6 +153,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   @override
   void dispose() {
+    _attendanceSub?.cancel();
     _tripSub?.cancel();
     LiveBusService.instance.stopAfterFrame();
     super.dispose();
@@ -316,11 +347,19 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                 valueListenable:
                                     LiveBusService.instance.etaMinutes,
                                 builder: (_, eta, _) {
-                                  final stopLabel = StudentDataService
-                                      .instance
-                                      .studentInfo
-                                      .value
-                                      .stop;
+                                  // The minutes count to the student's own
+                                  // stop only while it is still ahead; after
+                                  // that, to the end of the leg.
+                                  final mine = _activeTrip?.stopFor(
+                                    SessionService.instance.uid ?? '',
+                                  );
+                                  final stopLabel = mine != null && mine.isOpen
+                                      ? StudentDataService
+                                            .instance
+                                            .studentInfo
+                                            .value
+                                            .stop
+                                      : _etaDestinationLabel();
                                   final String line;
                                   if (_activeTrip == null) {
                                     line = AppStrings.t('route_not_started');
@@ -417,7 +456,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          AppStrings.t('to_school'),
+                                          _etaDestinationLabel(),
                                           style: TextStyle(
                                             color: context.textSecondary,
                                             fontSize: 13,
@@ -586,63 +625,92 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           ],
                         ),
                         const SizedBox(height: 14),
-                        ValueListenableBuilder<StudentInfo>(
-                          valueListenable:
-                              StudentDataService.instance.studentInfo,
-                          builder: (_, info, _) {
-                            // `DriverDataService.timingSlots` defaults to a
-                            // fixed 7:15/etc. schedule whenever no driver
-                            // document has loaded — which is exactly the
-                            // case for a brand-new student with no bus
-                            // assigned yet. Gate on the same "assigned"
-                            // signal the header badge above already uses,
-                            // rather than trust that notifier's default.
-                            final hasBus =
-                                info.busNumber.isNotEmpty ||
-                                info.route.isNotEmpty;
-                            if (!hasBus) {
-                              return Text(
-                                "Your driver hasn't set a schedule yet.",
-                                style: TextStyle(
-                                  color: context.textTertiary,
-                                  fontSize: 13,
+                        // Rebuilt as the driver marks attendance and trips
+                        // start or finish, so the badges move on their own.
+                        ListenableBuilder(
+                          listenable: Listenable.merge([
+                            StudentDataService.instance.studentInfo,
+                            ChildStatusService.instance,
+                            SessionService.instance,
+                          ]),
+                          builder: (_, _) {
+                            final info =
+                                StudentDataService.instance.studentInfo.value;
+                            final me = SessionService.instance.student.value;
+                            final driver = SessionService.instance.driverFor(
+                              info.driverId,
+                            );
+                            // The student's own round — what the driver
+                            // actually runs — and the driver's older
+                            // per-driver timings only when there is none.
+                            // Ride badges only once a driver carries them.
+                            final linked = driver != null;
+                            // The student's own day — when their institute
+                            // starts and lets out — as set in their weekly
+                            // schedule, not the van's pickup times.
+                            final today = me == null
+                                ? const WeeklyTimes()
+                                : WeeklyTimes.on(me);
+                            // When the van is expected at this student,
+                            // from the round's start and the order of its
+                            // stops; their own school hours sit underneath.
+                            final expected = me == null
+                                ? null
+                                : driver?.expectedTimes[me.id];
+                            final pickupTime = clock12(expected?.pickup ?? '');
+                            final dropoffTime = clock12(
+                              expected?.dropoff ?? '',
+                            );
+                            final schoolHours =
+                                today.schoolStartAt.isEmpty &&
+                                    today.schoolEndAt.isEmpty
+                                ? ''
+                                : 'School ${clock12(today.schoolStartAt).isEmpty ? '—' : clock12(today.schoolStartAt)}'
+                                      ' – ${clock12(today.schoolEndAt).isEmpty ? '—' : clock12(today.schoolEndAt)}';
+                            final morning = me == null || !linked
+                                ? null
+                                : _legBadge(
+                                    ChildStatusService.instance.legToday(
+                                      me.id,
+                                      morning: true,
+                                    ),
+                                  );
+                            final home = me == null || !linked
+                                ? null
+                                : _legBadge(
+                                    ChildStatusService.instance.legToday(
+                                      me.id,
+                                      morning: false,
+                                    ),
+                                  );
+                            return Column(
+                              children: [
+                                _ScheduleItem(
+                                  icon: '🌅',
+                                  label: AppStrings.t('expected_pickup'),
+                                  time: pickupTime.isEmpty ? '—' : pickupTime,
+                                  status: morning?.$1,
+                                  color: morning?.$2 ?? AppTheme.warning,
                                 ),
-                              );
-                            }
-                            return ValueListenableBuilder<DriverTimingSlots>(
-                              valueListenable:
-                                  DriverDataService.instance.timingSlots,
-                              builder: (_, slots, _) => Column(
-                                children: [
-                                  _ScheduleItem(
-                                    icon: '🌅',
-                                    label: AppStrings.t('school_time'),
-                                    time: formatTimeOfDay(
-                                      slots.morningPickupFromHome,
+                                _ScheduleItem(
+                                  icon: '🌇',
+                                  label: AppStrings.t('expected_dropoff'),
+                                  time: dropoffTime.isEmpty ? '—' : dropoffTime,
+                                  status: home?.$1,
+                                  color: home?.$2 ?? AppTheme.warning,
+                                ),
+                                if (schoolHours.isNotEmpty)
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      schoolHours,
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                    status: _isPast(slots.morningPickupFromHome)
-                                        ? 'Done'
-                                        : 'Upcoming',
-                                    color: _isPast(slots.morningPickupFromHome)
-                                        ? AppTheme.success
-                                        : AppTheme.warning,
                                   ),
-                                  _ScheduleItem(
-                                    icon: '🌇',
-                                    label: AppStrings.t('off_time'),
-                                    time: formatTimeOfDay(
-                                      slots.afternoonDropoffAtHome,
-                                    ),
-                                    status:
-                                        _isPast(slots.afternoonDropoffAtHome)
-                                        ? 'Done'
-                                        : 'Upcoming',
-                                    color: _isPast(slots.afternoonDropoffAtHome)
-                                        ? AppTheme.success
-                                        : AppTheme.warning,
-                                  ),
-                                ],
-                              ),
+                              ],
                             );
                           },
                         ),
@@ -813,7 +881,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
 // ── Widgets ───────────────────────────────────────────────────────────────
 
 class _ScheduleItem extends StatelessWidget {
-  final String icon, label, time, status;
+  final String icon, label, time;
+
+  /// Null when there is nothing honest to say about this leg yet.
+  final String? status;
   final Color color;
   const _ScheduleItem({
     required this.icon,
@@ -855,7 +926,7 @@ class _ScheduleItem extends StatelessWidget {
                 ],
               ),
             ),
-            StatusBadge(label: status, color: color),
+            if (status != null) StatusBadge(label: status!, color: color),
           ],
         ),
       ),

@@ -9,7 +9,10 @@ import '../data/ride_request_repository.dart';
 import '../data/user_repository.dart';
 import 'active_trip_service.dart';
 import 'child_status_service.dart';
+import 'expected_times_service.dart';
+import 'fee_billing_service.dart';
 import 'seat_reconciler.dart';
+import 'trip_session.dart';
 import 'notification_service.dart';
 import 'push_notification_service.dart';
 
@@ -177,16 +180,17 @@ class SessionService extends ChangeNotifier {
   void _watchDrivers(Set<String> ids) {
     for (final id in ids) {
       if (_driverSubs.containsKey(id)) continue;
-      _driverSubs[id] = UserRepository.instance.watchDriver(id).listen(
-        (driver) {
-          if (driver == null) return;
-          driversById.value = {...driversById.value, id: driver};
-          // The flattened per-role views hold copies of the driver's name
-          // and photo, so they have to be rebuilt too.
-          _backfillForRole();
-        },
-        onError: (Object e) => debugPrint('watch driver $id: $e'),
-      );
+      _driverSubs[id] = UserRepository.instance.watchDriver(id).listen((
+        driver,
+      ) {
+        if (driver == null) return;
+        driversById.value = {...driversById.value, id: driver};
+        // The flattened per-role views hold copies of the driver's name
+        // and photo, so they have to be rebuilt too.
+        _backfillForRole();
+        // Seat counts and round names live on the driver's document too.
+        notifyListeners();
+      }, onError: (Object e) => debugPrint('watch driver $id: $e'));
     }
     for (final id in _driverSubs.keys.toList()) {
       if (ids.contains(id)) continue;
@@ -317,6 +321,8 @@ class SessionService extends ChangeNotifier {
     // account's round to whoever signs in next on this phone.
     ActiveTripService.instance.unbind();
     SeatReconciler.instance.unbind();
+    ExpectedTimesService.instance.unbind();
+    FeeBillingService.instance.unbind();
     ChildStatusService.instance.unbind();
 
     // Notifications are per-account. Leaving them would show one family's alerts
@@ -329,6 +335,11 @@ class SessionService extends ChangeNotifier {
       unawaited(
         PushNotificationService.instance.unregisterForUser(signingOutUid),
       );
+      // The honest half of presence. The other half is `lastSeenAt` going
+      // stale, for the sign-out that never happens because the OS killed
+      // the app first. Fired before the role is cleared below, since the
+      // write is gated on this account still being a driver.
+      unawaited(_touchDriverPresence(signingOutUid, DriverStatus.offline));
     }
 
     user.value = null;
@@ -404,6 +415,16 @@ class SessionService extends ChangeNotifier {
   /// re-entering with the same role does not re-subscribe.
   UserRole? _subscribedRole;
 
+  /// Writes presence only for an account that is actually a driver, and
+  /// never over `pendingVerification` — that one is the admin's to clear,
+  /// and an app that overwrote it would quietly approve itself.
+  Future<void> _touchDriverPresence(String uid, DriverStatus status) async {
+    if (role != UserRole.driver) return;
+    if (driver.value?.status == DriverStatus.pendingVerification) return;
+    if (driver.value?.status == DriverStatus.suspended) return;
+    await UserRepository.instance.touchPresence(uid, status: status);
+  }
+
   void _subscribeRoleData(AppUser u) {
     if (_subscribedRole == u.role) return;
     _subscribedRole = u.role;
@@ -423,6 +444,9 @@ class SessionService extends ChangeNotifier {
             _followVehicle(selectedChild?.busId, selectedChild?.routeId);
             _backfillForRole();
             _resolveReferences();
+            // A driver accepting or removing a child changes this record;
+            // every screen listening here has to hear it at once.
+            notifyListeners();
           }, onError: (Object e) => debugPrint('children stream: $e')),
         );
         selectedChildIndex.addListener(_onSelectedChildChanged);
@@ -437,6 +461,9 @@ class SessionService extends ChangeNotifier {
             _followVehicle(s?.busId, s?.routeId);
             _backfillForRole();
             _resolveReferences();
+            // Same as a parent's children: a seat accepted or released
+            // shows on the student's screens straight away.
+            notifyListeners();
           }, onError: (Object e) => debugPrint('student stream: $e')),
         );
         _watchOutgoingRequests(uid);
@@ -446,7 +473,21 @@ class SessionService extends ChangeNotifier {
         // The live trip, watched once for the whole app rather than
         // re-derived per screen from this device's local tracking state.
         ActiveTripService.instance.bindToDriver(uid);
+        // Created now, not when the Route tab is first opened, so a round
+        // left running when the app was closed is picked up again straight
+        // away — the families' map does not wait for the driver to find
+        // the right tab.
+        TripSession.instance;
         SeatReconciler.instance.bindToDriver();
+        // Each booked child's expected pickup and drop-off, kept current on
+        // the driver's document for the families to read.
+        ExpectedTimesService.instance.bindToDriver();
+        // Monthly bills, the five-day reminders and overdue notices.
+        FeeBillingService.instance.bindToDriver();
+        // Says "this driver's app is running" where the admin panel and the
+        // parent-side search both look. Pending verification is a state an
+        // admin owns, so it is never overwritten from here.
+        unawaited(_touchDriverPresence(uid, DriverStatus.online));
 
         _subs.add(
           UserRepository.instance.watchDriver(uid).listen((d) {
@@ -525,6 +566,9 @@ class SessionService extends ChangeNotifier {
   void _onSelectedChildChanged() {
     _followVehicle(selectedChild?.busId, selectedChild?.routeId);
     _backfillForRole();
+    // Screens reading [selectedChild] through this notifier — "Find a
+    // driver for …" among them — kept the first child's name otherwise.
+    notifyListeners();
   }
 
   /// Points the [bus] and [route] notifiers at new ids, tearing down the
@@ -656,6 +700,7 @@ class SessionService extends ChangeNotifier {
         pendingRoutes.isNotEmpty ||
         pendingDrivers.isNotEmpty) {
       _backfillForRole();
+      notifyListeners();
     }
   }
 

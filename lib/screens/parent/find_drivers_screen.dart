@@ -5,11 +5,13 @@ import 'package:transit_core/transit_core.dart';
 
 import '../../app/ride_match_service.dart';
 import '../../app/session_service.dart';
+import '../../app/vehicle_capacity.dart';
 import '../../data/ride_request_repository.dart';
 import '../../app/round_display.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/text_controller_scope.dart';
 import '../../widgets/app_glyph.dart';
 
 /// Driver recommendations for one child, and the place a family asks for a seat.
@@ -213,7 +215,6 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
   );
 
   Future<_RoundChoice?> _pickRound(DriverMatch match, Student student) {
-    final noteCtrl = TextEditingController();
     DriverSchedule? selected = match.openSchedules.isEmpty
         ? null
         : match.openSchedules.first;
@@ -222,181 +223,192 @@ class _FindDriversScreenState extends State<FindDriversScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (innerCtx, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(innerCtx).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: innerCtx.cardBg,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
+      // The note's controller lives and dies with the sheet's own widget —
+      // see TextControllerScope for the crash this avoids.
+      builder: (sheetCtx) => TextControllerScope(
+        builder: (noteCtrl) => StatefulBuilder(
+          builder: (innerCtx, setSheetState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(innerCtx).viewInsets.bottom,
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Request a seat for ${student.name}',
-                    style: TextStyle(
-                      color: innerCtx.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'One round covers both ways — to '
-                    '${student.school.isEmpty ? 'their institute' : student.school} '
-                    'and back home again, on one seat. '
-                    '${match.driver.name} decides whether to accept.',
-                    style: TextStyle(
-                      color: innerCtx.textSecondary,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  ...roundsServing(match.driver, student.school).map((r) {
-                    final free = r.hasSpace;
-                    final isSelected = selected?.id == r.id;
-                    return GestureDetector(
-                      onTap: free
-                          ? () => setSheetState(() => selected = r)
-                          : null,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: innerCtx.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
                       child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? widget.accent.withValues(alpha: 0.16)
-                              : innerCtx.cardBgElevated,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Request a seat for ${student.name}',
+                      style: TextStyle(
+                        color: innerCtx.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'One round covers both ways — to '
+                      '${student.school.isEmpty ? 'their institute' : student.school} '
+                      'and back home again, on one seat. '
+                      '${match.driver.name} decides whether to accept.',
+                      style: TextStyle(
+                        color: innerCtx.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    ...roundsServing(match.driver, student.school).map((r) {
+                      final free = match.driver.roundHasSpace(r);
+                      final isSelected = selected?.id == r.id;
+                      return GestureDetector(
+                        onTap: free
+                            ? () => setSheetState(() => selected = r)
+                            : null,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
                             color: isSelected
-                                ? widget.accent
-                                : innerCtx.inputBorder,
+                                ? widget.accent.withValues(alpha: 0.16)
+                                : innerCtx.cardBgElevated,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSelected
+                                  ? widget.accent
+                                  : innerCtx.inputBorder,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                size: 18,
+                                color: free
+                                    ? (isSelected
+                                          ? widget.accent
+                                          : innerCtx.textTertiary)
+                                    : innerCtx.textTertiary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      r.label,
+                                      style: TextStyle(
+                                        color: free
+                                            ? innerCtx.textPrimary
+                                            : innerCtx.textTertiary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      roundSummary(r),
+                                      style: TextStyle(
+                                        color: innerCtx.textSecondary,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                free
+                                    ? '${match.driver.seatsFreeOn(r)} free'
+                                    : 'Full',
+                                style: TextStyle(
+                                  color: free
+                                      ? AppTheme.success
+                                      : AppTheme.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                              size: 18,
-                              color: free
-                                  ? (isSelected
-                                        ? widget.accent
-                                        : innerCtx.textTertiary)
-                                  : innerCtx.textTertiary,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    r.label,
-                                    style: TextStyle(
-                                      color: free
-                                          ? innerCtx.textPrimary
-                                          : innerCtx.textTertiary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    roundSummary(r),
-                                    style: TextStyle(
-                                      color: innerCtx.textSecondary,
-                                      fontSize: 11.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              free ? '${r.availableSeats} free' : 'Full',
-                              style: TextStyle(
-                                color: free ? AppTheme.success : AppTheme.error,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: innerCtx.textPrimary,
+                        fontSize: 14,
                       ),
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: noteCtrl,
-                    maxLines: 2,
-                    style: TextStyle(color: innerCtx.textPrimary, fontSize: 14),
-                    decoration: const InputDecoration(
-                      hintText: 'Anything the driver should know? (optional)',
+                      decoration: const InputDecoration(
+                        hintText: 'Anything the driver should know? (optional)',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  GestureDetector(
-                    onTap: selected == null
-                        ? null
-                        : () => Navigator.pop(
-                            innerCtx,
-                            _RoundChoice(
-                              schedule: selected!,
-                              note: noteCtrl.text.trim().isEmpty
-                                  ? null
-                                  : noteCtrl.text.trim(),
+                    const SizedBox(height: 18),
+                    GestureDetector(
+                      onTap: selected == null
+                          ? null
+                          : () => Navigator.pop(
+                              innerCtx,
+                              _RoundChoice(
+                                schedule: selected!,
+                                note: noteCtrl.text.trim().isEmpty
+                                    ? null
+                                    : noteCtrl.text.trim(),
+                              ),
                             ),
-                          ),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      decoration: BoxDecoration(
-                        color: selected == null
-                            ? innerCtx.surfaceBorder
-                            : widget.accent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        selected == null
-                            ? 'No rounds have space'
-                            : 'Send request',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        decoration: BoxDecoration(
                           color: selected == null
-                              ? innerCtx.textTertiary
-                              : Colors.white,
-                          fontWeight: FontWeight.w800,
+                              ? innerCtx.surfaceBorder
+                              : widget.accent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          selected == null
+                              ? 'No rounds have space'
+                              : 'Send request',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: selected == null
+                                ? innerCtx.textTertiary
+                                : Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ).whenComplete(noteCtrl.dispose);
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -654,17 +666,6 @@ class _MatchList extends StatelessWidget {
   }
 }
 
-/// The rounds of [driver] that carry children to [institute].
-///
-/// A driver's rounds do not all go to the same place: one run can drop half
-/// the children at a university and the rest at a college, and the next run
-/// may serve neither. Offering a family every round would let them book a
-/// seat on a trip that never passes their child's gate. A round with no
-/// institutes listed is taken to serve all of them, which is what every
-/// round saved before the field existed looks like.
-List<DriverSchedule> roundsServing(Driver driver, String institute) =>
-    driver.orderedSchedules.where((r) => r.serves(institute)).toList();
-
 class _DriverMatchCard extends StatelessWidget {
   final DriverMatch match;
   final Color accent;
@@ -725,7 +726,10 @@ class _DriverMatchCard extends StatelessWidget {
                     photoUrl: d.photoUrl,
                     size: 48,
                     borderRadius: BorderRadius.circular(24),
-                    fallback: const Text('🧑‍✈️', style: TextStyle(fontSize: 22)),
+                    fallback: const Text(
+                      '🧑‍✈️',
+                      style: TextStyle(fontSize: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -771,10 +775,17 @@ class _DriverMatchCard extends StatelessWidget {
             const SizedBox(height: 14),
             Row(
               children: [
-                _Stat(
-                  label: 'SEATS FREE',
-                  value: '${match.availableSeats}',
-                  color: match.hasOpenSeats ? AppTheme.success : AppTheme.error,
+                // The vehicle's own size. Free seats are per round and are
+                // on the round chips below; a figure summed across rounds
+                // described a 12-seater on two rounds as 24 seats.
+                FutureBuilder<int>(
+                  future: VehicleCapacity.of(d),
+                  initialData: VehicleCapacity.current(d),
+                  builder: (_, snap) => _Stat(
+                    label: 'TOTAL SEATS',
+                    value: '${snap.data ?? VehicleCapacity.current(d)}',
+                    color: context.textPrimary,
+                  ),
                 ),
                 _Stat(
                   label: 'RATING',
@@ -801,7 +812,9 @@ class _DriverMatchCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: _rounds.map((r) {
-                  final color = r.hasSpace ? AppTheme.success : AppTheme.error;
+                  final color = d.roundHasSpace(r)
+                      ? AppTheme.success
+                      : AppTheme.error;
                   return Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 9,
@@ -813,8 +826,13 @@ class _DriverMatchCard extends StatelessWidget {
                       border: Border.all(color: color.withValues(alpha: 0.28)),
                     ),
                     child: Text(
-                      '${roundSummary(r)} · '
-                      '${r.hasSpace ? '${r.availableSeats} free' : 'full'}',
+                      [
+                        if (r.label.trim().isNotEmpty) r.label.trim(),
+                        roundSummary(r),
+                        d.roundHasSpace(r)
+                            ? '${d.seatsFreeOn(r)} free'
+                            : 'full',
+                      ].where((t) => t.isNotEmpty).join(' · '),
                       style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 10,
@@ -840,8 +858,28 @@ class _DriverMatchCard extends StatelessWidget {
                   _Banner(
                     color: AppTheme.success,
                     icon: Icons.check_circle_rounded,
-                    text: 'Seat confirmed on ${existing!.scheduleLabel}',
+                    text:
+                        'Seat confirmed on '
+                        '${roundNameFor(d, existing!.scheduleId, fallback: existing!.scheduleLabel)}',
                   ),
+                  // The round itself — when it runs and how full it is —
+                  // so the family sees what they booked, not just its name.
+                  if (d.scheduleById(existing!.scheduleId) case final round?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        [
+                          roundSummary(round),
+                          '${d.seatsFreeOn(round)} of '
+                              '${d.vehicleCapacity > 0 && round.totalSeats > d.vehicleCapacity ? d.vehicleCapacity : round.totalSeats}'
+                              ' seats free',
+                        ].where((t) => t.isNotEmpty).join('  ·  '),
+                        style: TextStyle(
+                          color: context.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   GestureDetector(
                     onTap: onCancel,
@@ -873,9 +911,16 @@ class _DriverMatchCard extends StatelessWidget {
                   _Banner(
                     color: AppTheme.warning,
                     icon: Icons.hourglass_top_rounded,
-                    text: 'Awaiting reply · ${existing!.scheduleLabel}',
+                    text:
+                        'Awaiting reply · '
+                        '${roundNameFor(d, existing!.scheduleId, fallback: existing!.scheduleLabel)}',
                   ),
                   const SizedBox(height: 10),
+                  // The driver's monthly fee, to accept or turn down.
+                  if (existing!.feeStatus != FeeStatus.none) ...[
+                    _FeeAnswer(request: existing!, accent: accent),
+                    const SizedBox(height: 10),
+                  ],
                   GestureDetector(
                     onTap: onCancel,
                     child: Container(
@@ -1066,6 +1111,154 @@ class _Message extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The driver's fee on a waiting request: accept it, or turn it down with a
+/// reason the driver reads before sending a new one.
+class _FeeAnswer extends StatefulWidget {
+  final RideRequest request;
+  final Color accent;
+  const _FeeAnswer({required this.request, required this.accent});
+
+  @override
+  State<_FeeAnswer> createState() => _FeeAnswerState();
+}
+
+class _FeeAnswerState extends State<_FeeAnswer> {
+  bool _busy = false;
+
+  Future<void> _answer(bool accept) async {
+    String? note;
+    if (!accept) {
+      note = await showDialog<String>(
+        context: context,
+        builder: (ctx) => TextControllerScope(
+          builder: (ctrl) => AlertDialog(
+            title: const Text('Reject this fee?'),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText:
+                    'Tell the driver why — e.g. it is more than '
+                    'others charge for this distance',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                child: const Text('Reject fee'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (note == null) return;
+    }
+    setState(() => _busy = true);
+    try {
+      await RideMatchService.instance.answerFee(
+        widget.request,
+        accept: accept,
+        note: note,
+      );
+    } catch (e) {
+      debugPrint('fee answer failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not send. Check your connection.'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.request;
+    final rupees = (r.feePaisa / 100).round();
+    final driverNote = (r.feeDriverNote ?? '').trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '💰 Fee: Rs.$rupees / month',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (driverNote.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '"$driverNote"',
+              style: TextStyle(color: context.textSecondary, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 8),
+          switch (r.feeStatus) {
+            FeeStatus.accepted => const Text(
+              'You accepted this fee. Waiting for the driver to confirm the '
+              'seat.',
+              style: TextStyle(color: AppTheme.success, fontSize: 12),
+            ),
+            FeeStatus.rejected => Text(
+              'You turned it down'
+              '${(r.feeFamilyNote ?? '').isEmpty ? '' : ': "${r.feeFamilyNote}"'}'
+              '. Waiting for the driver.',
+              style: const TextStyle(color: AppTheme.error, fontSize: 12),
+            ),
+            _ =>
+              _busy
+                  ? const Center(child: CircularProgressIndicator())
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _answer(false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.error,
+                              side: const BorderSide(color: AppTheme.error),
+                            ),
+                            child: const Text('Reject'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _answer(true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.success,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Accept fee'),
+                          ),
+                        ),
+                      ],
+                    ),
+          },
+        ],
       ),
     );
   }

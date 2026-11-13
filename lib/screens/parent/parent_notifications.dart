@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/notification_service.dart';
+import '../../app/parent_data_service.dart';
 import '../../theme/app_theme.dart';
 
 class ParentNotifications extends StatefulWidget {
@@ -21,6 +22,15 @@ class ParentNotifications extends StatefulWidget {
 class _ParentNotificationsState extends State<ParentNotifications> {
   final _svc = NotificationService.instance;
   String _activeFilter = 'All';
+
+  /// The child whose alerts are shown; null shows every alert.
+  String? _childId;
+
+  /// The child an alert is about, by the `studentId` its sender attached.
+  static String? _childOf(AppNotification n) {
+    final id = n.data['studentId'];
+    return id is String && id.isNotEmpty ? id : null;
+  }
 
   @override
   void initState() {
@@ -44,7 +54,13 @@ class _ParentNotificationsState extends State<ParentNotifications> {
   }
 
   List<AppNotification> get _filtered {
-    final all = _svc.history.value;
+    final childId = _childId;
+    final all = childId == null
+        ? _svc.history.value
+        : [
+            for (final n in _svc.history.value)
+              if (_childOf(n) == childId) n,
+          ];
     switch (_activeFilter) {
       case 'Unread':
         return all.where((n) => !n.read).toList();
@@ -70,7 +86,6 @@ class _ParentNotificationsState extends State<ParentNotifications> {
     }
     return seen;
   }
-
 
   /// Where tapping [n] should take the user, or null to just mark it read.
   ///
@@ -237,6 +252,34 @@ class _ParentNotificationsState extends State<ParentNotifications> {
                           }).toList(),
                     ),
                   ),
+                  // One row per child, so each child's alerts read alone.
+                  ValueListenableBuilder<List<ChildInfo>>(
+                    valueListenable: ParentDataService.instance.children,
+                    builder: (context, children, _) {
+                      if (children.length < 2) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _ChildChip(
+                                label: AppStrings.t('all'),
+                                active: _childId == null,
+                                onTap: () => setState(() => _childId = null),
+                              ),
+                              for (final c in children)
+                                _ChildChip(
+                                  label: c.name.isEmpty ? 'Child' : c.name,
+                                  active: _childId == c.id,
+                                  onTap: () => setState(() => _childId = c.id),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 14),
 
                   // Grouped by date
@@ -333,10 +376,59 @@ class _ParentNotificationsState extends State<ParentNotifications> {
   }
 }
 
+class _ChildChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  const _ChildChip({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: active
+                ? AppTheme.parentPurple
+                : AppTheme.parentPurple.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: active ? Colors.white : AppTheme.parentPurple,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NotifCard extends StatelessWidget {
   final AppNotification notif;
   final VoidCallback onTap;
   const _NotifCard({required this.notif, required this.onTap});
+
+  /// Which child this alert is about, so a family with two can tell.
+  static String? _childName(AppNotification n) {
+    final id = n.data['studentId'];
+    if (id is! String || id.isEmpty) return null;
+    final child = ParentDataService.instance.children.value
+        .where((c) => c.id == id)
+        .firstOrNull;
+    if (child == null || child.name.trim().isEmpty) return null;
+    return child.name.trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -403,6 +495,29 @@ class _NotifCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (_childName(notif) case final name?) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.parentPurple.withValues(
+                              alpha: 0.12,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            name,
+                            style: const TextStyle(
+                              color: AppTheme.parentPurple,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         '${notif.date} · ${notif.time}',

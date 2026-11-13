@@ -53,11 +53,18 @@ class AppStrings {
     'status_waiting_to_board': 'Waiting to board',
     'status_on_the_bus': 'On the bus',
     'status_heading_home': 'Heading home',
+    'status_bus_arriving': 'Van is at the stop',
+    'status_almost_home': 'Almost home',
+    'to_pickup': 'to pickup',
+    'expected_pickup': 'Expected pickup',
+    'expected_dropoff': 'Expected drop-off',
+    'leg_on_the_way': 'On the way',
     'status_reached': 'Reached',
     'status_reached_place': 'Reached {place}',
     'status_reached_home': 'Reached home',
     'mark_absent_title': 'Not riding today?',
-    'mark_absent_body': 'Your driver is told straight away, so nobody waits at your gate for a child who is not coming.',
+    'mark_absent_body':
+        'Your driver is told straight away, so nobody waits at your gate for a child who is not coming.',
     'mark_absent_action': 'Mark off for today',
     'mark_absent_undo': 'Riding after all',
     'mark_absent_done': 'Your driver has been told.',
@@ -253,12 +260,15 @@ class AppStrings {
     'driver_chat_title': 'Driver Chat',
     'messages_title': 'Messages',
     'chat_empty_title': 'No messages yet',
-    'chat_empty_body': 'Say hello — the other side gets a notification even '
+    'chat_empty_body':
+        'Say hello — the other side gets a notification even '
         'with the app closed.',
     'chat_no_peer_title': 'No driver yet',
-    'chat_no_peer_body': 'Once a driver accepts a seat, you can message them '
+    'chat_no_peer_body':
+        'Once a driver accepts a seat, you can message them '
         'here.',
-    'driver_chat_inbox_empty': 'Messages from the families you carry will '
+    'driver_chat_inbox_empty':
+        'Messages from the families you carry will '
         'appear here.',
     'driver_chat_subtitle': 'Chat with the selected driver',
     'selected_driver': 'Selected Driver',
@@ -433,7 +443,7 @@ class AppStrings {
     // "grade".
     'grade_level_lbl': 'INSTITUTE TYPE',
     'select_level_hint': 'Select institute type',
-    'school_institution_lbl': 'SCHOOL / INSTITUTION',
+    'school_institution_lbl': 'INSTITUTION',
     'license_number_lbl': 'LICENSE NUMBER',
     'enter_license_hint': 'Enter your driving license number',
     'vehicle_number_lbl': 'VEHICLE NUMBER',
@@ -892,11 +902,18 @@ class AppStrings {
     'status_waiting_to_board': 'سوار ہونے کا منتظر',
     'status_on_the_bus': 'بس میں ہے',
     'status_heading_home': 'گھر کی طرف روانہ',
+    'status_bus_arriving': 'وین اسٹاپ پر پہنچ گئی',
+    'status_almost_home': 'تقریباً گھر پہنچ گئے',
+    'to_pickup': 'پک اپ کے لیے',
+    'expected_pickup': 'متوقع پک اپ',
+    'expected_dropoff': 'متوقع ڈراپ آف',
+    'leg_on_the_way': 'راستے میں',
     'status_reached': 'پہنچ گئے',
     'status_reached_place': '{place} پہنچ گئے',
     'status_reached_home': 'گھر پہنچ گئے',
     'mark_absent_title': 'آج نہیں جا رہے؟',
-    'mark_absent_body': 'آپ کے ڈرائیور کو فوراً اطلاع مل جائے گی، تاکہ کوئی آپ کے گیٹ پر انتظار نہ کرے۔',
+    'mark_absent_body':
+        'آپ کے ڈرائیور کو فوراً اطلاع مل جائے گی، تاکہ کوئی آپ کے گیٹ پر انتظار نہ کرے۔',
     'mark_absent_action': 'آج کے لیے چھٹی لگائیں',
     'mark_absent_undo': 'نہیں، جا رہے ہیں',
     'mark_absent_done': 'ڈرائیور کو بتا دیا گیا ہے۔',
@@ -1087,12 +1104,15 @@ class AppStrings {
     'driver_chat_title': 'ڈرائیور چیٹ',
     'messages_title': 'پیغامات',
     'chat_empty_title': 'ابھی کوئی پیغام نہیں',
-    'chat_empty_body': 'سلام کہیں — ایپ بند ہونے پر بھی دوسری طرف اطلاع '
+    'chat_empty_body':
+        'سلام کہیں — ایپ بند ہونے پر بھی دوسری طرف اطلاع '
         'پہنچ جائے گی۔',
     'chat_no_peer_title': 'ابھی کوئی ڈرائیور نہیں',
-    'chat_no_peer_body': 'جب کوئی ڈرائیور سیٹ قبول کر لے، آپ یہاں اُن سے '
+    'chat_no_peer_body':
+        'جب کوئی ڈرائیور سیٹ قبول کر لے، آپ یہاں اُن سے '
         'بات کر سکیں گے۔',
-    'driver_chat_inbox_empty': 'جن خاندانوں کو آپ لے جاتے ہیں اُن کے پیغامات '
+    'driver_chat_inbox_empty':
+        'جن خاندانوں کو آپ لے جاتے ہیں اُن کے پیغامات '
         'یہاں دکھائی دیں گے۔',
     'driver_chat_subtitle': 'منتخب ڈرائیور سے چیٹ کریں',
     'selected_driver': 'منتخب ڈرائیور',
@@ -1263,7 +1283,7 @@ class AppStrings {
     'childs_name_hint': 'بچے کا پورا نام',
     'grade_level_lbl': 'ادارے کی قسم',
     'select_level_hint': 'ادارے کی قسم منتخب کریں',
-    'school_institution_lbl': 'اسکول / ادارہ',
+    'school_institution_lbl': 'ادارہ',
     'license_number_lbl': 'لائسنس نمبر',
     'enter_license_hint': 'ڈرائیونگ لائسنس نمبر درج کریں',
     'vehicle_number_lbl': 'گاڑی کا نمبر',

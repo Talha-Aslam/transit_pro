@@ -7,8 +7,10 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/chat_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
+import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/student_logistics.dart';
 
 /// A real conversation between two accounts, backed by
 /// `chats/{chatId}/messages`.
@@ -282,34 +284,106 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.peerName.trim().isEmpty
-                    ? AppStrings.t('driver_chat_title')
-                    : widget.peerName.trim(),
-                style: TextStyle(
-                  color: context.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if ((widget.subtitle ?? '').trim().isNotEmpty)
+          // A driver can open the child the thread is about — their
+          // institute, locations, timings and family contacts — straight
+          // from the name, to check who they are talking about.
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _canOpenStudent ? _openStudent : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  widget.subtitle!.trim(),
-                  style: TextStyle(color: context.textSecondary, fontSize: 11),
+                  widget.peerName.trim().isEmpty
+                      ? AppStrings.t('driver_chat_title')
+                      : widget.peerName.trim(),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-            ],
+                if ((widget.subtitle ?? '').trim().isNotEmpty)
+                  Text(
+                    widget.subtitle!.trim(),
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                if (_canOpenStudent)
+                  Text(
+                    'Tap for student details',
+                    style: TextStyle(color: context.textTertiary, fontSize: 10),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
     ),
   );
+
+  bool get _canOpenStudent =>
+      widget.senderRole == 'driver' && (widget.studentId ?? '').isNotEmpty;
+
+  /// The child this thread is about, live off their record.
+  void _openStudent() {
+    final id = widget.studentId!;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scroll) => Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          decoration: BoxDecoration(
+            color: ctx.cardBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: StreamBuilder<Student?>(
+            stream: UserRepository.instance.watchStudent(id),
+            builder: (context, snap) {
+              final s = snap.data;
+              if (s == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return ListView(
+                controller: scroll,
+                children: [
+                  Text(
+                    s.name,
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    [
+                      if (s.grade.isNotEmpty) s.grade,
+                      if (s.school.isNotEmpty) s.school,
+                    ].join(' · '),
+                    style: TextStyle(color: context.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  StudentLogistics(student: s),
+                  const SizedBox(height: 24),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _composer(BuildContext context) {
     final enabled = _hasPeer && _chatId != null && !_sending;
@@ -546,16 +620,21 @@ class _DriverConversationsScreenState extends State<DriverConversationsScreen> {
       _loading = false;
       return;
     }
-    _sub = MessagingRepository.instance.watchThreadsFor(uid).listen((list) {
-      if (!mounted) return;
-      setState(() {
-        _threads = list;
-        _loading = false;
-      });
-    }, onError: (Object e) {
-      debugPrint('driver conversations stream: $e');
-      if (mounted) setState(() => _loading = false);
-    });
+    _sub = MessagingRepository.instance
+        .watchThreadsFor(uid)
+        .listen(
+          (list) {
+            if (!mounted) return;
+            setState(() {
+              _threads = list;
+              _loading = false;
+            });
+          },
+          onError: (Object e) {
+            debugPrint('driver conversations stream: $e');
+            if (mounted) setState(() => _loading = false);
+          },
+        );
   }
 
   @override
@@ -790,10 +869,7 @@ class _ThreadRow extends StatelessWidget {
             if (unread > 0) ...[
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppTheme.error,
                   borderRadius: BorderRadius.circular(10),

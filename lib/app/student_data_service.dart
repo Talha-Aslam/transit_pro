@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,6 +10,9 @@ import '../services/cloudinary_service.dart';
 import '../data/payment_repository.dart';
 import '../data/trip_repository.dart';
 import '../data/user_repository.dart';
+import 'driver_link.dart';
+import 'family_contact_sync.dart';
+import 'family_stats.dart';
 import 'session_service.dart';
 
 /// The student's profile, flattened for the UI.
@@ -164,8 +168,8 @@ class StudentDataService {
   /// [notificationPref] — they were never toggled off, not necessarily off.
   final notificationPrefs = ValueNotifier<Map<String, bool>>({});
 
-  /// Ride statistics, derived from completed trips on this student's route and
-  /// their own attendance records.
+  /// Ride statistics, from this student's own attendance across every trip
+  /// they rode — kept live, so a ride marked today counts today.
   ///
   /// Zero until trips exist. The prototype's 42 / 96% / 38 were invented, and a
   /// brand-new student showing 42 completed rides is worse than showing none.
@@ -182,7 +186,13 @@ class StudentDataService {
   /// Total confirmed payments, in whole rupees, formatted for display.
   final feesPaid = ValueNotifier<String>('');
 
-  String? _statsForRouteId;
+  /// The student whose rides are being followed.
+  String? _statsForStudentId;
+  StreamSubscription<List<AttendanceRecord>>? _ridesSub;
+
+  /// Trips whose on-time verdict is settled; a running trip is read again.
+  final _settledTrips = <String, Trip>{};
+  int _statsGeneration = 0;
   String? _guardianForParentId;
 
   // ── Live rebuild ──────────────────────────────────────────────────────────
@@ -190,6 +200,7 @@ class StudentDataService {
   void _rebuild() {
     final session = SessionService.instance;
     final user = session.user.value;
+    if (user?.role == UserRole.student) unawaited(FamilyContactSync.push());
     final student = session.student.value;
 
     if (user == null) {
@@ -200,19 +211,24 @@ class StudentDataService {
       safeRides.value = 0;
       completedRidesThisWeek.value = 0;
       feesPaid.value = '';
-      _statsForRouteId = null;
+      _ridesSub?.cancel();
+      _ridesSub = null;
+      _statsForStudentId = null;
       _guardianForParentId = null;
       return;
     }
 
     if (user.role != UserRole.student) return;
 
-    final bus = session.bus.value;
+    // A bus left on the record by a released seat is no bus at all.
+    final bus = student != null && isLinkedToDriver(student)
+        ? session.bus.value
+        : null;
     final route = session.route.value;
     // Admin-assigned bus first, falling back to the student's own direct
     // `driverId` — the pilot path, where a self-signed-up driver accepted
     // this student's ride request without any `Bus` document existing.
-    final driverId = bus?.driverId ?? student?.driverId ?? '';
+    final driverId = student == null ? '' : driverIdOf(student, bus);
     final driver = session.driverFor(driverId);
 
     studentInfo.value = StudentInfo(
@@ -259,61 +275,74 @@ class StudentDataService {
   }
 
   /// Ride counts and the on-time percentage, computed from real trips.
-  Future<void> _loadStats(Student? student) async {
-    final routeId = student?.routeId;
-    if (student == null || routeId == null || routeId.isEmpty) {
+  ///
+  /// Followed by student, not by admin route: a student whose driver signed
+  /// themselves up has no route at all, and keying on one left every such
+  /// student reading zero rides however many they had taken.
+  void _loadStats(Student? student) {
+    final id = student?.id ?? '';
+    if (id == _statsForStudentId) return;
+    _statsForStudentId = id;
+    _ridesSub?.cancel();
+    _ridesSub = null;
+    if (id.isEmpty) {
       totalRides.value = 0;
       onTimeRate.value = 0;
       safeRides.value = 0;
       completedRidesThisWeek.value = 0;
-      _statsForRouteId = null;
-      _updateFees(student?.id);
+      _updateFees(null);
       return;
     }
-    if (_statsForRouteId == routeId) return;
-    _statsForRouteId = routeId;
+    _ridesSub = TripRepository.instance
+        .watchAttendanceHistory(id)
+        .listen(
+          (records) => unawaited(_onRides(records)),
+          onError: (Object e) => debugPrint('student stats failed: $e'),
+        );
+    _updateFees(id);
+  }
 
+  Future<void> _onRides(List<AttendanceRecord> records) async {
+    final generation = ++_statsGeneration;
+    final stats = await familyTripStats(records, tripFor: _settledTrip);
+    if (generation != _statsGeneration) return;
+
+    totalRides.value = stats.totalTrips;
+    // A ride with no incident recorded against it is a safe ride. Until the
+    // Phase 3 safety layer writes incidents, these two are equal — which is
+    // honest, rather than the prototype's unexplained 42 vs 38.
+    safeRides.value = stats.totalTrips;
+    // The trips' own on-time verdicts. This was rides ÷ attendance rows —
+    // how often the student turned up, printed under "On-Time".
+    onTimeRate.value = stats.onTimePct;
+
+    // Monday 00:00 of the current week through now.
+    final now = DateTime.now();
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
+    completedRidesThisWeek.value = records
+        .where(
+          (r) =>
+              rodeOn(r) &&
+              r.markedAt != null &&
+              !r.markedAt!.isBefore(startOfWeek),
+        )
+        .length;
+  }
+
+  Future<Trip?> _settledTrip(String id) async {
+    final known = _settledTrips[id];
+    if (known != null) return known;
     try {
-      final records = await TripRepository.instance.fetchAttendanceForStudent(
-        student.id,
-      );
-
-      final boarded = records
-          .where((r) => r.status == AttendanceStatus.boarded)
-          .length;
-
-      totalRides.value = boarded;
-      // A ride with no incident recorded against it is a safe ride. Until the
-      // Phase 3 safety layer writes incidents, these two are equal — which is
-      // honest, rather than the prototype's unexplained 42 vs 38.
-      safeRides.value = boarded;
-      onTimeRate.value = records.isEmpty
-          ? 0
-          : ((boarded / records.length) * 100).round();
-
-      // Monday 00:00 of the current week through now. `markedAt` is null for
-      // a record that was written but never actually marked (shouldn't
-      // happen for a `boarded` status, but guarded anyway rather than
-      // trusting it).
-      final now = DateTime.now();
-      final startOfWeek = DateTime(
-        now.year,
-        now.month,
-        now.day,
-      ).subtract(Duration(days: now.weekday - 1));
-      completedRidesThisWeek.value = records
-          .where(
-            (r) =>
-                r.status == AttendanceStatus.boarded &&
-                r.markedAt != null &&
-                !r.markedAt!.isBefore(startOfWeek),
-          )
-          .length;
-    } catch (e) {
-      debugPrint('student stats failed: $e');
+      final trip = await TripRepository.instance.watchTrip(id).first;
+      if (trip != null && trip.onTime != null) _settledTrips[id] = trip;
+      return trip;
+    } catch (_) {
+      return null;
     }
-
-    _updateFees(student.id);
   }
 
   Future<void> _updateFees(String? studentId) async {
@@ -347,6 +376,10 @@ class StudentDataService {
       'studentIdNumber': info.studentId,
       'grade': info.grade,
       'school': info.school,
+      // The two pins the driver's route is built from: a new home or a new
+      // institute reaches the driver's next round from here.
+      'pickupLocation': ?info.pickup?.toMap(),
+      'dropoffLocation': ?info.dropoff?.toMap(),
     });
   }
 

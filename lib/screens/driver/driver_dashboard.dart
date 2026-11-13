@@ -18,7 +18,7 @@ import '../../app/language_provider.dart';
 import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../app/tracking_service.dart';
-import '../../models/route_data.dart';
+import '../../app/trip_session.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/dashboard_header.dart';
 import '../../widgets/glass_card.dart';
@@ -98,17 +98,19 @@ class _DriverDashboardState extends State<DriverDashboard> {
   /// which only knew about trips *this phone* had built a route for.
   bool get _routeStarted => ActiveTripService.instance.isOnRoute;
 
-  /// How many children are marked on board on the running trip. Zero
-  /// outside one.
-  int _boardedToday = 0;
+  /// Today's trips — the morning and the ride home of every round run so far
+  /// — and what was marked on each, by student.
+  List<Trip> _todayTrips = const [];
+  final Map<String, Map<String, AttendanceStatus>> _marksByTrip = {};
+  final Map<String, StreamSubscription<List<AttendanceRecord>>>
+  _attendanceSubs = {};
 
-  /// On-time arrivals across this driver's completed trips, as a
-  /// percentage, or null when they have none yet.
+  /// On-time arrivals as a percentage — today's trips when any have ended,
+  /// otherwise every completed trip — or null with nothing to go on.
   double? _onTimePct;
+  bool _onTimeIsToday = false;
 
-  StreamSubscription<List<AttendanceRecord>>? _attendanceSub;
   StreamSubscription<List<Trip>>? _tripsSub;
-  String? _attendanceTripId;
   String? _tripsUid;
 
   @override
@@ -116,7 +118,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     super.initState();
     ActiveTripService.instance.trip.addListener(_onTrackingChanged);
     SessionService.instance.addListener(_ensureTripsSubscription);
-    _ensureAttendanceSubscription();
     _ensureTripsSubscription();
   }
 
@@ -124,41 +125,56 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void dispose() {
     ActiveTripService.instance.trip.removeListener(_onTrackingChanged);
     SessionService.instance.removeListener(_ensureTripsSubscription);
-    _attendanceSub?.cancel();
+    for (final sub in _attendanceSubs.values) {
+      sub.cancel();
+    }
     _tripsSub?.cancel();
     super.dispose();
   }
 
   void _onTrackingChanged() {
     if (mounted) setState(() {});
-    // A new trip has its own attendance subcollection; an ended one has
-    // none worth counting.
-    _ensureAttendanceSubscription();
   }
 
-  /// Follows the running trip's attendance, so "students picked" counts
-  /// children the driver marked aboard rather than stops the van drove past.
-  void _ensureAttendanceSubscription() {
-    final tripId = ActiveTripService.instance.trip.value?.id;
-    if (tripId == _attendanceTripId) return;
-    _attendanceTripId = tripId;
-    _attendanceSub?.cancel();
-    _attendanceSub = null;
-    if (tripId == null) {
-      if (mounted) setState(() => _boardedToday = 0);
-      return;
+  /// Follows the attendance of each of today's trips, so the figures move
+  /// as the driver marks children and drop rows for days gone by.
+  void _watchTodayAttendance() {
+    final ids = {for (final t in _todayTrips) t.id};
+    for (final id in _attendanceSubs.keys.toList()) {
+      if (ids.contains(id)) continue;
+      _attendanceSubs.remove(id)?.cancel();
+      _marksByTrip.remove(id);
     }
-    _attendanceSub = TripRepository.instance.watchAttendance(tripId).listen(
-      (records) {
+    for (final id in ids) {
+      if (_attendanceSubs.containsKey(id)) continue;
+      _attendanceSubs[id] = TripRepository.instance.watchAttendance(id).listen((
+        records,
+      ) {
         if (!mounted) return;
         setState(() {
-          _boardedToday = records
-              .where((r) => r.status == AttendanceStatus.boarded)
-              .length;
+          _marksByTrip[id] = {for (final r in records) r.studentId: r.status};
         });
-      },
-      onError: (Object e) => debugPrint('dashboard attendance stream: $e'),
-    );
+      }, onError: (Object e) => debugPrint('dashboard attendance stream: $e'));
+    }
+  }
+
+  /// Children carried today — marked on the van, or delivered — once each,
+  /// whichever leg it was.
+  int get _carriedToday => {
+    for (final marks in _marksByTrip.values)
+      for (final e in marks.entries)
+        if (e.value == AttendanceStatus.boarded ||
+            e.value == AttendanceStatus.droppedOff)
+          e.key,
+  }.length;
+
+  /// Children on today's rounds, once each: the riders of every trip run
+  /// today, or — before the first one — the driver's whole roster.
+  int get _expectedToday {
+    final riders = {for (final t in _todayTrips) ...t.riderIds};
+    return riders.isNotEmpty
+        ? riders.length
+        : SessionService.instance.roster.value.length;
   }
 
   /// This driver's trip history, for the on-time bar.
@@ -174,22 +190,30 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
     _tripsSub = TripRepository.instance
         .watchTripsForDriver(uid, limit: 200)
-        .listen(
-          (trips) {
-            if (!mounted) return;
-            final completed = trips
-                .where((t) => t.status == TripStatus.completed)
-                .toList();
-            setState(() {
-              _onTimePct = completed.isEmpty
-                  ? null
-                  : completed.where((t) => t.onTime == true).length /
-                        completed.length *
-                        100;
-            });
-          },
-          onError: (Object e) => debugPrint('dashboard trips stream: $e'),
-        );
+        .listen((trips) {
+          if (!mounted) return;
+          final today = Trip.dateKeyFor(DateTime.now());
+          final rated = trips
+              .where(
+                (t) => t.status == TripStatus.completed && t.onTime != null,
+              )
+              .toList();
+          final ratedToday = rated.where((t) => t.dateKey == today).toList();
+          final basis = ratedToday.isNotEmpty ? ratedToday : rated;
+          setState(() {
+            _todayTrips = [
+              for (final t in trips)
+                if (t.dateKey == today && t.status != TripStatus.cancelled) t,
+            ];
+            _onTimeIsToday = ratedToday.isNotEmpty;
+            _onTimePct = basis.isEmpty
+                ? null
+                : basis.where((t) => t.onTime == true).length /
+                      basis.length *
+                      100;
+          });
+          _watchTodayAttendance();
+        }, onError: (Object e) => debugPrint('dashboard trips stream: $e'));
   }
 
   /// `AppTheme.warningLight`/`successLight` are tuned for the dark theme's
@@ -517,44 +541,52 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 ),
                               );
                             }
-                            // `etaMinutes` ticks on every simulation frame
-                            // while a trip is running — it is the notifier
-                            // that fires often enough to keep the stop
-                            // progress and student counts below current
-                            // without this screen polling for them.
-                            return ValueListenableBuilder<int>(
-                              valueListenable:
-                                  TrackingService.instance.liveRevision,
-                              builder: (_, _, _) {
-                                final eta =
-                                    TrackingService.instance.etaMinutes.value;
-                                final route = TrackingService.instance.route;
-                                if (route == null) {
+                            // Read from the round itself, which moves on
+                            // every stop marked and every GPS fix. The
+                            // legacy route copy it used to read was only
+                            // refreshed now and then, so "stops done" sat
+                            // still; and it counted each child twice — at
+                            // their gate and again at the institute.
+                            final c = TripSession.instance.controller;
+                            return ListenableBuilder(
+                              listenable: c,
+                              builder: (_, _) {
+                                if (!c.isRunning) {
                                   return Text(
-                                    "You haven't started a route yet.",
+                                    'This round is running on another '
+                                    'phone.',
                                     style: TextStyle(
                                       color: context.textTertiary,
                                       fontSize: 12,
                                     ),
                                   );
                                 }
-                                final stopsTotal = route.stops.length;
-                                final stopsDone = route.completedStops;
+                                final stops = c.stops
+                                    .where((s) => s.studentIds.isNotEmpty)
+                                    .toList();
+                                final stopsTotal = stops.length;
+                                final stopsDone = stops
+                                    .where((s) => !s.isOpen)
+                                    .length;
                                 final progress = stopsTotal == 0
                                     ? 0.0
                                     : stopsDone / stopsTotal;
-                                final studentsTotal = route.stops.fold<int>(
-                                  0,
-                                  (sum, s) => sum + s.studentCount,
-                                );
-                                final studentsPicked = route.stops
+                                // Exactly this round's students.
+                                final riders = c.trip?.riderIds ?? const [];
+                                final studentsTotal = riders.length;
+                                final studentsPicked = riders
                                     .where(
-                                      (s) => s.status == StopStatus.completed,
+                                      (id) =>
+                                          c.markFor(id) ==
+                                              AttendanceStatus.boarded ||
+                                          c.markFor(id) ==
+                                              AttendanceStatus.droppedOff,
                                     )
-                                    .fold<int>(
-                                      0,
-                                      (sum, s) => sum + s.studentCount,
-                                    );
+                                    .length;
+                                final secs = c.secondsToEnd;
+                                final eta = secs == null
+                                    ? '—'
+                                    : '${(secs / 60).ceil()} min';
                                 return Column(
                                   children: [
                                     Row(
@@ -605,16 +637,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                           icon:
                                               'assets/images/navbar/student.png',
                                           label: AppStrings.t('students'),
-                                          value: studentsTotal == 0
-                                              ? '$studentsPicked'
-                                              : '$studentsPicked/$studentsTotal',
+                                          value:
+                                              '$studentsPicked/$studentsTotal',
                                         ),
                                         const SizedBox(width: 8),
                                         _RouteStatChip(
                                           icon:
                                               'assets/images/stats/on_time.png',
                                           label: AppStrings.t('time_left'),
-                                          value: '$eta min',
+                                          value: eta,
                                         ),
                                       ],
                                     ),
@@ -861,45 +892,29 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        // Rebuilt on `liveRevision`, which moves whenever
-                        // a stop completes or the ETA shifts. This was a
-                        // plain `Builder`, listening to nothing — so both
-                        // bars froze for the whole round.
-                        ValueListenableBuilder<int>(
-                          valueListenable:
-                              TrackingService.instance.liveRevision,
-                          builder: (context, _, _) {
-                            final route = TrackingService.instance.route;
-                            final int studentsTotal;
-                            final int studentsPicked;
-                            if (route != null) {
-                              studentsTotal = route.stops.fold<int>(
-                                0,
-                                (sum, s) => sum + s.studentCount,
-                              );
-                              // Children the driver has actually marked on
-                              // board, from the trip's attendance records —
-                              // not stops the van has driven past, which is
-                              // what this counted before. A child who was
-                              // off sick was "picked up" the moment the bus
-                              // passed their gate.
-                              studentsPicked = _boardedToday;
-                            } else {
-                              // No trip is running right now, so the honest
-                              // "students" figure is this driver's own
-                              // accepted-request roster — not an admin route
-                              // assignment, which most self-signed-up
-                              // drivers in this pilot never have.
-                              studentsTotal =
-                                  SessionService.instance.roster.value.length;
-                              studentsPicked = 0;
-                            }
-                            final routeProgress = (route == null)
+                        // Today's figures: every round run today, live
+                        // from their attendance and from the round on this
+                        // phone. They used to come from the running trip
+                        // alone, count each child twice, and mix in every
+                        // trip the driver had ever completed.
+                        ListenableBuilder(
+                          listenable: TripSession.instance.controller,
+                          builder: (context, _) {
+                            final c = TripSession.instance.controller;
+                            final studentsTotal = _expectedToday;
+                            final studentsPicked = _carriedToday;
+                            final stops = c.isRunning
+                                ? c.stops
+                                      .where((s) => s.studentIds.isNotEmpty)
+                                      .toList()
+                                : const <TripStop>[];
+                            final routeProgress = stops.isEmpty
                                 ? null
-                                : (route.stops.isEmpty
-                                      ? 0.0
-                                      : route.completedStops /
-                                            route.stops.length);
+                                : stops.where((s) => !s.isOpen).length /
+                                      stops.length;
+                            final legsDone = _todayTrips
+                                .where((t) => t.status == TripStatus.completed)
+                                .length;
                             return Column(
                               children: [
                                 _StatBar(
@@ -913,7 +928,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                 routeProgress == null
                                     ? _StatBarPlaceholder(
                                         label: AppStrings.t('route_completion'),
-                                        message: 'Not started yet',
+                                        message: legsDone == 0
+                                            ? 'Not started yet'
+                                            : '$legsDone trip'
+                                                  '${legsDone == 1 ? '' : 's'}'
+                                                  ' completed today',
                                       )
                                     : _StatBar(
                                         label: AppStrings.t('route_completion'),
@@ -934,7 +953,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
                                   )
                                 else
                                   _StatBar(
-                                    label: AppStrings.t('on_time_perf'),
+                                    label: _onTimeIsToday
+                                        ? AppStrings.t('on_time_perf')
+                                        : '${AppStrings.t('on_time_perf')} '
+                                              '(all trips)',
                                     value: _onTimePct!.round(),
                                     total: 100,
                                     color: AppTheme.info,
@@ -1058,12 +1080,10 @@ class _SeatRequestsBanner extends StatelessWidget {
           title = booked == 0
               ? AppStrings.t('no_students_booked')
               : '$booked student${booked == 1 ? '' : 's'} on your roster';
-          subtitle = driver == null
-              ? AppStrings.t('loading_your_rounds')
-              : '${driver.totalAvailableSeats} of '
-                    '${driver.totalSeatsOffered} seats free across '
-                    '${driver.schedules.length} round'
-                    '${driver.schedules.length == 1 ? '' : 's'}.';
+          // No seat line: a figure like "12 of 12 seats free" next to a
+          // roster of three read as wrong, and the seats per round are on
+          // the requests screen this card opens.
+          subtitle = driver == null ? AppStrings.t('loading_your_rounds') : '';
           route = '/driver/ride-requests';
         }
 
@@ -1098,14 +1118,16 @@ class _SeatRequestsBanner extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 12,
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

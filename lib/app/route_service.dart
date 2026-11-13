@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:transit_core/transit_core.dart';
 
@@ -26,19 +26,19 @@ class GeocodeResult {
   });
 }
 
-/// Directions/geocoding over HTTP, backed by Google Maps Platform.
+/// Place search and geocoding over HTTP, backed by Google Maps Platform.
 ///
-/// Deliberately uses the **current-generation** products, not the legacy
-/// ones: Google no longer lets new projects enable the old Directions API
-/// or classic Places API, so this targets **Routes API**
-/// (`routes.googleapis.com`) and **Places API (New)**
-/// (`places.googleapis.com`). Both are POST+JSON with the key in an
-/// `X-Goog-Api-Key` header and an explicit `X-Goog-FieldMask` naming the
-/// response fields, rather than the old query-string GET style. Geocoding
-/// is unchanged — it has no "new" variant.
+/// Routing is not here any more: planning a round, and every route a map
+/// draws, goes through `RouteOptimizationService`, which calls the Routes
+/// API from the backend and caches the answer on the trip.
 ///
-/// Falls back to straight-line interpolation / null when no key is
-/// configured or a call fails — never throws into the caller.
+/// Uses **Places API (New)** (`places.googleapis.com`) — POST+JSON with the
+/// key in an `X-Goog-Api-Key` header and an explicit `X-Goog-FieldMask` —
+/// since Google no longer lets new projects enable the classic Places API.
+/// Geocoding is unchanged; it has no "new" variant.
+///
+/// Returns empty / null when no key is configured or a call fails — never
+/// throws into the caller.
 class RouteService {
   RouteService._();
   static final RouteService instance = RouteService._();
@@ -50,8 +50,6 @@ class RouteService {
 
   bool get _hasToken => accessToken != null && accessToken!.isNotEmpty;
 
-  static const _computeRoutesUrl =
-      'https://routes.googleapis.com/directions/v2:computeRoutes';
   static const _geocodeUrl =
       'https://maps.googleapis.com/maps/api/geocode/json';
   static const _autocompleteUrl =
@@ -68,108 +66,6 @@ class RouteService {
   static String newSessionToken() {
     final rand = Random();
     return List.generate(32, (_) => rand.nextInt(16).toRadixString(16)).join();
-  }
-
-  /// Fetch polyline points between [origin] and [destination], optionally
-  /// via [waypoints].
-  ///
-  /// [optimize] is a documented no-op: this always visits waypoints in the
-  /// order given. (Routes API *can* reorder them via
-  /// `optimizeWaypointOrder`, but that changes which stop comes next on a
-  /// live route, so it stays off deliberately.)
-  Future<List<GeoCoord>> fetchRoute({
-    required GeoCoord origin,
-    required GeoCoord destination,
-    List<GeoCoord> waypoints = const [],
-    bool optimize = true,
-  }) async {
-    final straightLine = [origin, ...waypoints, destination];
-    if (!_hasToken) return straightLine;
-
-    try {
-      final response = await _computeRoutes(
-        origin: origin,
-        destination: destination,
-        waypoints: waypoints,
-        fieldMask: 'routes.polyline.encodedPolyline',
-      );
-      if (response.statusCode != 200) {
-        debugPrint(
-          'RouteService: routes ${response.statusCode} — ${response.body}',
-        );
-        return straightLine;
-      }
-
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final routes = data['routes'] as List?;
-      if (routes == null || routes.isEmpty) return straightLine;
-
-      final polyline =
-          (routes.first as Map<String, dynamic>)['polyline']
-              as Map<String, dynamic>?;
-      final encoded = polyline?['encodedPolyline'] as String?;
-      if (encoded == null) return straightLine;
-
-      // Precision-5 encoded polyline — matches flutter_polyline_points'
-      // hardcoded 1e5 decode divisor, which is what ENCODED_POLYLINE means.
-      final decoded = PolylinePoints().decodePolyline(encoded);
-      return decoded.map((p) => GeoCoord(p.latitude, p.longitude)).toList();
-    } catch (e) {
-      debugPrint('RouteService error: $e');
-      return straightLine;
-    }
-  }
-
-  /// Fetch the driving distance and duration between two points.
-  ///
-  /// Returns the formatted strings the UI prints *and* the raw figures
-  /// behind them. `TrackingService.applyRouteEstimate` needs the numbers:
-  /// a '12 min' string cannot be aged by the thirty seconds that have
-  /// passed since it was fetched, which is what makes the on-screen ETA
-  /// tick down smoothly between refreshes.
-  Future<
-    ({String distance, String duration, double meters, int seconds})?
-  >
-  fetchDistanceDuration({
-    required GeoCoord origin,
-    required GeoCoord destination,
-  }) async {
-    if (!_hasToken) return null;
-
-    try {
-      final response = await _computeRoutes(
-        origin: origin,
-        destination: destination,
-        fieldMask: 'routes.distanceMeters,routes.duration',
-      );
-      if (response.statusCode != 200) {
-        debugPrint(
-          'RouteService: routes ${response.statusCode} — ${response.body}',
-        );
-        return null;
-      }
-
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final routes = data['routes'] as List?;
-      if (routes == null || routes.isEmpty) return null;
-
-      final route = routes.first as Map<String, dynamic>;
-      // Routes API already totals these across every leg, unlike the legacy
-      // Directions API which reported them per leg.
-      final meters = (route['distanceMeters'] as num?)?.toDouble();
-      final seconds = _parseDuration(route['duration'] as String?);
-      if (meters == null || seconds == null) return null;
-
-      return (
-        distance: _formatDistance(meters),
-        duration: _formatDuration(seconds),
-        meters: meters,
-        seconds: seconds,
-      );
-    } catch (e) {
-      debugPrint('RouteService distance error: $e');
-      return null;
-    }
   }
 
   /// Turns free-text (e.g. "Gulberg, Lahore") into a short list of candidate
@@ -318,7 +214,30 @@ class RouteService {
       final retrieved = await Future.wait(
         predictions.map((p) => _placeDetails(p, sessionToken)),
       );
-      return retrieved.whereType<GeocodeResult>().toList();
+      final places = retrieved.whereType<GeocodeResult>().toList();
+
+      // Nearest first. `locationBias` above only nudges Google's own
+      // ranking, which still put a campus three cities away at the top for
+      // a family typing the name of the one down their street. Once every
+      // candidate has a coordinate, the order is ours to decide.
+      if (near != null) {
+        places.sort((a, b) {
+          final da = Geolocator.distanceBetween(
+            near.lat,
+            near.lng,
+            a.coord.lat,
+            a.coord.lng,
+          );
+          final db = Geolocator.distanceBetween(
+            near.lat,
+            near.lng,
+            b.coord.lat,
+            b.coord.lng,
+          );
+          return da.compareTo(db);
+        });
+      }
+      return places;
     } catch (e) {
       debugPrint('RouteService search places error: $e');
       return [];
@@ -419,46 +338,6 @@ class RouteService {
     }
   }
 
-  /// One Routes API `computeRoutes` call. [fieldMask] is mandatory for this
-  /// API — it refuses a request without one, and the fields named here are
-  /// the only ones that come back (and the only ones billed for).
-  Future<http.Response> _computeRoutes({
-    required GeoCoord origin,
-    required GeoCoord destination,
-    List<GeoCoord> waypoints = const [],
-    required String fieldMask,
-  }) {
-    Map<String, dynamic> waypoint(GeoCoord c) => {
-      'location': {
-        'latLng': {'latitude': c.lat, 'longitude': c.lng},
-      },
-    };
-
-    return http.post(
-      Uri.parse(_computeRoutesUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': accessToken!,
-        'X-Goog-FieldMask': fieldMask,
-      },
-      body: json.encode({
-        'origin': waypoint(origin),
-        'destination': waypoint(destination),
-        if (waypoints.isNotEmpty)
-          'intermediates': waypoints.map(waypoint).toList(),
-        'travelMode': 'DRIVE',
-        'polylineEncoding': 'ENCODED_POLYLINE',
-      }),
-    );
-  }
-
-  /// Routes API reports duration as a protobuf duration string — `"165s"`.
-  int? _parseDuration(String? raw) {
-    if (raw == null || raw.isEmpty) return null;
-    final seconds = double.tryParse(raw.replaceAll('s', ''));
-    return seconds?.round();
-  }
-
   /// A loose ~0.2° (~20km) box around [center]. Geocoding's `bounds` only
   /// *biases* results (unlike Places' `locationBias`, which can restrict),
   /// so this doesn't need to be precise.
@@ -466,18 +345,5 @@ class RouteService {
     const delta = 0.2;
     return '${center.lat - delta},${center.lng - delta}'
         '|${center.lat + delta},${center.lng + delta}';
-  }
-
-  String _formatDistance(double meters) {
-    if (meters < 1000) return '${meters.round()} m';
-    return '${(meters / 1000).toStringAsFixed(1)} km';
-  }
-
-  String _formatDuration(int seconds) {
-    final minutes = (seconds / 60).round();
-    if (minutes < 60) return '$minutes min';
-    final hours = minutes ~/ 60;
-    final remainder = minutes % 60;
-    return remainder == 0 ? '$hours hr' : '$hours hr $remainder min';
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
+import '../../app/push_diagnostics.dart';
 import '../../app/auth_service.dart';
 import '../../app/active_trip_service.dart';
 import '../../app/driver_data_service.dart';
@@ -186,7 +187,7 @@ class _DriverProfileState extends State<DriverProfile> {
 
     return '$areas destination${areas == 1 ? '' : 's'} · '
         '$rounds round${rounds == 1 ? '' : 's'} · '
-        '${driver.totalAvailableSeats} of ${driver.totalSeatsOffered} seats free';
+        '${driver.bestAvailableSeats} of ${driver.vehicleSeats} seats free';
   }
 
   String _requestsSummary() {
@@ -298,9 +299,7 @@ class _DriverProfileState extends State<DriverProfile> {
       for (final s in session.routeStudents.value) s.id: s,
     };
     final waiting = roster.values
-        .where(
-          (s) => s.scheduleRequestStatus == ScheduleRequestStatus.pending,
-        )
+        .where((s) => s.scheduleRequestStatus == ScheduleRequestStatus.pending)
         .length;
     return waiting == 0
         ? 'Pickup and drop-off times they asked for'
@@ -661,11 +660,9 @@ class _DriverProfileState extends State<DriverProfile> {
                                     ? 'Not assigned yet'
                                     : info.busNumber,
                               ),
-                              _InfoCard(
-                                icon: '🗺️',
-                                label: AppStrings.t('route_lbl'),
-                                value: info.route,
-                              ),
+                              // No "Route" card: a self-signed-up driver has
+                              // no admin route, so it was always empty, and
+                              // where each round goes is on My Service.
                               _InfoCard(
                                 icon: '📞',
                                 label: AppStrings.t('mobile_lbl'),
@@ -755,6 +752,12 @@ class _DriverProfileState extends State<DriverProfile> {
                             onTap: () => context.push('/driver/messages'),
                           ),
                           _MenuItem(
+                            icon: '🏦',
+                            label: 'Payment Details',
+                            desc: 'Bank account and wallets families pay to',
+                            onTap: () => context.push('/driver/payout'),
+                          ),
+                          _MenuItem(
                             icon: '💳',
                             label: AppStrings.t('payment_history'),
                             desc: 'Monthly payment records',
@@ -816,6 +819,11 @@ class _DriverProfileState extends State<DriverProfile> {
                             icon: '📄',
                             label: AppStrings.t('terms_lbl'),
                             onTap: () => context.push('/driver/terms'),
+                          ),
+                          _MenuItem(
+                            materialIcon: Icons.notifications_active_outlined,
+                            label: 'Test notifications',
+                            onTap: () => runPushTest(context),
                           ),
                           _MenuItem(
                             materialIcon: Icons.pause_circle_outline_rounded,

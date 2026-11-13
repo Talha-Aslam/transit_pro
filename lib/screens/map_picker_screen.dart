@@ -538,12 +538,24 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+            // Taller, and it names the thing being confirmed. A family
+            // setting up their account read the address, saw a button the
+            // same weight as everything else on the sheet, and left the
+            // screen without pinning anything — so the one field that lets
+            // a driver be matched to their child stayed empty.
             GradientButton(
-              label: 'Confirm location',
+              label: 'Confirm this location',
               gradient: _buttonGradient,
               glowColor: accent,
+              height: 56,
               onTap: _confirm,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Drag the map to move the pin.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.textTertiary, fontSize: 11),
             ),
           ],
         ),

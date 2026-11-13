@@ -241,13 +241,12 @@ class _DriverPerformanceScreenState extends State<DriverPerformanceScreen> {
                               return StreamBuilder<List<Incident>>(
                                 stream: IncidentRepository.instance
                                     .watchForDriver(uid),
-                                builder: (context, incidentSnap) =>
-                                    _buildBody(
-                                      context,
-                                      trips,
-                                      ratings,
-                                      incidentSnap.data ?? const <Incident>[],
-                                    ),
+                                builder: (context, incidentSnap) => _buildBody(
+                                  context,
+                                  trips,
+                                  ratings,
+                                  incidentSnap.data ?? const <Incident>[],
+                                ),
                               );
                             },
                           );
@@ -617,9 +616,7 @@ class _MonthRow extends StatelessWidget {
                 Text(
                   // A month with no ratings has no average. This used to
                   // print one of three constants regardless.
-                  stat.rating == null
-                      ? '—'
-                      : stat.rating!.toStringAsFixed(1),
+                  stat.rating == null ? '—' : stat.rating!.toStringAsFixed(1),
                   style: const TextStyle(
                     color: AppTheme.warningLight,
                     fontSize: 12,

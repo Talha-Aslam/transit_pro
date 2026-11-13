@@ -3,6 +3,7 @@ import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
+import '../../app/vehicle_capacity.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
@@ -216,22 +217,35 @@ class _StudentDriverDetailsScreenState
                       label: AppStrings.t('driver_phone_lbl'),
                       value: widget.student.driverPhone,
                     ),
+                    // The driver's own record, not a fixed "8 years": it
+                    // read the same for every driver on every phone.
                     _InfoTile(
                       width: (MediaQuery.of(context).size.width - 56) / 2,
                       icon: '📅',
                       label: 'Experience',
-                      value: '8 years',
+                      value: () {
+                        final years =
+                            SessionService.instance
+                                .driverFor(widget.student.driverId)
+                                ?.experienceYears ??
+                            0;
+                        return years <= 0
+                            ? '—'
+                            : '$years year${years == 1 ? '' : 's'}';
+                      }(),
                     ),
-                    _InfoTile(
-                      width: (MediaQuery.of(context).size.width - 56) / 2,
-                      icon: '🚌',
-                      label: 'Transport Number',
-                      value: widget.student.busNumber,
-                    ),
-                    // No real "total seats" value is available from
-                    // `StudentInfo`/session data on this screen — the tile
-                    // used to show a fabricated '28' here, which is worse
-                    // than not showing it at all.
+                    // "Transport Number" repeated the bus tile above it, so
+                    // the vehicle's seat count takes its place.
+                    if (SessionService.instance.driverFor(
+                          widget.student.driverId,
+                        )
+                        case final driver?)
+                      _InfoTile(
+                        width: (MediaQuery.of(context).size.width - 56) / 2,
+                        icon: '👥',
+                        label: 'Total Seats',
+                        value: '${VehicleCapacity.current(driver)}',
+                      ),
                   ],
                 ),
                 if (_hasRidden) ...[

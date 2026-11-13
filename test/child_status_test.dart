@@ -45,11 +45,18 @@ void main() {
     });
 
     test('the driver hands over on arrival and on closing the round', () {
-      final src = read('lib/screens/driver/driver_route.dart');
-      expect(src, contains('GeofenceEvent.arrived'));
-      expect(src, contains('_handOverEveryoneAboard'));
+      // On arrival: the trip controller turns everyone aboard into dropped
+      // off the moment the van reaches the school.
+      final controller = read('lib/app/trip_controller.dart');
+      expect(controller, contains('Future<void> _arriveAtInstitute('));
+      expect(controller, contains('AttendanceStatus.droppedOff'));
+      // On closing: the session sweeps up anyone still aboard.
       expect(
-        src,
+        read('lib/app/trip_session.dart'),
+        contains('markRemainingDroppedOff'),
+      );
+      expect(
+        read('lib/screens/driver/driver_route.dart'),
         contains('_reportUnmarkedAttendance'),
         reason: 'silence used to be indistinguishable from nothing happening',
       );
@@ -57,12 +64,16 @@ void main() {
 
     test('the status badge is no longer "has a driver at all"', () {
       final src = read('lib/screens/parent/parent_dashboard.dart');
-      expect(src, contains('RideStatusBadge'));
+      expect(src, contains('RideStatusBadge('));
+      // The old card built its own badge from a "does this child have a
+      // driver" test and two translation keys. Either key appearing here
+      // again would mean that logic came back.
       expect(
-        src.contains("StatusBadge(\n"),
+        src.contains("AppStrings.t('on_the_bus')"),
         isFalse,
-        reason: 'the hardcoded badge is gone from the child card',
+        reason: 'the hand-built badge is gone from the child card',
       );
+      expect(src.contains("'unassigned_status'"), isFalse);
     });
   });
 
@@ -128,10 +139,7 @@ void main() {
     });
 
     test('the pair ordering is unchanged, so old threads still resolve', () {
-      expect(
-        ChatThread.idFor('b', 'a'),
-        ChatThread.idFor('a', 'b'),
-      );
+      expect(ChatThread.idFor('b', 'a'), ChatThread.idFor('a', 'b'));
       expect(ChatThread.idFor('a', 'b'), 'a__b');
       expect(ChatThread.idFor('a', 'b', studentId: ''), 'a__b');
     });

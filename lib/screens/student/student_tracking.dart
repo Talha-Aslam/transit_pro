@@ -6,10 +6,14 @@ import 'package:transit_core/transit_core.dart';
 
 import '../../map/live_bus_map_view.dart';
 import '../../app/language_provider.dart';
+import '../../app/live_bus_service.dart';
+import '../../app/family_trip_times.dart';
+import '../../app/round_display.dart';
 import '../../app/session_service.dart';
 import '../../app/student_data_service.dart';
 import '../../data/trip_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/app_glyph.dart';
 
@@ -58,15 +62,27 @@ class _StudentTrackingState extends State<StudentTracking> {
     _activeTrip = null;
     _myAttendance = null;
 
-    if (driverId == null || driverId.isEmpty) return;
+    final studentId = SessionService.instance.uid;
+    if (driverId == null || driverId.isEmpty || studentId == null) return;
     _tripSub = TripRepository.instance
-        .watchActiveTripForDriver(driverId)
+        .watchActiveTripForStudent(driverId, studentId)
         .listen(_onActiveTripChanged);
   }
 
   void _onActiveTripChanged(Trip? trip) {
     if (!mounted) return;
     setState(() => _activeTrip = trip);
+    // This tab's map follows the round itself rather than relying on the
+    // Home tab having been opened first.
+    if (trip == null || trip.busId.isEmpty) {
+      LiveBusService.instance.stop();
+    } else {
+      LiveBusService.instance.follow(
+        busId: trip.busId,
+        trip: trip,
+        studentId: SessionService.instance.uid,
+      );
+    }
 
     _attendanceSub?.cancel();
     _attendanceSub = null;
@@ -129,6 +145,13 @@ class _StudentTrackingState extends State<StudentTracking> {
     final schoolLabel = studentInfo.school.isEmpty
         ? 'School'
         : studentInfo.school;
+    // The round under way, by the name the driver gave it.
+    final roundName = trip == null
+        ? ''
+        : roundNameFor(
+            SessionService.instance.driverFor(studentInfo.driverId),
+            trip.scheduleId,
+          );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 100),
@@ -191,7 +214,9 @@ class _StudentTrackingState extends State<StudentTracking> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                '📍 $stopLabel → $schoolLabel',
+                                roundName.isEmpty
+                                    ? '📍 $stopLabel → $schoolLabel'
+                                    : '📍 $roundName · $stopLabel → $schoolLabel',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.9),
                                   fontSize: 11,
@@ -248,6 +273,7 @@ class _StudentTrackingState extends State<StudentTracking> {
                   padding: const EdgeInsets.all(18),
                   child: Row(
                     children: [
+                      // The driver's face, same as the parent's card.
                       Container(
                         width: 52,
                         height: 52,
@@ -255,8 +281,18 @@ class _StudentTrackingState extends State<StudentTracking> {
                           gradient: AppTheme.studentGradient,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Center(
-                          child: Text('🚌', style: TextStyle(fontSize: 26)),
+                        clipBehavior: Clip.antiAlias,
+                        child: AvatarImage(
+                          localFile: null,
+                          photoUrl: SessionService.instance
+                              .driverFor(studentInfo.driverId)
+                              ?.photoUrl,
+                          size: 52,
+                          borderRadius: BorderRadius.circular(16),
+                          fallback: const Text(
+                            '🚌',
+                            style: TextStyle(fontSize: 26),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -384,30 +420,88 @@ class _StudentTrackingState extends State<StudentTracking> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 14),
                         Builder(
                           builder: (_) {
-                            final boarded =
-                                _myAttendance?.status ==
-                                AttendanceStatus.boarded;
+                            final mark = _myAttendance?.status;
+                            final times = FamilyTripTimes.of(
+                              trip,
+                              SessionService.instance.uid ?? '',
+                            );
+                            final headline = times.headline(
+                              mark: mark,
+                              school: schoolLabel,
+                            );
+                            final aboard =
+                                mark == AttendanceStatus.boarded ||
+                                mark == AttendanceStatus.droppedOff;
+                            final done = mark == AttendanceStatus.droppedOff;
+                            final absent = mark == AttendanceStatus.absent;
+                            final mine = _StopItem(
+                              name: '$stopLabel (Your Stop)',
+                              time: times.toSchool
+                                  ? (aboard
+                                        ? 'Picked up'
+                                        : absent
+                                        ? 'Absent'
+                                        : FamilyTripTimes.clock(times.pickupAt))
+                                  : (done
+                                        ? 'Dropped off'
+                                        : absent
+                                        ? 'Not on van'
+                                        : FamilyTripTimes.clock(
+                                            times.arriveAt,
+                                          )),
+                              status: times.toSchool
+                                  ? (aboard ? 'passed' : 'current')
+                                  : (done ? 'passed' : 'current'),
+                              color: (times.toSchool ? aboard : done) || absent
+                                  ? AppTheme.success
+                                  : AppTheme.studentAmber,
+                            );
+                            final school = _StopItem(
+                              name: schoolLabel,
+                              time: times.toSchool
+                                  ? (done
+                                        ? 'Reached'
+                                        : FamilyTripTimes.clock(times.arriveAt))
+                                  : 'Left',
+                              status: times.toSchool
+                                  ? (done
+                                        ? 'passed'
+                                        : aboard
+                                        ? 'current'
+                                        : 'upcoming')
+                                  : 'passed',
+                              color: times.toSchool && aboard && !done
+                                  ? AppTheme.studentAmber
+                                  : times.toSchool && !done
+                                  ? Colors.white24
+                                  : AppTheme.success,
+                            );
                             return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _StopItem(
-                                  name: '$stopLabel (Your Stop)',
-                                  time: '',
-                                  status: boarded ? 'passed' : 'current',
-                                  color: boarded
-                                      ? AppTheme.success
-                                      : AppTheme.studentAmber,
-                                ),
-                                _StopItem(
-                                  name: schoolLabel,
-                                  time: '',
-                                  status: boarded ? 'current' : 'upcoming',
-                                  color: boarded
-                                      ? AppTheme.studentAmber
-                                      : Colors.white24,
-                                ),
+                                if (headline != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '🕒 $headline',
+                                    style: const TextStyle(
+                                      color: AppTheme.success,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 14),
+                                // Morning: this student's gate, then the
+                                // institute. Home: the other way round.
+                                if (times.toSchool) ...[
+                                  mine,
+                                  school,
+                                ] else ...[
+                                  school,
+                                  mine,
+                                ],
                               ],
                             );
                           },

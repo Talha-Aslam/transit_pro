@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../app/language_provider.dart';
+import '../app/location_hint.dart';
 import '../app/route_service.dart';
 import '../screens/map_picker_screen.dart';
 import '../theme/app_theme.dart';
@@ -243,10 +244,15 @@ class _PlaceSearchFieldState extends State<PlaceSearchField> {
     final token = _sessionToken ??= RouteService.newSessionToken();
     setState(() => _searching = true);
     _debounce = Timer(const Duration(milliseconds: 400), () async {
+      // Falls back to wherever the phone is when the screen has no better
+      // point to offer. Without an origin the results come back in
+      // Google's order, which put a campus three cities away above the one
+      // down the street — see LocationHint.
+      final origin = widget.near ?? await LocationHint.instance.current();
       final results = await RouteService.instance.searchPlaces(
         trimmed,
         sessionToken: token,
-        near: widget.near,
+        near: origin,
         poiCategory: widget.poiCategory,
       );
       // The field may have moved on to a different query while this was in
@@ -730,6 +736,15 @@ class ChildFormData {
   /// your school and are 2 km away".
   GeoCoord? pickup;
 
+  /// Where the institute is, captured when the family picks it from the
+  /// search results.
+  ///
+  /// The search already knows this — every suggestion comes back with a
+  /// coordinate — and the form used to drop it on the floor. It is the
+  /// far end of every one of this child's trips, so without it a driver's
+  /// route had to guess a destination from their own service areas.
+  GeoCoord? instituteLocation;
+
   ChildFormData({
     String name = '',
     String grade = '',
@@ -737,6 +752,7 @@ class ChildFormData {
     String school = '',
     String studentId = '',
     this.pickup,
+    this.instituteLocation,
   }) {
     nameCtrl.text = name;
     gradeCtrl.text = grade;
@@ -827,19 +843,12 @@ class ChildCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const FieldLabel('GRADE / CLASS', important: true),
-            const SizedBox(height: 6),
-            TextField(
-              controller: data.gradeCtrl,
-              style: TextStyle(color: context.textPrimary, fontSize: 15),
-              decoration: const InputDecoration(hintText: 'e.g. Grade 5'),
-            ),
-            const SizedBox(height: 12),
-            // Was labelled "GRADE / LEVEL" and stored straight into
-            // `ChildDraft.grade` — this dropdown's actual value domain
-            // (`kGradeOptions`: School/College/University/Academy) is the
-            // institute type, not a grade. See `ChildDraft.grade`'s doc
-            // comment.
+            // Asked before the class, because what "class" means depends
+            // on the answer: a university rider has a semester, not a
+            // Grade 5. (The dropdown's domain — School / College /
+            // University / Academy — is the institute type, not a grade;
+            // see `ChildDraft.grade`'s doc comment for why the field it
+            // writes to is still called that.)
             FieldLabel(AppStrings.t('grade_level_lbl'), important: true),
             const SizedBox(height: 6),
             ThemedDropdown(
@@ -852,18 +861,39 @@ class ChildCard extends StatelessWidget {
               },
             ),
             const SizedBox(height: 12),
+            const FieldLabel('CLASS / SEMESTER', important: true),
+            const SizedBox(height: 6),
+            TextField(
+              controller: data.gradeCtrl,
+              style: TextStyle(color: context.textPrimary, fontSize: 15),
+              decoration: const InputDecoration(
+                hintText: 'e.g. Grade 5, or 3rd semester',
+              ),
+            ),
+            const SizedBox(height: 12),
             FieldLabel(AppStrings.t('school_institution_lbl'), important: true),
             const SizedBox(height: 6),
             SchoolSearchField(
               controller: data.schoolCtrl,
               isCustom: data.isCustomSchool,
+              // Nearest campus first: a family typing "Punjab College"
+              // means the one near their home, not the first one Google
+              // happens to return.
+              near: data.pickup,
+              // Keeps the point the search already resolved. Dropping it
+              // is why editing this child later showed no institute
+              // location, though the family had picked it off a map.
+              onLocationSelected: (c) {
+                data.instituteLocation = c;
+                onChanged();
+              },
               onCustomChanged: (v) {
                 data.isCustomSchool = v;
                 onChanged();
               },
             ),
             const SizedBox(height: 12),
-            const FieldLabel('SCHOOL ROLL NUMBER', important: true),
+            const FieldLabel('ROLL NUMBER', important: true),
             const SizedBox(height: 6),
             TextField(
               controller: data.studentIdCtrl,
@@ -871,7 +901,12 @@ class ChildCard extends StatelessWidget {
               decoration: const InputDecoration(hintText: 'e.g. 12345'),
             ),
             const SizedBox(height: 12),
-            const FieldLabel('PICKUP POINT (OPTIONAL)'),
+            // Not labelled optional any more. It is the one field that
+            // decides whether a driver can be matched to this child at all
+            // — `rankDriversForStudent` has nothing to measure without it
+            // — so calling it optional invited families to skip the thing
+            // that makes the app work for them.
+            const FieldLabel('PICKUP POINT'),
             const SizedBox(height: 6),
             MapPointField(
               placeholder: 'Tap to pin where the van collects them',
@@ -1040,7 +1075,7 @@ class ServiceAreaCard extends StatelessWidget {
 ///
 /// [bookedSeats] is carried through read-only. It is shown so a driver can see
 /// why a round refuses to shrink, and it is never written from this form — the
-/// live value is merged back in by `RideMatchService.saveSchedules`.
+/// live value is merged back in by `RideMatchService.mergeRounds`.
 class RoundFormData {
   final String id;
   final labelCtrl = TextEditingController();
@@ -1148,6 +1183,10 @@ class RoundCard extends StatelessWidget {
   /// case the picker explains that rather than showing nothing.
   final List<String> availableInstitutes;
 
+  /// What is wrong with this round, shown on the card itself so the driver
+  /// sees which one to fix rather than a message at the far end of the page.
+  final String? error;
+
   const RoundCard({
     super.key,
     required this.index,
@@ -1157,6 +1196,7 @@ class RoundCard extends StatelessWidget {
     required this.onChanged,
     this.availableInstitutes = const [],
     this.accentColor = AppTheme.driverCyan,
+    this.error,
   });
 
   Future<void> _pickTime(
@@ -1267,6 +1307,7 @@ class RoundCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final booked = data.bookedSeats;
+    final problem = error;
 
     // See the matching comment on `ChildCard.build` — isolates this card's
     // repaint (cursor blink, focus changes, time-picker taps) from every
@@ -1279,12 +1320,39 @@ class RoundCard extends StatelessWidget {
           color: accentColor.withValues(alpha: context.isDark ? 0.10 : 0.06),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: accentColor.withValues(alpha: context.isDark ? 0.28 : 0.20),
+            color: problem != null
+                ? AppTheme.error
+                : accentColor.withValues(alpha: context.isDark ? 0.28 : 0.20),
+            width: problem != null ? 1.5 : 1,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (problem != null) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppTheme.error,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      problem,
+                      style: const TextStyle(
+                        color: AppTheme.error,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
             Row(
               children: [
                 Text(
@@ -1499,7 +1567,6 @@ class StepDot extends StatelessWidget {
   }
 }
 
-
 /// A tick-on/tick-off chip. Small enough that pulling in a Material
 /// `FilterChip` would fight this form's styling rather than save anything.
 class _ChoiceChip extends StatelessWidget {
@@ -1534,9 +1601,7 @@ class _ChoiceChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              selected
-                  ? Icons.check_circle_rounded
-                  : Icons.circle_outlined,
+              selected ? Icons.check_circle_rounded : Icons.circle_outlined,
               size: 15,
               color: selected ? accentColor : context.textTertiary,
             ),

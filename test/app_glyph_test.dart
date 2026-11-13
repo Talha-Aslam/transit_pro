@@ -35,8 +35,9 @@ void main() {
   });
 
   group('AppGlyph widget', () {
-    testWidgets('draws the mapped icon at the requested size and colour',
-        (tester) async {
+    testWidgets('draws the mapped icon at the requested size and colour', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -51,14 +52,13 @@ void main() {
       expect(icon.color, const Color(0xFF00FF00));
     });
 
-    testWidgets('falls back to drawing the glyph itself when unmapped',
-        (tester) async {
+    testWidgets('falls back to drawing the glyph itself when unmapped', (
+      tester,
+    ) async {
       // Nothing may silently disappear: an unknown glyph still has to show
       // up as the character it was.
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: AppGlyph('🦄', size: 18)),
-        ),
+        const MaterialApp(home: Scaffold(body: AppGlyph('🦄', size: 18))),
       );
 
       expect(find.byType(Icon), findsNothing);

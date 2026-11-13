@@ -53,8 +53,8 @@ void main() {
   const knownMissing = <String, String>{
     'assets/images/utilities/google.png':
         'Google mark for the sign-in button; login_screen.dart falls back to '
-            'an icon. Needs the official asset from Google\'s branding '
-            'guidelines, which must not be redrawn by hand.',
+        'an icon. Needs the official asset from Google\'s branding '
+        'guidelines, which must not be redrawn by hand.',
   };
 
   test('every referenced asset exists on disk', () {
@@ -65,7 +65,11 @@ void main() {
         missing.add('$asset  (referenced by ${users.join(', ')})');
       }
     });
-    expect(missing, isEmpty, reason: 'missing asset files:\n${missing.join('\n')}');
+    expect(
+      missing,
+      isEmpty,
+      reason: 'missing asset files:\n${missing.join('\n')}',
+    );
   });
 
   test('the known-missing list has not gone stale', () {
@@ -87,14 +91,14 @@ void main() {
 
   test('every referenced asset is declared in pubspec.yaml', () {
     bool isDeclared(String asset) => declared.any(
-          (entry) => entry.endsWith('/')
-              // A directory entry covers the files directly inside it, not
-              // files in its subdirectories — which is exactly how Flutter
-              // resolves it.
-              ? asset.startsWith(entry) &&
-                  !asset.substring(entry.length).contains('/')
-              : entry == asset,
-        );
+      (entry) => entry.endsWith('/')
+          // A directory entry covers the files directly inside it, not
+          // files in its subdirectories — which is exactly how Flutter
+          // resolves it.
+          ? asset.startsWith(entry) &&
+                !asset.substring(entry.length).contains('/')
+          : entry == asset,
+    );
 
     final undeclared = <String>[];
     referenced.forEach((asset, users) {
@@ -105,7 +109,8 @@ void main() {
     expect(
       undeclared,
       isEmpty,
-      reason: 'assets used in code but not declared in pubspec.yaml:\n'
+      reason:
+          'assets used in code but not declared in pubspec.yaml:\n'
           '${undeclared.join('\n')}',
     );
   });

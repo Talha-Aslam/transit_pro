@@ -161,7 +161,10 @@ service cloud.firestore {
                         || (isDriver()
                             && onlyChanges(['driverId', 'scheduleId', 'busId',
                                             'scheduleRequestStatus',
-                                            'scheduleRequestNote', 'updatedAt'])
+                                            'scheduleRequestNote', 'updatedAt',
+                                            // The fee agreed on the seat, and
+                                            // when its billing began.
+                                            'monthlyFeePaisa', 'feeStartedAt'])
                             && (hasAcceptedRequestFor(studentId)
                                 || resource.data.driverId == uid()))
                         || isAdmin());
@@ -282,6 +285,23 @@ service cloud.firestore {
       }
     }
 
+    // ── attendance, across trips ────────────────────────────────────────────
+    //
+    // A family's ride history — the Home screen's figures — is one
+    // collection-group query over every trip's `attendance` rows, filtered on
+    // `studentId` (`TripRepository.watchAttendanceHistory`). The rules above
+    // only describe one trip's rows at a time, and a collection-group query
+    // is checked against a recursive match instead; with none, the query was
+    // refused and every family's figures read zero. The `studentId` equality
+    // the query carries is what lets this check whose child it is.
+    match /{path=**}/attendance/{rowId} {
+      allow read: if signedIn()
+                  && (isDriver()
+                      || isAdmin()
+                      || resource.data.studentId == uid()
+                      || studentDoc(resource.data.studentId).parentId == uid());
+    }
+
     // ── payments ────────────────────────────────────────────────────────────
 
     match /payments/{paymentId} {
@@ -291,15 +311,22 @@ service cloud.firestore {
                       || resource.data.driverId == uid()
                       || isAdmin());
 
+      // The family records what they sent; the driver issues the monthly
+      // bill for a child whose seat they have accepted — and only that.
       allow create: if signedIn()
-                    && (request.resource.data.parentId == uid() || isAdmin());
+                    && (request.resource.data.parentId == uid()
+                        || (request.resource.data.driverId == uid()
+                            && hasAcceptedRequestFor(request.resource.data.studentId))
+                        || isAdmin());
 
       // A parent may attach a slip and mark it submitted, but must never set
       // status to 'paid' — only the receiving driver or an admin confirms that.
       allow update: if signedIn()
                     && ((resource.data.parentId == uid()
-                         && unchanged('status')
+                         && (unchanged('status')
+                             || request.resource.data.status == 'submitted')
                          && unchanged('amountPaisa')
+                         && unchanged('driverId')
                          && unchanged('confirmedBy'))
                         || resource.data.driverId == uid()
                         || isAdmin());
@@ -355,14 +382,28 @@ service cloud.firestore {
                     && (
                          // Family: withdraw, or re-send after a decline. Never
                          // 'accepted' — a parent must not be able to book their
-                         // own seat and skip the driver's decision.
+                         // own seat and skip the driver's decision. They may
+                         // answer the driver's fee, but never change it.
                          (resource.data.requesterId == uid()
-                          && request.resource.data.status in ['pending', 'cancelled'])
+                          && request.resource.data.status in ['pending', 'cancelled']
+                          && unchanged('feePaisa')
+                          && unchanged('feeDriverNote')
+                          && (unchanged('feeStatus')
+                              || request.resource.data.feeStatus in ['accepted', 'rejected']))
                          ||
                          // Driver: answer it. Never back to 'pending', which
                          // would strand a booked seat with no record of why.
                          (resource.data.driverId == uid()
                           && request.resource.data.status in ['accepted', 'rejected'])
+                         ||
+                         // Driver: ask a monthly fee on a request still waiting,
+                         // or a new one after the family turned the last down.
+                         (resource.data.driverId == uid()
+                          && resource.data.status == 'pending'
+                          && request.resource.data.status == 'pending'
+                          && request.resource.data.feeStatus == 'proposed'
+                          && onlyChanges(['feePaisa', 'feeStatus', 'feeDriverNote',
+                                          'feeFamilyNote', 'updatedAt']))
                          || isAdmin()
                        );
 
@@ -389,7 +430,16 @@ service cloud.firestore {
                     && (resource.data.requestedBy == uid()
                         || isAdmin()
                         || (isDriver()
-                            && (resource.data.assignedDriverId == null
+                            // `in` first, and not merely for tidiness: a
+                            // fresh request has no `assignedDriverId` key
+                            // (the model prunes nulls before writing), and
+                            // reading an absent field throws inside rule
+                            // evaluation, which Firestore treats as denied.
+                            // That turned "nobody has claimed this" — the
+                            // one state this clause exists to allow — into
+                            // a permission-denied for every driver.
+                            && (!('assignedDriverId' in resource.data)
+                                || resource.data.assignedDriverId == null
                                 || resource.data.assignedDriverId == uid())));
 
       allow delete: if isAdmin();

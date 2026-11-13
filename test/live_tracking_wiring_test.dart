@@ -28,19 +28,16 @@ void main() {
     });
 
     test('the trip records the same bus key the broadcast uses', () {
-      // Both must resolve a missing Bus document the same way, or the
-      // family looks for the wrong node.
-      final matches = RegExp(r'busId: _session\.bus\.value\?\.id \?\? (\w+)')
-          .allMatches(route)
-          .map((m) => m.group(1))
-          .toSet();
+      // The trip is written with `bus?.id ?? uid`, and every broadcast
+      // publishes under the key the trip recorded — so the family, who
+      // looks the van up by `trip.busId`, always finds the right node.
+      final session = read('lib/app/trip_session.dart');
       expect(
-        matches,
-        {'uid'},
-        reason: 'trip.busId and the RTDB broadcast key must agree; found '
-            '$matches',
+        session,
+        contains('final busId = SessionService.instance.bus.value?.id ?? uid;'),
       );
-      expect(matches.length, 1);
+      expect(session, contains('busId: trip.busId.isEmpty ? uid : trip.busId'));
+      expect(route, contains('busId: trip.busId.isEmpty ? uid : trip.busId'));
     });
 
     test('ending a route stops the broadcast', () {
@@ -86,7 +83,8 @@ void main() {
       test('${screen.split('/').last} follows the live bus', () {
         final src = read(screen);
         expect(src, contains('LiveBusService'));
-        expect(src, contains('watchActiveTripForDriver'));
+        // Only the child's own round: a driver can run several.
+        expect(src, contains('watchActiveTripForStudent'));
       });
 
       test('${screen.split('/').last} no longer shows the local ETA', () {
@@ -98,7 +96,8 @@ void main() {
         expect(
           src.contains('TrackingService.instance.etaMinutes'),
           isFalse,
-          reason: '$screen must read LiveBusService, not the local '
+          reason:
+              '$screen must read LiveBusService, not the local '
               'TrackingService',
         );
       });
@@ -128,15 +127,24 @@ void main() {
       // The Firestore rule for the seeding case falls back to this field,
       // because the parent trip does not exist yet while the batch is
       // checked. Drop it and Start Route returns PERMISSION_DENIED again.
-      expect(read('lib/data/trip_repository.dart'), contains('driverId: driverId'));
-      expect(read('firestore.rules'), contains('request.resource.data.driverId == uid()'));
+      expect(
+        read('lib/data/trip_repository.dart'),
+        contains('driverId: driverId'),
+      );
+      expect(
+        read('firestore.rules'),
+        contains('request.resource.data.driverId == uid()'),
+      );
     });
 
     test('the rule still refuses an attendance row under someone '
         'else\'s trip', () {
       final rules = read('firestore.rules');
       expect(rules, contains('.data.driverId == uid()'));
-      expect(rules, contains('exists(/databases/\$(database)/documents/trips/\$(tripId))'));
+      expect(
+        rules,
+        contains('exists(/databases/\$(database)/documents/trips/\$(tripId))'),
+      );
     });
   });
 }
