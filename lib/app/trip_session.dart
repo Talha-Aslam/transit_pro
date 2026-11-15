@@ -64,12 +64,30 @@ class FirestoreTripBackend implements TripBackend {
     final name = rider.name;
     final home = leg == TripLegKind.dropoff;
     final (type, title, body) = switch (event) {
+      FamilyEvent.routeStarted => (
+        NotificationType.routeStarted,
+        home ? '$name is heading home' : 'Your driver has started the route',
+        home
+            ? 'The driver has started the ride home. You will be told when '
+                  'the van is about ${_session.controller.nearbyLead.inMinutes} '
+                  "minutes from $name's drop-off point."
+            : 'The van is on its way to collect $name. You will be told when '
+                  'it is about ${_session.controller.nearbyLead.inMinutes} '
+                  'minutes away.',
+      ),
       FamilyEvent.nearby => (
         NotificationType.busApproaching,
-        'Driver is reaching within '
-            '${_session.controller.nearbyLead.inMinutes} min',
-        'Please get $name ready — the van will be at the pickup point in '
-            'about ${_session.controller.nearbyLead.inMinutes} minutes.',
+        home
+            ? '$name is about ${_session.controller.nearbyLead.inMinutes} '
+                  'min from home'
+            : 'Driver is reaching within '
+                  '${_session.controller.nearbyLead.inMinutes} min',
+        home
+            ? "The van will be at $name's drop-off point in about "
+                  '${_session.controller.nearbyLead.inMinutes} minutes.'
+            : 'Please get $name ready — the van will be at the pickup point '
+                  'in about ${_session.controller.nearbyLead.inMinutes} '
+                  'minutes.',
       ),
       FamilyEvent.arriving => (
         NotificationType.busArrived,

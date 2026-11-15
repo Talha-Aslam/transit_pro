@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
 
@@ -124,51 +123,4 @@ Future<bool> ensureLocationOrExplain(
     ),
   );
   return false;
-}
-
-/// Offers "Allow all the time" once, with the reason in plain words.
-///
-/// Tracking itself does not depend on it: the trip runs as a location
-/// foreground service, which keeps working with the screen off on
-/// while-in-use permission. Background permission is what keeps it working
-/// on phones whose makers stop foreground services aggressively, so it is
-/// offered rather than demanded, and only once — a driver who said no is
-/// not asked again every morning.
-Future<void> offerBackgroundLocation(BuildContext context) async {
-  const askedKey = 'asked_background_location';
-  try {
-    if (await Geolocator.checkPermission() != LocationPermission.whileInUse) {
-      return;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(askedKey) ?? false) return;
-    await prefs.setBool(askedKey, true);
-    if (!context.mounted) return;
-
-    final allow = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Keep sharing with the screen off?'),
-        content: const Text(
-          'Families follow the van on their phones during the trip. Choose '
-          '"Allow all the time" on the next screen so the van keeps showing '
-          'on their map when your screen is locked or you switch to Google '
-          'Maps. Location is only shared while a route is running.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Not now'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-    if (allow == true) await Geolocator.requestPermission();
-  } catch (e) {
-    debugPrint('background location offer skipped: $e');
-  }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../app/missed_bus_service.dart';
 import '../../widgets/logout_flow.dart';
 import '../../app/language_provider.dart';
 import '../../theme/app_theme.dart';
@@ -22,6 +24,34 @@ class _DriverLayoutState extends State<DriverLayout> {
   static const int _routeTab = 3;
 
   void _goToTab(int index) => setState(() => _tab = index);
+
+  @override
+  void initState() {
+    super.initState();
+    MissedBusService.instance.driverAcceptedJob.addListener(_onAcceptedJob);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onAcceptedJob());
+  }
+
+  @override
+  void dispose() {
+    MissedBusService.instance.driverAcceptedJob.removeListener(_onAcceptedJob);
+    super.dispose();
+  }
+
+  /// A family just accepted this driver's missed-bus fare: go straight to
+  /// the job's map with the pickup and drop-off already routed. Once per job
+  /// — backing out of the map does not reopen it (the Pickup Requests screen
+  /// keeps a button for that).
+  void _onAcceptedJob() {
+    final svc = MissedBusService.instance;
+    final job = svc.driverAcceptedJob.value;
+    if (job == null || svc.openedJobId == job.id || !mounted) return;
+    svc.openedJobId = job.id;
+    // A frame later, so the fare sheet closing in the same tick has gone.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.push('/driver/missed-bus-job');
+    });
+  }
 
   List<_NavItem> get _navItems => [
     _NavItem(

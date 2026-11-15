@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
@@ -118,7 +119,23 @@ class AccountService {
         case UserRole.admin:
           break;
       }
-      await Db.fs.collection('users').doc(uid).delete();
+      // A tombstone, not a hard delete: the admin panel must still list the
+      // account as "Deactivated" rather than have it vanish (or, for a
+      // parent, leave children pointing at nobody). Everything personal is
+      // erased — only the name and role stay, for the records that name it.
+      await Db.fs.collection('users').doc(uid).update({
+        'isDeleted': true,
+        'isActive': false,
+        'deletedAt': Db.now,
+        'deletedBy': uid,
+        'email': '',
+        'phone': '',
+        'photoUrl': FieldValue.delete(),
+        'fcmTokens': <String>[],
+        'emergencyContacts': <Map<String, dynamic>>[],
+        'isOnline': false,
+        'lastSeenAt': Db.now,
+      });
     } on FirebaseException catch (e) {
       debugPrint('delete (Firestore step) failed — ${e.code}: ${e.message}');
       throw const AccountException(

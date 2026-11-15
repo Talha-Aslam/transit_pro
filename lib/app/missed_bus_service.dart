@@ -47,6 +47,15 @@ class MissedBusService {
   /// on the driver's side of the same negotiation.
   final driverActiveBid = ValueNotifier<MissedBusRequest?>(null);
 
+  /// The pickup a family accepted from this driver and that is not finished
+  /// yet. The driver app opens the job map the moment this appears.
+  final driverAcceptedJob = ValueNotifier<core.MissedBusRequest?>(null);
+
+  /// The accepted job the driver app has already opened the map for, so it
+  /// is opened automatically once rather than on every rebuild.
+  String? openedJobId;
+  StreamSubscription<core.MissedBusRequest?>? _jobSub;
+
   StreamSubscription<core.MissedBusRequest?>? _activeSub;
   String? _watchingStudentId;
 
@@ -156,13 +165,99 @@ class MissedBusService {
           onError: (Object e) =>
               debugPrint('missed bus active bid watch failed: $e'),
         );
+    _jobSub?.cancel();
+    _jobSub = _repo
+        .watchMyAcceptedJob(driverId)
+        .listen(
+          (req) => driverAcceptedJob.value = req,
+          onError: (Object e) =>
+              debugPrint('missed bus accepted job watch failed: $e'),
+        );
   }
 
   void _stopWatchingMyBid() {
     _myBidSub?.cancel();
     _myBidSub = null;
+    _jobSub?.cancel();
+    _jobSub = null;
     _watchingDriverId = null;
     driverActiveBid.value = null;
+    driverAcceptedJob.value = null;
+  }
+
+  // ── Push to the other side ────────────────────────────────────────────────
+  //
+  // Every step of the negotiation is pushed to the other party, so a family
+  // that raised a request can lock their phone and still hear the moment a
+  // driver answers — and the driver hears the family's answer the same way.
+
+  String _familyRoute(core.MissedBusRequest r) => r.requestedBy == r.studentId
+      ? '/student/missed-bus'
+      : '/parent/missed-bus';
+
+  Future<core.MissedBusRequest?> _fetch(String id) async {
+    try {
+      return await _repo.fetch(id);
+    } catch (e) {
+      debugPrint('missed-bus fetch $id failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _tellFamily(
+    String requestId,
+    String title,
+    String Function(core.MissedBusRequest r) body,
+  ) async {
+    try {
+      final r = await _fetch(requestId);
+      if (r == null || r.requestedBy.isEmpty) return;
+      await PushSender.instance.notifyOne(
+        r.requestedBy,
+        core.UserNotification(
+          id: '',
+          type: core.NotificationType.missedBus,
+          title: title,
+          body: body(r),
+          data: {
+            'requestId': requestId,
+            'studentId': r.studentId,
+            'route': _familyRoute(r),
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('missed-bus family alert failed: $e');
+    }
+  }
+
+  Future<void> _tellDriver(
+    core.MissedBusRequest r,
+    String title,
+    String body, {
+    String route = '/driver/pickup-requests',
+  }) async {
+    final driverId = r.assignedDriverId ?? '';
+    if (driverId.isEmpty) return;
+    try {
+      await PushSender.instance.notifyOne(
+        driverId,
+        core.UserNotification(
+          id: '',
+          type: core.NotificationType.missedBus,
+          title: title,
+          body: body,
+          data: {'requestId': r.id, 'route': route},
+        ),
+      );
+    } catch (e) {
+      debugPrint('missed-bus driver alert failed: $e');
+    }
+  }
+
+  String get _myName {
+    final n = _session.driver.value?.name.trim() ?? '';
+    return n.isEmpty ? 'A driver' : n;
   }
 
   // ── Requester side ─────────────────────────────────────────────────────────
@@ -262,7 +357,17 @@ class MissedBusService {
   Future<void> cancelRequest() async {
     final req = studentActiveRequest.value;
     if (req == null) return;
+    final before = await _fetch(req.id);
     await _repo.cancelRequest(req.id);
+    if (before != null) {
+      unawaited(
+        _tellDriver(
+          before,
+          'Pickup request cancelled',
+          '${before.studentName} no longer needs the pickup.',
+        ),
+      );
+    }
   }
 
   /// Dismisses a resolved (declined/no-drivers) request and returns to the
@@ -305,11 +410,35 @@ class MissedBusService {
     final driver = _session.driver.value!;
     final bus = _session.bus.value!;
     await _repo.markViewing(requestId: requestId, driver: driver, bus: bus);
+    unawaited(
+      _tellFamily(
+        requestId,
+        'A driver is looking at your request',
+        (r) =>
+            '$_myName is checking whether they can collect '
+            '${r.studentName}. You will be told their fare next.',
+      ),
+    );
   }
 
   /// Step 2: the viewing driver sends a fare offer.
-  Future<void> sendBid({required String requestId, required int farePaisa}) =>
-      _repo.sendBid(requestId: requestId, farePaisa: farePaisa);
+  Future<void> sendBid({
+    required String requestId,
+    required int farePaisa,
+  }) async {
+    await _repo.sendBid(requestId: requestId, farePaisa: farePaisa);
+    final rupees = (farePaisa / 100).round();
+    unawaited(
+      _tellFamily(
+        requestId,
+        '$_myName offered Rs.$rupees',
+        (r) =>
+            '$_myName can collect ${r.studentName} from '
+            '${r.currentStopName} for Rs.$rupees. Open the app to accept or '
+            'reject the offer.',
+      ),
+    );
+  }
 
   /// A driver backs out of a request they're viewing or have bid on, before
   /// the requester has decided — same Firestore effect as the requester
@@ -318,6 +447,43 @@ class MissedBusService {
     final req = driverActiveBid.value;
     if (req == null) return;
     await _repo.rejectOffer(req.id);
+    unawaited(
+      _tellFamily(
+        req.id,
+        'Still looking for a driver',
+        (r) =>
+            '$_myName could not take the pickup for ${r.studentName}. '
+            'Other drivers can still answer.',
+      ),
+    );
+  }
+
+  /// The driver has the student on board.
+  Future<void> markPickedUp(core.MissedBusRequest job) async {
+    await _repo.markPickedUp(job.id);
+    unawaited(
+      _tellFamily(
+        job.id,
+        '${job.studentName} has been picked up',
+        (r) =>
+            '$_myName collected ${r.studentName} and is heading to '
+            '${r.destinationStopName}.',
+      ),
+    );
+  }
+
+  /// The student is at the destination — the job is finished.
+  Future<void> markCompleted(core.MissedBusRequest job) async {
+    await _repo.markCompleted(job.id);
+    unawaited(
+      _tellFamily(
+        job.id,
+        '${job.studentName} has been dropped off',
+        (r) =>
+            '$_myName dropped ${r.studentName} at '
+            '${r.destinationStopName}.',
+      ),
+    );
   }
 
   // ── Requester side: reviewing a bid ─────────────────────────────────────────
@@ -326,12 +492,35 @@ class MissedBusService {
     final req = studentActiveRequest.value;
     if (req == null) return;
     await _repo.confirmOffer(req.id);
+    final r = await _fetch(req.id);
+    if (r != null) {
+      unawaited(
+        _tellDriver(
+          r,
+          'Offer accepted — go collect ${r.studentName}',
+          '${r.studentName} is waiting at ${r.currentStopName}. Tap to open '
+              'the route to the pickup and drop-off.',
+          route: '/driver/missed-bus-job',
+        ),
+      );
+    }
   }
 
   Future<void> rejectOffer() async {
     final req = studentActiveRequest.value;
     if (req == null) return;
+    // Read before rejecting: rejecting clears the assigned driver.
+    final r = await _fetch(req.id);
     await _repo.rejectOffer(req.id);
+    if (r != null) {
+      unawaited(
+        _tellDriver(
+          r,
+          'Offer declined',
+          'The family declined your fare for ${r.studentName}.',
+        ),
+      );
+    }
   }
 
   // ── Mapping ────────────────────────────────────────────────────────────────
@@ -362,5 +551,8 @@ class MissedBusService {
     core.MissedBusStatus.declined => RequestStatus.declined,
     core.MissedBusStatus.noDrivers => RequestStatus.noDrivers,
     core.MissedBusStatus.cancelled => RequestStatus.cancelled,
+    // Never reaches the family's view (the watch excludes it); a finished
+    // ride reads as the accepted one it was.
+    core.MissedBusStatus.completed => RequestStatus.accepted,
   };
 }

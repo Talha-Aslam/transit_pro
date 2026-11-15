@@ -25,6 +25,7 @@ import '../screens/parent/edit_weekly_schedule_screen.dart';
 import '../screens/parent/change_password_screen.dart';
 import '../screens/parent/rate_app_screen.dart';
 import '../screens/chat/conversation_screen.dart';
+import '../screens/driver/driver_missed_bus_job_screen.dart';
 import '../screens/driver/driver_trip_map_screen.dart';
 import '../screens/driver/driver_timetables_screen.dart';
 import '../screens/driver/driver_layout.dart';
@@ -426,6 +427,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/driver/pickup-requests',
       builder: (context, state) => const DriverPickupRequestsScreen(),
+    ),
+    GoRoute(
+      path: '/driver/missed-bus-job',
+      builder: (context, state) => const DriverMissedBusJobScreen(),
     ),
     GoRoute(
       path: '/driver/ride-requests',

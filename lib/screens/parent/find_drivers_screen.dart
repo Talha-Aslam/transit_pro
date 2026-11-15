@@ -10,6 +10,8 @@ import '../../data/ride_request_repository.dart';
 import '../../app/round_display.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
+import '../../data/rating_repository.dart';
+import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/text_controller_scope.dart';
 import '../../widgets/app_glyph.dart';
@@ -713,22 +715,25 @@ class _DriverMatchCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: AvatarImage(
-                    localFile: null,
-                    photoUrl: d.photoUrl,
-                    size: 48,
-                    borderRadius: BorderRadius.circular(24),
-                    fallback: const Text(
-                      '🧑‍✈️',
-                      style: TextStyle(fontSize: 22),
+                TopRatedFrame(
+                  driverId: d.id,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: AvatarImage(
+                      localFile: null,
+                      photoUrl: d.photoUrl,
+                      size: 48,
+                      borderRadius: BorderRadius.circular(24),
+                      fallback: const Text(
+                        '🧑‍✈️',
+                        style: TextStyle(fontSize: 22),
+                      ),
                     ),
                   ),
                 ),
@@ -787,12 +792,15 @@ class _DriverMatchCard extends StatelessWidget {
                     color: context.textPrimary,
                   ),
                 ),
-                _Stat(
-                  label: 'RATING',
-                  value: d.ratingCount == 0
-                      ? 'New'
-                      : '${d.rating.toStringAsFixed(1)} (${d.ratingCount})',
-                  color: context.textPrimary,
+                // From the ratings themselves — the driver document's own
+                // rating fields are admin-only and never kept current.
+                FutureBuilder<DriverRatingSummary>(
+                  future: RatingRepository.instance.summaryFor(d.id),
+                  builder: (_, snap) => _Stat(
+                    label: 'RATING',
+                    value: (snap.data ?? const DriverRatingSummary()).label,
+                    color: context.textPrimary,
+                  ),
                 ),
               ],
             ),

@@ -8,7 +8,6 @@ import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/profile_service.dart';
-import '../../app/push_diagnostics.dart';
 import '../../app/ride_match_service.dart';
 import '../../app/round_display.dart';
 import '../../app/session_service.dart';
@@ -844,12 +843,6 @@ class _ParentProfileState extends State<ParentProfile> {
                                 icon: '📄',
                                 label: AppStrings.t('terms_lbl'),
                                 onTap: () => context.push('/parent/terms'),
-                              ),
-                              _MenuItem(
-                                materialIcon:
-                                    Icons.notifications_active_outlined,
-                                label: 'Test notifications',
-                                onTap: () => runPushTest(context),
                               ),
                               _MenuItem(
                                 materialIcon:

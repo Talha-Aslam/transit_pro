@@ -60,6 +60,12 @@ class AppNotification {
     this.kind,
   });
 
+  /// Whether [n] belongs on the "Alerts" tab: every real activity — trip
+  /// events, chat, seat requests, fee updates, missed-bus replies and
+  /// emergencies. Only generic `system` notices are left out. A device-local
+  /// item (null [kind]) is a geofence alert raised by this phone, so it counts.
+  static bool isAlert(AppNotification n) => n.kind != NotificationType.system;
+
   AppNotification copyWith({bool? read}) => AppNotification(
     id: id,
     kind: kind,
@@ -390,6 +396,7 @@ class NotificationService {
         NotificationType.routeCompleted => ('🌇', Color(0xFF10B981)),
         NotificationType.pickupAssigned => ('🧑‍✈️', Color(0xFF10B981)),
         NotificationType.rideRequest => ('📬', Color(0xFFF59E0B)),
+        NotificationType.rating => ('⭐', Color(0xFFF59E0B)),
         NotificationType.rideRequestAnswered => ('📨', Color(0xFF3B82F6)),
         NotificationType.payment => ('💳', Color(0xFF10B981)),
         NotificationType.document => ('📜', Color(0xFF8B5CF6)),

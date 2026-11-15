@@ -6,6 +6,7 @@ import '../../app/student_data_service.dart';
 import '../../app/vehicle_capacity.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
 import 'student_driver_chat.dart';
 import '../../widgets/app_glyph.dart';
@@ -151,23 +152,27 @@ class _StudentDriverDetailsScreenState
                     ),
                     child: Column(
                       children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.parentGradient,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: AvatarImage(
-                            localFile: null,
-                            photoUrl: SessionService.instance
-                                .driverFor(widget.student.driverId)
-                                ?.photoUrl,
-                            size: 72,
-                            borderRadius: BorderRadius.circular(18),
-                            fallback: const Text(
-                              '🧑‍✈️',
-                              style: TextStyle(fontSize: 34),
+                        TopRatedFrame(
+                          driverId: widget.student.driverId,
+                          radius: 21,
+                          child: Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.parentGradient,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: AvatarImage(
+                              localFile: null,
+                              photoUrl: SessionService.instance
+                                  .driverFor(widget.student.driverId)
+                                  ?.photoUrl,
+                              size: 72,
+                              borderRadius: BorderRadius.circular(18),
+                              fallback: const Text(
+                                '🧑‍✈️',
+                                style: TextStyle(fontSize: 34),
+                              ),
                             ),
                           ),
                         ),

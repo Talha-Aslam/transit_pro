@@ -59,7 +59,9 @@ class _ParentNotificationsState extends State<ParentNotifications> {
         ? _svc.history.value
         : [
             for (final n in _svc.history.value)
-              if (_childOf(n) == childId) n,
+              // Family-wide items (chat, fees, seat requests) carry no child,
+              // and must not vanish because a child chip is selected.
+              if (_childOf(n) == null || _childOf(n) == childId) n,
           ];
     switch (_activeFilter) {
       case 'Unread':
@@ -67,7 +69,9 @@ class _ParentNotificationsState extends State<ParentNotifications> {
       case 'Today':
         return all.where((n) => n.date == 'Today').toList();
       case 'Alerts':
-        return all.where((n) => n.type == 'alert').toList();
+        // Every real event — trips, chat, seat requests, fees, missed-bus
+        // replies, emergencies — not only the red emergency kinds.
+        return all.where(AppNotification.isAlert).toList();
       default:
         return all;
     }

@@ -972,7 +972,14 @@ class _ParentDashboardState extends State<ParentDashboard> {
                         // reserved for a safety layer that doesn't exist),
                         // and a fourth invented number is worse than three
                         // honest ones.
-                        _StatsRow(children: children),
+                        // Only the selected child's figures — children can ride
+                        // with different drivers, so a family-wide sum read
+                        // as one child's history. Keyed by child so switching
+                        // tabs never shows the previous child's numbers.
+                        _StatsRow(
+                          key: ValueKey('stats-${child?.id ?? ''}'),
+                          children: [?child],
+                        ),
                         const SizedBox(height: 20),
 
                         // â”€â”€ Recent alerts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1076,7 +1083,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
   }
 }
 
-/// Family-wide trip stats (total rides, on-time %, rides this week), computed
+/// One child's trip stats (total rides, on-time %, rides this week), computed
 /// from real attendance/trip data rather than the old invented trip list.
 ///
 /// Listens once per child (not on every parent-dashboard rebuild — a
@@ -1086,7 +1093,7 @@ class _ParentDashboardState extends State<ParentDashboard> {
 class _StatsRow extends StatefulWidget {
   final List<ChildInfo> children;
 
-  const _StatsRow({required this.children});
+  const _StatsRow({super.key, required this.children});
 
   @override
   State<_StatsRow> createState() => _StatsRowState();
@@ -1151,8 +1158,12 @@ class _StatsRowState extends State<_StatsRow> {
 
   Future<void> _recompute() async {
     final generation = ++_generation;
+    // Each feed is filtered to its own child again: the collection-group
+    // query is by `studentId`, but a stray row from another child must never
+    // be counted here.
     final stats = await familyTripStats([
-      for (final list in _records.values) ...list,
+      for (final e in _records.entries)
+        ...e.value.where((r) => r.studentId == e.key),
     ], tripFor: _tripFor);
     if (!mounted || generation != _generation) return;
     setState(() => _stats = stats);

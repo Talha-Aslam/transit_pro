@@ -8,6 +8,7 @@ import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/child_selector.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/app_glyph.dart';
 
@@ -213,21 +214,25 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                         padding: const EdgeInsets.all(18),
                         child: Column(
                           children: [
-                            Container(
-                              width: 76,
-                              height: 76,
-                              decoration: BoxDecoration(
-                                gradient: AppTheme.parentGradient,
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: AvatarImage(
-                                localFile: null,
-                                photoUrl: _driver?.photoUrl,
-                                size: 76,
-                                borderRadius: BorderRadius.circular(22),
-                                fallback: const Text(
-                                  '🧑‍✈️',
-                                  style: TextStyle(fontSize: 34),
+                            TopRatedFrame(
+                              driverId: _driver?.id ?? '',
+                              radius: 25,
+                              child: Container(
+                                width: 76,
+                                height: 76,
+                                decoration: BoxDecoration(
+                                  gradient: AppTheme.parentGradient,
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                child: AvatarImage(
+                                  localFile: null,
+                                  photoUrl: _driver?.photoUrl,
+                                  size: 76,
+                                  borderRadius: BorderRadius.circular(22),
+                                  fallback: const Text(
+                                    '🧑‍✈️',
+                                    style: TextStyle(fontSize: 34),
+                                  ),
                                 ),
                               ),
                             ),

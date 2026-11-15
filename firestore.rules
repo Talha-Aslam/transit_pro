@@ -113,6 +113,14 @@ service cloud.firestore {
       allow delete: if signedIn() && (userId == uid() || isAdmin());
     }
 
+    // Sign-in / sign-out history the admin panel shows as "Access". The
+    // owner appends; nobody edits or erases history from a client.
+    match /users/{userId}/accessLog/{entryId} {
+      allow read: if isAdmin() || (signedIn() && userId == uid());
+      allow create: if signedIn() && userId == uid();
+      allow update, delete: if false;
+    }
+
     // ── students ────────────────────────────────────────────────────────────
     //
     // Readable by the owning parent, the student themselves, any driver (they
@@ -201,9 +209,17 @@ service cloud.firestore {
 
       // Drivers may edit their own details but cannot approve themselves,
       // reassign their own bus, or inflate their own rating.
+      //
+      // `status` carries both approval (pendingVerification / suspended —
+      // admin-only) and presence (offline / online / onTrip — the driver's
+      // app keeps it current). A driver may move only between the presence
+      // values: without this the app's online/offline writes were all
+      // denied, and the admin panel showed every driver offline.
       allow update: if signedIn()
                     && ((driverId == uid()
-                         && unchanged('status')
+                         && (unchanged('status')
+                             || (resource.data.get('status', '') in ['offline', 'online', 'onTrip']
+                                 && request.resource.data.status in ['offline', 'online', 'onTrip']))
                          && unchanged('rating')
                          && unchanged('ratingCount')
                          && unchanged('busId')
@@ -229,8 +245,16 @@ service cloud.firestore {
     match /buses/{busId} {
       allow read: if signedIn();
 
+      // `getAfter`, not `isDriver()`: a driver's sign-up writes their user
+      // record and their bus in one batch, and rules read a batch's other
+      // documents as they were *before* it — so `isDriver()` saw no user
+      // record yet, refused the bus, and with it the whole sign-up. The
+      // account was left signed in to Auth with no profile behind it.
       allow create: if isAdmin()
-                    || (isDriver() && request.resource.data.driverId == uid());
+                    || (signedIn()
+                        && request.resource.data.driverId == uid()
+                        && getAfter(/databases/$(database)/documents/users/$(uid()))
+                             .data.role == 'driver');
 
       allow update: if isAdmin()
                     || (resource.data.driverId == uid()

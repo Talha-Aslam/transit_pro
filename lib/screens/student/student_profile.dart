@@ -7,7 +7,6 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/auth_service.dart';
 import '../../app/language_provider.dart';
 import '../../app/profile_service.dart';
-import '../../app/push_diagnostics.dart';
 import '../../app/student_data_service.dart';
 import '../../app/session_service.dart';
 import '../../app/subscription_provider.dart';
@@ -801,11 +800,6 @@ class _StudentProfileState extends State<StudentProfile> {
                             icon: '📋',
                             label: AppStrings.t('terms_lbl'),
                             onTap: () => context.push('/student/terms'),
-                          ),
-                          _SettingTile(
-                            materialIcon: Icons.notifications_active_outlined,
-                            label: 'Test notifications',
-                            onTap: () => runPushTest(context),
                           ),
                           _SettingTile(
                             materialIcon: Icons.pause_circle_outline_rounded,

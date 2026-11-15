@@ -4,7 +4,7 @@
       "android": {
         "default": {
           "projectId": "transitpro-db",
-          "appId": "1:231263449779:android:140f82afb54519da2f76c6",
+          "appId": "1:231263449779:android:56ca56204fbe3a872f76c6",
           "fileOutput": "android/app/google-services.json"
         }
       },
@@ -12,7 +12,7 @@
         "lib/firebase_options.dart": {
           "projectId": "transitpro-db",
           "configurations": {
-            "android": "1:231263449779:android:140f82afb54519da2f76c6",
+            "android": "1:231263449779:android:56ca56204fbe3a872f76c6",
             "ios": "1:231263449779:ios:442d1b9bd602114a2f76c6",
             "macos": "1:231263449779:ios:442d1b9bd602114a2f76c6",
             "web": "1:231263449779:web:12e9bb6b22a9f0a52f76c6",
@@ -33,7 +33,20 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
     }
-  ]
+  ],
+  "hosting": {
+    "public": "legal_site",
+    "cleanUrls": true,
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ]
+  }
 }

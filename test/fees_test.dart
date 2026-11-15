@@ -138,13 +138,13 @@ void main() {
       );
     });
 
-    test('every profile can test push notifications', () {
+    test('no profile shows the push test button', () {
       for (final p in [
         'lib/screens/driver/driver_profile.dart',
         'lib/screens/parent/parent_profile.dart',
         'lib/screens/student/student_profile.dart',
       ]) {
-        expect(read(p), contains('runPushTest(context)'), reason: p);
+        expect(read(p), isNot(contains('runPushTest(context)')), reason: p);
       }
     });
   });

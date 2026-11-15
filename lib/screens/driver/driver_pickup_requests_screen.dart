@@ -22,11 +22,13 @@ class _DriverPickupRequestsScreenState
   void initState() {
     super.initState();
     _service.driverIncomingRequests.addListener(_rebuild);
+    _service.driverAcceptedJob.addListener(_rebuild);
   }
 
   @override
   void dispose() {
     _service.driverIncomingRequests.removeListener(_rebuild);
+    _service.driverAcceptedJob.removeListener(_rebuild);
     super.dispose();
   }
 
@@ -146,6 +148,30 @@ class _DriverPickupRequestsScreenState
                   ],
                 ),
               ),
+
+              // An accepted pickup still to finish — always one tap from its
+              // map, even after the driver backed out of it.
+              if (_service.driverAcceptedJob.value != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => context.push('/driver/missed-bus-job'),
+                      icon: const Icon(Icons.map_rounded, size: 18),
+                      label: Text(
+                        'Accepted pickup — '
+                        '${_service.driverAcceptedJob.value!.studentName}. '
+                        'Open route',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.success,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ),
 
               // ── Body ─────────────────────────────────────────────────────
               Expanded(
@@ -451,7 +477,15 @@ class _BidSheetState extends State<_BidSheet> {
     // this sheet to do.
     final bid = _service.driverActiveBid.value;
     if (bid == null || bid.status == RequestStatus.accepted) {
-      Navigator.of(context).maybePop();
+      // Remove this sheet itself, never whatever is on top: on acceptance the
+      // job map is pushed over it, and a plain pop would close the map.
+      final route = ModalRoute.of(context);
+      if (route == null || !route.isActive) return;
+      if (route.isCurrent) {
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).removeRoute(route);
+      }
       return;
     }
     setState(() {});

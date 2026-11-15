@@ -243,7 +243,7 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Family timings',
+                  'Student timings',
                   style: TextStyle(
                     color: context.textPrimary,
                     fontSize: 20,

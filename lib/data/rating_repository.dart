@@ -107,6 +107,29 @@ class RatingRepository {
   }
 
   /// Whether [raterId] may still rate [driverId] this week.
+  /// Average and count from this driver's ratings, cached for a few minutes
+  /// so a list of drivers does not query the same driver per rebuild.
+  Future<DriverRatingSummary> summaryFor(String driverId) {
+    final now = DateTime.now();
+    final hit = _summaries[driverId];
+    if (hit != null && now.difference(hit.$1) < const Duration(minutes: 3)) {
+      return hit.$2;
+    }
+    final future = Db.ratings
+        .where('driverId', isEqualTo: driverId)
+        .limit(500)
+        .get()
+        .then((s) => DriverRatingSummary.of(s.docs.map((d) => d.data())))
+        .catchError((Object _) => const DriverRatingSummary());
+    _summaries[driverId] = (now, future);
+    return future;
+  }
+
+  final _summaries = <String, (DateTime, Future<DriverRatingSummary>)>{};
+
+  /// Forgets [driverId]'s cached summary — after a rating was just added.
+  void invalidate(String driverId) => _summaries.remove(driverId);
+
   Future<bool> canRate({
     required String driverId,
     required String raterId,

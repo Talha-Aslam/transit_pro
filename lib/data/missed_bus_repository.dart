@@ -85,6 +85,33 @@ class MissedBusRepository {
       .snapshots()
       .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
 
+  /// The pickup this driver has had accepted and not yet finished — what the
+  /// driver's job map runs off. Same index as [watchMyActiveBid].
+  Stream<MissedBusRequest?> watchMyAcceptedJob(String driverId) => Db
+      .missedBusRequests
+      .where('assignedDriverId', isEqualTo: driverId)
+      .where('status', isEqualTo: MissedBusStatus.accepted.name)
+      .orderBy('createdAt', descending: true)
+      .limit(1)
+      .snapshots()
+      .map((s) => s.docs.isEmpty ? null : s.docs.first.data());
+
+  Future<MissedBusRequest?> fetch(String requestId) async =>
+      (await Db.missedBusRequests.doc(requestId).get()).data();
+
+  /// The driver has the student on board.
+  Future<void> markPickedUp(String requestId) => Db.fs
+      .collection('missedBusRequests')
+      .doc(requestId)
+      .update({'pickedUpAt': Db.now});
+
+  /// The driver dropped the student at the destination — the job is over.
+  Future<void> markCompleted(String requestId) =>
+      Db.fs.collection('missedBusRequests').doc(requestId).update({
+        'status': MissedBusStatus.completed.name,
+        'completedAt': Db.now,
+      });
+
   Future<String> raiseRequest(MissedBusRequest request) async {
     final ref = await Db.missedBusRequests.add(request);
     await ref.update({'createdAt': Db.now});

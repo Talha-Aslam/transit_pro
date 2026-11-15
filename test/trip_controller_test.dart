@@ -118,6 +118,9 @@ void main() {
       optimizer: optimizer,
       backend: backend,
       clock: () => now,
+      // The fixtures' distances were laid out around a five-minute lead; the
+      // app's own default (ten) is checked on its own below.
+      nearbyLead: const Duration(minutes: 5),
     );
   });
 
@@ -521,6 +524,26 @@ void main() {
     });
   });
 
+  test('families are warned ten minutes ahead by default', () {
+    expect(
+      TripController(optimizer: optimizer, backend: backend).nearbyLead,
+      const Duration(minutes: 10),
+    );
+  });
+
+  test('every family on the round hears the route has started', () async {
+    await startPickup([
+      kid('S1', a),
+      kid('S2', b, absent: ['2026-11-09']),
+      kid('S3', c),
+    ]);
+    final started = [
+      for (final e in backend.events)
+        if (e.$2 == FamilyEvent.routeStarted) e.$1,
+    ];
+    expect(started, unorderedEquals(['S1', 'S3']), reason: 'S2 is off today');
+  });
+
   group('five minutes before a pickup', () {
     List<String> warned() => [
       for (final e in backend.events)
@@ -560,7 +583,7 @@ void main() {
       expect(warned(), ['S1']);
     });
 
-    test('the ride home sends no pickup warning', () async {
+    test('the ride home warns nobody before they are on board', () async {
       await ctl.start(
         TripStartRequest(
           driverId: 'd',

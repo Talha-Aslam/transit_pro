@@ -26,6 +26,7 @@ import '../../widgets/app_glyph.dart';
   NotificationType.routeCompleted => ('🌇', AppTheme.success),
   NotificationType.pickupAssigned => ('🧑‍✈️', AppTheme.success),
   NotificationType.rideRequest => ('📬', AppTheme.warning),
+  NotificationType.rating => ('⭐', AppTheme.warning),
   NotificationType.rideRequestAnswered => ('📨', AppTheme.info),
   NotificationType.payment => ('💳', AppTheme.success),
   NotificationType.document => ('📜', AppTheme.purple),
@@ -43,10 +44,14 @@ import '../../widgets/app_glyph.dart';
 /// produce read as `Admin`; the fully automated bus/route/attendance events
 /// read as `System`.
 String _tabFor(NotificationType type) => switch (type) {
-  NotificationType.chat || NotificationType.rideRequest => 'Parents',
-  NotificationType.document ||
-  NotificationType.payment ||
+  // Fees and fee answers come from families, as do missed-bus asks.
+  NotificationType.chat ||
+  NotificationType.rideRequest ||
   NotificationType.rideRequestAnswered ||
+  NotificationType.payment ||
+  NotificationType.rating ||
+  NotificationType.missedBus => 'Parents',
+  NotificationType.document ||
   NotificationType.pickupAssigned ||
   NotificationType.adminMessage => 'Admin',
   _ => 'System',

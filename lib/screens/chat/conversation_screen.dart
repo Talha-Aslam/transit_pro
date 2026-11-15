@@ -855,7 +855,9 @@ class _ThreadRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    preview.isEmpty ? '—' : preview,
+                    preview.isEmpty
+                        ? 'No messages yet — tap to start'
+                        : preview,
                     style: TextStyle(
                       color: context.textSecondary,
                       fontSize: 12,

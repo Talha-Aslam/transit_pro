@@ -139,11 +139,13 @@ class _LoginScreenState extends State<LoginScreen> {
           // Dismissing the account sheet is not a failure — say nothing.
           return;
 
+        case GoogleNotRegistered(email: final email):
+          await _offerGoogleRegistration(email);
+
         case GoogleNeedsProfile():
-          // First-time Google account, or one that closed the app before
-          // finishing onboarding last time. Either way the role is already
-          // recorded on the profile now — onboarding reads it from there and
-          // does not ask again.
+          // An account that closed the app before finishing onboarding last
+          // time. The role is already recorded on the profile — onboarding
+          // reads it from there and does not ask again.
           context.go('/complete-profile');
 
         case GoogleSignedIn(user: final user):
@@ -161,6 +163,61 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _loading = false;
         _error = 'Something went wrong. Please try again.';
+      });
+    }
+  }
+
+  /// The Google account has no profile. Say so plainly — nothing in the app
+  /// has been opened — and let the user either register it as this role or
+  /// back out and pick another account.
+  Future<void> _offerGoogleRegistration(String email) async {
+    final roleName = switch (_role) {
+      UserRole.driver => 'Driver',
+      UserRole.student => 'Student',
+      _ => 'Parent',
+    };
+    final create = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('No profile found'),
+        content: Text(
+          '${email.isEmpty ? 'This Google account' : email} is not registered '
+          'as a $roleName.\n\nYou can create a new $roleName account with it, '
+          'or go back and choose another account.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Go back'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Create $roleName account'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+
+    if (create != true) {
+      await AuthService.instance.cancelGoogleRegistration();
+      if (!mounted) return;
+      setState(() => _error = 'Account not registered as a $roleName.');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.registerGoogleAccount(role: _role);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      context.go('/complete-profile');
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
       });
     }
   }

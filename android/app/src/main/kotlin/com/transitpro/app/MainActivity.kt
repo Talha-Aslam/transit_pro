@@ -1,4 +1,4 @@
-package com.example.transit_pro
+package com.transitpro.app
 
 import io.flutter.embedding.android.FlutterActivity
 

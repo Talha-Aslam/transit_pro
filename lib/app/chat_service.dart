@@ -65,7 +65,7 @@ class ChatService {
           // A preview, not the whole essay — a lock screen truncates
           // anyway, and the thread is one tap away.
           body: text.length > 140 ? '${text.substring(0, 139)}…' : text,
-          data: {'chatId': chatId, 'route': ?route},
+          data: {'chatId': chatId, 'route': ?route, 'studentId': ?studentId},
         ),
       );
     } catch (e) {

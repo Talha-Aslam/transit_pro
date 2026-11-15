@@ -13,6 +13,7 @@ import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/student_logistics.dart';
 import '../../widgets/app_glyph.dart';
+import '../chat/conversation_screen.dart';
 
 /// The driver's roster — everyone who has a seat on one of their rounds.
 ///
@@ -968,11 +969,7 @@ class _BookedPassengerCard extends StatelessWidget {
 
 /// Everything the driver knows about one rider, from live records only.
 ///
-/// The chat thread and "alert the parent" chips that used to live here were
-/// backed by hardcoded messages and a device-local notification that never left
-/// the driver's phone, so they have been removed rather than dressed up in real
-/// names. Messaging a family is `MessagingRepository`'s job and belongs on a
-/// screen that actually does it.
+/// Chat buttons open the real [ConversationScreen] for this rider's family.
 class _PassengerDetailSheet extends StatelessWidget {
   final Student student;
   final DriverSchedule? round;
@@ -1071,6 +1068,12 @@ class _PassengerDetailSheet extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  // The driver can open a conversation with any family on the
+                  // roster — not only reply to one that wrote first. Opening
+                  // the conversation creates the thread, which is what puts it
+                  // in the driver's Messages list from then on.
+                  _ChatButtons(student: student),
                   const SizedBox(height: 16),
                   GlassCard(
                     enableBlur: false,
@@ -1415,6 +1418,71 @@ class _SummaryPill extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Chat with parent" / "Chat with student" for one rider.
+///
+/// A child added by a parent has no login of their own, so the conversation is
+/// with the parent. A self-registered student *is* the account (their student
+/// id is their uid), so the conversation is with them. Either way the thread
+/// is keyed by the student id, exactly as the family's own chat screen keys it,
+/// so both sides land in the same thread.
+class _ChatButtons extends StatelessWidget {
+  final Student student;
+
+  const _ChatButtons({required this.student});
+
+  void _open(
+    BuildContext context, {
+    required String peerId,
+    required String peerName,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ConversationScreen(
+          peerId: peerId,
+          peerName: peerName,
+          subtitle: [
+            if (student.grade.isNotEmpty) student.grade,
+            if (student.school.isNotEmpty) student.school,
+          ].join(' · '),
+          studentId: student.id,
+          senderRole: 'driver',
+          accentGradient: AppTheme.driverGradient,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = student.name.trim().isEmpty ? 'Student' : student.name.trim();
+    final hasParent = student.parentId.trim().isNotEmpty;
+    final peerId = hasParent ? student.parentId.trim() : student.id;
+    final label = hasParent ? "Chat with $name's parent" : 'Chat with $name';
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: peerId.isEmpty
+            ? null
+            : () => _open(
+                context,
+                peerId: peerId,
+                peerName: hasParent ? "$name's parent" : name,
+              ),
+        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+        label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppTheme.driverCyan,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       ),
     );

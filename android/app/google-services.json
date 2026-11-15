@@ -31,6 +31,14 @@
           }
         },
         {
+          "client_id": "231263449779-h1jodcsch08n74pffpi3j906ksfbk2dd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.transit_pro",
+            "certificate_hash": "db035acd52329d4b156ca9385adadd55eac24f6c"
+          }
+        },
+        {
           "client_id": "231263449779-k4lgheujqaukh1iakr0o7fcdcnmkf396.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -46,6 +54,88 @@
       "api_key": [
         {
           "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
+        },
+        {
+          "current_key": "AIzaSyDgdTIjAGxIHJs88vV7_hfqnIba93kcLcc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "231263449779-3t0ru7d3nb5h23luipmoutdq0jc7isq0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.transitpro.transitAdmin"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:231263449779:android:56ca56204fbe3a872f76c6",
+        "android_client_info": {
+          "package_name": "com.transitpro.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "231263449779-52hber2j3va0k8hdloqt8qg1pqaig8um.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.app",
+            "certificate_hash": "db035acd52329d4b156ca9385adadd55eac24f6c"
+          }
+        },
+        {
+          "client_id": "231263449779-ftl36p1q85oa8pt0o2v8kr2in5g5pv1v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.app",
+            "certificate_hash": "dad127083904e91b28f61fd242f843c7e15d5736"
+          }
+        },
+        {
+          "client_id": "231263449779-kl2qfaar9qf1imi9f5qvd1j6fagde1vh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.app",
+            "certificate_hash": "5ce643599747d7ca35acff00ea49c805ceb1b895"
+          }
+        },
+        {
+          "client_id": "231263449779-mgdimnq0nku2vioh3fleq9t9j2cvecgd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.app",
+            "certificate_hash": "4aaccc9897e5adc4e4d782775f4f78f4c911a82c"
+          }
+        },
+        {
+          "client_id": "231263449779-s7iatrpcgptb2q632d2e17c566jibipe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.app",
+            "certificate_hash": "4721e660131157e1e156b69e45b3caeb926df913"
+          }
+        },
+        {
+          "client_id": "231263449779-k3tsdb8h0pvl45g5f3m6jmlegsjb7g2m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
+        },
+        {
+          "current_key": "AIzaSyDgdTIjAGxIHJs88vV7_hfqnIba93kcLcc"
         }
       ],
       "services": {
@@ -83,6 +173,14 @@
           }
         },
         {
+          "client_id": "231263449779-d60sgqduvb5il7uesuh9cb3k66sebvk9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.transitpro.transit_admin",
+            "certificate_hash": "db035acd52329d4b156ca9385adadd55eac24f6c"
+          }
+        },
+        {
           "client_id": "231263449779-l6fklb1bs39f0vphrgdhkksuq8m2lt2q.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -106,6 +204,9 @@
       "api_key": [
         {
           "current_key": "AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U"
+        },
+        {
+          "current_key": "AIzaSyDgdTIjAGxIHJs88vV7_hfqnIba93kcLcc"
         }
       ],
       "services": {

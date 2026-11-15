@@ -13,7 +13,11 @@ enum TripLegKind { pickup, dropoff }
 
 /// What a family is told about, as the round goes on.
 enum FamilyEvent {
-  /// The van is within [TripController.nearbyLead] of the child's pickup.
+  /// The driver has started the round this child is on.
+  routeStarted,
+
+  /// The van is within [TripController.nearbyLead] of the child's stop —
+  /// their pickup in the morning, their drop-off on the way home.
   nearby,
   arriving,
   boarded,
@@ -150,7 +154,7 @@ class TripController extends ChangeNotifier {
     this.etaRefresh = const Duration(minutes: 2, seconds: 30),
     this.dwellBeforeSuggest = const Duration(seconds: 20),
     this.dwellPerStop = const Duration(seconds: 45),
-    this.nearbyLead = const Duration(minutes: 5),
+    this.nearbyLead = const Duration(minutes: 10),
     this.instituteGroupMeters = 150,
   }) : _now = clock ?? DateTime.now;
 
@@ -483,6 +487,12 @@ class TripController extends ChangeNotifier {
     _trip = trip;
     await backend.createTrip(trip, req.riders);
 
+    // Every family on the round hears the van has set off — a child kept home
+    // today or with no pin is not on [riders], so is not told.
+    for (final r in riders) {
+      backend.notifyFamily(r, FamilyEvent.routeStarted, _leg);
+    }
+
     // The first pickup can already be minutes away when the round starts.
     if (_flagNearby()) unawaited(_persist());
     notifyListeners();
@@ -684,10 +694,14 @@ class TripController extends ChangeNotifier {
   /// [nearbyLead], once per stop. Returns whether any stop was flagged, so
   /// the caller can save it.
   bool _flagNearby() {
-    if (_trip == null || _leg != TripLegKind.pickup) return false;
+    if (_trip == null) return false;
+    // A gate in the morning; a home on the way back.
+    final kind = _leg == TripLegKind.pickup
+        ? TripStopKind.pickup
+        : TripStopKind.drop;
     var flagged = false;
     for (final s in openStops) {
-      if (s.kind != TripStopKind.pickup ||
+      if (s.kind != kind ||
           s.nearbyAlerted ||
           s.status != TripStopStatus.pending) {
         continue;

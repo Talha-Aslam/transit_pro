@@ -203,8 +203,6 @@ class _DriverRouteState extends State<DriverRoute> {
       return;
     }
     if (!mounted) return;
-    await offerBackgroundLocation(context);
-    if (!mounted) return;
 
     final leg = await _askDirection(schedule);
     if (leg == null || !mounted) return;

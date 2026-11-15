@@ -14,6 +14,7 @@ import 'fee_billing_service.dart';
 import 'seat_reconciler.dart';
 import 'trip_session.dart';
 import 'notification_service.dart';
+import 'presence_service.dart';
 import 'push_notification_service.dart';
 
 /// Where the signed-in user stands, from the router's point of view.
@@ -263,6 +264,10 @@ class SessionService extends ChangeNotifier {
     // an empty notification list.
     NotificationService.instance.bindToUser(uid);
 
+    // Online / last seen for the admin panel. The role follows once the
+    // user document arrives (see `_subscribeRoleData`).
+    PresenceService.instance.bind(uid);
+
     // Fire-and-forget: this shows an OS permission dialog and does a
     // network round trip (`getToken()`), neither of which should hold up
     // sign-in — the caller is already past the point of needing this to
@@ -296,6 +301,10 @@ class SessionService extends ChangeNotifier {
     // Captured before `_uid` is cleared below — `unregisterForUser` needs
     // it to remove the right entry from `fcmTokens`.
     final signingOutUid = _uid;
+
+    // First, while the Firebase session is still valid: mark this account
+    // offline so the admin panel does not show it online until it times out.
+    await PresenceService.instance.unbind();
 
     for (final sub in _subs) {
       await sub.cancel();
@@ -429,6 +438,10 @@ class SessionService extends ChangeNotifier {
     if (_subscribedRole == u.role) return;
     _subscribedRole = u.role;
     final uid = u.uid;
+    PresenceService.instance.updateRole(
+      u.role,
+      driverStatus: () => driver.value?.status,
+    );
 
     switch (u.role) {
       case UserRole.parent:

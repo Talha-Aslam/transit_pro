@@ -55,6 +55,15 @@ class GoogleNeedsProfile extends GoogleOutcome {
   const GoogleNeedsProfile(this.profile);
 }
 
+/// Authenticated with Google, but this account has no Transit Pro profile.
+///
+/// Nothing has been written and no session started. The caller must either
+/// [AuthService.registerGoogleAccount] or [AuthService.cancelGoogleRegistration].
+class GoogleNotRegistered extends GoogleOutcome {
+  final String email;
+  const GoogleNotRegistered({required this.email});
+}
+
 /// Signed in against an existing, complete profile.
 class GoogleSignedIn extends GoogleOutcome {
   final AppUser user;
@@ -162,7 +171,15 @@ class AuthService {
         password: password,
       );
     } on FirebaseAuthException catch (e) {
-      throw AuthException(_messageFor(e));
+      // A sign-up that failed half way leaves the login behind with no
+      // profile, so the same email is "already in use" for ever after. The
+      // owner of that login — proven by the password — finishes it here
+      // instead of being stuck.
+      final resumed = e.code == 'email-already-in-use'
+          ? await _resumeUnfinishedSignUp(email, password)
+          : null;
+      if (resumed == null) throw AuthException(_messageFor(e));
+      cred = resumed;
     }
 
     final user = cred.user;
@@ -207,6 +224,29 @@ class AuthService {
     }
   }
 
+  /// Signs in to a login whose sign-up never got as far as a profile, so the
+  /// sign-up can be finished. Null when the password is wrong or the account
+  /// is a complete one — a real "email already in use".
+  Future<UserCredential?> _resumeUnfinishedSignUp(
+    String email,
+    String password,
+  ) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = cred.user;
+      if (user == null) return null;
+      final existing = await UserRepository.instance.fetchUser(user.uid);
+      if (existing == null) return cred;
+      await _auth.signOut();
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// How long a single network round trip inside sign-in gets before this
   /// gives up and says so, rather than leaving the caller's loading spinner
   /// running against a Firestore retry cycle that may never surface an error.
@@ -235,9 +275,17 @@ class AuthService {
         // earlier account on this device could still be read back by the
         // router's `auth.cachedRole ?? 'parent'` fallback on a later sign-in.
         await signOut();
+        // Almost always a sign-up that stopped before its profile was
+        // saved; signing up again with the same details finishes it.
         throw const AuthException(
-          'This account has no profile. Please contact your administrator.',
+          "This account's sign-up did not finish. Please sign up again with "
+          'the same email and password to complete it.',
         );
+      }
+
+      if (profile.isDeleted) {
+        await _finishSelfDeletion(user);
+        throw const AuthException('This account has been deleted.');
       }
 
       if (!profile.isActive) {
@@ -317,46 +365,36 @@ class AuthService {
       final user = cred.user;
       if (user == null) throw const AuthException('Google sign-in failed.');
 
-      await SessionService.instance.start(user.uid);
-
-      var profile = await UserRepository.instance
+      // Every check runs BEFORE the session starts. The router redirects off
+      // the session, so starting it first (as this used to) let an account
+      // with the wrong role, or no profile at all, land on a dashboard for a
+      // moment — showing whatever the screens had cached — before the checks
+      // below signed it out again.
+      final profile = await UserRepository.instance
           .fetchUser(user.uid)
           .timeout(_authTimeout);
 
       if (profile == null) {
-        // First Google sign-in for this account. Persist the base record now
-        // — see the method doc for why this, not memory, is what makes an
-        // abandoned onboarding attempt recoverable.
-        profile = AppUser(
-          uid: user.uid,
-          role: role,
-          name: user.displayName ?? googleUser.displayName ?? '',
-          email: user.email ?? googleUser.email,
-          photoUrl: user.photoURL ?? googleUser.photoUrl,
-        );
-        await UserRepository.instance.createUser(profile).timeout(_authTimeout);
+        // Not registered. Nothing is written and no session is started: the
+        // login screen says so and offers to create the account, see
+        // [registerGoogleAccount] / [cancelGoogleRegistration].
+        return GoogleNotRegistered(email: user.email ?? googleUser.email);
       }
 
-      if (!profile.profileComplete) {
-        // Either just created above, or a returning user who closed the app
-        // before finishing onboarding last time. Both resume from the same
-        // stored record — never recreated, never re-asked which role they are.
-        _currentUser = profile;
-        await _cacheRole(profile.role);
-        return GoogleNeedsProfile(profile);
+      if (profile.isDeleted) {
+        await _finishSelfDeletion(user);
+        throw const AuthException('This account has been deleted.');
       }
 
-      // This account already has a committed role, and it isn't the one this
-      // login screen is for — e.g. signing in on `/login/driver` with a
-      // Google account that finished onboarding as a Student. Landing them in
-      // the Student app anyway is "correct" by the stored role, but silent:
-      // from their side they picked Driver and ended up somewhere else with
-      // no explanation. Refuse plainly instead.
+      // Registered under another role — e.g. a Student account on the Parent
+      // login. Checked for unfinished profiles too, so an account is never
+      // onboarded as a role other than the one it was created with.
       if (profile.role != role) {
         await signOut();
         throw AuthException(
-          'This Google account is registered as a ${profile.role.name}. '
-          'Please use the ${profile.role.name} login instead.',
+          'No ${role.name} profile found for this Google account. It is '
+          'registered as a ${profile.role.name} — please use the '
+          '${profile.role.name} login instead.',
         );
       }
 
@@ -369,6 +407,11 @@ class AuthService {
 
       _currentUser = profile;
       await _cacheRole(profile.role);
+      await SessionService.instance.start(user.uid);
+
+      // Either a returning user who closed the app before finishing
+      // onboarding, or a complete account.
+      if (!profile.profileComplete) return GoogleNeedsProfile(profile);
       return GoogleSignedIn(profile);
     } on FirebaseAuthException catch (e) {
       throw AuthException(_messageFor(e));
@@ -400,6 +443,70 @@ class AuthService {
       debugPrint('Google sign-in failed: $e');
       throw const AuthException('Google sign-in failed. Please try again.');
     }
+  }
+
+  /// Creates the base `users/{uid}` record for a Google account that
+  /// [signInWithGoogle] reported as [GoogleNotRegistered], after the user
+  /// chose to register it as [role]. Onboarding then fills in the rest.
+  Future<GoogleOutcome> registerGoogleAccount({required UserRole role}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw const AuthException(
+        'Your Google sign-in expired. Please try again.',
+      );
+    }
+    try {
+      final profile = AppUser(
+        uid: user.uid,
+        role: role,
+        name: user.displayName ?? '',
+        email: user.email ?? '',
+        photoUrl: user.photoURL,
+      );
+      await UserRepository.instance.createUser(profile).timeout(_authTimeout);
+      _currentUser = profile;
+      await _cacheRole(role);
+      await SessionService.instance.start(user.uid);
+      return GoogleNeedsProfile(profile);
+    } on FirebaseException catch (e) {
+      await signOut();
+      throw AuthException(_messageForFirestore(e));
+    } on TimeoutException {
+      await signOut();
+      throw const AuthException(
+        'Taking too long to sign in — check your connection and try again.',
+      );
+    }
+  }
+
+  /// Signs out of an account whose profile is a tombstone. When the user
+  /// deleted it themselves and the login survived (Firebase wanted a recent
+  /// sign-in), this sign-in *is* that recent sign-in — so the login is
+  /// removed now, finishing what they asked for. An account an admin
+  /// archived keeps its login.
+  Future<void> _finishSelfDeletion(User user) async {
+    try {
+      final raw = (await Db.fs.collection('users').doc(user.uid).get()).data();
+      if (raw?['deletedBy'] == user.uid) await user.delete();
+    } catch (e) {
+      debugPrint('finishing self-deletion failed: $e');
+    }
+    await signOut();
+  }
+
+  /// The user declined to register a [GoogleNotRegistered] account: remove
+  /// the empty Firebase login Google sign-in just created, and sign out.
+  Future<void> cancelGoogleRegistration() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      try {
+        final profile = await UserRepository.instance.fetchUser(user.uid);
+        if (profile == null) await user.delete();
+      } catch (_) {
+        // Best effort — an orphaned login is harmless, signing out is not.
+      }
+    }
+    await signOut();
   }
 
   // ── Password management ───────────────────────────────────────────────────

@@ -300,9 +300,10 @@ async function sendToToken(env, accessToken, deviceToken, notification) {
             priority: 'HIGH',
             notification: {
               channel_id: ANDROID_CHANNEL_ID,
-              // Collapsing on type means a burst of position updates shows
-              // the newest one rather than a stack of stale ones.
-              tag: notification.type || 'general',
+              // One tray entry per notification. Tagging by type made each
+              // alert replace the previous one of its kind — a second chat
+              // message, or a second child's "boarded", wiped the first.
+              tag: notification.docId || notification.type || 'general',
             },
           },
           apns: {
@@ -313,6 +314,7 @@ async function sendToToken(env, accessToken, deviceToken, notification) {
           data: {
             type: notification.type || '',
             docId: notification.docId || '',
+            route: notification.route || '',
           },
         },
       }),
@@ -397,6 +399,8 @@ async function handleSend(request, env) {
         title: stringField(doc, 'title') || 'Transit Pro',
         body: stringField(doc, 'body'),
         type: stringField(doc, 'type'),
+        route:
+          doc?.fields?.data?.mapValue?.fields?.route?.stringValue ?? '',
         docId,
       };
       break;

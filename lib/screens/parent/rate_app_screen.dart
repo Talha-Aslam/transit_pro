@@ -32,6 +32,8 @@ class _RateAppScreenState extends State<RateAppScreen> {
         userId: uid,
         rating: _stars,
         comment: _ctrl.text,
+        userName: SessionService.instance.user.value?.name ?? '',
+        userRole: SessionService.instance.user.value?.role.name ?? '',
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

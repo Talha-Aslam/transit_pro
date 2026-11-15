@@ -42,7 +42,9 @@ class _StudentNotificationsState extends State<StudentNotifications> {
       case 'Today':
         return all.where((n) => n.date == 'Today').toList();
       case 'Alerts':
-        return all.where((n) => n.type == 'alert').toList();
+        // Every real event — trips, chat, seat requests, fees, missed-bus
+        // replies, emergencies — not only the red emergency kinds.
+        return all.where(AppNotification.isAlert).toList();
       default:
         return all;
     }

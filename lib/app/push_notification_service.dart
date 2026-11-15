@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:transit_core/transit_core.dart';
 
 import '../data/user_repository.dart';
 import 'notification_service.dart';
+import 'router.dart';
+import 'session_service.dart';
 
 /// Registers this device for push notifications: requests OS permission,
 /// then saves the token onto `users/{uid}.fcmTokens` via
@@ -67,6 +70,7 @@ class PushNotificationService {
       await UserRepository.instance.addFcmToken(uid, token);
 
       _listenForForegroundMessages();
+      _listenForTaps();
 
       // Tokens rotate (reinstall, token expiry, app data cleared) — without
       // this, a device would silently stop receiving push after a rotation
@@ -86,6 +90,73 @@ class PushNotificationService {
   }
 
   StreamSubscription<RemoteMessage>? _messageSub;
+  StreamSubscription<RemoteMessage>? _tapSub;
+  bool _initialTapHandled = false;
+
+  /// A tapped push opens the screen it is about, not just the app.
+  ///
+  /// Covers both a tap while the app was in the background
+  /// ([FirebaseMessaging.onMessageOpenedApp]) and a tap that launched it from
+  /// closed ([FirebaseMessaging.getInitialMessage], once per process).
+  void _listenForTaps() {
+    _tapSub?.cancel();
+    _tapSub = FirebaseMessaging.onMessageOpenedApp.listen(
+      (m) => unawaited(_openFromPush(m)),
+      onError: (Object e) => debugPrint('Push notifications: onOpened — $e'),
+    );
+    if (_initialTapHandled) return;
+    _initialTapHandled = true;
+    FirebaseMessaging.instance.getInitialMessage().then((m) {
+      if (m != null) unawaited(_openFromPush(m));
+    });
+  }
+
+  Future<void> _openFromPush(RemoteMessage message) async {
+    final uid = _boundUid;
+    final docId = message.data['docId'] as String?;
+    final type = message.data['type'] as String?;
+    var route = message.data['route'] as String?;
+
+    // The push carries only the inbox id; the deep link is on the inbox item.
+    if ((route == null || route.isEmpty) &&
+        uid != null &&
+        docId != null &&
+        docId.isNotEmpty) {
+      try {
+        final item = (await Db.notifications(uid).doc(docId).get()).data();
+        final r = item?.data['route'];
+        if (r is String) route = r;
+      } catch (e) {
+        debugPrint('Push notifications: reading tapped item failed — $e');
+      }
+    }
+    if (uid != null && docId != null && docId.isNotEmpty) {
+      unawaited(
+        MessagingRepository.instance.markRead(uid, docId).catchError((_) {}),
+      );
+    }
+
+    final role = SessionService.instance.user.value?.role.name;
+    if ((route == null || route.isEmpty) && type == 'chat' && role != null) {
+      route = switch (role) {
+        'driver' => '/driver/messages',
+        'student' => '/student/driver-chat',
+        _ => '/parent/driver-chat',
+      };
+    }
+    if (route == null || !route.startsWith('/')) return;
+    // Never follow a link into another role's screens.
+    if (role != null && !route.startsWith('/$role')) return;
+
+    final target = route;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        appRouter.push(target);
+      } catch (e) {
+        debugPrint('Push notifications: opening $target failed — $e');
+      }
+    });
+  }
 
   /// Notes every push that arrives while the app is alive.
   ///
@@ -114,6 +185,8 @@ class PushNotificationService {
     _refreshSub = null;
     await _messageSub?.cancel();
     _messageSub = null;
+    await _tapSub?.cancel();
+    _tapSub = null;
     final token = _registeredToken;
     _boundUid = null;
     _registeredToken = null;

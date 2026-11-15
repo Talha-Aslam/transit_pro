@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBVqe3a87m5AgLg7frpYcx8Yid37EI0n8U',
-    appId: '1:231263449779:android:140f82afb54519da2f76c6',
+    appId: '1:231263449779:android:56ca56204fbe3a872f76c6',
     messagingSenderId: '231263449779',
     projectId: 'transitpro-db',
     storageBucket: 'transitpro-db.firebasestorage.app',

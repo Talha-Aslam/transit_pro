@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
-import '../../app/push_diagnostics.dart';
 import '../../app/auth_service.dart';
 import '../../app/active_trip_service.dart';
 import '../../app/driver_data_service.dart';
@@ -17,6 +16,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/theme_provider.dart';
 import '../../widgets/account_management_section.dart';
 import '../../widgets/avatar_image.dart';
+import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/app_glyph.dart';
@@ -389,54 +389,62 @@ class _DriverProfileState extends State<DriverProfile> {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Container(
-                          width: 84,
-                          height: 84,
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade200.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(26),
-                            border: Border.all(
-                              color: AppTheme.driverCyan.withValues(alpha: 0.5),
-                              width: 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.driverCyan.withValues(
-                                  alpha: 0.3,
-                                ),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
+                        TopRatedFrame(
+                          driverId: SessionService.instance.uid ?? '',
+                          radius: 29,
+                          child: Container(
+                            width: 84,
+                            height: 84,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade200.withValues(
+                                alpha: 0.3,
                               ),
-                            ],
-                          ),
-                          // Local file first (so a just-picked photo shows
-                          // immediately), then the uploaded URL off the
-                          // driver document. The URL half was missing, which
-                          // is the whole reason the photo vanished on every
-                          // restart: it was being uploaded and saved
-                          // correctly, just never read back.
-                          child: ValueListenableBuilder<File?>(
-                            valueListenable:
-                                ProfileService.instance.driverImage,
-                            builder: (_, file, _) =>
-                                ValueListenableBuilder<bool>(
-                                  valueListenable: _svc.uploadingPhoto,
-                                  builder: (_, uploading, _) => AvatarImage(
-                                    localFile: file,
-                                    photoUrl: SessionService
-                                        .instance
-                                        .driver
-                                        .value
-                                        ?.photoUrl,
-                                    size: 84,
-                                    uploading: uploading,
-                                    borderRadius: BorderRadius.circular(23),
-                                    fallback: const Text(
-                                      '👨',
-                                      style: TextStyle(fontSize: 44),
+                              borderRadius: BorderRadius.circular(26),
+                              border: Border.all(
+                                color: AppTheme.driverCyan.withValues(
+                                  alpha: 0.5,
+                                ),
+                                width: 3,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.driverCyan.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            // Local file first (so a just-picked photo shows
+                            // immediately), then the uploaded URL off the
+                            // driver document. The URL half was missing, which
+                            // is the whole reason the photo vanished on every
+                            // restart: it was being uploaded and saved
+                            // correctly, just never read back.
+                            child: ValueListenableBuilder<File?>(
+                              valueListenable:
+                                  ProfileService.instance.driverImage,
+                              builder: (_, file, _) =>
+                                  ValueListenableBuilder<bool>(
+                                    valueListenable: _svc.uploadingPhoto,
+                                    builder: (_, uploading, _) => AvatarImage(
+                                      localFile: file,
+                                      photoUrl: SessionService
+                                          .instance
+                                          .driver
+                                          .value
+                                          ?.photoUrl,
+                                      size: 84,
+                                      uploading: uploading,
+                                      borderRadius: BorderRadius.circular(23),
+                                      fallback: const Text(
+                                        '👨',
+                                        style: TextStyle(fontSize: 44),
+                                      ),
                                     ),
                                   ),
-                                ),
+                            ),
                           ),
                         ),
                         Positioned(
@@ -741,7 +749,7 @@ class _DriverProfileState extends State<DriverProfile> {
                           ),
                           _MenuItem(
                             icon: '🗓️',
-                            label: 'Family Timings',
+                            label: 'Student Timings',
                             desc: _timetablesSummary(),
                             onTap: () => context.push('/driver/timetables'),
                           ),
@@ -819,11 +827,6 @@ class _DriverProfileState extends State<DriverProfile> {
                             icon: '📄',
                             label: AppStrings.t('terms_lbl'),
                             onTap: () => context.push('/driver/terms'),
-                          ),
-                          _MenuItem(
-                            materialIcon: Icons.notifications_active_outlined,
-                            label: 'Test notifications',
-                            onTap: () => runPushTest(context),
                           ),
                           _MenuItem(
                             materialIcon: Icons.pause_circle_outline_rounded,

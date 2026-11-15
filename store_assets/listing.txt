@@ -1,0 +1,35 @@
+SHORT DESCRIPTION
+Track your school van live, find verified drivers and manage monthly fees.
+
+FULL DESCRIPTION
+Transit Pro makes daily school, college and university van transport simple and safe for families, students and drivers.
+
+FOR PARENTS
+• Find a verified van driver who serves your child's school, college or university
+• Send a seat request for each child and agree the monthly fee in the app
+• Follow the van live on the map during pickup and drop-off
+• See expected pickup and drop-off times for your child
+• Get notifications when the van is about to arrive, when your child is picked up, and when they are dropped off
+• Mark the days your child is not riding, so the driver skips your stop
+• Keep track of monthly bills, upload payment proof and see what is paid, pending or overdue
+• Chat with your driver and keep emergency contacts up to date
+
+FOR STUDENTS (16+)
+• Manage your own pickup and drop-off locations, timings and institute details
+• Track your van live and see your round, schedule and trip history
+
+FOR DRIVERS
+• Create morning and afternoon rounds with your own timings and seat limits
+• Get seat requests from families nearby and accept the ones that fit your route
+• Start a route and let families follow it live; the stops are put in a sensible order for you
+• Mark pickup, drop-off and absence for each student
+• Send monthly bills, reminders and confirm payments received
+• Show your bank or mobile-wallet details so families can pay you directly
+
+PRIVACY AND SAFETY
+• Drivers are verified by our team before they can accept students
+• The van's location is shared only while the driver has started a route, and only with families on that round
+• Each family sees only its own child's details
+• Transit Pro does not show ads and does not handle money; families pay drivers directly
+
+Questions or feedback: talhaaslamdev@gmail.com

@@ -36,6 +36,8 @@ class AppFeedbackRepository {
     required String userId,
     required int rating,
     String? comment,
+    String userName = '',
+    String userRole = '',
   }) => Db.appFeedback.add(
     AppFeedback(
       id: '',
@@ -45,6 +47,8 @@ class AppFeedbackRepository {
           ? null
           : comment.trim(),
       timestamp: DateTime.now(),
+      userName: userName.trim(),
+      userRole: userRole,
     ),
   );
 }

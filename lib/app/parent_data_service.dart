@@ -381,8 +381,14 @@ class ParentDataService {
       final records = await TripRepository.instance.fetchAttendanceForStudent(
         child.id,
       );
+      // A finished ride ends as `droppedOff`, not `boarded` — requiring
+      // `boarded` alone meant no child who had completed a ride could ever
+      // rate their driver.
       return records.any(
-        (r) => r.driverId == driverId && r.status == AttendanceStatus.boarded,
+        (r) =>
+            r.driverId == driverId &&
+            (r.status == AttendanceStatus.boarded ||
+                r.status == AttendanceStatus.droppedOff),
       );
     } catch (e) {
       debugPrint('hasRiddenWithDriver failed: $e');
@@ -408,6 +414,33 @@ class ParentDataService {
       studentId: child.id.isEmpty ? null : child.id,
     );
     if (!accepted) return;
+    RatingRepository.instance.invalidate(driverId);
+
+    // The driver hears who rated them and the score.
+    final me = SessionService.instance.user.value;
+    final isSelf = me?.role == UserRole.student;
+    final rater = (me?.name.trim().isNotEmpty ?? false)
+        ? me!.name.trim()
+        : (isSelf ? 'A student' : 'A parent');
+    final stars = rating.round().clamp(1, 5);
+    unawaited(
+      PushSender.instance.notifyOne(
+        driverId,
+        UserNotification(
+          id: '',
+          type: NotificationType.rating,
+          title: 'New rating: $stars/5 ${'★' * stars}',
+          body: isSelf || child.name.trim().isEmpty
+              ? '$rater rated you $stars out of 5.'
+              : "$rater (${child.name.trim()}'s parent) rated you $stars out "
+                    'of 5.',
+          data: {
+            'studentId': ?(child.id.isEmpty ? null : child.id),
+            'route': '/driver/performance',
+          },
+        ),
+      ),
+    );
 
     final updated = Map<String, DriverRatingInfo>.from(driverRatings.value);
     updated[_ratingKey(driverId, child.id)] = DriverRatingInfo(
