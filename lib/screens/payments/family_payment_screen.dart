@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,11 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../../ai/slip_check_service.dart';
+import '../../ai/slip_matcher.dart';
+import '../../ai/slip_parser.dart';
 import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../data/payment_repository.dart';
 import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ai_check_widgets.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/payment_presentation.dart';
 
@@ -46,6 +51,16 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
   String? _billId;
   File? _slip;
   bool _sending = false;
+
+  /// The AI read of [_slip], started the moment it is picked so it is
+  /// usually done by the time "Send" is tapped.
+  Future<SlipReading>? _slipReading;
+
+  /// [_slipReading] once it has finished — shown under the screenshot.
+  SlipReading? _slipRead;
+
+  /// Waiting on the AI check before the sheet can show.
+  bool _checking = false;
   int _payerIndex = SessionService.instance.selectedChildIndex.value;
 
   bool get _accent => SessionService.instance.student.value != null;
@@ -85,7 +100,74 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
       source: ImageSource.gallery,
       imageQuality: 80,
     );
-    if (picked != null) setState(() => _slip = File(picked.path));
+    if (picked == null) return;
+    final file = File(picked.path);
+    // Read on-device straight away; nothing is uploaded until "Send".
+    final reading = SlipCheckService.instance.read(file);
+    setState(() {
+      _slip = file;
+      _slipReading = reading;
+      _slipRead = null;
+    });
+    final read = await reading;
+    if (mounted && identical(_slip, file)) setState(() => _slipRead = read);
+  }
+
+  /// Runs the AI check of the attached screenshot against what is being
+  /// paid, and shows it. Null when the family chose not to send this
+  /// screenshot (or closed the sheet); otherwise the check to store — which
+  /// is itself null when the screenshot could not be checked at all.
+  Future<({SlipReading reading, SlipCheck? check})?> _checkSlip({
+    required Driver driver,
+    required String paymentId,
+    required int amountPaisa,
+    required String monthKey,
+    DateTime? periodStart,
+  }) async {
+    final slip = _slip!;
+    setState(() => _checking = true);
+    SlipReading reading;
+    SlipCheck? check;
+    try {
+      reading = await (_slipReading ?? SlipCheckService.instance.read(slip));
+      final duplicate = await SlipCheckService.instance.isDuplicate(
+        reading,
+        paymentId,
+      );
+      check = evaluateSlip(
+        reading,
+        SlipCheckService.expectationFor(
+          driver: driver,
+          amountPaisa: amountPaisa,
+          periodStart: periodStart,
+          monthKey: monthKey,
+        ),
+        duplicate: duplicate,
+      );
+    } catch (e) {
+      debugPrint('slip check failed: $e');
+      reading = SlipReading.empty;
+      check = null;
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+    if (!mounted) return null;
+    if (check == null) return (reading: reading, check: null);
+    final choice = await showAiCheckSheet(
+      context,
+      details: SlipCheckDetails(check: check),
+      matches: check.matches,
+      accent: _color,
+      proceedLabel: 'Send to ${driver.name}',
+      proceedAnywayLabel: 'Send anyway',
+      chooseAnotherLabel: 'Choose another screenshot',
+    );
+    if (choice == AiCheckChoice.chooseAnother && mounted) {
+      unawaited(_pickSlip());
+    }
+    return choice == AiCheckChoice.proceed
+        ? (reading: reading, check: check)
+        : null;
   }
 
   /// [payer]'s bills still to pay, the one due first at the top.
@@ -129,10 +211,24 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
     final payerId = SessionService.instance.uid;
     if (payerId == null) return;
 
-    setState(() => _sending = true);
     final repo = PaymentRepository.instance;
     final paymentId = bill?.id ?? repo.newPaymentId();
     final monthKey = bill?.monthKey ?? _monthKey;
+    final amountPaisa = bill?.amountPaisa ?? rupees * 100;
+
+    // The AI check, before anything is uploaded. It only warns: the family
+    // can always send anyway.
+    final checked = await _checkSlip(
+      driver: driver,
+      paymentId: paymentId,
+      amountPaisa: amountPaisa,
+      monthKey: monthKey,
+      periodStart: bill?.periodStart,
+    );
+    if (checked == null || !mounted) return;
+    var check = checked.check;
+
+    setState(() => _sending = true);
     try {
       String? url;
       String? publicId;
@@ -152,6 +248,7 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
           slipUrl: url,
           slipPublicId: publicId,
           notes: notes,
+          slipCheck: check,
         );
       } else {
         await repo.submitProof(
@@ -165,8 +262,26 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
           slipUrl: url,
           slipPublicId: publicId,
           notes: notes,
+          slipCheck: check,
         );
       }
+      // Claim the transaction id. Taken already (a race, or a check run
+      // offline) means the same screenshot paid something else.
+      if (check != null) {
+        final taken = await SlipCheckService.instance.register(
+          reading: checked.reading,
+          paymentId: paymentId,
+          parentId: payerId,
+          driverId: driver.id,
+        );
+        if (taken && !check.issues.contains(SlipCheck.duplicateTransaction)) {
+          check = check.copyWith(
+            issues: [...check.issues, SlipCheck.duplicateTransaction],
+          );
+          await repo.updateSlipCheck(paymentId, check);
+        }
+      }
+      final aiLine = check == null ? '' : ' ${check.summary()}.';
       await PushSender.instance.notifyOne(
         driver.id,
         UserNotification(
@@ -174,8 +289,8 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
           type: NotificationType.payment,
           title: 'Payment sent for ${payer.name}',
           body:
-              'Rs.$rupees via $method for ${monthLabel(monthKey)}. Check '
-              'your account and mark it received.',
+              'Rs.$rupees via $method for ${monthLabel(monthKey)}.$aiLine '
+              'Check your account and mark it received.',
           data: {
             'paymentId': paymentId,
             'studentId': payer.studentId,
@@ -183,9 +298,32 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
           },
         ),
       );
+      // Warnings reach the family too, not only the driver — in their inbox
+      // and on their lock screen, so a wrong screenshot is fixed quickly.
+      if (check != null && !check.matches) {
+        await PushSender.instance.notifyOne(
+          payerId,
+          UserNotification(
+            id: '',
+            type: NotificationType.payment,
+            title: 'Check your payment screenshot',
+            body:
+                '${check.summary()} for ${payer.name}, '
+                '${monthLabel(monthKey)}. ${check.messages().join(' ')} '
+                '${driver.name} will confirm once they check their account.',
+            data: {
+              'paymentId': paymentId,
+              'studentId': payer.studentId,
+              'route': _accent ? '/student/payment' : '/parent/payment',
+            },
+          ),
+        );
+      }
       if (!mounted) return;
       setState(() {
         _slip = null;
+        _slipReading = null;
+        _slipRead = null;
         _amount.clear();
         _note.clear();
       });
@@ -383,11 +521,17 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
                             : Image.file(_slip!, fit: BoxFit.cover),
                       ),
                     ),
+                    if (_slip != null) ...[
+                      const SizedBox(height: 8),
+                      _SlipReadLine(reading: _slipRead),
+                    ],
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _sending ? null : () => _send(payer, driver),
+                        onPressed: _sending || _checking
+                            ? null
+                            : () => _send(payer, driver),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _color,
                           foregroundColor: Colors.white,
@@ -397,7 +541,11 @@ class _FamilyPaymentScreenState extends State<FamilyPaymentScreen> {
                           ),
                         ),
                         child: Text(
-                          _sending ? 'Sending…' : 'Send to ${driver.name}',
+                          _checking
+                              ? 'Checking screenshot…'
+                              : _sending
+                              ? 'Sending…'
+                              : 'Send to ${driver.name}',
                         ),
                       ),
                     ),
@@ -526,11 +674,15 @@ class _HistoryRow extends StatelessWidget {
     final p = payment;
     final color = paymentStatusColor(p.status);
     final note = p.driverNote?.trim() ?? '';
+    final check = p.slipCheck;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GlassCard(
         enableBlur: false,
         padding: const EdgeInsets.all(14),
+        onTap: check == null
+            ? null
+            : () => showSlipCheckDetails(context, check),
         child: Row(
           children: [
             Text(
@@ -560,6 +712,10 @@ class _HistoryRow extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
+                  if (check != null) ...[
+                    const SizedBox(height: 4),
+                    AiCheckBadge.slip(check, dense: true),
+                  ],
                 ],
               ),
             ),
@@ -652,6 +808,34 @@ class _BillPicker extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// One line under the attached screenshot: still reading, or what was read.
+class _SlipReadLine extends StatelessWidget {
+  final SlipReading? reading;
+  const _SlipReadLine({required this.reading});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = reading;
+    final String text;
+    if (r == null) {
+      text = '🤖 Reading the screenshot…';
+    } else if (r.isEmpty) {
+      text = '🤖 Could not read this screenshot — you can still send it.';
+    } else {
+      final parts = [
+        if (r.amountPaisa != null) paisaToDisplay(r.amountPaisa!),
+        if (r.transactionId != null) 'ID ${r.transactionId}',
+        if (r.receiverName != null) 'to ${r.receiverName}',
+      ];
+      text = '🤖 Read: ${parts.join(' · ')}';
+    }
+    return Text(
+      text,
+      style: TextStyle(color: context.textSecondary, fontSize: 12),
     );
   }
 }

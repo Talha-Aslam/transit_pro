@@ -118,6 +118,7 @@ class PaymentRepository {
     String? slipUrl,
     String? slipPublicId,
     String? notes,
+    SlipCheck? slipCheck,
   }) => Db.fs.collection('payments').doc(paymentId).set({
     ...Payment(
       id: paymentId,
@@ -131,6 +132,7 @@ class PaymentRepository {
       slipUrl: slipUrl,
       slipPublicId: slipPublicId,
       notes: notes,
+      slipCheck: slipCheck,
     ).toMap(),
     'paidAt': Db.now,
     'createdAt': Db.now,
@@ -191,6 +193,7 @@ class PaymentRepository {
     String? slipUrl,
     String? slipPublicId,
     String? notes,
+    SlipCheck? slipCheck,
   }) => Db.fs.collection('payments').doc(paymentId).update({
     'status': PaymentStatus.submitted.name,
     'methodName': methodName,
@@ -198,7 +201,18 @@ class PaymentRepository {
     'slipPublicId': ?slipPublicId,
     'notes': ?notes,
     'paidAt': Db.now,
+    // A resubmission replaces the last screenshot's check — or clears it
+    // when this one could not be checked, so an old verdict never sticks
+    // to a new screenshot.
+    'slipCheck': slipCheck?.toMap() ?? FieldValue.delete(),
   });
+
+  /// Replaces the AI check on a payment the family just sent — when the
+  /// transaction id turned out to be taken only as it was registered.
+  Future<void> updateSlipCheck(String paymentId, SlipCheck check) => Db.fs
+      .collection('payments')
+      .doc(paymentId)
+      .update({'slipCheck': check.toMap()});
 
   /// The driver's answer on a bill. Received closes it; not received puts
   /// it back to what is owed — due, or overdue past its date — with the

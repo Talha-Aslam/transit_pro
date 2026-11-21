@@ -99,12 +99,27 @@ service cloud.firestore {
       // button) does, and it is safe precisely because it is one-way — a
       // user can pause their own account but never un-suspend it, which
       // stays exclusively an admin action.
+      //
+      // The account-state fields the admin panel decides are not the
+      // user's to undo: a user may turn their own profile into a tombstone
+      // (`isDeleted` false → true, `AccountService.delete()`), but never
+      // clear one an admin archived, and never touch `authDeleted` (an
+      // admin's permanent delete) or `deactivatedBy` (an admin's
+      // deactivation). `get(…, default)` keeps documents that predate
+      // these fields writable.
       allow update: if signedIn()
                     && ((userId == uid()
                          && unchanged('role')
                          && (unchanged('isActive')
                              || (resource.data.isActive == true
-                                 && request.resource.data.isActive == false)))
+                                 && request.resource.data.isActive == false))
+                         && (request.resource.data.get('isDeleted', false)
+                                 == resource.data.get('isDeleted', false)
+                             || request.resource.data.get('isDeleted', false) == true)
+                         && request.resource.data.get('authDeleted', false)
+                                == resource.data.get('authDeleted', false)
+                         && request.resource.data.get('deactivatedBy', '')
+                                == resource.data.get('deactivatedBy', ''))
                         || isAdmin());
 
       // A user may delete their own account document -- `AccountService
@@ -356,6 +371,25 @@ service cloud.firestore {
                         || isAdmin());
 
       allow delete: if isAdmin();
+    }
+
+    // ── slip transaction ids ────────────────────────────────────────────────
+    //
+    // `slip_tids/{provider_TID}` → {paymentId, parentId, driverId, createdAt}.
+    // The AI slip check registers the transaction id read off every payment
+    // screenshot, so the same screenshot sent for a second bill is caught.
+    // A get by exact id is all a family needs ("is this id taken?"); there
+    // is no list, so nobody can enumerate other families' payments.
+    //
+    // Create-only: a `set` on an id that already exists is an update, and
+    // updates are refused — which is exactly how the app learns the id is
+    // taken. Only an admin may correct or remove an entry.
+    match /slip_tids/{tidKey} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+                    && request.resource.data.parentId == uid()
+                    && request.resource.data.paymentId is string;
+      allow update, delete: if isAdmin();
     }
 
     // ── ride requests ───────────────────────────────────────────────────────

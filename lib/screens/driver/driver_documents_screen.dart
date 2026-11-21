@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,25 +6,26 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 
+import '../../ai/doc_check_service.dart';
+import '../../ai/doc_matcher.dart';
+import '../../app/driver_documents.dart';
 import '../../app/language_provider.dart';
 import '../../app/session_service.dart';
 import '../../data/user_repository.dart';
 import '../../services/cloudinary_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ai_check_widgets.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/app_glyph.dart';
 
-/// The documents a driver must have verified before they count as checked
-/// out.
-///
-/// `DocumentType` still carries `routePermit` and `schoolContract` — older
-/// submissions keep rendering in the admin app — but this project does not
-/// ask for either, so neither is offered here nor counted towards
-/// verification.
-List<DocumentType> get kRequiredDriverDocuments =>
-    _kDocMeta.keys.toList(growable: false);
-
+/// What each required document looks like on this screen, in the order of
+/// [kRequiredDriverDocuments] (CNIC first).
 const _kDocMeta = <DocumentType, (String icon, String title, String hint)>{
+  DocumentType.cnic: (
+    '🆔',
+    'CNIC (National ID)',
+    'Front & back photo of your CNIC',
+  ),
   DocumentType.drivingLicense: (
     '🪪',
     'Driving License',
@@ -33,11 +35,6 @@ const _kDocMeta = <DocumentType, (String icon, String title, String hint)>{
     '🚌',
     'Vehicle Registration',
     'Photo of vehicle registration certificate',
-  ),
-  DocumentType.insuranceCertificate: (
-    '🛡️',
-    'Insurance Certificate',
-    'Upload your current insurance document',
   ),
   DocumentType.medicalFitness: (
     '🩺',
@@ -71,6 +68,9 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     final driverId = SessionService.instance.uid;
     if (driverId != null) {
       _repo.watchDriverDocuments(driverId).listen((docs) {
+        // A CNIC filed as "vehicle registration" by an older sign-up is
+        // relabelled once; the stream then delivers the corrected rows.
+        unawaited(fixSignupCnicMislabels(docs));
         if (!mounted) return;
         setState(() {
           _all = docs;
@@ -136,6 +136,36 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     if (driverId == null) return;
 
     setState(() => _uploading.add(type));
+
+    // The AI check of a licence or registration photo, before upload. It
+    // only warns; the admin still verifies the document.
+    DocCheck? check;
+    if (DocCheckService.supports(type)) {
+      check = await DocCheckService.instance.check(
+        File(picked.path),
+        type,
+        _expectation(),
+      );
+      if (!mounted) return;
+      if (check != null) {
+        final answer = await showAiCheckSheet(
+          context,
+          details: DocCheckDetails(check: check),
+          matches: check.matches,
+          accent: AppTheme.driverCyan,
+          proceedLabel: 'Upload',
+          proceedAnywayLabel: 'Upload anyway',
+          chooseAnotherLabel: 'Choose another photo',
+        );
+        if (!mounted) return;
+        if (answer != AiCheckChoice.proceed) {
+          setState(() => _uploading.remove(type));
+          if (answer == AiCheckChoice.chooseAnother) await _pickFile(type);
+          return;
+        }
+      }
+    }
+
     try {
       if (!CloudinaryService.instance.isConfigured) {
         throw const UploadException(
@@ -156,6 +186,12 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
           fileUrl: result.secureUrl,
           publicId: result.publicId,
           fileName: picked.name,
+          // The licence's own expiry, read off the card — the admin sees
+          // it and can correct it when verifying.
+          expiryDate: type == DocumentType.drivingLicense
+              ? check?.expiryDate
+              : null,
+          docCheck: check,
         ),
       );
       if (mounted) {
@@ -166,6 +202,22 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     } finally {
       if (mounted) setState(() => _uploading.remove(type));
     }
+  }
+
+  /// What a licence or registration card is compared with: the driver's
+  /// profile name, and their vehicle's seats and plate.
+  DocExpectation _expectation() {
+    final session = SessionService.instance;
+    final driver = session.driver.value;
+    final bus = session.bus.value;
+    final capacity = (driver?.vehicleCapacity ?? 0) > 0
+        ? driver!.vehicleCapacity
+        : (bus?.capacity ?? 0);
+    return DocExpectation(
+      driverName: driver?.name ?? '',
+      listedCapacity: capacity,
+      listedPlate: bus?.plateNumber ?? '',
+    );
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -319,6 +371,7 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
                                   fileName: doc?.fileName,
                                   uploading: _uploading.contains(type),
                                   rejectionReason: doc?.rejectionReason,
+                                  docCheck: doc?.docCheck,
                                   onUpload: () => _pickFile(type),
                                 ),
                               );
@@ -433,6 +486,7 @@ class _DocCard extends StatelessWidget {
   final String? fileName;
   final bool uploading;
   final String? rejectionReason;
+  final DocCheck? docCheck;
   final VoidCallback onUpload;
 
   const _DocCard({
@@ -443,6 +497,7 @@ class _DocCard extends StatelessWidget {
     required this.fileName,
     required this.uploading,
     required this.rejectionReason,
+    this.docCheck,
     required this.onUpload,
   });
 
@@ -522,6 +577,33 @@ class _DocCard extends StatelessWidget {
           ] else if (status == DocumentStatus.rejected) ...[
             const SizedBox(height: 12),
             _RejectedRow(reason: rejectionReason, onReupload: onUpload),
+          ],
+          if (!uploading &&
+              docCheck != null &&
+              status != DocumentStatus.notUploaded) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => showDocCheckDetails(context, docCheck!),
+              child: Row(
+                children: [
+                  AiCheckBadge.doc(docCheck!, dense: true),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      docCheck!.matches
+                          ? 'Tap to see what was read'
+                          : docCheck!.messages().first,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),

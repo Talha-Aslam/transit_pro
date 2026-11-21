@@ -178,3 +178,55 @@ key. Nothing breaks in between.
 The endpoint verifies the Firebase ID token, refuses anyone whose
 `users/{uid}.role` is not `driver`, rebuilds the request from origin,
 destination and at most 25 stops, and pins the field mask.
+
+## AI reader (`POST /ai/read`)
+
+The fallback for the app's on-device OCR (Google ML Kit). When ML Kit cannot
+read the amount or transaction id off a parent's payment screenshot — or the
+key fields off a driver's licence / registration card — the app sends the
+image, shrunk to at most 1280 px, here and Gemini reads it into a fixed JSON
+shape. Any signed-in user may call it; the Firebase ID token is verified.
+
+1. Create a key in Google AI Studio (https://aistudio.google.com/apikey).
+   The free tier is enough for a school-van fleet.
+2. Store it as a secret — you are prompted for the value, nothing is echoed:
+
+   ```
+   npx wrangler secret put GEMINI_API_KEY
+   ```
+
+3. Deploy: `npx wrangler deploy`
+
+The model is `GEMINI_MODEL` in `wrangler.jsonc` (default `gemini-3.1-flash-lite`,
+called through `v1beta/models/{model}:generateContent`). Change it there if
+Google retires the model; no app release is needed.
+
+Until the key is set the endpoint answers `503 {"error":"ai_unavailable"}`
+and the app silently keeps its on-device result. The image and the key are
+never logged; a failed call logs only Gemini's HTTP status.
+
+## Admin: delete an account permanently (`POST /admin/delete-account`)
+
+Used by the admin panel's **Delete permanently** on a parent, driver or
+self-registered student. It deletes that person's Firebase Auth sign-in
+through the Identity Toolkit admin API
+(`projects/{project}/accounts:delete`), which frees the email so it can be
+registered again — under any role. The admin panel writes the Firestore
+tombstone (name and role kept, contact details erased) only after this call
+succeeds; if it fails, nothing is changed.
+
+* Caller must send their Firebase ID token, and their own `users/{uid}` must
+  say `role: admin` (not deleted, not deactivated) — otherwise `403`.
+* Admin accounts and the caller's own account are refused (`403`); a uid
+  with no `users` document is `404`.
+* A sign-in that is already gone (`USER_NOT_FOUND`) answers `200` with
+  `alreadyGone: true`, so a retry after a half-finished delete is safe.
+
+It uses the same `SERVICE_ACCOUNT_JSON` secret — no new secret. The
+service account needs permission to delete Auth users; the Firebase Admin SDK
+service account (`firebase-adminsdk-…@…`) already has it. The Worker asks
+for the `identitytoolkit` OAuth scope in addition to messaging and datastore.
+
+Deploy: `npx wrangler deploy`. Test locally (no network, no real keys):
+`npm test`.
+

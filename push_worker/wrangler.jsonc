@@ -15,6 +15,10 @@
     // Not a secret: it is in google-services.json and in every API URL the
     // app already calls. The private key is the secret, and that is set with
     // `wrangler secret put`, never here.
-    "FIREBASE_PROJECT_ID": "transitpro-db"
+    "FIREBASE_PROJECT_ID": "transitpro-db",
+    // Model behind POST /ai/read. Not a secret; the key is GEMINI_API_KEY,
+    // set with `wrangler secret put`. Swap the model here when Google
+    // retires it — no app release needed.
+    "GEMINI_MODEL": "gemini-3.1-flash-lite"
   }
 }

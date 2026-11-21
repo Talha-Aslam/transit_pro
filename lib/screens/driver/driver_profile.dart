@@ -7,6 +7,7 @@ import 'package:transit_core/transit_core.dart';
 import '../../app/auth_service.dart';
 import '../../app/active_trip_service.dart';
 import '../../app/driver_data_service.dart';
+import '../../app/driver_documents.dart';
 import '../../app/profile_service.dart';
 import '../../app/language_provider.dart';
 import '../../data/user_repository.dart';
@@ -20,7 +21,6 @@ import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/image_source_sheet.dart';
 import '../../widgets/app_glyph.dart';
-import 'driver_documents_screen.dart';
 
 class DriverProfile extends StatefulWidget {
   final void Function(int) onNavigate;

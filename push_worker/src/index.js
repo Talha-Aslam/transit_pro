@@ -29,7 +29,10 @@ const JWKS_URL =
 const SCOPES = [
   'https://www.googleapis.com/auth/firebase.messaging',
   'https://www.googleapis.com/auth/datastore',
+  // Deleting a Firebase Auth user (POST /admin/delete-account).
+  'https://www.googleapis.com/auth/identitytoolkit',
 ].join(' ');
+const IDENTITY_TOOLKIT = 'https://identitytoolkit.googleapis.com/v1/projects/';
 
 /** Notification channel the Flutter app creates; keep the two in step. */
 const ANDROID_CHANNEL_ID = 'transit_pro_channel';
@@ -78,7 +81,13 @@ let cachedAccessToken = null;
 
 async function googleAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedAccessToken && cachedAccessToken.expiresAt > now + 60) {
+  // Keyed by scope as well as expiry: a token minted before a scope was
+  // added to SCOPES must not be reused for the new API.
+  if (
+    cachedAccessToken &&
+    cachedAccessToken.scope === SCOPES &&
+    cachedAccessToken.expiresAt > now + 60
+  ) {
     return cachedAccessToken.value;
   }
 
@@ -129,6 +138,7 @@ async function googleAccessToken(env) {
   const body = await response.json();
   cachedAccessToken = {
     value: body.access_token,
+    scope: SCOPES,
     expiresAt: now + (body.expires_in ?? 3600),
   };
   return cachedAccessToken.value;
@@ -230,6 +240,7 @@ async function readDocument(env, accessToken, path) {
 }
 
 const stringField = (doc, name) => doc?.fields?.[name]?.stringValue ?? '';
+const boolField = (doc, name) => doc?.fields?.[name]?.booleanValue === true;
 
 function stringArrayField(doc, name) {
   const values = doc?.fields?.[name]?.arrayValue?.values ?? [];
@@ -560,6 +571,320 @@ async function handleRoutes(request, env) {
   });
 }
 
+// ── AI reader (Gemini) ─────────────────────────────────────────────────────
+
+/**
+ * The fallback for the app's on-device OCR: when ML Kit could not read the
+ * amount or transaction id off a payment screenshot, or the key fields off a
+ * licence / registration card, the app sends the (downsized) image here and
+ * Gemini reads it into a fixed JSON shape.
+ *
+ *   POST /ai/read
+ *   Authorization: Bearer <Firebase ID token>
+ *   { "kind": "slip" | "license" | "registration",
+ *     "mimeType": "image/jpeg", "imageBase64": "<…>" }
+ *   → 200 { "result": { …fields… }, "model": "<model id>" }
+ *   → 503 { "error": "ai_unavailable" } when no key is configured — the app
+ *         then keeps its OCR-only result.
+ *
+ * The key is the `GEMINI_API_KEY` secret; it never ships in the app. The
+ * image and the key are never logged.
+ */
+
+/**
+ * Free-tier Flash-Lite. Measured on the owner's real receipts (Nov 2026):
+ * 2.5-7 s and exact (incl. JazzCash's superscript "Rs. 1.00"), while
+ * `gemini-flash-latest` and `gemini-3.8-flash` did not answer within 45-90 s
+ * and `gemini-2.5-flash` is closed to new keys. Override with GEMINI_MODEL.
+ */
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+/** ~2 MB of base64 ≈ 1.5 MB of JPEG; the app sends ≤1280 px, far under it. */
+const MAX_IMAGE_BASE64 = 2 * 1024 * 1024;
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const str = (description) => ({ type: 'string', description });
+
+const AI_KINDS = {
+  slip: {
+    prompt:
+      'This is a screenshot of a money-transfer receipt from a Pakistani ' +
+      'payment app or bank (Easypaisa, JazzCash, NayaPay, SadaPay, Meezan ' +
+      'or another bank, possibly via Raast). Read it exactly. The amount is ' +
+      'the amount transferred in rupees (if a total including fees is ' +
+      'shown, use the total); JazzCash prints the decimals as superscript, ' +
+      'so "Rs. 1.00" is one rupee, not one hundred. Ignore fee, charge and ' +
+      'tax lines. Copy the transaction id as printed (TID, Transaction ID, ' +
+      'ID#, Trx ID, Reference Number / STAN), keeping a trailing "..." if ' +
+      'it is cut off. Give the date and time as ISO 8601 local time. The ' +
+      'receiver is who the money was sent to; the sender is who sent it. ' +
+      'Leave out any field that is not visible. Do not guess.',
+    schema: {
+      type: 'object',
+      properties: {
+        provider: str('App or bank that issued the receipt: easypaisa, jazzcash, nayapay, sadapay, meezan, bank or unknown'),
+        successful: { type: 'boolean', description: 'false if the receipt says failed, pending or unsuccessful' },
+        amount: { type: 'number', description: 'Amount transferred in rupees, e.g. 1 or 4500.5' },
+        transactionId: str('Transaction id exactly as printed'),
+        dateTime: str('Transaction date and time, ISO 8601, e.g. 2026-11-20T01:33:00'),
+        receiverName: str('Name of the person the money was sent to'),
+        receiverAccount: str('Receiver account / mobile number as printed, masks included'),
+        senderName: str('Name of the sender'),
+        senderAccount: str('Sender account / mobile number as printed, masks included'),
+      },
+    },
+  },
+  license: {
+    prompt:
+      'This should be a photo of a Pakistani (usually Punjab) driving ' +
+      'licence. Read it exactly. Dates as ISO 8601 (YYYY-MM-DD). The expiry ' +
+      'is the "Valid Upto" / "Expiry" / "Valid Till" date. Categories are ' +
+      'the vehicle classes the holder may drive (e.g. M/CYCLE, M/CAR, LTV, ' +
+      'HTV, PSV). Set isDrivingLicense to false if it is not a driving ' +
+      'licence. Leave out any field that is not visible. Do not guess.',
+    schema: {
+      type: 'object',
+      properties: {
+        isDrivingLicense: { type: 'boolean' },
+        name: str('Holder name'),
+        fatherName: str('Father / husband name'),
+        cnic: str('CNIC number, 13 digits as printed'),
+        licenseNumber: str('Licence number'),
+        issueDate: str('Issue date, YYYY-MM-DD'),
+        expiryDate: str('Expiry date, YYYY-MM-DD'),
+        categories: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  },
+  registration: {
+    prompt:
+      'This should be a photo of a Pakistani (usually Punjab) vehicle ' +
+      'registration card — either the front (Make, Maker Name, Type of ' +
+      'Body, Seating Capacity, Year of Mfg, MRZ line starting C<ETD) or the ' +
+      'back (Excise & Taxation, Form-G: Owner\'s Name, Chassis No, Engine ' +
+      'No, Reg No). Read it exactly. The registration number looks like ' +
+      'LEA-12-1234 or ABC-123. Set isVehicleRegistration to false if it is ' +
+      'not a vehicle registration card. Leave out any field that is not ' +
+      'visible or is blacked out. Do not guess.',
+    schema: {
+      type: 'object',
+      properties: {
+        isVehicleRegistration: { type: 'boolean' },
+        registrationNumber: str('Registration / plate number'),
+        make: str('Make (model), e.g. HIACE'),
+        makerName: str('Maker, e.g. TOYOTA'),
+        bodyType: str('Type of body, e.g. VAN, MOTOR CYCLE'),
+        seatingCapacity: { type: 'integer' },
+        yearOfManufacture: { type: 'integer' },
+        colour: str('Colour'),
+        ownerName: str("Owner's name"),
+      },
+    },
+  },
+};
+
+/** The major version in a model id ("gemini-3.8-flash" → 3), or 0. */
+function geminiMajor(model) {
+  const m = /gemini-(\d+)/.exec(model);
+  return m ? Number(m[1]) : 0;
+}
+
+async function handleAiRead(request, env) {
+  const authorization = request.headers.get('authorization') ?? '';
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    return json({ error: 'Missing bearer token.' }, 401);
+  }
+  try {
+    await verifyIdToken(authorization.slice(7).trim(), env.FIREBASE_PROJECT_ID);
+  } catch (error) {
+    return json({ error: String(error.message ?? error) }, 401);
+  }
+
+  if (!env.GEMINI_API_KEY) return json({ error: 'ai_unavailable' }, 503);
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: 'Body must be JSON.' }, 400);
+  }
+  const kind = AI_KINDS[payload?.kind] ? payload.kind : null;
+  if (!kind) return json({ error: 'kind must be slip, license or registration.' }, 400);
+  const mimeType = String(payload.mimeType ?? 'image/jpeg');
+  if (!ALLOWED_MIME.has(mimeType)) return json({ error: 'Unsupported image type.' }, 400);
+  const image = typeof payload.imageBase64 === 'string' ? payload.imageBase64 : '';
+  if (!image) return json({ error: 'imageBase64 is required.' }, 400);
+  if (image.length > MAX_IMAGE_BASE64) return json({ error: 'Image too large.' }, 413);
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(image.slice(0, 1024))) {
+    return json({ error: 'imageBase64 is not base64.' }, 400);
+  }
+
+  const model = (env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim();
+  const spec = AI_KINDS[kind];
+  const generationConfig = {
+    temperature: 0,
+    responseMimeType: 'application/json',
+    responseJsonSchema: spec.schema,
+  };
+  const contents = [
+    {
+      role: 'user',
+      parts: [
+        { inlineData: { mimeType, data: image.replace(/\s+/g, '') } },
+        { text: spec.prompt },
+      ],
+    },
+  ];
+  const call = (config) =>
+    fetch(GEMINI_API + encodeURIComponent(model) + ':generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Header, not ?key=, so the key never lands in a URL or a log line.
+        'x-goog-api-key': env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({ contents, generationConfig: config }),
+    });
+
+  // Reading a receipt needs no deliberation; thinking only adds latency.
+  // `thinkingLevel` exists on Gemini 3+ and is an error on older models. An
+  // alias ("gemini-flash-latest") does not say which it is, so it is tried
+  // with the level and, if refused as a bad request, once without.
+  const mayThink = geminiMajor(model) >= 3 || model.endsWith('-latest');
+  let response = await call(
+    mayThink
+      ? { ...generationConfig, thinkingConfig: { thinkingLevel: 'LOW' } }
+      : generationConfig,
+  );
+  if (mayThink && response.status === 400) response = await call(generationConfig);
+
+  if (!response.ok) {
+    // Status only: Google's error body can echo request details.
+    console.error('ai/read: gemini answered', response.status);
+    const status = response.status === 429 ? 429 : 502;
+    return json({ error: 'ai_failed', status: response.status }, status);
+  }
+
+  let text = '';
+  try {
+    const body = await response.json();
+    const parts = body?.candidates?.[0]?.content?.parts ?? [];
+    text = parts.map((p) => (typeof p.text === 'string' && !p.thought ? p.text : '')).join('');
+  } catch {
+    return json({ error: 'ai_failed' }, 502);
+  }
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    console.error('ai/read: model returned non-JSON');
+    return json({ error: 'ai_failed' }, 502);
+  }
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return json({ error: 'ai_failed' }, 502);
+  }
+  return json({ result, model });
+}
+
+// ── Admin: permanently delete an account's sign-in ─────────────────────────
+
+/**
+ *   POST /admin/delete-account
+ *   Authorization: Bearer <Firebase ID token of an admin>
+ *   { "uid": "<account to delete>" }
+ *   → 200 { "deleted": true, "uid": "…", "alreadyGone": false }
+ *
+ * The one step of the admin panel's "Delete permanently" that a client
+ * cannot do: removing someone else's Firebase Auth user, which frees the
+ * email for a new registration. It needs the service account; the admin
+ * app writes the Firestore tombstone itself, and only after this succeeded.
+ *
+ * Refused unless the caller's own `users/{uid}` says `role: admin` (and is
+ * neither deleted nor deactivated). Never deletes an admin account or the
+ * caller's own, and only accounts that have a `users` document — so the
+ * endpoint cannot be pointed at arbitrary uids. A sign-in that is already
+ * gone (USER_NOT_FOUND) counts as success, so a retry after a half-finished
+ * delete completes cleanly.
+ */
+async function handleAdminDeleteAccount(request, env) {
+  const authorization = request.headers.get('authorization') ?? '';
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    return json({ error: 'Missing bearer token.' }, 401);
+  }
+  let callerUid;
+  try {
+    callerUid = await verifyIdToken(
+      authorization.slice(7).trim(),
+      env.FIREBASE_PROJECT_ID,
+    );
+  } catch (error) {
+    return json({ error: String(error.message ?? error) }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: 'Body must be JSON.' }, 400);
+  }
+  const uid = typeof payload?.uid === 'string' ? payload.uid.trim() : '';
+  // Firebase uids are at most 128 characters, and never contain a slash —
+  // which would otherwise walk the Firestore path below.
+  if (!uid || uid.length > 128 || uid.includes('/')) {
+    return json({ error: 'uid is required.' }, 400);
+  }
+
+  if (!env.SERVICE_ACCOUNT_JSON) {
+    return json({ error: 'Worker is not configured.' }, 500);
+  }
+  const accessToken = await googleAccessToken(env);
+
+  const caller = await readDocument(env, accessToken, 'users/' + callerUid);
+  if (
+    stringField(caller, 'role') !== 'admin' ||
+    boolField(caller, 'isDeleted') ||
+    caller?.fields?.isActive?.booleanValue === false
+  ) {
+    return json({ error: 'Only an admin can delete accounts.' }, 403);
+  }
+  if (uid === callerUid) {
+    return json({ error: 'You cannot delete your own account.' }, 403);
+  }
+
+  const target = await readDocument(env, accessToken, 'users/' + uid);
+  if (!target) return json({ error: 'No such account.' }, 404);
+  if (stringField(target, 'role') === 'admin') {
+    return json({ error: 'Admin accounts cannot be deleted.' }, 403);
+  }
+
+  const response = await fetch(
+    IDENTITY_TOOLKIT + env.FIREBASE_PROJECT_ID + '/accounts:delete',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + accessToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ localId: uid }),
+    },
+  );
+  if (response.ok) {
+    console.log('admin ' + callerUid + ' deleted the sign-in of ' + uid);
+    return json({ deleted: true, uid, alreadyGone: false });
+  }
+  const text = await response.text();
+  if (text.includes('USER_NOT_FOUND')) {
+    return json({ deleted: true, uid, alreadyGone: true });
+  }
+  // Status only: Google's error body can echo request details.
+  console.error('admin/delete-account: identitytoolkit answered', response.status);
+  return json(
+    { error: 'Could not delete the sign-in.', status: response.status },
+    502,
+  );
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -568,7 +893,12 @@ export default {
       return json({ ok: true, project: env.FIREBASE_PROJECT_ID ?? null });
     }
 
-    if (url.pathname !== '/send' && url.pathname !== '/routes') {
+    if (
+      url.pathname !== '/send' &&
+      url.pathname !== '/routes' &&
+      url.pathname !== '/ai/read' &&
+      url.pathname !== '/admin/delete-account'
+    ) {
       return json({ error: 'Not found.' }, 404);
     }
     if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405);
@@ -581,6 +911,10 @@ export default {
 
     try {
       if (url.pathname === '/routes') return await handleRoutes(request, env);
+      if (url.pathname === '/ai/read') return await handleAiRead(request, env);
+      if (url.pathname === '/admin/delete-account') {
+        return await handleAdminDeleteAccount(request, env);
+      }
       return await handleSend(request, env);
     } catch (error) {
       // Never leak the service account or a Google error body to the caller.

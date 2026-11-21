@@ -58,6 +58,11 @@ android {
 
     buildTypes {
         release {
+            // ML Kit text recognition: see proguard-rules.pro.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             signingConfig = if (hasUploadKey) {
                 signingConfigs.getByName("upload")
             } else {

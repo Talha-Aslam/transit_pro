@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "node --test test/admin_delete_account.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.156.0"

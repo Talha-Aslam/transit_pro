@@ -199,10 +199,7 @@ class OnboardingService {
             DriverDocument(
               id: ref.id,
               driverId: uid,
-              // No CNIC case in DocumentType; vehicleRegistration is the
-              // closest existing slot and the admin app renders the file
-              // regardless of which one it lands in.
-              type: DocumentType.vehicleRegistration,
+              type: DocumentType.cnic,
               status: DocumentStatus.pending,
               fileUrl: idCardUrl,
               publicId: idCardPublicId,

@@ -3,6 +3,7 @@ import 'package:transit_core/transit_core.dart';
 
 import '../app/language_provider.dart';
 import '../theme/app_theme.dart';
+import 'ai_check_widgets.dart';
 import 'glass_card.dart';
 
 /// One place that decides how a [Payment] looks.
@@ -265,7 +266,13 @@ class PaymentRow extends StatelessWidget {
         // blur per row is the classic BackdropFilter-in-a-list jank source.
         enableBlur: false,
         padding: const EdgeInsets.all(14),
-        onTap: onTap,
+        // A family's own row has nothing else to open; with an AI check
+        // on it, a tap shows what the check read.
+        onTap:
+            onTap ??
+            (payment.slipCheck == null
+                ? null
+                : () => showSlipCheckDetails(context, payment.slipCheck!)),
         child: Row(
           children: [
             Container(
@@ -305,6 +312,10 @@ class PaymentRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: context.textTertiary, fontSize: 11),
                   ),
+                  if (payment.slipCheck != null) ...[
+                    const SizedBox(height: 4),
+                    AiCheckBadge.slip(payment.slipCheck!, dense: true),
+                  ],
                 ],
               ),
             ),

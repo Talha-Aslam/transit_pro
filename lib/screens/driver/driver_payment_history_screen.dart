@@ -8,6 +8,7 @@ import '../../app/push_sender.dart';
 import '../../app/session_service.dart';
 import '../../data/payment_repository.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/ai_check_widgets.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/payment_presentation.dart';
 
@@ -467,6 +468,10 @@ class _DriverPaymentHistoryScreenState
                     ),
                   ),
                 ],
+                if (payment.slipCheck != null) ...[
+                  const SizedBox(height: 12),
+                  SlipCheckDetails(check: payment.slipCheck!),
+                ],
                 if ((payment.slipUrl ?? '').isNotEmpty) ...[
                   const SizedBox(height: 12),
                   ClipRRect(
@@ -575,6 +580,13 @@ class _DriverPaymentHistoryScreenState
     // After the sheet has gone, so its field is not still listening.
     WidgetsBinding.instance.addPostFrameCallback((_) => note.dispose());
     if (decision == null) return;
+    // Marking it received over an AI warning: say the warnings once more.
+    final check = payment.slipCheck;
+    if (decision && check != null && !check.matches) {
+      if (!mounted) return;
+      final sure = await confirmDespiteSlipWarnings(context, check);
+      if (!sure) return;
+    }
     final uid = SessionService.instance.uid;
     if (uid == null) return;
     try {

@@ -22,6 +22,7 @@ import '../../app/trip_session.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/dashboard_header.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/verify_documents_card.dart';
 import '../../widgets/app_glyph.dart';
 
 /// The vehicle this driver actually drives, for use in messages sent to families.
@@ -406,6 +407,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
+                  // Until every required document is submitted, so
+                  // verification is always one tap away.
+                  const VerifyDocumentsCard(),
+
                   // ── Route status ─────────────────────────────────────────
                   GlassCard(
                     gradient: LinearGradient(

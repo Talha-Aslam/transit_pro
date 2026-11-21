@@ -91,6 +91,24 @@ class AuthService {
   static const _roleKey = 'logged_in_role';
   static const _themeKey = 'theme_is_dark';
 
+  /// A profile an admin archived with the old admin-panel "Delete"
+  /// (`isDeleted` without the user's own uid in `deletedBy`). The admin
+  /// panel shows it as Deactivated and can activate it again, so it is
+  /// worded as a deactivation, not a deletion.
+  static const adminDeactivatedMessage =
+      'This account has been deactivated by the administrator. Please '
+      'contact support.';
+
+  /// The user deleted this account themselves from the app.
+  static const selfDeletedMessage = 'This account has been deleted.';
+
+  /// Whether a tombstoned `users/{uid}` (`isDeleted`) is the user's own
+  /// deletion — `AccountService.delete()` writes their uid to `deletedBy`.
+  /// Anything else (no `deletedBy`, or an admin's) is an admin action.
+  @visibleForTesting
+  static bool isSelfDeletedTombstone(String uid, Map<String, dynamic>? raw) =>
+      raw != null && raw['deletedBy'] == uid;
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
@@ -227,24 +245,61 @@ class AuthService {
   /// Signs in to a login whose sign-up never got as far as a profile, so the
   /// sign-up can be finished. Null when the password is wrong or the account
   /// is a complete one — a real "email already in use".
+  ///
+  /// A tombstoned profile is never resumed into:
+  /// * deleted by the user themselves, with the login left behind (Firebase
+  ///   wanted a recent sign-in) — this sign-in is that recent sign-in, so
+  ///   the old login is removed and a brand-new one created for this
+  ///   sign-up (a new uid; nothing of the old account carries over);
+  /// * archived by an admin — refused with [adminDeactivatedMessage].
+  ///
+  /// An account an admin deleted *permanently* has no login any more, so
+  /// `createUserWithEmailAndPassword` succeeds and this is never reached.
   Future<UserCredential?> _resumeUnfinishedSignUp(
     String email,
     String password,
   ) async {
+    final UserCredential cred;
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
+      cred = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      final user = cred.user;
-      if (user == null) return null;
-      final existing = await UserRepository.instance.fetchUser(user.uid);
-      if (existing == null) return cred;
-      await _auth.signOut();
-      return null;
     } catch (_) {
       return null;
     }
+    final user = cred.user;
+    if (user == null) return null;
+
+    Map<String, dynamic>? raw;
+    try {
+      raw = (await Db.fs.collection('users').doc(user.uid).get()).data();
+    } catch (_) {
+      await _auth.signOut();
+      return null;
+    }
+    if (raw == null) return cred; // an unfinished sign-up: finish it
+
+    if (asBool(raw['isDeleted'])) {
+      if (isSelfDeletedTombstone(user.uid, raw)) {
+        try {
+          await user.delete();
+          return await _auth.createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          );
+        } catch (e) {
+          debugPrint('replacing a self-deleted login failed: $e');
+          await _auth.signOut();
+          return null;
+        }
+      }
+      await _auth.signOut();
+      throw const AuthException(adminDeactivatedMessage);
+    }
+
+    await _auth.signOut();
+    return null;
   }
 
   /// How long a single network round trip inside sign-in gets before this
@@ -283,10 +338,7 @@ class AuthService {
         );
       }
 
-      if (profile.isDeleted) {
-        await _finishSelfDeletion(user);
-        throw const AuthException('This account has been deleted.');
-      }
+      if (profile.isDeleted) await _refuseTombstone(user);
 
       if (!profile.isActive) {
         await signOut();
@@ -381,10 +433,7 @@ class AuthService {
         return GoogleNotRegistered(email: user.email ?? googleUser.email);
       }
 
-      if (profile.isDeleted) {
-        await _finishSelfDeletion(user);
-        throw const AuthException('This account has been deleted.');
-      }
+      if (profile.isDeleted) await _refuseTombstone(user);
 
       // Registered under another role — e.g. a Student account on the Parent
       // login. Checked for unfinished profiles too, so an account is never
@@ -479,19 +528,35 @@ class AuthService {
     }
   }
 
-  /// Signs out of an account whose profile is a tombstone. When the user
-  /// deleted it themselves and the login survived (Firebase wanted a recent
-  /// sign-in), this sign-in *is* that recent sign-in — so the login is
-  /// removed now, finishing what they asked for. An account an admin
-  /// archived keeps its login.
-  Future<void> _finishSelfDeletion(User user) async {
+  /// Refuses a sign-in whose profile is a tombstone (`isDeleted`), always
+  /// signing out: "deleted" when the user deleted it themselves (and the
+  /// leftover login is removed — see [_finishSelfDeletion]), otherwise
+  /// [adminDeactivatedMessage] — an admin archived it, and the admin panel
+  /// can activate it again.
+  Future<Never> _refuseTombstone(User user) async {
+    final selfDeleted = await _finishSelfDeletion(user);
+    throw AuthException(
+      selfDeleted ? selfDeletedMessage : adminDeactivatedMessage,
+    );
+  }
+
+  /// Signs out of an account whose profile is a tombstone, and reports
+  /// whether the user deleted it themselves. When they did and the login
+  /// survived (Firebase wanted a recent sign-in), this sign-in *is* that
+  /// recent sign-in — so the login is removed now, finishing what they
+  /// asked for and freeing the email. An account an admin archived keeps
+  /// its login.
+  Future<bool> _finishSelfDeletion(User user) async {
+    var selfDeleted = false;
     try {
       final raw = (await Db.fs.collection('users').doc(user.uid).get()).data();
-      if (raw?['deletedBy'] == user.uid) await user.delete();
+      selfDeleted = isSelfDeletedTombstone(user.uid, raw);
+      if (selfDeleted) await user.delete();
     } catch (e) {
       debugPrint('finishing self-deletion failed: $e');
     }
     await signOut();
+    return selfDeleted;
   }
 
   /// The user declined to register a [GoogleNotRegistered] account: remove

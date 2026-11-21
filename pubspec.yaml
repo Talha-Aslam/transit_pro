@@ -1,7 +1,7 @@
 name: transit_pro
 description: "Student Transport Management App - Safe Journeys, Happy Kids, Peace of Mind"
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+6
 
 environment:
   sdk: ^3.10.0
@@ -24,11 +24,16 @@ dependencies:
   google_sign_in: 6.2.1
   google_maps_flutter: ^2.18.1
   intl: ^0.20.2
+  # AI slip & document check: on-device OCR (Latin script only), and a
+  # pure-Dart JPEG encoder to shrink an image before the Gemini fallback.
+  google_mlkit_text_recognition: ^0.16.0
+  image: ^4.13.1
 
   # Shared domain layer — models, enums and config used by BOTH this app and
   # the admin app. See ../../transit_core.
   transit_core:
     path: ../../transit_core
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
