@@ -324,16 +324,11 @@ class MissedBusService {
       final candidates = await UserRepository.instance.fetchDriversServing(
         institute,
       );
-      final origin = from ?? student?.pickupLocation;
       final recipients = <String>[
         for (final d in candidates)
-          // The same three tests the seat search applies, for the same
-          // reasons: an archived or suspended driver is not an option, and
-          // one whose service radius does not reach the child cannot help.
-          if (!d.isDeleted &&
-              d.status != core.DriverStatus.suspended &&
-              d.coversLocation(origin))
-            d.id,
+          // The same tests the seat search applies, for the same reason: an
+          // archived or suspended driver is not an option.
+          if (!d.isDeleted && d.status != core.DriverStatus.suspended) d.id,
       ];
       if (recipients.isEmpty) return;
 

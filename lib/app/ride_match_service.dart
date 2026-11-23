@@ -225,12 +225,25 @@ class RideMatchService {
       ? '/student/$path'
       : '/parent/$path';
 
+  /// Where a notification about a booked seat's fee opens for the family:
+  /// the driver's details, where the fee is answered.
+  static String _familySeatRoute(RideRequest request) =>
+      request.requesterId == request.studentId
+      ? '/student'
+      : '/parent/driver-details';
+
   /// The driver names a monthly fee for [request] — or a new one after the
   /// family turned the last down — and the family is told.
+  ///
+  /// Also works on a seat already booked: a driver who accepted without a
+  /// fee, or wants to change it, sends one here. [currentFeePaisa] is the fee
+  /// in force on that seat (0 when none), which stays until the family
+  /// accepts the new one.
   Future<void> proposeFee(
     RideRequest request, {
     required int feePaisa,
     String? note,
+    int currentFeePaisa = 0,
   }) async {
     final driverId = SessionService.instance.uid;
     if (driverId == null || driverId != request.driverId) {
@@ -239,27 +252,78 @@ class RideMatchService {
     if (feePaisa <= 0) {
       throw const RideRequestException('Enter the fee you want per month.');
     }
+    if (!request.isPending && !request.isAccepted) {
+      throw const RideRequestException(
+        'This seat request is closed, so a fee cannot be sent on it.',
+      );
+    }
+    final booked = request.isAccepted;
+    if (booked && currentFeePaisa > 0 && feePaisa == currentFeePaisa) {
+      throw const RideRequestException(
+        'That is already the fee for this seat.',
+      );
+    }
     await _requests.proposeFee(
       requestId: request.id,
       feePaisa: feePaisa,
       note: note,
     );
     final rupees = (feePaisa / 100).round();
+    final said = (note ?? '').trim().isEmpty ? '' : ' — "${note!.trim()}"';
+    final changing = booked && currentFeePaisa > 0;
     await _notify(
       request.requesterId,
       UserNotification(
         id: '',
         type: NotificationType.rideRequestAnswered,
-        title: 'Fee for ${request.studentName}: Rs.$rupees a month',
-        body:
-            '${request.driverName} asks Rs.$rupees a month for '
-            '${request.scheduleLabel}'
-            '${(note ?? '').trim().isEmpty ? '' : ' — "${note!.trim()}"'}. '
-            'Tap to accept or reject.',
+        title: changing
+            ? 'New fee for ${request.studentName}: Rs.$rupees a month'
+            : 'Fee for ${request.studentName}: Rs.$rupees a month',
+        body: changing
+            ? '${request.driverName} asks Rs.$rupees a month instead of '
+                  'Rs.${(currentFeePaisa / 100).round()}$said. '
+                  'Tap to accept or reject.'
+            : '${request.driverName} asks Rs.$rupees a month for '
+                  '${request.scheduleLabel}$said. Tap to accept or reject.',
         data: {
           'requestId': request.id,
           'studentId': request.studentId,
-          'route': _familyRoute(request, 'find-drivers'),
+          'route': booked
+              ? _familySeatRoute(request)
+              : _familyRoute(request, 'find-drivers'),
+        },
+      ),
+    );
+  }
+
+  /// Requests already asked about on this phone, so a family tapping twice
+  /// does not ping the driver twice.
+  final _feeAskedAt = <String, DateTime>{};
+
+  /// The family asks the driver to set the monthly fee on a booked seat
+  /// that has none. Only a notification: the driver sends the fee.
+  Future<void> askForFee(RideRequest request) async {
+    final last = _feeAskedAt[request.id];
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(hours: 1)) {
+      throw const RideRequestException(
+        'The driver was asked already. Give them a little time to reply.',
+      );
+    }
+    _feeAskedAt[request.id] = DateTime.now();
+    await _notify(
+      request.driverId,
+      UserNotification(
+        id: '',
+        type: NotificationType.rideRequest,
+        title: 'Set the fee for ${request.studentName}',
+        body:
+            '${request.studentName}\'s family asks you to set the monthly fee '
+            'for their seat. Open Booked students to send it.',
+        data: {
+          'requestId': request.id,
+          'studentId': request.studentId,
+          'route': '/driver',
         },
       ),
     );
@@ -279,6 +343,7 @@ class RideMatchService {
     );
     final rupees = (request.feePaisa / 100).round();
     final reason = (note ?? '').trim();
+    final booked = request.isAccepted;
     await _notify(
       request.driverId,
       UserNotification(
@@ -288,14 +353,19 @@ class RideMatchService {
             ? 'Fee accepted for ${request.studentName}'
             : 'Fee turned down for ${request.studentName}',
         body: accept
-            ? 'Rs.$rupees a month is agreed. Accept the seat to book it.'
+            ? (booked
+                  ? 'Rs.$rupees a month is agreed. It applies from the next '
+                        'bill.'
+                  : 'Rs.$rupees a month is agreed. Accept the seat to book '
+                        'it.')
             : 'They said no to Rs.$rupees a month'
                   '${reason.isEmpty ? '' : ': "$reason"'}. '
-                  'Send a new fee, or decline.',
+                  '${booked ? 'The current fee stays. Send a new one if you '
+                            'like.' : 'Send a new fee, or decline.'}',
         data: {
           'requestId': request.id,
           'studentId': request.studentId,
-          'route': '/driver/ride-requests',
+          'route': booked ? '/driver' : '/driver/ride-requests',
         },
       ),
     );
@@ -361,7 +431,6 @@ class RideMatchService {
     required List<ServiceArea> areas,
     required List<DriverSchedule> rounds,
     int? vehicleCapacity,
-    double? radiusKm,
     GeoCoord? baseLocation,
     int? missedBusFarePaisa,
   }) async {
@@ -378,7 +447,6 @@ class RideMatchService {
       areas: areas,
       schedules: merged,
       vehicleCapacity: vehicleCapacity,
-      radiusKm: radiusKm,
       baseLocation: baseLocation,
       missedBusFarePaisa: missedBusFarePaisa,
     );

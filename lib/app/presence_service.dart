@@ -70,10 +70,10 @@ class PresenceService with WidgetsBindingObserver {
     _uid = null;
     if (uid != null) {
       unawaited(_logAccess(uid, 'signOut'));
-      await _write(uid, online: false).timeout(
-        const Duration(seconds: 4),
-        onTimeout: () {},
-      );
+      await _write(
+        uid,
+        online: false,
+      ).timeout(const Duration(seconds: 4), onTimeout: () {});
     }
     _role = null;
     _driverStatus = null;

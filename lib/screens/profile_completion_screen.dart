@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../app/auth_service.dart';
@@ -12,7 +9,6 @@ import '../app/profile_draft.dart';
 import '../app/session_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/image_source_sheet.dart';
 import '../widgets/profile_form_fields.dart';
 
 /// One-time onboarding for accounts that arrive without a full profile.
@@ -58,8 +54,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   bool _saving = false;
   String _error = '';
 
-  final _picker = ImagePicker();
-
   // Shared
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -83,8 +77,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final _vehicleCtrl = TextEditingController();
   final _seatCapacityCtrl = TextEditingController();
   String? _vehicleType;
-  File? _licensePhoto;
-  File? _idCardPhoto;
 
   /// Where this driver runs, and the rounds families can book.
   ///
@@ -105,7 +97,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   ];
 
   final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
-  double _serviceRadiusKm = 5;
   GeoCoord? _baseLocation;
 
   @override
@@ -261,30 +252,11 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         .where((a) => !a.isBlank)
         .map((a) => a.toModel())
         .toList(),
-    serviceRadiusKm: _serviceRadiusKm,
     baseLocation: _baseLocation,
     schedules: _rounds.map((r) => r.toModel()).toList(),
-    licensePhoto: _licensePhoto,
-    idCardPhoto: _idCardPhoto,
   );
 
   // ── Actions ───────────────────────────────────────────────────────────────
-
-  Future<void> _pickDocument({required bool isLicense}) async {
-    final source = await showImageSourceSheet(context, accentColor: _accent);
-    if (source == null) return;
-
-    final picked = await _picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null) return;
-
-    setState(() {
-      if (isLicense) {
-        _licensePhoto = File(picked.path);
-      } else {
-        _idCardPhoto = File(picked.path);
-      }
-    });
-  }
 
   Future<void> _submit() async {
     final draft = _draft;
@@ -854,36 +826,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     ),
     const SizedBox(height: 16),
     Row(
-      children: [
-        Expanded(
-          child: DocumentUploadTile(
-            title: 'Upload License',
-            subtitle: _licensePhoto == null
-                ? 'Front photo of license'
-                : 'Ready to upload',
-            icon: Icons.badge_rounded,
-            accentColor: AppTheme.driverCyan,
-            isDone: _licensePhoto != null,
-            onTap: () => _pickDocument(isLicense: true),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: DocumentUploadTile(
-            title: 'Upload ID Card',
-            subtitle: _idCardPhoto == null
-                ? 'CNIC / national ID photo'
-                : 'Ready to upload',
-            icon: Icons.credit_card_rounded,
-            accentColor: AppTheme.driverCyan,
-            isDone: _idCardPhoto != null,
-            onTap: () => _pickDocument(isLicense: false),
-          ),
-        ),
-      ],
-    ),
-    const SizedBox(height: 16),
-    Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
@@ -952,8 +894,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     const SizedBox(height: 20),
   ];
 
-  /// "Where do you drive?" — the institutions this driver serves, plus how far
-  /// they will travel to collect a student.
+  /// "Where do you drive?" — the institutions this driver serves, and where
+  /// they start their day (families see how far away they are).
   List<Widget> _serviceSection() => [
     _sectionHeading(
       'Where do you drive?',
@@ -987,16 +929,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       value: _baseLocation,
       accentColor: AppTheme.driverCyan,
       onPicked: (p) => setState(() => _baseLocation = p),
-    ),
-    const SizedBox(height: 16),
-    // A local widget so dragging the slider only repaints this small subtree
-    // instead of rebuilding (and re-blurring) the entire form on every frame.
-    _RadiusSlider(
-      initialValue: _serviceRadiusKm,
-      accentColor: AppTheme.driverCyan,
-      // Just keeps the field in sync for `_draft` at submit time — no
-      // setState here, so the drag never touches the rest of the form.
-      onChanged: (v) => _serviceRadiusKm = v,
     ),
   ];
 
@@ -1095,52 +1027,4 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
         ),
       );
-}
-
-/// Owns its own drag value so continuous slider updates never rebuild
-/// [ProfileCompletionScreen]'s much larger, blur-backed form.
-class _RadiusSlider extends StatefulWidget {
-  final double initialValue;
-  final Color accentColor;
-  final ValueChanged<double> onChanged;
-
-  const _RadiusSlider({
-    required this.initialValue,
-    required this.accentColor,
-    required this.onChanged,
-  });
-
-  @override
-  State<_RadiusSlider> createState() => _RadiusSliderState();
-}
-
-class _RadiusSliderState extends State<_RadiusSlider> {
-  late double _value = widget.initialValue;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FieldLabel('HOW FAR WILL YOU TRAVEL? — ${_value.round()} KM'),
-        Slider(
-          value: _value,
-          min: 1,
-          max: 30,
-          divisions: 29,
-          activeColor: widget.accentColor,
-          label: '${_value.round()} km',
-          onChanged: (v) {
-            setState(() => _value = v);
-            widget.onChanged(v);
-          },
-        ),
-        Text(
-          'Families further than this from your starting point will not see '
-          'you. Leave it wide if you are flexible.',
-          style: TextStyle(color: context.textTertiary, fontSize: 11),
-        ),
-      ],
-    );
-  }
 }

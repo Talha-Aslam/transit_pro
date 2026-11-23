@@ -10,6 +10,7 @@ import '../../widgets/child_selector.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/seat_fee.dart';
 import '../../widgets/app_glyph.dart';
 
 class DriverDetailsScreen extends StatefulWidget {
@@ -87,11 +88,15 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
   void _onRatingChanged() => setState(() {});
 
   /// A driver who removes this child is gone from here at once, not the
-  /// next time the screen is opened.
+  /// next time the screen is opened; a new agreed fee shows at once too.
   void _onChildrenChanged() {
     if (!mounted) return;
     final now = _svc.selectedChild?.driver ?? '';
-    if (now != (_driver?.id ?? '')) _onChildChanged();
+    if (now != (_driver?.id ?? '')) {
+      _onChildChanged();
+    } else {
+      setState(() {});
+    }
   }
 
   Future<void> _submitWeeklyRating(ChildInfo child) async {
@@ -332,6 +337,15 @@ class _DriverDetailsScreenState extends State<DriverDetailsScreen> {
                           ),
                         ],
                       ),
+                      // The seat's monthly fee: answer the driver's fee
+                      // request, or ask them to set one.
+                      if (child != null && child.driver.trim().isNotEmpty)
+                        FamilySeatFeeCard(
+                          driverId: child.driver.trim(),
+                          studentId: child.id,
+                          currentFeePaisa: child.monthlyFeePaisa,
+                          accent: AppTheme.parentPurple,
+                        ),
                       if (_hasRidden && child != null) ...[
                         const SizedBox(height: 16),
                         GlassCard(

@@ -137,8 +137,8 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
 
     setState(() => _uploading.add(type));
 
-    // The AI check of a licence or registration photo, before upload. It
-    // only warns; the admin still verifies the document.
+    // The AI check of a CNIC, licence or registration photo, before upload.
+    // It only warns; the admin still verifies the document.
     DocCheck? check;
     if (DocCheckService.supports(type)) {
       check = await DocCheckService.instance.check(
@@ -186,9 +186,10 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
           fileUrl: result.secureUrl,
           publicId: result.publicId,
           fileName: picked.name,
-          // The licence's own expiry, read off the card — the admin sees
-          // it and can correct it when verifying.
-          expiryDate: type == DocumentType.drivingLicense
+          // The licence's or CNIC's own expiry, read off the card — the
+          // admin sees it and can correct it when verifying.
+          expiryDate:
+              type == DocumentType.drivingLicense || type == DocumentType.cnic
               ? check?.expiryDate
               : null,
           docCheck: check,
@@ -204,8 +205,8 @@ class _DriverDocumentsScreenState extends State<DriverDocumentsScreen> {
     }
   }
 
-  /// What a licence or registration card is compared with: the driver's
-  /// profile name, and their vehicle's seats and plate.
+  /// What a CNIC, licence or registration card is compared with: the
+  /// driver's profile name, and their vehicle's seats and plate.
   DocExpectation _expectation() {
     final session = SessionService.instance;
     final driver = session.driver.value;

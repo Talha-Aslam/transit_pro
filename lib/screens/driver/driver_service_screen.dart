@@ -44,7 +44,6 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
   ];
 
   List<RoundFormData> _rounds = [];
-  double _radiusKm = 5;
   GeoCoord? _base;
   final _fareCtrl = TextEditingController();
 
@@ -108,9 +107,6 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
       _rounds = driver.schedules.isEmpty
           ? [RoundFormData.fresh(ordinal: 1)]
           : driver.orderedSchedules.map(RoundFormData.from).toList();
-      _radiusKm = driver.serviceRadiusKm <= 0
-          ? 5
-          : driver.serviceRadiusKm.clamp(1, 30);
       _base = driver.baseLocation;
       final capacity = driver.vehicleCapacity > 0
           ? driver.vehicleCapacity
@@ -190,7 +186,6 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
         areas: areas,
         rounds: rounds,
         vehicleCapacity: capacity,
-        radiusKm: _radiusKm,
         baseLocation: _base,
         missedBusFarePaisa: fareRupees <= 0 ? 0 : fareRupees * 100,
       );
@@ -334,20 +329,6 @@ class _DriverServiceScreenState extends State<DriverServiceScreen> {
                               value: _base,
                               accentColor: AppTheme.driverCyan,
                               onPicked: (p) => setState(() => _base = p),
-                            ),
-                            const SizedBox(height: 16),
-                            FieldLabel(
-                              'HOW FAR YOU WILL TRAVEL — '
-                              '${_radiusKm.round()} KM',
-                            ),
-                            Slider(
-                              value: _radiusKm,
-                              min: 1,
-                              max: 30,
-                              divisions: 29,
-                              activeColor: AppTheme.driverCyan,
-                              label: '${_radiusKm.round()} km',
-                              onChanged: (v) => setState(() => _radiusKm = v),
                             ),
                             const SizedBox(height: 20),
                             _heading(

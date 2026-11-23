@@ -13,6 +13,7 @@ import '../../widgets/avatar_image.dart';
 import '../../data/rating_repository.dart';
 import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/seat_fee.dart';
 import '../../widgets/text_controller_scope.dart';
 import '../../widgets/app_glyph.dart';
 
@@ -926,7 +927,7 @@ class _DriverMatchCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   // The driver's monthly fee, to accept or turn down.
                   if (existing!.feeStatus != FeeStatus.none) ...[
-                    _FeeAnswer(request: existing!, accent: accent),
+                    FeeAnswerCard(request: existing!, accent: accent),
                     const SizedBox(height: 10),
                   ],
                   GestureDetector(
@@ -1119,154 +1120,6 @@ class _Message extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// The driver's fee on a waiting request: accept it, or turn it down with a
-/// reason the driver reads before sending a new one.
-class _FeeAnswer extends StatefulWidget {
-  final RideRequest request;
-  final Color accent;
-  const _FeeAnswer({required this.request, required this.accent});
-
-  @override
-  State<_FeeAnswer> createState() => _FeeAnswerState();
-}
-
-class _FeeAnswerState extends State<_FeeAnswer> {
-  bool _busy = false;
-
-  Future<void> _answer(bool accept) async {
-    String? note;
-    if (!accept) {
-      note = await showDialog<String>(
-        context: context,
-        builder: (ctx) => TextControllerScope(
-          builder: (ctrl) => AlertDialog(
-            title: const Text('Reject this fee?'),
-            content: TextField(
-              controller: ctrl,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText:
-                    'Tell the driver why — e.g. it is more than '
-                    'others charge for this distance',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-                child: const Text('Reject fee'),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (note == null) return;
-    }
-    setState(() => _busy = true);
-    try {
-      await RideMatchService.instance.answerFee(
-        widget.request,
-        accept: accept,
-        note: note,
-      );
-    } catch (e) {
-      debugPrint('fee answer failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not send. Check your connection.'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final r = widget.request;
-    final rupees = (r.feePaisa / 100).round();
-    final driverNote = (r.feeDriverNote ?? '').trim();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.warning.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.warning.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '💰 Fee: Rs.$rupees / month',
-            style: TextStyle(
-              color: context.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if (driverNote.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              '"$driverNote"',
-              style: TextStyle(color: context.textSecondary, fontSize: 12),
-            ),
-          ],
-          const SizedBox(height: 8),
-          switch (r.feeStatus) {
-            FeeStatus.accepted => const Text(
-              'You accepted this fee. Waiting for the driver to confirm the '
-              'seat.',
-              style: TextStyle(color: AppTheme.success, fontSize: 12),
-            ),
-            FeeStatus.rejected => Text(
-              'You turned it down'
-              '${(r.feeFamilyNote ?? '').isEmpty ? '' : ': "${r.feeFamilyNote}"'}'
-              '. Waiting for the driver.',
-              style: const TextStyle(color: AppTheme.error, fontSize: 12),
-            ),
-            _ =>
-              _busy
-                  ? const Center(child: CircularProgressIndicator())
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _answer(false),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.error,
-                              side: const BorderSide(color: AppTheme.error),
-                            ),
-                            child: const Text('Reject'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => _answer(true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.success,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Accept fee'),
-                          ),
-                        ),
-                      ],
-                    ),
-          },
-        ],
       ),
     );
   }

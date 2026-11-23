@@ -10,6 +10,7 @@ import '../../data/user_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/seat_fee.dart';
 import '../../widgets/student_logistics.dart';
 import '../../widgets/text_controller_scope.dart';
 
@@ -106,12 +107,7 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
   /// Asks the driver for the monthly fee to put to the family, then sends
   /// it. Also how a new fee goes out after the family turned one down.
   Future<void> _proposeFee(RideRequest request) async {
-    final result = await showModalBottomSheet<(int, String)>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _FeeSheet(request: request),
-    );
+    final result = await showFeeProposalSheet(context, request: request);
     if (result == null) return;
     await _run(
       request,
@@ -1270,120 +1266,6 @@ class _EmptyState extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The driver's monthly fee for one seat, and a note to go with it.
-class _FeeSheet extends StatefulWidget {
-  final RideRequest request;
-  const _FeeSheet({required this.request});
-
-  @override
-  State<_FeeSheet> createState() => _FeeSheetState();
-}
-
-class _FeeSheetState extends State<_FeeSheet> {
-  late final _amount = TextEditingController(
-    text: widget.request.feePaisa > 0
-        ? '${(widget.request.feePaisa / 100).round()}'
-        : '',
-  );
-  final _note = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    _note.dispose();
-    super.dispose();
-  }
-
-  void _send() {
-    final rupees = int.tryParse(_amount.text.trim()) ?? 0;
-    if (rupees <= 0) {
-      setState(() => _error = 'Enter the fee per month.');
-      return;
-    }
-    Navigator.pop(context, (rupees, _note.text.trim()));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final r = widget.request;
-    final turnedDown = r.feeStatus == FeeStatus.rejected;
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: context.cardBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Monthly fee for ${r.studentName}',
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              turnedDown
-                  ? 'The family turned down Rs.${(r.feePaisa / 100).round()}'
-                        '${(r.feeFamilyNote ?? '').isEmpty ? '.' : ': "${r.feeFamilyNote}".'}'
-                        ' Send a new fee, or decline the request.'
-                  : 'The family accepts or rejects it. Billing starts the day '
-                        'you accept the seat, every 30 days.',
-              style: TextStyle(color: context.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _amount,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              style: TextStyle(color: context.textPrimary, fontSize: 16),
-              decoration: InputDecoration(
-                prefixText: 'Rs. ',
-                suffixText: '/ month',
-                hintText: 'e.g. 4000',
-                errorText: _error,
-              ),
-              onChanged: (_) {
-                if (_error != null) setState(() => _error = null);
-              },
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _note,
-              style: TextStyle(color: context.textPrimary, fontSize: 14),
-              decoration: const InputDecoration(
-                hintText: 'Note for the family (optional)',
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _send,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.driverCyan,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Send fee'),
-              ),
-            ),
-          ],
         ),
       ),
     );

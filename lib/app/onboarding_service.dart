@@ -1,11 +1,7 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:transit_core/transit_core.dart';
 
 import '../data/user_repository.dart';
-import '../services/cloudinary_service.dart';
 import 'profile_draft.dart';
 import 'session_service.dart';
 
@@ -32,9 +28,10 @@ class OnboardingService {
 
   /// Creates every document [draft] implies, then marks the profile complete.
   ///
-  /// Order matters: file uploads run first, because a failed upload must leave
-  /// nothing behind. Once uploads succeed, the Firestore writes go out in a
-  /// single batch so a half-provisioned account is not possible.
+  /// The Firestore writes go out in a single batch so a half-provisioned
+  /// account is not possible. A driver's licence, CNIC and registration are
+  /// not part of sign-up: they are uploaded afterwards from Documents, where
+  /// the AI check reads each one.
   Future<AppUser> provision({
     required String uid,
     required ProfileDraft draft,
@@ -44,21 +41,7 @@ class OnboardingService {
       throw OnboardingException('Incomplete profile: ${gaps.join(', ')}');
     }
 
-    // ── 1. Uploads, before anything is written ──────────────────────────────
-    String? licenseUrl, licensePublicId;
-    String? idCardUrl, idCardPublicId;
-
-    if (draft.role == UserRole.driver) {
-      final license = await _upload(draft.licensePhoto, uid, 'drivingLicense');
-      licenseUrl = license?.secureUrl;
-      licensePublicId = license?.publicId;
-
-      final idCard = await _upload(draft.idCardPhoto, uid, 'idCard');
-      idCardUrl = idCard?.secureUrl;
-      idCardPublicId = idCard?.publicId;
-    }
-
-    // ── 2. One batch ────────────────────────────────────────────────────────
+    // ── One batch ────────────────────────────────────────────────────────
     final batch = Db.fs.batch();
 
     final profile = AppUser(
@@ -165,7 +148,6 @@ class OnboardingService {
             // in transit_admin after checking the licence and ID.
             status: DriverStatus.pendingVerification,
             serviceAreas: draft.serviceAreas,
-            serviceRadiusKm: draft.serviceRadiusKm,
             baseLocation: draft.baseLocation,
             // Written with whatever `bookedSeats` the draft carries, which for a
             // new driver is zero on every round. `Driver.toMap()` also emits the
@@ -176,37 +158,6 @@ class OnboardingService {
           ),
           SetOptions(merge: true),
         );
-
-        if (licenseUrl != null) {
-          final ref = Db.documents.doc();
-          batch.set(
-            ref,
-            DriverDocument(
-              id: ref.id,
-              driverId: uid,
-              type: DocumentType.drivingLicense,
-              status: DocumentStatus.pending,
-              fileUrl: licenseUrl,
-              publicId: licensePublicId,
-              uploadedAt: DateTime.now(),
-            ),
-          );
-        }
-        if (idCardUrl != null) {
-          final ref = Db.documents.doc();
-          batch.set(
-            ref,
-            DriverDocument(
-              id: ref.id,
-              driverId: uid,
-              type: DocumentType.cnic,
-              status: DocumentStatus.pending,
-              fileUrl: idCardUrl,
-              publicId: idCardPublicId,
-              uploadedAt: DateTime.now(),
-            ),
-          );
-        }
 
       case UserRole.admin:
         throw const OnboardingException(
@@ -222,29 +173,5 @@ class OnboardingService {
 
     await SessionService.instance.refresh();
     return profile;
-  }
-
-  Future<UploadResult?> _upload(File? file, String uid, String docType) async {
-    if (file == null) return null;
-    if (!CloudinaryService.instance.isConfigured) {
-      throw const OnboardingException(
-        'File upload is not configured, so documents cannot be saved. '
-        'Contact support.',
-      );
-    }
-    try {
-      return await CloudinaryService.instance.uploadDriverDocument(
-        file,
-        uid,
-        docType,
-      );
-    } on UploadException catch (e) {
-      throw OnboardingException(e.message);
-    } catch (e) {
-      debugPrint('Onboarding upload failed: $e');
-      throw const OnboardingException(
-        'Could not upload your documents. Check your connection and try again.',
-      );
-    }
   }
 }

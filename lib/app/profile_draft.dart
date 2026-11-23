@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:transit_core/transit_core.dart';
 
 /// One child on a parent's account, as typed into a form.
@@ -114,8 +112,7 @@ class ProfileDraft {
   /// to fill in later from the profile screen.
   final List<ServiceArea> serviceAreas;
 
-  /// How far the driver will travel to collect a student, from [baseLocation].
-  final double serviceRadiusKm;
+  /// Where the driver starts their day; families see how far away it is.
   final GeoCoord? baseLocation;
 
   /// The bookable rounds. Reuses the domain type rather than a parallel draft
@@ -123,11 +120,6 @@ class ProfileDraft {
   /// what [DriverSchedule] already represents, and a second near-identical type
   /// would just be somewhere for the two to drift apart.
   final List<DriverSchedule> schedules;
-
-  /// Local files, uploaded to Cloudinary during provisioning. Null when the
-  /// driver has already uploaded that document.
-  final File? licensePhoto;
-  final File? idCardPhoto;
 
   const ProfileDraft({
     required this.role,
@@ -147,11 +139,8 @@ class ProfileDraft {
     this.vehicleType = '',
     this.seatCapacity = 0,
     this.serviceAreas = const [],
-    this.serviceRadiusKm = 0,
     this.baseLocation,
     this.schedules = const [],
-    this.licensePhoto,
-    this.idCardPhoto,
   });
 
   /// Children with something actually typed into them. A parent adding a second
@@ -177,11 +166,8 @@ class ProfileDraft {
     String? vehicleType,
     int? seatCapacity,
     List<ServiceArea>? serviceAreas,
-    double? serviceRadiusKm,
     GeoCoord? baseLocation,
     List<DriverSchedule>? schedules,
-    File? licensePhoto,
-    File? idCardPhoto,
   }) => ProfileDraft(
     role: role ?? this.role,
     name: name ?? this.name,
@@ -200,11 +186,8 @@ class ProfileDraft {
     vehicleType: vehicleType ?? this.vehicleType,
     seatCapacity: seatCapacity ?? this.seatCapacity,
     serviceAreas: serviceAreas ?? this.serviceAreas,
-    serviceRadiusKm: serviceRadiusKm ?? this.serviceRadiusKm,
     baseLocation: baseLocation ?? this.baseLocation,
     schedules: schedules ?? this.schedules,
-    licensePhoto: licensePhoto ?? this.licensePhoto,
-    idCardPhoto: idCardPhoto ?? this.idCardPhoto,
   );
 }
 
@@ -282,8 +265,9 @@ class ProfileRequirements {
         if (d.vehicleType.trim().isEmpty) gaps.add('Vehicle type');
         if (d.seatCapacity <= 0) gaps.add('Seat capacity');
         if (d.experienceYears <= 0) gaps.add('Years of experience');
-        if (d.licensePhoto == null) gaps.add('Licence photo');
-        if (d.idCardPhoto == null) gaps.add('ID card photo');
+        // Licence, CNIC and registration photos are not asked for here: the
+        // driver uploads them from Documents, where each one is read by the
+        // AI check, and the home screen keeps asking until they are in.
 
         // Both of these are required rather than optional-with-a-nudge-later,
         // because a driver missing either is invisible to every parent in the

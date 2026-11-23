@@ -108,8 +108,40 @@ void main() {
 
     test('the family answers the fee with a reason', () {
       final screen = read('lib/screens/parent/find_drivers_screen.dart');
-      expect(screen, contains('class _FeeAnswer'));
-      expect(screen, contains('RideMatchService.instance.answerFee('));
+      expect(screen, contains('FeeAnswerCard('));
+      final widgets = read('lib/widgets/seat_fee.dart');
+      expect(widgets, contains('class FeeAnswerCard'));
+      expect(widgets, contains('RideMatchService.instance.answerFee('));
+    });
+
+    test('a booked seat can get or change its fee from both sides', () {
+      final roster = read(
+        'lib/screens/driver/driver_booked_students_screen.dart',
+      );
+      expect(roster, contains('DriverSeatFeeCard('));
+      expect(roster, contains('requestSeatFee('));
+      expect(
+        read('lib/screens/parent/driver_details_screen.dart'),
+        contains('FamilySeatFeeCard('),
+      );
+      expect(
+        read('lib/screens/student/student_driver_details_screen.dart'),
+        contains('FamilySeatFeeCard('),
+      );
+      final rules = read('firestore.rules');
+      expect(
+        rules,
+        contains("resource.data.status in ['pending', 'accepted']"),
+      );
+      expect(
+        rules,
+        contains("onlyChanges(['feeStatus', 'feeFamilyNote', 'updatedAt'])"),
+      );
+      expect(rules, contains("unchanged('monthlyFeePaisa')"));
+      expect(
+        read('lib/app/session_service.dart'),
+        contains('FeeAgreementSync.instance.bindToDriver()'),
+      );
     });
 
     test('rules let each side do exactly its part', () {

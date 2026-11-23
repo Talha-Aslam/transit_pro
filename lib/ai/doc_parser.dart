@@ -1,5 +1,5 @@
-/// Reads a Pakistani (Punjab) driving licence or vehicle registration card
-/// from OCR text, and checks it against the driver's profile.
+/// Reads a Pakistani CNIC, (Punjab) driving licence or vehicle registration
+/// card from OCR text, and checks it against the driver's profile.
 ///
 /// Pure Dart — unit tested with text transcribed from real cards. Lines are
 /// in OCR block order (a label followed by its value), the way ML Kit reads
@@ -8,16 +8,22 @@ library;
 
 import 'text_utils.dart';
 
-/// What was read off a licence or registration card. [fields] uses the
+/// What was read off a CNIC, licence or registration card. [fields] uses the
 /// `DocCheck.fieldLabels` keys and holds only non-sensitive values (a CNIC
-/// as its last four digits).
-/// `DocumentType.drivingLicense.name` / `.vehicleRegistration.name`, spelled
-/// out so this file needs no Flutter import.
+/// number as its last four digits; never a date of birth or address).
+///
+/// `DocumentType.drivingLicense.name` / `.vehicleRegistration.name` /
+/// `.cnic.name`, spelled out so this file needs no Flutter import.
 const docTypeLicense = 'drivingLicense';
 const docTypeRegistration = 'vehicleRegistration';
+const docTypeCnic = 'cnic';
+
+/// `fields['expiryDate']` for a CNIC issued for life.
+const lifetimeExpiry = 'Lifetime';
 
 class DocReading {
-  /// `DocumentType` name: [docTypeLicense] or [docTypeRegistration].
+  /// `DocumentType` name: [docTypeLicense], [docTypeRegistration] or
+  /// [docTypeCnic].
   final String docType;
   final Map<String, String> fields;
   final DateTime? expiryDate;
@@ -45,18 +51,26 @@ class DocReading {
   });
 
   bool get isLicense => docType == docTypeLicense;
+  bool get isCnic => docType == docTypeCnic;
+
+  /// A CNIC valid for life: no expiry date to check.
+  bool get isLifetime => fields['expiryDate'] == lifetimeExpiry;
 
   /// The fields a check depends on are missing — worth asking Gemini.
   bool get needsAi {
     if (!looksRight) return true;
     if (isLicense) return fields['name'] == null || expiryDate == null;
+    if (isCnic) {
+      return fields['name'] == null || (expiryDate == null && !isLifetime);
+    }
     return fields['seatingCapacity'] == null &&
         fields['bodyType'] == null &&
         fields['registrationNumber'] == null &&
         fields['ownerName'] == null;
   }
 
-  /// Gemini's JSON (see the Worker's `license` / `registration` schemas).
+  /// Gemini's JSON (see the Worker's `license` / `registration` / `cnic`
+  /// schemas).
   factory DocReading.fromAi(String docType, Map<String, dynamic> m) {
     String? str(String k) {
       final v = m[k];
@@ -76,6 +90,29 @@ class DocReading {
       if (value != null) fields[key] = value;
     }
 
+    if (docType == docTypeCnic) {
+      put('name', str('name'));
+      put('fatherName', str('fatherName'));
+      put('cnicLast4', last4Digits(str('cnic')));
+      final issue = date('issueDate');
+      final expiry = date('expiryDate');
+      if (issue != null) fields['issueDate'] = _iso(issue);
+      if (expiry != null) {
+        fields['expiryDate'] = _iso(expiry);
+      } else if (m['lifetime'] == true) {
+        fields['expiryDate'] = lifetimeExpiry;
+      }
+      if (str('side')?.toLowerCase() == 'back') fields['side'] = 'back';
+      return DocReading(
+        docType: docType,
+        fields: fields,
+        expiryDate: expiry,
+        issueDate: issue,
+        looksRight: m['isCnic'] != false,
+        hasText: true,
+        engine: 'gemini',
+      );
+    }
     if (docType == docTypeLicense) {
       put('name', str('name'));
       put('fatherName', str('fatherName'));
@@ -142,6 +179,8 @@ class DocReading {
         used = true;
       }
     }
+    // A name was read, so the front was in the photo after all.
+    if (merged['name'] != null) merged.remove('side');
     final cats = categories.isNotEmpty ? categories : ai.categories;
     if (categories.isEmpty && ai.categories.isNotEmpty) used = true;
     if (expiryDate == null && ai.expiryDate != null) used = true;
@@ -237,7 +276,7 @@ class DocParser {
   }
 
   static final _anyLabel = RegExp(
-    r"\b(name|father|husband|cnic|licen[cs]e\s*(?:no|number|#)|issue|valid|expiry|category|categories|date\s*of|make|maker|type\s*of\s*body|colou?r|seating|horse\s*power|year\s*of|tax\s*paid|laden|owner|chassis|chasis|engine\s*no|address|reg(?:istration)?\.?\s*no|import|purchase|blood|cell\s*no)\b",
+    r"\b(name|father|husband|cnic|gender|country\s*of\s*stay|identity\s*number|licen[cs]e\s*(?:no|number|#)|issue|valid|expiry|category|categories|date\s*of|make|maker|type\s*of\s*body|colou?r|seating|horse\s*power|year\s*of|tax\s*paid|laden|owner|chassis|chasis|engine\s*no|address|reg(?:istration)?\.?\s*no|import|purchase|blood|cell\s*no)\b",
     caseSensitive: false,
   );
 
@@ -374,6 +413,138 @@ class DocParser {
       expiryDate: expiry,
       issueDate: issue,
       categories: cats,
+      looksRight: looksRight,
+      hasText: _enoughText(text),
+    );
+  }
+
+  // ── CNIC ────────────────────────────────────────────────────────────────
+
+  static final _cnicFrontWords = RegExp(
+    r"national\s*identity\s*card|identity\s*number|islamic\s*republic\s*of\s*pakistan|country\s*of\s*stay|date\s*of\s*expiry",
+    caseSensitive: false,
+  );
+
+  /// The back: address, the Registrar General's signature, "if found".
+  static final _cnicBackWords = RegExp(
+    r"registrar\s*general|present\s*address|permanent\s*address|if\s*found|nadra",
+    caseSensitive: false,
+  );
+
+  static final _lifetime = RegExp(
+    r'\blife\s*-?\s*time\b',
+    caseSensitive: false,
+  );
+
+  /// A Pakistani CNIC — the smart card or the older green one, front or
+  /// back. Reads the holder's name, father's name, the last four digits of
+  /// the number, and the issue and expiry dates. The date of birth and the
+  /// address are deliberately not kept.
+  static DocReading parseCnic(List<String> rawLines) {
+    final lines = cleanLines(rawLines);
+    const type = docTypeCnic;
+    if (lines.isEmpty) return const DocReading(docType: type);
+    final text = lines.join('\n');
+    final fields = <String, String>{};
+
+    bool nameLike(String s) => looksLikeName(
+      s,
+      stopWords: const {
+        'name',
+        'father',
+        'husband',
+        'pakistan',
+        'islamic',
+        'republic',
+        'national',
+        'identity',
+        'card',
+        'gender',
+        'country',
+        'stay',
+        'signature',
+        'holder',
+        'date',
+        'birth',
+      },
+    );
+
+    final name = _labelled(
+      lines,
+      RegExp(r"\b(?:holder'?s?\s*)?name\b", caseSensitive: false),
+      exclude: RegExp(
+        r"father|husband|s\s*/\s*o|d\s*/\s*o|w\s*/\s*o",
+        caseSensitive: false,
+      ),
+      accept: nameLike,
+    );
+    if (name != null) fields['name'] = _title(name);
+
+    final father = _labelled(
+      lines,
+      RegExp(
+        r"\b(?:father'?s?|husband'?s?)\s*(?:/\s*husband'?s?\s*)?name\b",
+        caseSensitive: false,
+      ),
+      accept: nameLike,
+    );
+    if (father != null) fields['fatherName'] = _title(father);
+
+    final cnicMatch = _cnic.firstMatch(text.replaceAll(RegExp(r'[lI]'), '1'));
+    if (cnicMatch != null) {
+      fields['cnicLast4'] = '${cnicMatch[2]!.substring(4)}${cnicMatch[3]}';
+    }
+
+    DateTime? labelledDate(RegExp label) {
+      final v = _labelled(
+        lines,
+        label,
+        accept: (s) => findDates([s]).isNotEmpty,
+      );
+      return v == null ? null : firstDateIn([v]);
+    }
+
+    final issue = labelledDate(
+      RegExp(r'\b(date\s*of\s*issue|issue\s*date)\b', caseSensitive: false),
+    );
+    final expiryLabel = RegExp(
+      r'\b(date\s*of\s*expiry|expiry\s*date|valid\s*(?:up\s*to|upto|till))\b',
+      caseSensitive: false,
+    );
+    var expiry = labelledDate(expiryLabel);
+    final lifetime =
+        expiry == null &&
+        _labelled(lines, expiryLabel, accept: _lifetime.hasMatch) != null;
+    if (expiry == null && !lifetime) {
+      // Unlabelled: birth, issue and expiry are the card's three dates, and
+      // expiry is the latest. Two dates could be birth and issue, so no
+      // guess is made from fewer than three.
+      final all = findDates(lines).map((d) => d.value).toList()..sort();
+      if (all.length >= 3) expiry = all.last;
+    }
+    if (issue != null) fields['issueDate'] = _iso(issue);
+    if (expiry != null) {
+      fields['expiryDate'] = _iso(expiry);
+    } else if (lifetime) {
+      fields['expiryDate'] = lifetimeExpiry;
+    }
+
+    final front = _cnicFrontWords.hasMatch(text);
+    final back = _cnicBackWords.hasMatch(text);
+    // A driving licence prints the holder's CNIC too; it is not one.
+    final looksRight =
+        !_licenceWords.hasMatch(text) &&
+        (front ||
+            back ||
+            (cnicMatch != null &&
+                RegExp('pakistan', caseSensitive: false).hasMatch(text)));
+    if (looksRight && back && !front && name == null) fields['side'] = 'back';
+
+    return DocReading(
+      docType: type,
+      fields: fields,
+      expiryDate: expiry,
+      issueDate: issue,
       looksRight: looksRight,
       hasText: _enoughText(text),
     );

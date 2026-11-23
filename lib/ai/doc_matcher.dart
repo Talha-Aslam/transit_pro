@@ -1,5 +1,5 @@
-/// Compares a licence or registration card with the driver's profile and
-/// produces the [DocCheck] stored on the document.
+/// Compares a CNIC, licence or registration card with the driver's profile
+/// and produces the [DocCheck] stored on the document.
 library;
 
 import 'package:transit_core/transit_core.dart';
@@ -50,24 +50,35 @@ DocCheck evaluateDoc(DocReading r, DocExpectation e, {DateTime? now}) {
     issues.add(DocCheck.wrongDocument);
   }
 
-  if (r.isLicense) {
+  /// The holder's name against the profile name.
+  void checkName() {
     final name = r.fields['name'];
-    if (name != null && e.driverName.trim().isNotEmpty) {
-      nameMatch = nameMatchPercent(name, e.driverName);
-      // A profile that gives fewer names than the licence ("Talha" against
-      // "Talha Aslam") is not a mismatch.
-      if (nameMatch < 60 && !namesMatch(name, e.driverName)) {
-        issues.add(DocCheck.nameMismatch);
-      }
+    if (name == null || e.driverName.trim().isEmpty) return;
+    nameMatch = nameMatchPercent(name, e.driverName);
+    // A profile that gives fewer names than the card ("Talha" against
+    // "Talha Aslam") is not a mismatch.
+    if (nameMatch! < 60 && !namesMatch(name, e.driverName)) {
+      issues.add(DocCheck.nameMismatch);
     }
+  }
+
+  void checkExpiry() {
     final expiry = r.expiryDate;
-    if (expiry != null) {
-      if (expiry.isBefore(today)) {
-        issues.add(DocCheck.expired);
-      } else if (!expiry.isAfter(today.add(licenceExpiringSoon))) {
-        issues.add(DocCheck.expiringSoon);
-      }
+    if (expiry == null) return;
+    if (expiry.isBefore(today)) {
+      issues.add(DocCheck.expired);
+    } else if (!expiry.isAfter(today.add(licenceExpiringSoon))) {
+      issues.add(DocCheck.expiringSoon);
     }
+  }
+
+  if (r.isCnic) {
+    checkName();
+    checkExpiry();
+    if (r.fields['side'] == 'back') notes.add(DocCheck.backSideOnly);
+  } else if (r.isLicense) {
+    checkName();
+    checkExpiry();
     if (r.categories.isNotEmpty &&
         !r.categories.any(commercialCategories.contains)) {
       issues.add(DocCheck.noCommercialCategory);

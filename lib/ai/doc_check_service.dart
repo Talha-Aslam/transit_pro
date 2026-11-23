@@ -8,14 +8,15 @@ import 'doc_matcher.dart';
 import 'doc_parser.dart';
 import 'ocr_service.dart';
 
-/// The AI check of a driver's licence or registration-card photo. Advisory:
-/// the admin still verifies every document.
+/// The AI check of a driver's CNIC, licence or registration-card photo.
+/// Advisory: the admin still verifies every document.
 class DocCheckService {
   DocCheckService._();
   static final DocCheckService instance = DocCheckService._();
 
-  /// Only these two are read; other documents upload as before.
+  /// Only these are read; other documents (medical fitness) upload as before.
   static bool supports(DocumentType type) =>
+      type == DocumentType.cnic ||
       type == DocumentType.drivingLicense ||
       type == DocumentType.vehicleRegistration;
 
@@ -32,14 +33,15 @@ class DocCheckService {
     DocExpectation expectation,
   ) async {
     if (!supports(type) || !_isImage(file.path)) return null;
-    final license = type == DocumentType.drivingLicense;
     var reading = DocReading(docType: type.name);
+    DocReading parse(List<String> lines) => switch (type) {
+      DocumentType.cnic => DocParser.parseCnic(lines),
+      DocumentType.drivingLicense => DocParser.parseLicense(lines),
+      _ => DocParser.parseRegistration(lines),
+    };
     try {
       final ocr = await OcrService.instance.read(file.path);
       if (!ocr.isEmpty) {
-        DocReading parse(List<String> lines) => license
-            ? DocParser.parseLicense(lines)
-            : DocParser.parseRegistration(lines);
         reading = parse(
           ocr.blockLines,
         ).mergedWith(parse(ocr.rows), fromAi: false);
@@ -49,7 +51,11 @@ class DocCheckService {
     }
     if (reading.needsAi) {
       final ai = await AiReaderClient.instance.read(
-        kind: license ? AiReadKind.license : AiReadKind.registration,
+        kind: switch (type) {
+          DocumentType.cnic => AiReadKind.cnic,
+          DocumentType.drivingLicense => AiReadKind.license,
+          _ => AiReadKind.registration,
+        },
         file: file,
       );
       if (ai != null) {

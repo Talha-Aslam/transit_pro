@@ -10,6 +10,7 @@ import '../data/user_repository.dart';
 import 'active_trip_service.dart';
 import 'child_status_service.dart';
 import 'expected_times_service.dart';
+import 'fee_agreement_sync.dart';
 import 'fee_billing_service.dart';
 import 'seat_reconciler.dart';
 import 'trip_session.dart';
@@ -330,6 +331,7 @@ class SessionService extends ChangeNotifier {
     // account's round to whoever signs in next on this phone.
     ActiveTripService.instance.unbind();
     SeatReconciler.instance.unbind();
+    FeeAgreementSync.instance.unbind();
     ExpectedTimesService.instance.unbind();
     FeeBillingService.instance.unbind();
     ChildStatusService.instance.unbind();
@@ -492,6 +494,8 @@ class SessionService extends ChangeNotifier {
         // the right tab.
         TripSession.instance;
         SeatReconciler.instance.bindToDriver();
+        // A fee the family agreed after booking, put on the child's record.
+        FeeAgreementSync.instance.bindToDriver();
         // Each booked child's expected pickup and drop-off, kept current on
         // the driver's document for the families to read.
         ExpectedTimesService.instance.bindToDriver();

@@ -11,7 +11,7 @@ import 'package:image/image.dart' as img;
 import 'package:transit_core/transit_core.dart';
 
 /// What the Worker's Gemini reader is asked to read.
-enum AiReadKind { slip, license, registration }
+enum AiReadKind { slip, license, registration, cnic }
 
 /// The Gemini fallback, through the Worker: `POST {pushWorkerUrl}/ai/read`.
 ///

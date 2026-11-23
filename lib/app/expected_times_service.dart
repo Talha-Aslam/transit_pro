@@ -129,9 +129,7 @@ class ExpectedTimesService {
     }
     try {
       await UserRepository.instance.updateDriver(uid, {
-        'expectedTimes': {
-          for (final e in all.entries) e.key: e.value.toMap(),
-        },
+        'expectedTimes': {for (final e in all.entries) e.key: e.value.toMap()},
       });
     } catch (e) {
       debugPrint('saving expected times failed: $e');

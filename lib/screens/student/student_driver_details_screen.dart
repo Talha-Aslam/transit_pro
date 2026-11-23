@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:transit_core/transit_core.dart';
 import '../../app/language_provider.dart';
 import '../../app/parent_data_service.dart';
 import '../../app/session_service.dart';
@@ -8,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/top_rated_frame.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/seat_fee.dart';
 import 'student_driver_chat.dart';
 import '../../widgets/app_glyph.dart';
 
@@ -253,6 +255,18 @@ class _StudentDriverDetailsScreenState
                       ),
                   ],
                 ),
+                // The seat's monthly fee: answer the driver's fee request,
+                // or ask them to set one.
+                if (widget.student.driverId.isNotEmpty && _child.id.isNotEmpty)
+                  ValueListenableBuilder<Student?>(
+                    valueListenable: SessionService.instance.student,
+                    builder: (_, me, _) => FamilySeatFeeCard(
+                      driverId: widget.student.driverId,
+                      studentId: _child.id,
+                      currentFeePaisa: me?.monthlyFeePaisa ?? 0,
+                      accent: AppTheme.studentAmber,
+                    ),
+                  ),
                 if (_hasRidden) ...[
                   const SizedBox(height: 16),
 

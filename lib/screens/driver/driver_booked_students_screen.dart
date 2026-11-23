@@ -11,6 +11,7 @@ import '../../data/ride_request_repository.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/glass_card.dart';
+import '../../widgets/seat_fee.dart';
 import '../../widgets/student_logistics.dart';
 import '../../widgets/app_glyph.dart';
 import '../chat/conversation_screen.dart';
@@ -557,6 +558,14 @@ class _DriverBookedStudentsScreenState
       padding: const EdgeInsets.only(bottom: 8),
       child: _BookedPassengerCard(
         student: student,
+        request: request,
+        onFee: request == null
+            ? null
+            : () => requestSeatFee(
+                context,
+                request,
+                currentFeePaisa: student.monthlyFeePaisa,
+              ),
         removable: request != null,
         busy: _busyStudentId == student.id,
         onTap: () => _openDetails(student, request),
@@ -780,6 +789,13 @@ String? _todayLine(Student student) {
 class _BookedPassengerCard extends StatelessWidget {
   final Student student;
 
+  /// The accepted request behind this seat; its fee fields say whether a
+  /// fee proposal is waiting on the family.
+  final RideRequest? request;
+
+  /// Sets or changes the monthly fee. Null when no request backs the seat.
+  final VoidCallback? onFee;
+
   /// Whether an accepted [RideRequest] backs this seat. Only then is there a
   /// seat for `release` to hand back.
   final bool removable;
@@ -790,6 +806,8 @@ class _BookedPassengerCard extends StatelessWidget {
 
   const _BookedPassengerCard({
     required this.student,
+    required this.request,
+    required this.onFee,
     required this.removable,
     required this.busy,
     required this.onTap,
@@ -849,15 +867,37 @@ class _BookedPassengerCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    if (student.monthlyFeePaisa > 0)
-                      Text(
-                        'Fee: Rs.${(student.monthlyFeePaisa / 100).round()} / month',
-                        style: const TextStyle(
-                          color: AppTheme.success,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    if (seatFeeSummary(student, request) case (
+                      final text,
+                      final color,
+                    )) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (onFee != null) ...[
+                            const SizedBox(width: 6),
+                            _FeeChip(
+                              label: student.monthlyFeePaisa > 0
+                                  ? 'Change fee'
+                                  : 'Request fee',
+                              onTap: onFee!,
+                            ),
+                          ],
+                        ],
                       ),
+                    ],
                     // Today's timings at a glance, by the day of the week.
                     if (_todayLine(student) case final today?) ...[
                       const SizedBox(height: 2),
@@ -958,6 +998,36 @@ class _BookedPassengerCard extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The small "Request fee" / "Change fee" action on a roster card.
+class _FeeChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _FeeChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppTheme.driverCyan.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppTheme.driverCyan.withValues(alpha: 0.4)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: AppTheme.driverAccent,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -1136,6 +1206,10 @@ class _PassengerDetailSheet extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  // The monthly fee: set it if the seat was accepted without
+                  // one, or ask the family to agree a new one.
+                  DriverSeatFeeCard(studentId: student.id),
                   const SizedBox(height: 16),
                   // Where they are collected and set down, their timings,
                   // and who to call — all from their live record.

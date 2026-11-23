@@ -197,7 +197,6 @@ class UserRepository {
     required List<ServiceArea> areas,
     required List<DriverSchedule> schedules,
     int? vehicleCapacity,
-    double? radiusKm,
     GeoCoord? baseLocation,
     int? missedBusFarePaisa,
   }) => updateDriver(driverId, {
@@ -208,7 +207,6 @@ class UserRepository {
         .where((n) => n.isNotEmpty)
         .toList(),
     'schedules': schedules.map((s) => s.toMap()).toList(),
-    'serviceRadiusKm': ?radiusKm,
     'baseLocation': ?baseLocation?.toMap(),
     'missedBusFarePaisa': ?missedBusFarePaisa,
   });
@@ -253,8 +251,7 @@ class UserRepository {
   /// break the way the `payments` queries did. Everything else worth filtering
   /// on (seats free, distance, not suspended) is applied by
   /// [rankDriversForStudent] in memory, because each of those would otherwise
-  /// cost another composite index, and `serviceRadiusKm` is not expressible as a
-  /// Firestore filter at all without a geohash scheme this pilot does not need.
+  /// cost another composite index.
   Stream<List<Driver>> watchDriversServing(String school) {
     final key = ServiceArea.normalize(school);
     if (key.isEmpty) return Stream.value(const []);
@@ -297,7 +294,6 @@ class UserRepository {
       // could still be sent seat requests.
       if (d.isDeleted) continue;
       if (d.status == DriverStatus.suspended) continue;
-      if (!d.coversLocation(from)) continue;
 
       final matched = d.serviceAreas
           .where(

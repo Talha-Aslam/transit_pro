@@ -28,9 +28,23 @@ void main() {
     );
   });
 
-  test('sign-up stores the CNIC photo as CNIC, not vehicle registration', () {
-    final src = File('lib/app/onboarding_service.dart').readAsStringSync();
-    expect(src, contains('type: DocumentType.cnic'));
+  test('sign-up asks for no document photos — Documents does, with the AI '
+      'check', () {
+    final onboarding = File(
+      'lib/app/onboarding_service.dart',
+    ).readAsStringSync();
+    expect(onboarding, isNot(contains('DriverDocument(')));
+    for (final screen in [
+      'lib/screens/signup_screen.dart',
+      'lib/screens/profile_completion_screen.dart',
+    ]) {
+      final src = File(screen).readAsStringSync();
+      expect(src, isNot(contains('DocumentUploadTile(')), reason: screen);
+      expect(src, isNot(contains('HOW FAR')), reason: screen);
+    }
+    final draft = File('lib/app/profile_draft.dart').readAsStringSync();
+    expect(draft, isNot(contains('licensePhoto')));
+    expect(draft, isNot(contains("gaps.add('ID card photo')")));
   });
 
   group('sign-up CNIC filed as vehicle registration', () {

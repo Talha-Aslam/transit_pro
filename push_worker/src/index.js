@@ -576,12 +576,12 @@ async function handleRoutes(request, env) {
 /**
  * The fallback for the app's on-device OCR: when ML Kit could not read the
  * amount or transaction id off a payment screenshot, or the key fields off a
- * licence / registration card, the app sends the (downsized) image here and
+ * CNIC / licence / registration card, the app sends the (downsized) image here and
  * Gemini reads it into a fixed JSON shape.
  *
  *   POST /ai/read
  *   Authorization: Bearer <Firebase ID token>
- *   { "kind": "slip" | "license" | "registration",
+ *   { "kind": "slip" | "license" | "registration" | "cnic",
  *     "mimeType": "image/jpeg", "imageBase64": "<…>" }
  *   → 200 { "result": { …fields… }, "model": "<model id>" }
  *   → 503 { "error": "ai_unavailable" } when no key is configured — the app
@@ -657,6 +657,31 @@ const AI_KINDS = {
       },
     },
   },
+  cnic: {
+    prompt:
+      'This should be a photo of a Pakistani CNIC (Computerized National ' +
+      'Identity Card) issued by NADRA — the smart card or the older green ' +
+      'card, front or back. Read it exactly. Dates as ISO 8601 ' +
+      '(YYYY-MM-DD); on the card they are printed DD.MM.YYYY. The expiry is ' +
+      'the "Date of Expiry"; set lifetime to true if it says Lifetime ' +
+      'instead of a date. Do not read or return the date of birth or the ' +
+      'address. side is "front" when the name is visible, else "back". Set ' +
+      'isCnic to false if it is not a CNIC. Leave out any field that is not ' +
+      'visible. Do not guess.',
+    schema: {
+      type: 'object',
+      properties: {
+        isCnic: { type: 'boolean' },
+        side: str('front or back'),
+        name: str('Holder name'),
+        fatherName: str('Father / husband name'),
+        cnic: str('Identity number, 13 digits as printed'),
+        issueDate: str('Date of issue, YYYY-MM-DD'),
+        expiryDate: str('Date of expiry, YYYY-MM-DD'),
+        lifetime: { type: 'boolean', description: 'true if the expiry says Lifetime' },
+      },
+    },
+  },
   registration: {
     prompt:
       'This should be a photo of a Pakistani (usually Punjab) vehicle ' +
@@ -710,7 +735,7 @@ async function handleAiRead(request, env) {
     return json({ error: 'Body must be JSON.' }, 400);
   }
   const kind = AI_KINDS[payload?.kind] ? payload.kind : null;
-  if (!kind) return json({ error: 'kind must be slip, license or registration.' }, 400);
+  if (!kind) return json({ error: 'kind must be slip, license, registration or cnic.' }, 400);
   const mimeType = String(payload.mimeType ?? 'image/jpeg');
   if (!ALLOWED_MIME.has(mimeType)) return json({ error: 'Unsupported image type.' }, 400);
   const image = typeof payload.imageBase64 === 'string' ? payload.imageBase64 : '';

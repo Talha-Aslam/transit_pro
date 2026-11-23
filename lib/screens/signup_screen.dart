@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:transit_core/transit_core.dart';
 import '../app/auth_service.dart';
@@ -9,7 +6,6 @@ import '../app/language_provider.dart';
 import '../app/profile_draft.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/image_source_sheet.dart';
 import '../widgets/profile_form_fields.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -35,17 +31,11 @@ class _SignupScreenState extends State<SignupScreen> {
   late List<ChildFormData> _children;
 
   // Driver-specific
-  final _picker = ImagePicker();
   final _licenseCtrl = TextEditingController();
   final _vehicleCtrl = TextEditingController();
   final _experienceCtrl = TextEditingController();
   final _seatCapacityCtrl = TextEditingController();
   String? _vehicleType;
-
-  // Real files, not just names. The prototype kept `picked.name` and never
-  // uploaded anything, so a driver's licence existed only as a caption.
-  File? _licensePhoto;
-  File? _idCardPhoto;
 
   /// Where the driver runs, and the rounds families can book. Collected here as
   /// well as on the Google completion screen, and validated by the same
@@ -62,7 +52,6 @@ class _SignupScreenState extends State<SignupScreen> {
   ];
 
   final List<RoundFormData> _rounds = [RoundFormData.fresh(ordinal: 1)];
-  double _serviceRadiusKm = 5;
   GeoCoord? _baseLocation;
 
   // Student-specific
@@ -117,25 +106,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _onLangChanged() => setState(() {});
 
-  Future<void> _pickDriverDocument({required bool isLicense}) async {
-    final source = await showImageSourceSheet(
-      context,
-      accentColor: AppTheme.driverCyan,
-    );
-    if (source == null) return;
-
-    final picked = await _picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null) return;
-
-    setState(() {
-      if (isLicense) {
-        _licensePhoto = File(picked.path);
-      } else {
-        _idCardPhoto = File(picked.path);
-      }
-    });
-  }
-
   String _localizedRoleName(String id) {
     switch (id) {
       case 'parent':
@@ -189,11 +159,8 @@ class _SignupScreenState extends State<SignupScreen> {
         .where((a) => !a.isBlank)
         .map((a) => a.toModel())
         .toList(),
-    serviceRadiusKm: _serviceRadiusKm,
     baseLocation: _baseLocation,
     schedules: _rounds.map((r) => r.toModel()).toList(),
-    licensePhoto: _licensePhoto,
-    idCardPhoto: _idCardPhoto,
   );
 
   Future<void> _signup() async {
@@ -744,36 +711,6 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
           const SizedBox(height: 16),
           Row(
-            children: [
-              Expanded(
-                child: DocumentUploadTile(
-                  title: 'Upload License',
-                  subtitle: _licensePhoto == null
-                      ? 'Front photo of license'
-                      : 'Ready to upload',
-                  icon: Icons.badge_rounded,
-                  accentColor: AppTheme.driverCyan,
-                  isDone: _licensePhoto != null,
-                  onTap: () => _pickDriverDocument(isLicense: true),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DocumentUploadTile(
-                  title: 'Upload ID Card',
-                  subtitle: _idCardPhoto == null
-                      ? 'CNIC / national ID photo'
-                      : 'Ready to upload',
-                  icon: Icons.credit_card_rounded,
-                  accentColor: AppTheme.driverCyan,
-                  isDone: _idCardPhoto != null,
-                  onTap: () => _pickDriverDocument(isLicense: false),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -937,7 +874,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  /// Service areas, travel radius and bookable rounds.
+  /// Service areas, starting point and bookable rounds.
   ///
   /// Mirrors the same section on the Google profile-completion screen and shares
   /// its widgets, so a driver who signs up manually and one who signs in with
@@ -976,21 +913,6 @@ class _SignupScreenState extends State<SignupScreen> {
       value: _baseLocation,
       accentColor: AppTheme.driverCyan,
       onPicked: (p) => setState(() => _baseLocation = p),
-    ),
-    const SizedBox(height: 16),
-    FieldLabel('HOW FAR WILL YOU TRAVEL? — ${_serviceRadiusKm.round()} KM'),
-    Slider(
-      value: _serviceRadiusKm,
-      min: 1,
-      max: 30,
-      divisions: 29,
-      activeColor: AppTheme.driverCyan,
-      label: '${_serviceRadiusKm.round()} km',
-      onChanged: (v) => setState(() => _serviceRadiusKm = v),
-    ),
-    Text(
-      'Families further than this from your starting point will not see you.',
-      style: TextStyle(color: context.textTertiary, fontSize: 11),
     ),
     const SizedBox(height: 24),
     _serviceHeading(

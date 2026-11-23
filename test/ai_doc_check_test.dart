@@ -95,6 +95,40 @@ const licence = [
   '01-01-2000',
 ];
 
+/// A smart CNIC, front — made-up holder and number.
+const cnicFront = [
+  'PAKISTAN',
+  'National Identity Card',
+  'ISLAMIC REPUBLIC OF PAKISTAN',
+  'Name',
+  'Talha Aslam',
+  'Father Name',
+  'Muhammad Aslam',
+  'Gender',
+  'M',
+  'Country of Stay',
+  'Pakistan',
+  'Identity Number',
+  '35202-1234567-9',
+  'Date of Birth',
+  '01.01.1999',
+  'Date of Issue',
+  '15.03.2020',
+  'Date of Expiry',
+  '15.03.2030',
+  'Holder Signature',
+];
+
+/// The back of a CNIC: address and the Registrar General, no name.
+const cnicBack = [
+  'Present Address',
+  'House 12 Street 4 Model Town Lahore',
+  'Permanent Address',
+  'House 12 Street 4 Model Town Lahore',
+  'Registrar General of Pakistan',
+  'If found please drop in any post box',
+];
+
 final now = DateTime(2026, 11, 20, 10);
 
 void main() {
@@ -313,6 +347,115 @@ void main() {
         now: now,
       );
       expect(c.issues, [DocCheck.unreadable]);
+    });
+  });
+
+  group('CNIC', () {
+    test('reads the front of a smart card, keeping no birth date', () {
+      final r = DocParser.parseCnic(cnicFront);
+      expect(r.looksRight, isTrue);
+      expect(r.isCnic, isTrue);
+      expect(r.fields['name'], 'Talha Aslam');
+      expect(r.fields['fatherName'], 'Muhammad Aslam');
+      expect(r.fields['cnicLast4'], '5679');
+      expect(r.issueDate, DateTime(2020, 3, 15));
+      expect(r.expiryDate, DateTime(2030, 3, 15));
+      expect(r.fields.values, isNot(contains('1999-01-01')));
+      expect(r.fields.containsKey('side'), isFalse);
+      expect(r.needsAi, isFalse);
+    });
+
+    test('a valid card in the profile name passes', () {
+      final c = evaluateDoc(
+        DocParser.parseCnic(cnicFront),
+        const DocExpectation(driverName: 'Talha Aslam'),
+        now: now,
+      );
+      expect(c.matches, isTrue);
+      expect(c.docType, 'cnic');
+      expect(c.nameMatchPercent, 100);
+    });
+
+    test('an expired card and a different name are both flagged', () {
+      final c = evaluateDoc(
+        DocParser.parseCnic(cnicFront),
+        const DocExpectation(driverName: 'Ahmed Raza'),
+        now: DateTime(2031, 1, 1),
+      );
+      expect(c.issues, containsAll([DocCheck.expired, DocCheck.nameMismatch]));
+      expect(c.messages().first, contains('CNIC'));
+      expect(c.messages().join(' '), isNot(contains('licence')));
+    });
+
+    test('expiring within 30 days is a warning', () {
+      final c = evaluateDoc(
+        DocParser.parseCnic(cnicFront),
+        const DocExpectation(driverName: 'Talha Aslam'),
+        now: DateTime(2030, 3, 1),
+      );
+      expect(c.issues, [DocCheck.expiringSoon]);
+    });
+
+    test('the back alone is the right card, with a note', () {
+      final r = DocParser.parseCnic(cnicBack);
+      expect(r.looksRight, isTrue);
+      expect(r.fields['side'], 'back');
+      final c = evaluateDoc(
+        r,
+        const DocExpectation(driverName: 'Talha Aslam'),
+        now: now,
+      );
+      expect(c.matches, isTrue);
+      expect(c.notes, [DocCheck.backSideOnly]);
+    });
+
+    test('a driving licence is not taken for a CNIC', () {
+      final c = evaluateDoc(
+        DocParser.parseCnic(licence),
+        const DocExpectation(driverName: 'Talha Aslam'),
+        now: now,
+      );
+      expect(c.issues, contains(DocCheck.wrongDocument));
+      expect(c.messages().first, contains('CNIC'));
+    });
+
+    test('a lifetime card has nothing to expire', () {
+      final lines = [...cnicFront];
+      lines[lines.indexOf('15.03.2030')] = 'Lifetime';
+      final r = DocParser.parseCnic(lines);
+      expect(r.isLifetime, isTrue);
+      expect(r.expiryDate, isNull);
+      expect(r.needsAi, isFalse);
+      final c = evaluateDoc(
+        r,
+        const DocExpectation(driverName: 'Talha Aslam'),
+        now: DateTime(2060, 1, 1),
+      );
+      expect(c.matches, isTrue);
+    });
+
+    test("Gemini's answer keeps only the last four digits", () {
+      final r = DocReading.fromAi(docTypeCnic, {
+        'isCnic': true,
+        'side': 'front',
+        'name': 'Talha Aslam',
+        'cnic': '3520212345679',
+        'issueDate': '2020-03-15',
+        'expiryDate': '2030-03-15',
+      });
+      expect(r.fields['cnicLast4'], '5679');
+      expect(r.fields.values.join(), isNot(contains('3520212345679')));
+      expect(r.expiryDate, DateTime(2030, 3, 15));
+      expect(r.engine, 'gemini');
+    });
+
+    test('a front read by Gemini clears an OCR back-side guess', () {
+      final ocr = DocParser.parseCnic(cnicBack);
+      final merged = ocr.mergedWith(
+        DocReading.fromAi(docTypeCnic, {'isCnic': true, 'name': 'Talha Aslam'}),
+      );
+      expect(merged.fields['name'], 'Talha Aslam');
+      expect(merged.fields.containsKey('side'), isFalse);
     });
   });
 

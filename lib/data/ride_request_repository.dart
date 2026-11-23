@@ -56,6 +56,15 @@ class RideRequestRepository {
       .docsList
       .map(_newestFirst);
 
+  /// One request, live — the family's view of a booked seat's fee.
+  Stream<RideRequest?> watch({
+    required String driverId,
+    required String studentId,
+  }) => Db.rideRequests
+      .doc(RideRequest.idFor(driverId: driverId, studentId: studentId))
+      .snapshots()
+      .map((s) => s.data());
+
   Future<RideRequest?> fetch({
     required String driverId,
     required String studentId,
@@ -321,7 +330,9 @@ class RideRequestRepository {
   });
 
   /// The driver names a monthly fee for a waiting request — or a new one
-  /// after the family turned the last down.
+  /// after the family turned the last down, or for a seat already booked
+  /// (with no fee yet, or a changed one). On a booked seat the fee in force
+  /// stays on the student record until the family accepts.
   Future<void> proposeFee({
     required String requestId,
     required int feePaisa,
